@@ -128,7 +128,7 @@
   .verdict-skip { background: var(--red-dim); color: var(--red); }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
   .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
-  .pd-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .pd-actions { display: none; gap: 8px; margin-top: 8px; }
   .pd-actions button {
     font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 6px;
     border: none; cursor: pointer; min-height: 32px;
@@ -137,6 +137,16 @@
   .btn-pull:active { opacity: 0.8; }
   .btn-skip { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
   .btn-note { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
+  /* Show action buttons only on mobile (touch devices) */
+  @media (max-width: 768px) {
+    .pd-actions { display: flex; }
+  }
+  .skip-dropdown { display: none; }
+  .note-input { display: none; }
+  @media (max-width: 768px) {
+    .skip-dropdown.open { display: block; }
+    .note-input.open { display: flex; }
+  }
 
   /* Skip dropdown */
   .skip-dropdown {

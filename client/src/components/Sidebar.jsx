@@ -67,14 +67,14 @@ const NavItem = ({ to, icon: Icon, label, isActive }) => (
   <NavLink
     exact
     to={to}
-    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+    className={`flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 ${
       isActive
-        ? "bg-indigo-500/10 text-indigo-400"
-        : "text-gray-400 hover:text-white hover:bg-white/5"
+        ? "bg-red-500/10 text-red-400"
+        : "text-gray-500 hover:text-gray-200 hover:bg-white/5"
     }`}
   >
     <Icon />
-    <span className="text-sm font-medium">{label}</span>
+    <span className="text-xs font-semibold tracking-wide">{label}</span>
   </NavLink>
 );
 
@@ -130,7 +130,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
   };
 
   return (
-    <div className="lg:w-64">
+    <div className="lg:w-52">
       {/* Sidebar backdrop (mobile only) */}
       <div
         className={`fixed inset-0 bg-gray-900/50 z-40 lg:hidden transition-opacity duration-200 ${
@@ -144,12 +144,12 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
       <div
         id="sidebar"
         ref={sidebar}
-        className={`fixed z-50 left-0 top-0 lg:static lg:left-auto lg:top-auto lg:translate-x-0 transform h-screen overflow-y-auto no-scrollbar w-64 lg:w-64 flex-shrink-0 bg-slate-900 transition-transform duration-200 ease-in-out flex flex-col ${
+        className={`fixed z-50 left-0 top-0 lg:static lg:left-auto lg:top-auto lg:translate-x-0 transform h-screen overflow-y-auto no-scrollbar w-52 lg:w-52 flex-shrink-0 transition-transform duration-200 ease-in-out flex flex-col ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Sidebar header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
+        <div className="flex items-center justify-between h-12 px-3 border-b border-slate-800">
           {/* Logo */}
           <NavLink exact to="/" className="flex items-center gap-2">
             <img src={Logo} alt="PartHawk" className="h-8 w-auto" />
