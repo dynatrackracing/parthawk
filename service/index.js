@@ -67,23 +67,28 @@ app.get('/test', (req, res) => {
 app.get('/api/debug/makes', async (req, res) => {
   try {
     const { database } = require('./database/database');
-    const yardMakes = await database('yard_vehicle').distinct('make').orderBy('make');
 
-    const autoCount = await database('Auto').count('* as cnt').first();
-    const autoSample = await database('Auto').select('*').limit(5);
-    const itemSample = await database('Item').select('title', 'manufacturerPartNumber').limit(5);
-    const compatCount = await database('AutoItemCompatibility').count('* as cnt').first();
-    const compatSample = await database('AutoItemCompatibility').select('*').limit(5);
+    const counts = {};
+    for (const t of ['Auto', 'AutoItemCompatibility', 'Item', 'InterchangeNumber', 'Competitor', 'CompetitorListing']) {
+      try { const r = await database(t).count('* as cnt').first(); counts[t] = parseInt(r?.cnt || 0); }
+      catch (e) { counts[t] = 'ERROR: ' + e.message; }
+    }
+
+    let competitorListingSample = [];
+    try { competitorListingSample = await database('CompetitorListing').select('*').limit(3); } catch (e) {}
+
+    let compatSample = [];
+    try { compatSample = await database('AutoItemCompatibility').select('*').limit(3); } catch (e) {}
+
+    const yardMakes = await database('yard_vehicle').distinct('make').orderBy('make');
     const autoMakes = await database('Auto').distinct('make').orderBy('make').limit(50);
 
     res.json({
-      yard_vehicle_makes: yardMakes.map(r => r.make),
-      auto_count: parseInt(autoCount?.cnt || 0),
-      auto_sample: autoSample,
-      auto_makes: autoMakes.map(r => r.make),
-      item_sample: itemSample,
-      compatibility_count: parseInt(compatCount?.cnt || 0),
+      table_counts: counts,
+      competitor_listing_sample: competitorListingSample,
       compatibility_sample: compatSample,
+      yard_vehicle_makes: yardMakes.map(r => r.make),
+      auto_makes: autoMakes.map(r => r.make),
     });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });
