@@ -3,6 +3,7 @@
 const { log } = require('../lib/logger');
 const router = require('express-promise-router')();
 const AttackListService = require('../services/AttackListService');
+const DeadInventoryService = require('../services/DeadInventoryService');
 const { database } = require('../database/database');
 
 /**
@@ -14,6 +15,21 @@ router.get('/', async (req, res) => {
     const { days = 90 } = req.query;
     const service = new AttackListService();
     const results = await service.getAllYardsAttackList({ daysBack: parseInt(days) });
+
+    // Enrich with dead inventory warnings (best effort, non-blocking)
+    const deadService = new DeadInventoryService();
+    for (const yard of results) {
+      for (const vehicle of (yard.vehicles || [])) {
+        for (const part of (vehicle.parts || [])) {
+          if (part.partNumber) {
+            try {
+              const warning = await deadService.getWarning(part.partNumber);
+              if (warning) part.deadWarning = warning;
+            } catch (e) { /* ignore */ }
+          }
+        }
+      }
+    }
 
     res.json({
       success: true,

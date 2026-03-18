@@ -91,6 +91,21 @@ router.post('/scrape/:id', async (req, res) => {
         log.error({ err }, `Scrape failed for ${yard.name}`);
       });
     }
+  } else if (yard.chain === 'Foss') {
+    const FossScraper = require('../scrapers/FossScraper');
+    const scraper = new FossScraper();
+    const location = scraper.locations.find(l => l.name === yard.name);
+    if (location) {
+      scraper.scrapeLocation(location).catch(err => {
+        log.error({ err }, `Foss scrape failed for ${yard.name}`);
+      });
+    }
+  } else if (yard.chain === 'Pull-A-Part') {
+    const PullAPartScraper = require('../scrapers/PullAPartScraper');
+    const scraper = new PullAPartScraper();
+    scraper.scrapeYard(yard).catch(err => {
+      log.error({ err }, `Pull-A-Part scrape failed for ${yard.name}`);
+    });
   }
 
   res.json({ message: `Scrape started for ${yard.name}` });

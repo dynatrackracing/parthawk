@@ -57,23 +57,55 @@ class OpportunityService {
   }
 
   /**
-   * Get market demand from sold items
+   * Get market demand from sold items + market_demand_cache for broader coverage.
    */
   async getMarketDemand({ cutoffDate }) {
-    const results = await SoldItem.query()
-      .select(
-        'categoryId',
-        'categoryTitle',
-        'title',
-        raw('COUNT(*) as "soldCount"'),
-        raw('AVG("soldPrice") as "avgPrice"'),
-        raw('array_agg(DISTINCT compatibility) as "compatibilities"')
-      )
-      .where('soldDate', '>=', cutoffDate)
-      .groupBy('categoryId', 'categoryTitle', 'title')
-      .orderBy('soldCount', 'desc');
+    // Primary: SoldItem table (competitor research)
+    let soldResults = [];
+    try {
+      soldResults = await SoldItem.query()
+        .select(
+          'categoryId',
+          'categoryTitle',
+          'title',
+          raw('COUNT(*) as "soldCount"'),
+          raw('AVG("soldPrice") as "avgPrice"'),
+          raw('array_agg(DISTINCT compatibility) as "compatibilities"')
+        )
+        .where('soldDate', '>=', cutoffDate)
+        .groupBy('categoryId', 'categoryTitle', 'title')
+        .orderBy('soldCount', 'desc');
+    } catch (e) {
+      this.log.warn({ err: e.message }, 'SoldItem query failed, using cache only');
+    }
 
-    return results;
+    // Supplement with market_demand_cache for parts with high market demand
+    try {
+      const { database } = require('../database/database');
+      const cacheRows = await database('market_demand_cache')
+        .where('ebay_sold_90d', '>=', 5)
+        .orderBy('ebay_sold_90d', 'desc')
+        .limit(200);
+
+      for (const row of cacheRows) {
+        // Only add if not already in soldResults
+        const base = row.part_number_base;
+        const exists = soldResults.some(r =>
+          (r.title || '').toUpperCase().includes(base.toUpperCase()));
+        if (!exists) {
+          soldResults.push({
+            categoryId: null,
+            categoryTitle: null,
+            title: base,
+            soldCount: row.ebay_sold_90d,
+            avgPrice: parseFloat(row.ebay_avg_price) || 0,
+            compatibilities: [],
+          });
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    return soldResults;
   }
 
   /**

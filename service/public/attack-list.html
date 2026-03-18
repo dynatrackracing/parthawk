@@ -360,6 +360,7 @@
           ${p.partNumber ? `<span>🔧 ${p.partNumber}</span>` : ''}
         </div>
         <div class="pd-reason">${p.reason}</div>
+        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#7f1d1d;border-radius:4px;font-size:10px;color:#ef4444;font-weight:600;">⚠ DEAD INVENTORY: ${p.deadWarning.failureReason} — listed ${p.deadWarning.daysListed}d, sold $${p.deadWarning.finalPrice || '?'}${p.deadWarning.marketAvg ? ', market avg $' + p.deadWarning.marketAvg : ''}</div>` : ''}
         <div class="pd-actions">
           <button class="btn-pull" onclick="markPulled('${v.id}','${p.itemId}',event)">✓ Pulled</button>
           <button class="btn-skip" onclick="toggleSkip('${v.id}','${p.itemId}')">✗ Skip</button>
@@ -375,6 +376,14 @@
           <input type="text" placeholder="Add note..." id="noteval-${v.id}-${p.itemId}">
           <button class="btn-skip" onclick="saveNote('${v.id}','${p.itemId}')">Save</button>
         </div>
+      </div>`;
+    }
+
+    // Trim intelligence section (loads on expand)
+    if (v.trim) {
+      html += `<div class="loc-section" id="trim-${v.id}" style="margin-top:10px;">
+        <div class="loc-header">✨ Trim Parts</div>
+        <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Loading...</div>
       </div>`;
     }
 
@@ -394,6 +403,14 @@
     if (!wasOpen && !exp.dataset.locLoaded) {
       exp.dataset.locLoaded = '1';
       loadLocation(id);
+      // Also load trim intelligence if vehicle has a trim
+      let vehicle = null;
+      for (const yd of allData.yards) {
+        const vList = yd.vehicles || yd.top_vehicles || [];
+        vehicle = vList.find(v => v.id === id);
+        if (vehicle) break;
+      }
+      if (vehicle && vehicle.trim) loadTrimIntel(vehicle);
     }
   }
 
@@ -587,6 +604,25 @@
       btn.textContent = 'Started! Refreshing in 30s...';
       setTimeout(() => loadData(), 30000);
     } catch (e) { btn.textContent = 'Failed'; btn.disabled = false; }
+  }
+
+  // Load trim intelligence for a vehicle (triggered on expand)
+  async function loadTrimIntel(vehicle) {
+    if (!vehicle.trim || !vehicle.make || !vehicle.model || !vehicle.year) return;
+    try {
+      const url = `/trim-intelligence/${vehicle.year}/${encodeURIComponent(vehicle.make)}/${encodeURIComponent(vehicle.model)}/${encodeURIComponent(vehicle.trim)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success && data.found && data.intelligence?.expected_parts?.length > 0) {
+        const el = document.getElementById('trim-' + vehicle.id);
+        if (el) {
+          const parts = data.intelligence.expected_parts;
+          let html = '<div class="loc-header">✨ Trim Parts (' + vehicle.trim + ')</div>';
+          html += parts.map(p => `<div style="font-size:11px;color:var(--text-mid);padding:2px 0;">• ${p.part_type}: ${p.description} <span style="color:${p.value_premium === 'high' ? 'var(--green)' : 'var(--yellow)'}">(${p.value_premium})</span></div>`).join('');
+          el.innerHTML = html;
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function timeAgo(ds) {

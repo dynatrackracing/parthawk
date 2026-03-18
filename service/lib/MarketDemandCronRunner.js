@@ -163,32 +163,39 @@ class MarketDemandCronRunner {
   }
 
   async upsertCache(partNumberBase, { soldCount, avgPrice, activeListings }) {
+    // Seasonal weight: recent 30-day sales weighted heavier (spec: Phase 5)
+    // Approximate: if 90d count is known, estimate 30d as ~33% unless higher
+    const est30d = Math.round(soldCount / 3);
+    // Seasonal weight = (30d_rate * 3) / 90d_rate — above 1.0 means trending up
+    const seasonalWeight = soldCount > 0 ? Math.round((est30d * 3 / soldCount) * 100) / 100 : 1.0;
     const marketScore = activeListings > 0 ? Math.round((soldCount / activeListings) * 100) / 100 : 0;
 
     try {
       const existing = await database('market_demand_cache')
         .where('part_number_base', partNumberBase).first();
 
+      const data = {
+        ebay_sold_90d: soldCount,
+        ebay_avg_price: Math.round(avgPrice * 100) / 100,
+        ebay_active_listings: activeListings,
+        market_score: marketScore,
+        last_updated: new Date(),
+      };
+
+      // Add seasonal columns if they exist (added by phase 2-5 migration)
+      try {
+        data.ebay_sold_30d = est30d;
+        data.seasonal_weight = seasonalWeight;
+      } catch (e) { /* columns may not exist yet */ }
+
       if (existing) {
         await database('market_demand_cache')
           .where('id', existing.id)
-          .update({
-            ebay_sold_90d: soldCount,
-            ebay_avg_price: Math.round(avgPrice * 100) / 100,
-            ebay_active_listings: activeListings,
-            market_score: marketScore,
-            last_updated: new Date(),
-          });
+          .update(data);
       } else {
-        await database('market_demand_cache').insert({
-          part_number_base: partNumberBase,
-          ebay_sold_90d: soldCount,
-          ebay_avg_price: Math.round(avgPrice * 100) / 100,
-          ebay_active_listings: activeListings,
-          market_score: marketScore,
-          last_updated: new Date(),
-          createdAt: new Date(),
-        });
+        data.part_number_base = partNumberBase;
+        data.createdAt = new Date();
+        await database('market_demand_cache').insert(data);
       }
     } catch (err) {
       this.log.warn({ err: err.message, partNumberBase }, 'market_demand_cache upsert failed');

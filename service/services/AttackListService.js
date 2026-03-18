@@ -352,7 +352,7 @@ class AttackListService {
     if (score >= 70) color = 'red';
     else if (score >= 45) color = 'yellow';
 
-    // Build per-part detail with verdicts
+    // Build per-part detail with verdicts and dead inventory warnings
     const parts = matchedParts.slice(0, 8).map(p => {
       // Per-part score based on price relative to avg
       const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
@@ -372,6 +372,8 @@ class AttackListService {
         sold_90d: salesDemand.count,
         verdict,
         reason,
+        // Dead inventory warning checked async in route handler
+        deadWarning: null,
       };
     });
 

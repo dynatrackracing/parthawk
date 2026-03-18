@@ -65,8 +65,10 @@ class PricingService {
 
   /**
    * Get market price data from sold items
+   * Seasonal demand weighting: recent 30-day sales weighted heavier than 90-day in all scoring
    */
   async getMarketPriceData({ cutoffDate }) {
+    const cutoff30 = new Date(Date.now() - 30 * 86400000);
     const results = await SoldItem.query()
       .select(
         'title',
@@ -74,7 +76,8 @@ class PricingService {
         raw('MIN("soldPrice") as "minPrice"'),
         raw('MAX("soldPrice") as "maxPrice"'),
         raw('AVG("soldPrice") as "avgPrice"'),
-        raw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "soldPrice") as "medianPrice"')
+        raw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "soldPrice") as "medianPrice"'),
+        raw(`COUNT(*) FILTER (WHERE "soldDate" >= '${cutoff30.toISOString()}') as "soldCount30d"`)
       )
       .where('soldDate', '>=', cutoffDate)
       .groupBy('title');
@@ -83,8 +86,14 @@ class PricingService {
     const priceMap = {};
     for (const row of results) {
       const key = this.normalizeTitle(row.title);
+      const soldCount = parseInt(row.soldCount, 10);
+      const soldCount30d = parseInt(row.soldCount30d || 0, 10);
+      // Seasonal weight: if 30d sales rate exceeds 90d average rate, demand is trending up
+      const seasonalWeight = soldCount > 0 ? (soldCount30d * 3) / soldCount : 1.0;
       priceMap[key] = {
-        soldCount: parseInt(row.soldCount, 10),
+        soldCount,
+        soldCount30d,
+        seasonalWeight: Math.round(seasonalWeight * 100) / 100,
         min: parseFloat(row.minPrice),
         max: parseFloat(row.maxPrice),
         avg: parseFloat(row.avgPrice),

@@ -86,6 +86,87 @@ router.patch('/:id/fitment', async (req, res) => {
 });
 
 /**
+ * GET /api/parts/lookup/programmed?partNumber=xxx
+ * Programmed listing price protection:
+ * - Excludes programmed/flashed/VIN-specific listings from comp pool for unprogrammed units
+ * - Programmed listings floor at 20-30% above unprogrammed market rate
+ * - Programmed comps only compare against other programmed listings
+ */
+router.get('/lookup/programmed', async (req, res) => {
+  const { partNumber } = req.query;
+  if (!partNumber) return res.status(400).json({ error: 'partNumber required' });
+
+  const { normalizePartNumber } = require('../lib/partNumberUtils');
+  const base = normalizePartNumber(partNumber);
+
+  try {
+    // Get market data for this part
+    let marketData = null;
+    try {
+      marketData = await database('market_demand_cache')
+        .where('part_number_base', base).first();
+    } catch (e) { /* ignore */ }
+
+    // Get our listings for this part
+    const ourListings = await database('YourListing')
+      .where('listingStatus', 'Active')
+      .where(function() {
+        this.where('sku', partNumber).orWhere('sku', 'like', `${base}%`);
+      })
+      .select('*');
+
+    // Separate programmed vs unprogrammed
+    const PROGRAMMED_KEYWORDS = ['PROGRAMMED', 'FLASHED', 'VIN-SPECIFIC', 'CODED TO', 'PLUG AND PLAY'];
+    const isProgrammed = (title) => {
+      const t = (title || '').toUpperCase();
+      return PROGRAMMED_KEYWORDS.some(kw => t.includes(kw));
+    };
+
+    const programmedListings = ourListings.filter(l => isProgrammed(l.title));
+    const unprogrammedListings = ourListings.filter(l => !isProgrammed(l.title));
+
+    // Get sold comps
+    const soldComps = await database('YourSale')
+      .where(function() {
+        this.where('sku', partNumber).orWhere('sku', 'like', `${base}%`);
+      })
+      .orderBy('soldDate', 'desc')
+      .limit(20)
+      .select('title', 'salePrice', 'soldDate');
+
+    const programmedComps = soldComps.filter(s => isProgrammed(s.title));
+    const unprogrammedComps = soldComps.filter(s => !isProgrammed(s.title));
+
+    const unprogrammedAvg = unprogrammedComps.length > 0
+      ? unprogrammedComps.reduce((sum, s) => sum + (parseFloat(s.salePrice) || 0), 0) / unprogrammedComps.length
+      : (marketData ? parseFloat(marketData.ebay_avg_price) : null);
+
+    const programmedAvg = programmedComps.length > 0
+      ? programmedComps.reduce((sum, s) => sum + (parseFloat(s.salePrice) || 0), 0) / programmedComps.length
+      : null;
+
+    // Programmed floor: 20-30% above unprogrammed market rate
+    const programmedFloor = unprogrammedAvg ? Math.round(unprogrammedAvg * 1.25 * 100) / 100 : null;
+
+    return res.json({
+      partNumber, base,
+      unprogrammedAvg: unprogrammedAvg ? Math.round(unprogrammedAvg * 100) / 100 : null,
+      programmedAvg: programmedAvg ? Math.round(programmedAvg * 100) / 100 : null,
+      programmedFloor,
+      programmedListingCount: programmedListings.length,
+      unprogrammedListingCount: unprogrammedListings.length,
+      programmedCompCount: programmedComps.length,
+      unprogrammedCompCount: unprogrammedComps.length,
+      guidance: programmedFloor
+        ? `Programmed listings should be priced at or above $${programmedFloor.toFixed(2)} (25% above unprogrammed market rate of $${unprogrammedAvg.toFixed(2)})`
+        : 'Insufficient comp data for programmed pricing guidance',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/import/csv
  * Import eBay orders CSV directly via API.
  * Body: multipart with 'file' and 'store' fields.
@@ -149,6 +230,7 @@ router.post('/import/csv', async (req, res) => {
         soldDate,
         buyerUsername: row['Buyer Username'] || null,
         shippedDate,
+        store: store || 'dynatrack',
         createdAt: new Date(),
         updatedAt: new Date(),
       });

@@ -39,6 +39,9 @@ app.use('/cogs', require('./routes/cogs'));
 app.use('/api/parts', require('./routes/parts'));
 app.use('/part-location', require('./routes/part-location'));
 app.use('/vin', require('./routes/vin'));
+app.use('/stale-inventory', require('./routes/stale-inventory'));
+app.use('/competitors', require('./routes/competitors'));
+app.use('/trim-intelligence', require('./routes/trim-intelligence'));
 // Serve static admin tools
 app.use('/admin', express.static(path.resolve(__dirname, 'public')));
 app.get('/admin/import', (req, res) => {
@@ -114,6 +117,55 @@ async function start() {
         await runner.work();
       } catch (err) {
         log.error({ err }, 'Market demand cache update failed');
+      }
+    });
+
+    // Stale inventory automation - runs weekly Wednesday at 3:00 AM
+    const StaleInventoryService = require('./services/StaleInventoryService');
+    const staleInventoryJob = schedule.scheduleJob('0 3 * * 3', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting weekly stale inventory automation');
+      try {
+        const service = new StaleInventoryService();
+        const result = await service.runAutomation();
+        log.info({ result }, 'Stale inventory automation complete');
+      } catch (err) {
+        log.error({ err }, 'Stale inventory automation failed');
+      }
+    });
+
+    // Dead inventory scan - runs weekly Monday at 4:00 AM
+    const DeadInventoryService = require('./services/DeadInventoryService');
+    const deadInventoryJob = schedule.scheduleJob('0 4 * * 1', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting weekly dead inventory scan');
+      try {
+        const service = new DeadInventoryService();
+        await service.scanAndLog();
+      } catch (err) {
+        log.error({ err }, 'Dead inventory scan failed');
+      }
+    });
+
+    // Restock scan - runs weekly Tuesday at 4:00 AM
+    const RestockService = require('./services/RestockService');
+    const restockJob = schedule.scheduleJob('0 4 * * 2', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting weekly restock scan');
+      try {
+        const service = new RestockService();
+        await service.scanAndFlag();
+      } catch (err) {
+        log.error({ err }, 'Restock scan failed');
+      }
+    });
+
+    // Competitor monitoring - runs weekly Thursday at 4:00 AM
+    const CompetitorMonitorService = require('./services/CompetitorMonitorService');
+    const competitorJob = schedule.scheduleJob('0 4 * * 4', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting weekly competitor monitoring');
+      try {
+        const service = new CompetitorMonitorService();
+        await service.scan();
+      } catch (err) {
+        log.error({ err }, 'Competitor monitoring failed');
       }
     });
 
