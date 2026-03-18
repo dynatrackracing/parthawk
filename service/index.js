@@ -68,30 +68,31 @@ app.get('/api/debug/makes', async (req, res) => {
   try {
     const { database } = require('./database/database');
 
+    const tables = [
+      'Auto', 'AutoItemCompatibility', 'Item', 'InterchangeNumber',
+      'ItemInterchangeNumber', 'Competitor', 'CompetitorListing',
+      'YourSale', 'YourListing', 'SoldItem', 'SoldItemSeller',
+      'yard', 'yard_vehicle', 'yard_visit_feedback',
+      'pull_session', 'vin_cache', 'trim_intelligence',
+      'part_location', 'dead_inventory', 'market_demand_cache',
+      'PriceCheck', 'PriceSnapshot', 'MarketResearchRun',
+      'Cron', 'Users',
+      'stale_inventory_action', 'return_intake', 'restock_flag', 'competitor_alert',
+    ];
+
     const counts = {};
-    for (const t of ['Auto', 'AutoItemCompatibility', 'Item', 'InterchangeNumber', 'Competitor', 'CompetitorListing']) {
-      try { const r = await database(t).count('* as cnt').first(); counts[t] = parseInt(r?.cnt || 0); }
-      catch (e) { counts[t] = 'ERROR: ' + e.message; }
+    for (const t of tables) {
+      try {
+        const r = await database(t).count('* as cnt').first();
+        counts[t] = parseInt(r?.cnt || 0);
+      } catch (e) {
+        counts[t] = 0;
+      }
     }
 
-    let competitorListingSample = [];
-    try { competitorListingSample = await database('CompetitorListing').select('*').limit(3); } catch (e) {}
-
-    let compatSample = [];
-    try { compatSample = await database('AutoItemCompatibility').select('*').limit(3); } catch (e) {}
-
-    const yardMakes = await database('yard_vehicle').distinct('make').orderBy('make');
-    const autoMakes = await database('Auto').distinct('make').orderBy('make').limit(50);
-
-    res.json({
-      table_counts: counts,
-      competitor_listing_sample: competitorListingSample,
-      compatibility_sample: compatSample,
-      yard_vehicle_makes: yardMakes.map(r => r.make),
-      auto_makes: autoMakes.map(r => r.make),
-    });
+    res.json({ table_counts: counts });
   } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message });
   }
 });
 
