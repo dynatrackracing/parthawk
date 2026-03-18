@@ -466,6 +466,51 @@ router.get('/stats', authMiddleware, async (req, res, next) => {
 });
 
 /**
+ * POST /sync/import-items
+ * Bulk import competitor/reference items.
+ * Body: { records: [...] }
+ */
+router.post('/import-items', async (req, res) => {
+  const { records } = req.body;
+  if (!records || !Array.isArray(records)) return res.status(400).json({ error: 'records array required' });
+
+  const { database } = require('../database/database');
+  const { normalizePartNumber } = require('../lib/partNumberUtils');
+  let imported = 0, skipped = 0, errors = 0;
+
+  for (const r of records) {
+    if (!r.ebayId) { errors++; continue; }
+    try {
+      const existing = await database('Item').where('ebayId', r.ebayId).first();
+      if (existing) { skipped++; continue; }
+      const partBase = r.manufacturerPartNumber ? normalizePartNumber(r.manufacturerPartNumber) : null;
+      await database('Item').insert({
+        id: r.id || r.ebayId,
+        ebayId: r.ebayId,
+        price: parseFloat(r.price) || 0,
+        quantity: parseInt(r.quantity) || 1,
+        title: r.title || null,
+        categoryId: r.categoryId || '',
+        categoryTitle: r.categoryTitle || '',
+        seller: r.seller || '',
+        manufacturerPartNumber: r.manufacturerPartNumber || null,
+        manufacturerId: r.manufacturerId || null,
+        pictureUrl: r.pictureUrl || null,
+        processed: r.processed === true || r.processed === 'true',
+        partNumberBase: partBase,
+        createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
+        updatedAt: r.updatedAt ? new Date(r.updatedAt) : new Date(),
+      });
+      imported++;
+    } catch (err) {
+      if (err.message?.includes('duplicate') || err.message?.includes('unique')) skipped++;
+      else errors++;
+    }
+  }
+  res.json({ success: true, imported, skipped, errors, total: records.length });
+});
+
+/**
  * POST /sync/import-sales
  * Bulk import sales records from JSON body.
  * Body: { records: [...] } — array of sale objects
