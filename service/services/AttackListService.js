@@ -454,10 +454,11 @@ class AttackListService {
     // Floor enforcement
     if ((partCount > 0 || salesDemand.count > 0) && score < 10) score = 10;
 
-    // Vehicle color
+    // Vehicle color: green=pull(80+), yellow=watch(60-79), red=skip(0-39), gray=no data
     let color = 'gray';
-    if (score >= 70) color = 'red';
-    else if (score >= 45) color = 'yellow';
+    if (score >= 80) color = 'green';
+    else if (score >= 60) color = 'yellow';
+    else if (score >= 1) color = 'red';
 
     // === BUILD PARTS LIST ===
     // Combine Item-based parts + YourSale part type breakdowns
@@ -466,7 +467,7 @@ class AttackListService {
     // From Item table (if any)
     for (const p of matchedParts.slice(0, 4)) {
       const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
-      const verdict = partScore >= 70 ? 'PULL' : partScore >= 45 ? 'WATCH' : 'SKIP';
+      const verdict = partScore >= 80 ? 'PULL' : partScore >= 60 ? 'WATCH' : 'SKIP';
       parts.push({
         itemId: p.itemId,
         title: p.title,
@@ -489,7 +490,7 @@ class AttackListService {
       // Skip if already covered by Item-based parts
       if (parts.some(p => p.partType === partType)) continue;
       const ptScore = score; // inherit vehicle score
-      const verdict = ptScore >= 70 ? 'PULL' : ptScore >= 45 ? 'WATCH' : 'SKIP';
+      const verdict = ptScore >= 80 ? 'PULL' : ptScore >= 60 ? 'WATCH' : 'SKIP';
       parts.push({
         itemId: null,
         title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
@@ -590,7 +591,7 @@ class AttackListService {
           last_scraped: yard.last_scraped,
         },
         total_vehicles: vehicles.length,
-        hot_vehicles: scored.filter(v => v.color_code !== 'gray').length,
+        hot_vehicles: scored.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
         top_score: scored[0]?.score || 0,
         est_total_value: scored.reduce((sum, v) => sum + v.est_value, 0),
         vehicles: scored, // ALL vehicles, not just top 5

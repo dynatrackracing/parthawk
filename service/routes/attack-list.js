@@ -97,7 +97,7 @@ router.get('/summary', async (req, res) => {
       top_score: r.top_score,
       est_value: r.est_total_value,
       last_scraped: r.yard.last_scraped,
-      visit_priority: r.top_score >= 70 ? '🔴 GO TODAY' : r.top_score >= 45 ? '🟡 CONSIDER' : '⬜ SKIP',
+      visit_priority: r.top_score >= 80 ? '🟢 GO TODAY' : r.top_score >= 60 ? '🟡 CONSIDER' : '⬜ SKIP',
     }));
 
     res.json({ success: true, summary, generated_at: new Date().toISOString() });

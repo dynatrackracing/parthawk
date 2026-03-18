@@ -75,8 +75,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 800;
   }
-  .v-score.red { background: var(--red-dim); color: var(--red); }
+  .v-score.green { background: #064e3b; color: var(--green); }
   .v-score.yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .v-score.red { background: var(--red-dim); color: var(--red); }
   .v-score.gray { background: #1f2937; color: var(--text-muted); }
   .v-info { flex: 1; min-width: 0; }
   .v-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -86,8 +87,9 @@
     font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
     letter-spacing: 0.03em; text-transform: uppercase;
   }
-  .chip-red { background: var(--red-dim); color: var(--red); }
+  .chip-green { background: #064e3b; color: var(--green); }
   .chip-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .chip-red { background: var(--red-dim); color: var(--red); }
   .chip-gray { background: #1f2937; color: var(--text-faint); }
   .chip-age { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
   .age-today { background: #064e3b; color: var(--green); }
@@ -102,7 +104,7 @@
   /* Retention toggle */
   .toggle-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
   .toggle-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; }
-  .toggle-btn.active { background: var(--red-dim); color: var(--red); border-color: var(--red-dim); }
+  .toggle-btn.active { background: #064e3b; color: var(--green); border-color: #064e3b; }
 
   /* Expanded view */
   .v-expanded {
@@ -121,9 +123,9 @@
   .pd-verdict {
     font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; margin-left: 8px;
   }
-  .verdict-pull { background: var(--red-dim); color: var(--red); }
+  .verdict-pull { background: #064e3b; color: var(--green); }
   .verdict-watch { background: var(--yellow-dim); color: var(--yellow); }
-  .verdict-skip { background: #1f2937; color: var(--text-muted); }
+  .verdict-skip { background: var(--red-dim); color: var(--red); }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
   .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
   .pd-actions { display: flex; gap: 8px; margin-top: 8px; }
@@ -131,7 +133,7 @@
     font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 6px;
     border: none; cursor: pointer; min-height: 32px;
   }
-  .btn-pull { background: var(--red); color: white; }
+  .btn-pull { background: var(--green); color: #0a0a0a; font-weight: 700; }
   .btn-pull:active { opacity: 0.8; }
   .btn-skip { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
   .btn-note { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
@@ -328,8 +330,8 @@
       if (yd.total_vehicles === 0) continue;
 
       const vehicles = yd.vehicles || yd.top_vehicles || [];
-      const priority = yd.top_score >= 70 ? 'GO' : yd.top_score >= 45 ? 'MAYBE' : '—';
-      const prioClass = yd.top_score >= 70 ? 'chip-red' : yd.top_score >= 45 ? 'chip-yellow' : 'chip-gray';
+      const priority = yd.top_score >= 80 ? 'GO' : yd.top_score >= 60 ? 'MAYBE' : '—';
+      const prioClass = yd.top_score >= 80 ? 'chip-green' : yd.top_score >= 60 ? 'chip-yellow' : 'chip-gray';
       const lastScraped = yd.yard.last_scraped ? timeAgo(yd.yard.last_scraped) : 'never';
 
       html += `<div class="yard-group">
@@ -354,7 +356,7 @@
     const sc = v.color_code;
     const parts = v.parts || [];
     const chips = parts.slice(0, 4).map(p => {
-      const cc = p.verdict === 'PULL' ? 'chip-red' : p.verdict === 'WATCH' ? 'chip-yellow' : 'chip-gray';
+      const cc = p.verdict === 'PULL' ? 'chip-green' : p.verdict === 'WATCH' ? 'chip-yellow' : 'chip-red';
       return `<span class="chip ${cc}">${p.partType || p.category || '?'}</span>`;
     }).join('');
 
@@ -372,7 +374,7 @@
             ${v.color ? `<span>${v.color}</span>` : ''}
             ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>
-          <div class="v-chips">${chips || '<span class="chip chip-gray">No match</span>'}</div>
+          <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
         </div>
         <div class="v-right">
           ${v.est_value > 0 ? `<div class="v-value">$${v.est_value}</div>` : ''}
