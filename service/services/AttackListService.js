@@ -183,9 +183,14 @@ class AttackListService {
   /**
    * Build sales index keyed by "make|model" from YourSale title parsing.
    *
-   * Parses each sale title to extract make, model, and part type.
-   * Groups by make|model so we can match against yard_vehicle (year, make, model).
-   * Each entry includes per-part-type breakdowns with prices and counts.
+   * Each entry stores an array of individual sale records with parsed year
+   * ranges so that scoreVehicle can filter by whether the yard vehicle's
+   * year falls within the sale's fitment range.
+   *
+   * Year range parsing:
+   *   "2007-2008 Dodge Ram" → yearStart=2007, yearEnd=2008
+   *   "Dodge Ram 2006 5.7L" → yearStart=2006, yearEnd=2006
+   *   "2005-2010 Chrysler 300" → yearStart=2005, yearEnd=2010
    */
   async buildSalesIndex(cutoff) {
     const index = {};
@@ -207,45 +212,69 @@ class AttackListService {
         }
         if (!make) continue;
 
-        // Extract model from title — find the word(s) after the make name
         const model = this.extractModelFromTitle(title, make);
         if (!model) continue;
 
         const partType = detectPartType(title);
+        const yearRange = this.extractYearRange(title);
 
         const key = `${make}|${model}`;
         if (!index[key]) {
-          index[key] = {
-            make, model,
-            count: 0, totalRevenue: 0, avgPrice: 0,
-            partTypes: {},
-            firstSale: sale.soldDate,
-            lastSale: sale.soldDate,
-          };
+          index[key] = { make, model, sales: [] };
         }
-        const entry = index[key];
-        entry.count++;
-        entry.totalRevenue += price;
-        entry.avgPrice = entry.totalRevenue / entry.count;
-        if (sale.soldDate < entry.firstSale) entry.firstSale = sale.soldDate;
-        if (sale.soldDate > entry.lastSale) entry.lastSale = sale.soldDate;
-
-        // Track per-part-type
-        if (partType) {
-          if (!entry.partTypes[partType]) {
-            entry.partTypes[partType] = { count: 0, totalPrice: 0, avgPrice: 0, titles: [] };
-          }
-          const pt = entry.partTypes[partType];
-          pt.count++;
-          pt.totalPrice += price;
-          pt.avgPrice = pt.totalPrice / pt.count;
-          if (pt.titles.length < 3) pt.titles.push(title);
-        }
+        index[key].sales.push({
+          price,
+          partType,
+          yearStart: yearRange.start,
+          yearEnd: yearRange.end,
+          soldDate: sale.soldDate,
+          title,
+        });
       }
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildSalesIndex: YourSale table not ready');
     }
     return index;
+  }
+
+  /**
+   * Extract year or year range from a sale title.
+   * Returns { start, end } where both are integers.
+   *
+   * Handles:
+   *   "2007-2008 Dodge Ram"      → { start: 2007, end: 2008 }
+   *   "Dodge Ram 2006 5.7L"      → { start: 2006, end: 2006 }
+   *   "2005-2010 Chrysler 300"   → { start: 2005, end: 2010 }
+   *   "2012, 2013 Honda Civic"   → { start: 2012, end: 2013 }
+   *   "2012 2013 Honda Civic"    → { start: 2012, end: 2013 }
+   */
+  extractYearRange(title) {
+    // Pattern 1: explicit range "YYYY-YYYY"
+    const rangeMatch = title.match(/\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b/);
+    if (rangeMatch) {
+      return { start: parseInt(rangeMatch[1]), end: parseInt(rangeMatch[2]) };
+    }
+
+    // Pattern 2: two years separated by comma or space "YYYY, YYYY" or "YYYY YYYY"
+    const twoYearMatch = title.match(/\b((?:19|20)\d{2})\s*[,\s]\s*((?:19|20)\d{2})\b/);
+    if (twoYearMatch) {
+      const y1 = parseInt(twoYearMatch[1]);
+      const y2 = parseInt(twoYearMatch[2]);
+      // Only treat as range if years are close together (within 10 years)
+      if (Math.abs(y2 - y1) <= 10) {
+        return { start: Math.min(y1, y2), end: Math.max(y1, y2) };
+      }
+    }
+
+    // Pattern 3: single year "YYYY"
+    const singleMatch = title.match(/\b((?:19|20)\d{2})\b/);
+    if (singleMatch) {
+      const y = parseInt(singleMatch[1]);
+      return { start: y, end: y };
+    }
+
+    // No year found
+    return { start: 0, end: 0 };
   }
 
   /**
@@ -380,37 +409,48 @@ class AttackListService {
       matchedParts = this.findMatchedParts(make, model, year, inventoryIndex);
     }
 
-    // Find matching sales from YourSale by make+model title match
-    const salesDemand = { count: 0, avgPrice: 0, partTypes: {} };
+    // Find matching sales from YourSale by make+model+year
+    const salesDemand = { count: 0, avgPrice: 0, totalRevenue: 0, partTypes: {} };
     const alsoCheck = make ? (MAKE_ALSO_CHECK[make] || []) : [];
     const allMakes = [make, ...alsoCheck].filter(Boolean);
 
+    // Collect all candidate salesIndex entries by make+model (exact + partial model)
+    const candidateKeys = new Set();
     for (const m of allMakes) {
-      // Exact make+model match
-      const key = `${m}|${modelUpper}`;
-      if (salesIndex[key]) {
-        salesDemand.count += salesIndex[key].count;
-        salesDemand.avgPrice = salesIndex[key].avgPrice;
-        Object.assign(salesDemand.partTypes, salesIndex[key].partTypes);
+      const exactKey = `${m}|${modelUpper}`;
+      if (salesIndex[exactKey]) candidateKeys.add(exactKey);
+      // Partial model match (yard "RAM 1500" ↔ sale "Ram", or "300" ↔ "300C")
+      for (const sKey of Object.keys(salesIndex)) {
+        if (!sKey.startsWith(m + '|')) continue;
+        const sModel = sKey.split('|')[1];
+        if (sModel && (modelUpper.includes(sModel) || sModel.includes(modelUpper))) {
+          candidateKeys.add(sKey);
+        }
       }
-      // Also try partial model match (e.g., yard has "RAM 1500", sales have "Ram")
-      for (const [sKey, sVal] of Object.entries(salesIndex)) {
-        if (sKey.startsWith(m + '|')) {
-          const sModel = sKey.split('|')[1];
-          if (sModel && modelUpper.includes(sModel) || sModel.includes(modelUpper)) {
-            if (sKey !== key) { // avoid double-counting exact match
-              salesDemand.count += sVal.count;
-              if (sVal.avgPrice > salesDemand.avgPrice) salesDemand.avgPrice = sVal.avgPrice;
-              for (const [pt, ptData] of Object.entries(sVal.partTypes)) {
-                if (!salesDemand.partTypes[pt]) salesDemand.partTypes[pt] = { ...ptData };
-                else {
-                  salesDemand.partTypes[pt].count += ptData.count;
-                  salesDemand.partTypes[pt].totalPrice += ptData.totalPrice;
-                  salesDemand.partTypes[pt].avgPrice = salesDemand.partTypes[pt].totalPrice / salesDemand.partTypes[pt].count;
-                }
-              }
-            }
+    }
+
+    // Filter each candidate's individual sales by year range
+    for (const cKey of candidateKeys) {
+      const entry = salesIndex[cKey];
+      for (const sale of entry.sales) {
+        // Year must fall within the sale's fitment range
+        if (sale.yearStart > 0 && sale.yearEnd > 0) {
+          if (year < sale.yearStart || year > sale.yearEnd) continue;
+        }
+        // Year matches — count this sale
+        salesDemand.count++;
+        salesDemand.totalRevenue += sale.price;
+        salesDemand.avgPrice = salesDemand.totalRevenue / salesDemand.count;
+
+        if (sale.partType) {
+          if (!salesDemand.partTypes[sale.partType]) {
+            salesDemand.partTypes[sale.partType] = { count: 0, totalPrice: 0, avgPrice: 0, titles: [] };
           }
+          const pt = salesDemand.partTypes[sale.partType];
+          pt.count++;
+          pt.totalPrice += sale.price;
+          pt.avgPrice = pt.totalPrice / pt.count;
+          if (pt.titles.length < 3) pt.titles.push(sale.title);
         }
       }
     }
