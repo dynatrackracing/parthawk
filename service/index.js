@@ -63,6 +63,29 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
+// TEMPORARY debug endpoint — remove after checking make formats
+app.get('/api/debug/makes', async (req, res) => {
+  try {
+    const { database } = require('./database/database');
+    const yardMakes = await database('yard_vehicle').distinct('make').orderBy('make');
+    let itemMakes = [];
+    try {
+      itemMakes = await database('Item').distinct('make').orderBy('make').limit(50);
+    } catch (e) {
+      // Item table may not have a 'make' column — try via Auto table
+      try {
+        itemMakes = await database('Auto').distinct('make').orderBy('make').limit(50);
+      } catch (e2) { itemMakes = [{ make: 'ERROR: ' + e2.message }]; }
+    }
+    res.json({
+      yard_vehicle_makes: yardMakes.map(r => r.make),
+      item_or_auto_makes: itemMakes.map(r => r.make),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
   // Have Node serve the files for our built React app
   app.use(express.static(path.resolve(__dirname, '../client/build')));
