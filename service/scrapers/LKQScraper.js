@@ -76,20 +76,25 @@ class LKQScraper {
       return { location: location.name, success: true, count: 0 };
     }
 
-    // Mark all existing as inactive, then re-activate/insert found ones
+    const now = new Date();
+
+    // Step 1: Mark ALL vehicles for this yard as inactive (not seen this scrape).
+    // Vehicles confirmed present below get re-activated with updated last_seen.
     await database('yard_vehicle').where('yard_id', yard.id).where('active', true)
-      .update({ active: false, updatedAt: new Date() });
+      .update({ active: false, updatedAt: now });
 
     let inserted = 0, updated = 0;
     for (const v of vehicles) {
       try {
+        // Match on year+make+model within this yard
         const existing = await database('yard_vehicle')
           .where('yard_id', yard.id).where('year', v.year)
           .where('make', v.make).where('model', v.model).first();
         if (existing) {
           await database('yard_vehicle').where('id', existing.id).update({
             trim: v.trim || null, color: v.color || null, row_number: v.row || null,
-            date_added: v.dateAdded || null, active: true, scraped_at: new Date(), updatedAt: new Date(),
+            date_added: v.dateAdded || null, active: true,
+            last_seen: now, scraped_at: now, updatedAt: now,
           });
           updated++;
         } else {
@@ -97,7 +102,8 @@ class LKQScraper {
             id: uuidv4(), yard_id: yard.id, year: v.year, make: v.make, model: v.model,
             trim: v.trim || null, color: v.color || null, row_number: v.row || null,
             vin: v.vin || null, date_added: v.dateAdded || null,
-            active: true, scraped_at: new Date(), createdAt: new Date(), updatedAt: new Date(),
+            active: true, first_seen: now, last_seen: now,
+            scraped_at: now, createdAt: now, updatedAt: now,
           });
           inserted++;
         }
@@ -106,7 +112,11 @@ class LKQScraper {
       }
     }
 
-    await database('yard').where('id', yard.id).update({ last_scraped: new Date(), updatedAt: new Date() });
+    // Step 2: Vehicles not seen this scrape already have active=false from step 1.
+    // Their last_seen stays unchanged so we know when they were last confirmed.
+    // Vehicles older than 7 days are excluded by the attack list query.
+
+    await database('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
     this.log.info({ location: location.name, total: vehicles.length, inserted, updated }, 'Complete');
     return { location: location.name, success: true, total: vehicles.length, inserted, updated };
   }

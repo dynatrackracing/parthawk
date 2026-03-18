@@ -12,9 +12,12 @@ const { database } = require('../database/database');
  */
 router.get('/', async (req, res) => {
   try {
-    const { days = 90 } = req.query;
+    const { days = 90, activeOnly } = req.query;
     const service = new AttackListService();
-    const results = await service.getAllYardsAttackList({ daysBack: parseInt(days) });
+    const results = await service.getAllYardsAttackList({
+      daysBack: parseInt(days),
+      activeOnly: activeOnly === 'true',
+    });
 
     // Enrich with dead inventory warnings (best effort, non-blocking)
     const deadService = new DeadInventoryService();

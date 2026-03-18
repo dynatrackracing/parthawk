@@ -386,6 +386,8 @@ class AttackListService {
       row_number: vehicle.row_number,
       color: vehicle.color,
       date_added: vehicle.date_added,
+      last_seen: vehicle.last_seen,
+      is_active: vehicle.active,
       score,
       color_code: color,
       est_value: Math.round(partCount > 0 ? avgPrice * partCount : 0),
@@ -411,20 +413,40 @@ class AttackListService {
     const salesIndex = await this.buildSalesIndex(cutoff);
     const stockIndex = await this.buildStockIndex();
 
+    // 7-day retention: show vehicles last seen within 7 days
+    const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const activeOnly = options.activeOnly === true;
+
     const results = [];
     for (const yard of yards) {
-      const vehicles = await database('yard_vehicle')
+      let vQuery = database('yard_vehicle')
         .where('yard_id', yard.id)
-        .where('active', true)
         .orderBy('date_added', 'desc')
-        .limit(200);
+        .limit(500);
+
+      if (activeOnly) {
+        // Only vehicles confirmed in latest scrape
+        vQuery = vQuery.where('active', true);
+      } else {
+        // All vehicles seen within 7 days (active OR recently gone)
+        vQuery = vQuery.where(function() {
+          this.where('active', true)
+            .orWhere('last_seen', '>=', retentionCutoff);
+        });
+      }
+
+      const vehicles = await vQuery;
 
       if (vehicles.length === 0) continue;
 
       const scored = vehicles.map(v =>
         this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex)
       );
-      scored.sort((a, b) => b.score - a.score);
+      // Sort: active vehicles first, then by score descending
+      scored.sort((a, b) => {
+        if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+        return b.score - a.score;
+      });
 
       results.push({
         yard: {
