@@ -7,16 +7,17 @@ const { v4: uuidv4 } = require('uuid');
 /**
  * LKQ Pick Your Part Scraper — Direct API
  *
- * Uses the pyp.com getVehicleInventory.aspx JSON endpoint directly.
- * No browser automation needed.
- *
  * Endpoint: https://www.pyp.com/getVehicleInventory.aspx?page=PAGE&filter=&store=STOREID
  *
  * Verified store IDs (from browser DevTools 2026-03-18):
- *   Raleigh:    1168  (inventory slug: raleigh-1168)
- *   Durham:     1142  (inventory slug: durham-1142)
- *   Greensboro: 1226  (inventory slug: greensboro-1226)
- *   East NC:    1227  (inventory slug: east-nc-1227)
+ *   Raleigh:    1168  (slug: raleigh-1168)
+ *   Durham:     1142  (slug: durham-1142)
+ *   Greensboro: 1226  (slug: greensboro-1226)
+ *   East NC:    1227  (slug: east-nc-1227)
+ *
+ * Some stores require a session cookie from the inventory page before
+ * the API will respond. We GET the inventory page first to pick up
+ * set-cookie headers, then pass those cookies to the API call.
  */
 class LKQScraper {
   constructor() {
@@ -28,8 +29,6 @@ class LKQScraper {
       { name: 'LKQ East NC',    storeId: '1227', slug: 'east-nc-1227'    },
     ];
     this.baseUrl = 'https://www.pyp.com/getVehicleInventory.aspx';
-    // Flag: set to true to log the first raw API response for debugging field names
-    this._debugFirstResponse = true;
   }
 
   async scrapeAll() {
@@ -59,7 +58,6 @@ class LKQScraper {
       return { location: location.name, success: true, count: 0 };
     }
 
-    // Mark all existing as inactive, then re-activate found ones
     await database('yard_vehicle').where('yard_id', yard.id).where('active', true)
       .update({ active: false, updatedAt: new Date() });
 
@@ -95,11 +93,58 @@ class LKQScraper {
   }
 
   /**
-   * Build headers that mimic a real browser XHR from the inventory page.
-   * The API checks Referer + X-Requested-With to block direct calls.
+   * Establish a session by visiting the inventory page, capture cookies,
+   * then use those cookies for API requests.
    */
-  buildHeaders(location) {
-    return {
+  async getSessionCookies(location) {
+    const pageUrl = `https://www.pyp.com/inventory/${location.slug}/`;
+    this.log.info({ pageUrl }, 'Fetching inventory page for session cookies');
+
+    try {
+      const response = await fetch(pageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'follow',
+      });
+
+      // Extract all set-cookie headers
+      const setCookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [];
+      // Fallback for older Node: raw headers
+      const rawSetCookies = setCookies.length > 0 ? setCookies :
+        (response.headers.raw ? (response.headers.raw()['set-cookie'] || []) : []);
+
+      // Build cookie string from set-cookie headers
+      const cookieParts = rawSetCookies.map(c => c.split(';')[0]);
+      const cookieString = cookieParts.join('; ');
+
+      this.log.info({
+        status: response.status,
+        cookieCount: cookieParts.length,
+        cookies: cookieString.slice(0, 200),
+      }, 'Session cookies captured');
+
+      return cookieString;
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'Failed to get session cookies');
+      return '';
+    }
+  }
+
+  /**
+   * Fetch all inventory pages from the PYP API for a location.
+   */
+  async fetchInventory(location) {
+    // Step 1: Get session cookies from the inventory page
+    const cookies = await this.getSessionCookies(location);
+
+    const allVehicles = [];
+    let page = 1;
+    let debugLogged = false;
+
+    const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'application/json, text/javascript, */*; q=0.01',
       'Accept-Language': 'en-US,en;q=0.9',
@@ -107,69 +152,85 @@ class LKQScraper {
       'Origin': 'https://www.pyp.com',
       'X-Requested-With': 'XMLHttpRequest',
     };
-  }
-
-  /**
-   * Fetch all inventory pages from the PYP API for a location.
-   */
-  async fetchInventory(location) {
-    const allVehicles = [];
-    let page = 1;
-    const headers = this.buildHeaders(location);
+    if (cookies) {
+      headers['Cookie'] = cookies;
+    }
 
     while (page <= 100) {
       const url = `${this.baseUrl}?page=${page}&filter=&store=${location.storeId}`;
-      this.log.debug({ url, page }, 'Fetching inventory page');
 
       try {
         const response = await fetch(url, { headers });
 
         if (!response.ok) {
-          this.log.warn({ status: response.status, page, store: location.storeId }, 'API returned non-OK status');
+          // Log full response headers on 403 so we can diagnose
+          const respHeaders = {};
+          response.headers.forEach((val, key) => { respHeaders[key] = val; });
+          this.log.warn({
+            status: response.status,
+            page,
+            store: location.storeId,
+            location: location.name,
+            responseHeaders: respHeaders,
+          }, 'API returned non-OK status');
           break;
         }
 
         const rawText = await response.text();
 
-        // DEBUG: Log the raw response for the first page of the first location
-        if (this._debugFirstResponse && page === 1) {
-          this._debugFirstResponse = false;
-          // Log first 2000 chars of raw response so we can see field names
+        // DEBUG: Log the raw response for the first successful 200
+        if (!debugLogged) {
+          debugLogged = true;
+          console.log('RAW API RESPONSE:', JSON.stringify({ location: location.name, store: location.storeId, length: rawText.length, body: rawText.substring(0, 2000) }));
           this.log.info({
             location: location.name,
             storeId: location.storeId,
-            rawResponseLength: rawText.length,
-            rawResponsePreview: rawText.slice(0, 2000),
-          }, 'DEBUG: Raw API response for first page');
+            rawLength: rawText.length,
+            rawPreview: rawText.substring(0, 2000),
+          }, 'RAW API RESPONSE (first 200 OK)');
         }
 
         let data;
         try {
           data = JSON.parse(rawText);
         } catch (parseErr) {
-          this.log.warn({
-            page,
-            rawPreview: rawText.slice(0, 500),
-          }, 'Response is not valid JSON');
+          this.log.warn({ page, rawPreview: rawText.slice(0, 500) }, 'Response is not valid JSON');
           break;
         }
 
-        // Handle both array and object-with-array responses
+        // Find the vehicle array in the response regardless of shape
         let vehicles = [];
         if (Array.isArray(data)) {
           vehicles = data;
         } else if (data && typeof data === 'object') {
-          // The API might wrap results in an object — find the array
+          // Log all top-level keys on first page
+          if (page === 1) {
+            this.log.info({
+              topLevelKeys: Object.keys(data),
+              topLevelTypes: Object.fromEntries(
+                Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? `array(${v.length})` : typeof v])
+              ),
+              location: location.name,
+            }, 'API response structure');
+
+            // If there's an array, log the keys of its first element
+            for (const [key, val] of Object.entries(data)) {
+              if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+                this.log.info({
+                  arrayKey: key,
+                  firstItemKeys: Object.keys(val[0]),
+                  firstItem: JSON.stringify(val[0]).substring(0, 500),
+                }, 'First vehicle object in response');
+              }
+            }
+          }
+
+          // Walk all values looking for the vehicle array
           for (const val of Object.values(data)) {
             if (Array.isArray(val) && val.length > 0) {
               vehicles = val;
               break;
             }
-          }
-          // Also log the top-level keys so we understand the structure
-          if (page === 1) {
-            this.log.info({ topLevelKeys: Object.keys(data), location: location.name },
-              'API response is an object, not an array');
           }
         }
 
@@ -183,7 +244,6 @@ class LKQScraper {
         this.log.info({ page, raw: vehicles.length, parsed: parsed.length, location: location.name }, 'Page parsed');
 
         page++;
-        // 500ms delay between requests
         await new Promise(r => setTimeout(r, 500));
       } catch (err) {
         this.log.error({ err: err.message, page }, 'Fetch failed');
@@ -197,8 +257,7 @@ class LKQScraper {
 
   /**
    * Parse a single vehicle object from the API response.
-   * Tries every known field name convention — we'll narrow this down
-   * once we see the actual API response shape.
+   * Covers every known PYP field name convention.
    */
   parseVehicle(item) {
     if (!item || typeof item !== 'object') return null;
