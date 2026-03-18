@@ -69,31 +69,33 @@ class PullAPartScraper {
   }
 
   async fetchInventory(yard) {
-    let puppeteer;
+    let chromium;
     try {
-      puppeteer = require('puppeteer');
+      const pw = require('playwright');
+      chromium = pw.chromium;
     } catch (err) {
-      this.log.error('Puppeteer not available for Pull-A-Part scrape');
+      this.log.error('Playwright not available for Pull-A-Part scrape');
       return [];
     }
 
     const vehicles = [];
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-             '--no-first-run', '--no-zygote', '--single-process', '--disable-gpu'],
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     try {
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      });
+      const page = await context.newPage();
 
       // Pull-A-Part has location-specific inventory pages
       // Assumption: scrape_url in yard record points to the right location page
       const url = yard.scrape_url || `${this.baseUrl}/locations/`;
       this.log.info({ url }, 'Pull-A-Part: navigating');
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
-      await new Promise(r => setTimeout(r, 3000));
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForTimeout(3000);
 
       // Try to find and click "View Inventory" or similar link
       try {
@@ -187,7 +189,7 @@ class PullAPartScraper {
             const next = document.querySelector('a[rel="next"], .pagination .next a, [aria-label="Next"]');
             if (next) next.click();
           });
-          await new Promise(r => setTimeout(r, 3000));
+          await page.waitForTimeout(3000);
 
           const moreVehicles = await page.evaluate(() => {
             const results = [];

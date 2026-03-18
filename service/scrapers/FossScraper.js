@@ -83,30 +83,32 @@ class FossScraper {
   }
 
   async fetchInventory(location) {
-    let puppeteer;
+    let chromium;
     try {
-      puppeteer = require('puppeteer');
+      const pw = require('playwright');
+      chromium = pw.chromium;
     } catch (err) {
-      this.log.error('Puppeteer not available for Foss scrape');
+      this.log.error('Playwright not available for Foss scrape');
       return [];
     }
 
     const vehicles = [];
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-             '--no-first-run', '--no-zygote', '--single-process', '--disable-gpu'],
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     try {
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      });
+      const page = await context.newPage();
 
       // Navigate to inventory page with location filter
       const url = `${this.baseUrl}/inventory`;
       this.log.info({ url }, 'Foss: navigating to inventory');
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
-      await new Promise(r => setTimeout(r, 3000));
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForTimeout(3000);
 
       // Try to select location if there's a dropdown
       try {
@@ -122,7 +124,7 @@ class FossScraper {
             }
           }
         }, location.city);
-        await new Promise(r => setTimeout(r, 2000));
+        await page.waitForTimeout(2000);
       } catch (e) {
         // Location selection may not be needed
       }
@@ -198,7 +200,7 @@ class FossScraper {
             const next = document.querySelector('a[rel="next"], .pagination .next a, [aria-label="Next"], .next-page');
             if (next) next.click();
           });
-          await new Promise(r => setTimeout(r, 2000));
+          await page.waitForTimeout(2000);
 
           const moreVehicles = await page.evaluate(() => {
             const results = [];
