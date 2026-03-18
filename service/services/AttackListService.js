@@ -138,44 +138,46 @@ class AttackListService {
   async buildInventoryIndex() {
     const index = {};
 
-    const hasAIC = await database.schema.hasTable('AutoItemCompatibility');
-    if (!hasAIC) return index;
+    try {
+      // Join Auto -> AutoItemCompatibility -> Item to get parts with fitment data
+      const rows = await database('Auto')
+        .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+        .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+        .where('Item.price', '>', 0)
+        .select(
+          'Auto.year',
+          'Auto.make',
+          'Auto.model',
+          'Item.id as itemId',
+          'Item.title',
+          'Item.price',
+          'Item.categoryTitle',
+          'Item.manufacturerPartNumber'
+        );
 
-    // Join Auto -> AutoItemCompatibility -> Item to get parts with fitment data
-    const rows = await database('Auto')
-      .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
-      .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
-      .where('Item.price', '>', 0)
-      .select(
-        'Auto.year',
-        'Auto.make',
-        'Auto.model',
-        'Item.id as itemId',
-        'Item.title',
-        'Item.price',
-        'Item.categoryTitle',
-        'Item.manufacturerPartNumber'
-      );
-
-    for (const row of rows) {
-      const key = `${row.make}|${row.model}|${row.year}`;
-      if (!index[key]) {
-        index[key] = { items: [], count: 0, totalValue: 0, avgPrice: 0 };
+      for (const row of rows) {
+        const key = `${row.make}|${row.model}|${row.year}`;
+        if (!index[key]) {
+          index[key] = { items: [], count: 0, totalValue: 0, avgPrice: 0 };
+        }
+        const entry = index[key];
+        // Deduplicate by item ID
+        if (!entry.items.some(i => i.itemId === row.itemId)) {
+          entry.items.push({
+            itemId: row.itemId,
+            title: row.title,
+            price: parseFloat(row.price) || 0,
+            category: row.categoryTitle,
+            partNumber: row.manufacturerPartNumber,
+          });
+          entry.count++;
+          entry.totalValue += parseFloat(row.price) || 0;
+          entry.avgPrice = entry.totalValue / entry.count;
+        }
       }
-      const entry = index[key];
-      // Deduplicate by item ID
-      if (!entry.items.some(i => i.itemId === row.itemId)) {
-        entry.items.push({
-          itemId: row.itemId,
-          title: row.title,
-          price: parseFloat(row.price) || 0,
-          category: row.categoryTitle,
-          partNumber: row.manufacturerPartNumber,
-        });
-        entry.count++;
-        entry.totalValue += parseFloat(row.price) || 0;
-        entry.avgPrice = entry.totalValue / entry.count;
-      }
+    } catch (err) {
+      // Tables may not exist yet — return empty index, scoring still works
+      this.log.warn({ err: err.message }, 'buildInventoryIndex: tables not ready');
     }
 
     return index;
@@ -188,30 +190,30 @@ class AttackListService {
   async buildSalesIndex(cutoff) {
     const index = {};
 
-    const hasYourSale = await database.schema.hasTable('YourSale');
-    if (!hasYourSale) return index;
+    try {
+      const sales = await database('YourSale')
+        .where('soldDate', '>=', cutoff)
+        .whereNotNull('title')
+        .select('title', 'salePrice');
 
-    const sales = await database('YourSale')
-      .where('soldDate', '>=', cutoff)
-      .whereNotNull('title')
-      .select('title', 'salePrice');
+      for (const sale of sales) {
+        const title = (sale.title || '').toLowerCase();
 
-    for (const sale of sales) {
-      const title = (sale.title || '').toLowerCase();
+        let make = null;
+        for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+          if (title.includes(alias)) { make = canonical; break; }
+        }
+        if (!make) continue;
 
-      // Extract make from title
-      let make = null;
-      for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-        if (title.includes(alias)) { make = canonical; break; }
+        if (!index[make]) {
+          index[make] = { count: 0, totalRevenue: 0, avgPrice: 0 };
+        }
+        index[make].count++;
+        index[make].totalRevenue += parseFloat(sale.salePrice) || 0;
+        index[make].avgPrice = index[make].totalRevenue / index[make].count;
       }
-      if (!make) continue;
-
-      if (!index[make]) {
-        index[make] = { count: 0, totalRevenue: 0, avgPrice: 0 };
-      }
-      index[make].count++;
-      index[make].totalRevenue += parseFloat(sale.salePrice) || 0;
-      index[make].avgPrice = index[make].totalRevenue / index[make].count;
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'buildSalesIndex: YourSale table not ready');
     }
 
     return index;
@@ -224,24 +226,25 @@ class AttackListService {
   async buildStockIndex() {
     const index = {};
 
-    const hasListings = await database.schema.hasTable('YourListing');
-    if (!hasListings) return index;
+    try {
+      const listings = await database('YourListing')
+        .where('listingStatus', 'Active')
+        .whereNotNull('title')
+        .select('title', 'quantityAvailable');
 
-    const listings = await database('YourListing')
-      .where('listingStatus', 'Active')
-      .whereNotNull('title')
-      .select('title', 'quantityAvailable');
+      for (const listing of listings) {
+        const title = (listing.title || '').toLowerCase();
 
-    for (const listing of listings) {
-      const title = (listing.title || '').toLowerCase();
+        let make = null;
+        for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+          if (title.includes(alias)) { make = canonical; break; }
+        }
+        if (!make) continue;
 
-      let make = null;
-      for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-        if (title.includes(alias)) { make = canonical; break; }
+        index[make] = (index[make] || 0) + (listing.quantityAvailable || 1);
       }
-      if (!make) continue;
-
-      index[make] = (index[make] || 0) + (listing.quantityAvailable || 1);
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'buildStockIndex: YourListing table not ready');
     }
 
     return index;

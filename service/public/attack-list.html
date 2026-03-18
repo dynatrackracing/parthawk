@@ -398,6 +398,101 @@
     font-weight: 600;
     cursor: pointer;
   }
+
+  /* Part location section in expanded view */
+  .location-section {
+    margin-top: 14px;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .location-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  .location-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .location-steps {
+    list-style: decimal;
+    padding-left: 18px;
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.6;
+  }
+
+  .location-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .location-confidence {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .confidence-high { background: #064e3b; color: var(--green); }
+  .confidence-field { background: var(--yellow-dim); color: var(--yellow); }
+  .confidence-researched { background: #1f2937; color: var(--text-muted); }
+
+  .location-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .location-actions button {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .location-actions button:active { opacity: 0.7; }
+
+  .location-loading {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .location-empty {
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .location-hazard {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--yellow);
+    background: var(--yellow-dim);
+    padding: 6px 8px;
+    border-radius: 5px;
+  }
 </style>
 </head>
 <body>
@@ -615,6 +710,10 @@
         </div>
         <div class="vehicle-expanded" id="vexp-${v.id}">
           <div class="parts-table">${partsDetailHtml}</div>
+          <div class="location-section" id="loc-${v.id}">
+            <div class="location-header">📍 Part Location</div>
+            <div class="location-loading">Tap to load location info</div>
+          </div>
         </div>
       </div>`;
   }
@@ -633,7 +732,132 @@
 
   function toggleVehicle(vehicleId) {
     const exp = document.getElementById('vexp-' + vehicleId);
+    const wasOpen = exp.classList.contains('open');
     exp.classList.toggle('open');
+
+    // Load location data on first expand
+    if (!wasOpen && !exp.dataset.locationLoaded) {
+      exp.dataset.locationLoaded = '1';
+      loadLocationForVehicle(vehicleId);
+    }
+  }
+
+  // Part types eligible for research
+  const RESEARCH_PARTS = ['ECM', 'PCM', 'BCM', 'TIPM', 'fuse box', 'TCM', 'ABS module', 'amplifier'];
+
+  async function loadLocationForVehicle(vehicleId) {
+    // Find the vehicle data from allData
+    let vehicle = null;
+    for (const yard of allData.yards) {
+      vehicle = yard.top_vehicles.find(v => v.id === vehicleId);
+      if (vehicle) break;
+    }
+    if (!vehicle) return;
+
+    const locDiv = document.getElementById('loc-' + vehicleId);
+    const year = parseInt(vehicle.year) || 0;
+    const make = encodeURIComponent(vehicle.make || '');
+    const model = encodeURIComponent(vehicle.model || '');
+    const trim = vehicle.trim ? '&trim=' + encodeURIComponent(vehicle.trim) : '';
+
+    // Determine the best part type to look up from matched parts
+    const parts = vehicle.parts || [];
+    let partType = null;
+
+    // Try to detect part type from matched item titles/categories
+    for (const p of parts) {
+      const text = ((p.title || '') + ' ' + (p.category || '')).toUpperCase();
+      for (const rt of RESEARCH_PARTS) {
+        if (text.includes(rt.toUpperCase())) { partType = rt; break; }
+      }
+      if (partType) break;
+    }
+
+    // If no part type detected from inventory, default to ECM (most common pull)
+    if (!partType) partType = 'ECM';
+
+    // Check if eligible for research (year >= 2014 and valid part type)
+    if (year < 2014) {
+      locDiv.innerHTML = `
+        <div class="location-header">📍 Part Location</div>
+        <div class="location-empty">Add location — no auto-research for pre-2014 vehicles</div>`;
+      return;
+    }
+
+    locDiv.innerHTML = `
+      <div class="location-header">📍 Part Location — ${partType}</div>
+      <div class="location-loading">Researching location...</div>`;
+
+    try {
+      const res = await fetch(`/part-location/${encodeURIComponent(partType)}/${make}/${model}/${year}?${trim}`);
+      const data = await res.json();
+
+      if (!data.success) throw new Error(data.error);
+
+      if (!data.found) {
+        locDiv.innerHTML = `
+          <div class="location-header">📍 Part Location — ${partType}</div>
+          <div class="location-empty">${data.eligible
+            ? 'No location data yet — research returned no results'
+            : 'Add location'}</div>`;
+        return;
+      }
+
+      renderLocation(locDiv, data.location, partType);
+    } catch (err) {
+      locDiv.innerHTML = `
+        <div class="location-header">📍 Part Location — ${partType}</div>
+        <div class="location-empty">Could not load: ${err.message}</div>`;
+    }
+  }
+
+  function renderLocation(container, loc, partType) {
+    const steps = Array.isArray(loc.removal_steps) ? loc.removal_steps : [];
+    const stepsHtml = steps.length > 0
+      ? `<ol class="location-steps">${steps.map(s => `<li>${s}</li>`).join('')}</ol>`
+      : '';
+
+    const confClass = loc.confidence === 'high_confidence' ? 'confidence-high' :
+                       loc.confidence === 'field_confirmed' ? 'confidence-field' : 'confidence-researched';
+    const confLabel = loc.confidence === 'high_confidence' ? 'Confirmed' :
+                      loc.confidence === 'field_confirmed' ? 'Field Data' : 'Researched';
+
+    container.innerHTML = `
+      <div class="location-header">📍 Part Location — ${partType}
+        <span class="location-confidence ${confClass}">${confLabel}</span>
+      </div>
+      ${loc.location_text ? `<div class="location-text">${loc.location_text}</div>` : ''}
+      ${stepsHtml}
+      <div class="location-meta">
+        ${loc.tools ? `<span>🔧 ${loc.tools}</span>` : ''}
+        ${loc.avg_pull_minutes ? `<span>⏱ ~${loc.avg_pull_minutes} min</span>` : ''}
+        ${loc.confirmed_count > 0 ? `<span>✓ ${loc.confirmed_count} confirmation${loc.confirmed_count !== 1 ? 's' : ''}</span>` : ''}
+      </div>
+      ${loc.hazards ? `<div class="location-hazard">⚠️ ${loc.hazards}</div>` : ''}
+      <div class="location-actions">
+        <button onclick="confirmLocation('${loc.id}')">✓ Confirm</button>
+        <button onclick="flagLocation('${loc.id}')">✗ Wrong</button>
+      </div>`;
+  }
+
+  async function confirmLocation(locId) {
+    try {
+      await fetch('/part-location/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: locId }),
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  async function flagLocation(locId) {
+    try {
+      await fetch('/part-location/flag-wrong', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: locId }),
+      });
+    } catch (e) { /* ignore */ }
   }
 
   async function triggerScrape() {

@@ -37,6 +37,7 @@ app.use('/yards', require('./routes/yards'));
 app.use('/attack-list', require('./routes/attack-list'));
 app.use('/cogs', require('./routes/cogs'));
 app.use('/api/parts', require('./routes/parts'));
+app.use('/part-location', require('./routes/part-location'));
 // Serve static admin tools
 app.use('/admin', express.static(path.resolve(__dirname, 'public')));
 app.get('/admin/import', (req, res) => {
