@@ -87,4 +87,116 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+/**
+ * POST /attack-list/log-pull
+ * Log a part as pulled. Auto-creates pull_session if needed.
+ * Body: { vehicleId, itemId, yardId? }
+ */
+router.post('/log-pull', async (req, res) => {
+  try {
+    const { vehicleId, itemId } = req.body;
+
+    // Find the yard for this vehicle
+    let yardId = req.body.yardId;
+    if (!yardId && vehicleId) {
+      try {
+        const vehicle = await database('yard_vehicle').where('id', vehicleId).first();
+        if (vehicle) yardId = vehicle.yard_id;
+      } catch (e) { /* ignore */ }
+    }
+
+    // Auto-create or find today's pull session for this yard
+    let sessionId = null;
+    if (yardId) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        let session = await database('pull_session')
+          .where('yard_id', yardId)
+          .where('date', today)
+          .first();
+
+        if (!session) {
+          const { v4: uuidv4 } = require('uuid');
+          const inserted = await database('pull_session').insert({
+            id: uuidv4(),
+            yard_id: yardId,
+            date: today,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }).returning('id');
+          sessionId = inserted[0]?.id || inserted[0];
+        } else {
+          sessionId = session.id;
+        }
+      } catch (e) {
+        log.warn({ err: e.message }, 'pull_session create failed');
+      }
+    }
+
+    res.json({ success: true, sessionId });
+  } catch (err) {
+    log.error({ err }, 'Error logging pull');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /attack-list/visit-feedback
+ * Log yard visit feedback after a session.
+ * Body: { yardId, rating (1-5), notes?, pullerName? }
+ */
+router.post('/visit-feedback', async (req, res) => {
+  try {
+    const { yardId, rating, notes, pullerName } = req.body;
+    if (!yardId || !rating) return res.status(400).json({ error: 'yardId and rating required' });
+
+    const { v4: uuidv4 } = require('uuid');
+    await database('yard_visit_feedback').insert({
+      id: uuidv4(),
+      yard_id: yardId,
+      puller_name: pullerName || null,
+      visit_date: new Date().toISOString().slice(0, 10),
+      rating: parseInt(rating),
+      notes: notes || null,
+      createdAt: new Date(),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    log.error({ err }, 'Error saving visit feedback');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /attack-list/last-visit/:yardId
+ * Get most recent visit feedback for a yard.
+ */
+router.get('/last-visit/:yardId', async (req, res) => {
+  try {
+    const { yardId } = req.params;
+    const visit = await database('yard_visit_feedback')
+      .where('yard_id', yardId)
+      .orderBy('visit_date', 'desc')
+      .first();
+
+    if (!visit) return res.json({ success: true, found: false });
+
+    const daysAgo = Math.floor((Date.now() - new Date(visit.visit_date).getTime()) / 86400000);
+    res.json({
+      success: true,
+      found: true,
+      visit: {
+        daysAgo,
+        rating: visit.rating,
+        notes: visit.notes,
+        pullerName: visit.puller_name,
+        date: visit.visit_date,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
