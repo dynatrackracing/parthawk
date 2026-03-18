@@ -73,7 +73,7 @@ router.get('/yards', async (req, res) => {
   try {
     const yards = await database('yard')
       .where('enabled', true)
-      .where('flagged', false)
+      .where(function() { this.where('flagged', false).orWhereNull('flagged'); })
       .select('id', 'name', 'chain', 'distance_from_base', 'entry_fee', 'tax_rate', 'visit_frequency')
       .orderBy('distance_from_base', 'asc');
 

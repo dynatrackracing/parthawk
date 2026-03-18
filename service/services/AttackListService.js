@@ -401,7 +401,9 @@ class AttackListService {
   async getAllYardsAttackList(options = {}) {
     const yards = await database('yard')
       .where('enabled', true)
-      .where('flagged', false)
+      .where(function() {
+        this.where('flagged', false).orWhereNull('flagged');
+      })
       .orderBy('distance_from_base', 'asc');
 
     const inventoryIndex = await this.buildInventoryIndex();
