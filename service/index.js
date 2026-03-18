@@ -63,26 +63,30 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
-// TEMPORARY debug endpoint — remove after checking make formats
+// TEMPORARY debug endpoint — remove after use
 app.get('/api/debug/makes', async (req, res) => {
   try {
     const { database } = require('./database/database');
     const yardMakes = await database('yard_vehicle').distinct('make').orderBy('make');
-    let itemMakes = [];
-    try {
-      itemMakes = await database('Item').distinct('make').orderBy('make').limit(50);
-    } catch (e) {
-      // Item table may not have a 'make' column — try via Auto table
-      try {
-        itemMakes = await database('Auto').distinct('make').orderBy('make').limit(50);
-      } catch (e2) { itemMakes = [{ make: 'ERROR: ' + e2.message }]; }
-    }
+
+    const autoCount = await database('Auto').count('* as cnt').first();
+    const autoSample = await database('Auto').select('*').limit(5);
+    const itemSample = await database('Item').select('title', 'manufacturerPartNumber').limit(5);
+    const compatCount = await database('AutoItemCompatibility').count('* as cnt').first();
+    const compatSample = await database('AutoItemCompatibility').select('*').limit(5);
+    const autoMakes = await database('Auto').distinct('make').orderBy('make').limit(50);
+
     res.json({
       yard_vehicle_makes: yardMakes.map(r => r.make),
-      item_or_auto_makes: itemMakes.map(r => r.make),
+      auto_count: parseInt(autoCount?.cnt || 0),
+      auto_sample: autoSample,
+      auto_makes: autoMakes.map(r => r.make),
+      item_sample: itemSample,
+      compatibility_count: parseInt(compatCount?.cnt || 0),
+      compatibility_sample: compatSample,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
