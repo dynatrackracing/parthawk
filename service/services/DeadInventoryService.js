@@ -6,6 +6,8 @@ const YourSale = require('../models/YourSale');
 const YourListing = require('../models/YourListing');
 const Item = require('../models/Item');
 const { raw } = require('objection');
+const { database } = require('../database/database');
+const { normalizePartNumber } = require('../lib/partNumberUtils');
 
 /**
  * DeadInventoryService - Identifies stale listings that need action
@@ -284,6 +286,106 @@ class DeadInventoryService {
       reasoning,
       viewItemUrl: listing.viewItemUrl,
     };
+  }
+
+  /**
+   * Scan for dead inventory and log to dead_inventory table.
+   * Items listed > 60 days with no sale in YourSale.
+   */
+  async scanAndLog() {
+    this.log.info('Running dead inventory scan-and-log');
+    const STALE_DAYS = 60;
+    const cutoff = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
+
+    let items;
+    try {
+      items = await database('Item')
+        .where('createdAt', '<', cutoff)
+        .whereNotNull('manufacturerPartNumber')
+        .select('id', 'title', 'price', 'manufacturerPartNumber', 'partNumberBase', 'createdAt');
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'scanAndLog: Item query failed');
+      return { scanned: 0, flagged: 0 };
+    }
+
+    let flagged = 0;
+    for (const item of items) {
+      const base = item.partNumberBase || normalizePartNumber(item.manufacturerPartNumber);
+      const daysListed = Math.floor((Date.now() - new Date(item.createdAt).getTime()) / 86400000);
+
+      // Check if sold
+      let soldCount = 0;
+      try {
+        const sales = await database('YourSale')
+          .whereRaw('UPPER(title) LIKE ?', ['%' + (base || '').toUpperCase() + '%'])
+          .count('* as cnt').first();
+        soldCount = parseInt(sales?.cnt) || 0;
+      } catch (e) { /* table may not exist */ }
+
+      if (soldCount > 0) continue;
+
+      // Failure reason
+      let failureReason = 'unknown';
+      const itemPrice = parseFloat(item.price) || 0;
+      let marketAvg = 0;
+      try {
+        const cache = await database('market_demand_cache')
+          .where('part_number_base', base).first();
+        if (cache) marketAvg = parseFloat(cache.ebay_avg_price) || 0;
+      } catch (e) { /* table may not exist */ }
+
+      if (marketAvg > 0 && itemPrice > marketAvg * 1.2) failureReason = 'overpriced';
+      else if (marketAvg > 0) failureReason = 'low_demand';
+
+      // Skip duplicates
+      try {
+        const existing = await database('dead_inventory')
+          .where('part_number_exact', item.manufacturerPartNumber).first();
+        if (existing) continue;
+      } catch (e) { /* table may not exist */ }
+
+      try {
+        await database('dead_inventory').insert({
+          part_number_exact: item.manufacturerPartNumber,
+          part_number_base: base,
+          description: item.title,
+          days_listed: daysListed,
+          final_price: itemPrice,
+          market_avg_at_time: marketAvg || null,
+          price_vs_market: marketAvg > 0 ? Math.round((itemPrice / marketAvg) * 100) / 100 : null,
+          failure_reason: failureReason,
+          sold: false,
+          createdAt: new Date(),
+        });
+        flagged++;
+      } catch (err) {
+        this.log.warn({ err: err.message }, 'dead_inventory insert failed');
+      }
+    }
+
+    this.log.info({ scanned: items.length, flagged }, 'Dead inventory scan complete');
+    return { scanned: items.length, flagged };
+  }
+
+  /**
+   * Check if a part number has a dead inventory warning.
+   * Returns warning object or null.
+   */
+  async getWarning(partNumber) {
+    if (!partNumber) return null;
+    const base = normalizePartNumber(partNumber);
+    try {
+      const record = await database('dead_inventory')
+        .where('part_number_base', base)
+        .orderBy('createdAt', 'desc').first();
+      if (!record) return null;
+      return {
+        daysListed: record.days_listed,
+        failureReason: record.failure_reason,
+        finalPrice: record.final_price,
+        marketAvg: record.market_avg_at_time,
+      };
+    } catch (e) { return null; }
   }
 }
 
