@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -12,556 +12,242 @@
 <title>PartHawk — Attack List</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #0a0a0a;
-    --surface: #141414;
-    --surface2: #1c1c1c;
-    --border: #2a2a2a;
-    --red: #ef4444;
-    --red-dim: #7f1d1d;
-    --yellow: #eab308;
-    --yellow-dim: #713f12;
-    --green: #22c55e;
-    --gray: #374151;
-    --text: #f9fafb;
-    --text-mid: #d1d5db;
-    --text-muted: #6b7280;
-    --text-faint: #374151;
-    --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c;
+    --border: #2a2a2a; --red: #ef4444; --red-dim: #7f1d1d;
+    --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
+    --gray: #374151; --text: #f9fafb; --text-mid: #d1d5db;
+    --text-muted: #6b7280; --text-faint: #374151;
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
   }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; }
 
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding-bottom: 40px;
-  }
-
+  /* Header */
   header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 20px 14px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 16px; position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
   }
-
-  .header-left h1 {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    color: var(--text);
+  .header-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; }
+  .header-left p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .header-actions { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-mid); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
   }
+  .icon-btn:active { opacity: 0.7; }
 
-  .header-left p {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  .refresh-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-mid);
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .refresh-btn:active { opacity: 0.7; }
-
+  /* Tabs */
   .tabs {
-    display: flex;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
+    display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
-
   .tabs::-webkit-scrollbar { display: none; }
-
   .tab {
-    padding: 12px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-muted);
-    cursor: pointer;
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
+    padding: 11px 16px; font-size: 12px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; white-space: nowrap;
+    border-bottom: 2px solid transparent; flex-shrink: 0;
   }
+  .tab.active { color: var(--text); border-bottom-color: var(--red); }
 
-  .tab.active {
-    color: var(--text);
-    border-bottom-color: var(--red);
-  }
-
-  .container { padding: 16px; }
-
-  /* Loading state */
-  .loading {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-muted);
-  }
-
-  .spinner {
-    width: 32px; height: 32px;
-    border: 2px solid var(--border);
-    border-top-color: var(--red);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 16px;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Yard cards */
-  .yard-section {
-    margin-bottom: 20px;
-  }
-
-  .yard-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: 14px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px 12px 0 0;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .yard-header.collapsed {
-    border-radius: 12px;
-  }
-
-  .yard-name {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .yard-meta {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 3px;
-    display: flex;
-    gap: 10px;
-  }
-
-  .yard-right {
-    text-align: right;
-    flex-shrink: 0;
-    margin-left: 12px;
-  }
-
-  .yard-priority {
-    font-size: 13px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 6px;
-  }
-
-  .priority-go { background: var(--red-dim); color: var(--red); }
-  .priority-consider { background: var(--yellow-dim); color: var(--yellow); }
-  .priority-skip { background: var(--gray); color: var(--text-muted); }
-
-  .yard-est {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
+  /* Status bar */
+  .status-bar {
+    padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;
   }
 
   /* Vehicle list */
-  .vehicle-list {
-    border: 1px solid var(--border);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    overflow: hidden;
-  }
-
+  .vehicle-list { padding: 0; }
   .vehicle-row {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.1s;
+    border-bottom: 1px solid var(--border); background: var(--surface2);
   }
-
-  .vehicle-row:last-child { border-bottom: none; }
   .vehicle-row:active { background: var(--surface); }
 
-  .vehicle-collapsed {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    gap: 12px;
+  /* Collapsed view — 48px min height per spec */
+  .v-collapsed {
+    display: flex; align-items: center; padding: 10px 14px; gap: 10px;
+    min-height: 48px; cursor: pointer; user-select: none;
   }
-
-  .score-badge {
-    width: 42px; height: 42px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: 800;
-    flex-shrink: 0;
+  .v-score {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
   }
-
-  .score-red { background: var(--red-dim); color: var(--red); }
-  .score-yellow { background: var(--yellow-dim); color: var(--yellow); }
-  .score-gray { background: #1f2937; color: var(--text-muted); }
-
-  .vehicle-info { flex: 1; min-width: 0; }
-
-  .vehicle-title {
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .v-score.red { background: var(--red-dim); color: var(--red); }
+  .v-score.yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .v-score.gray { background: #1f2937; color: var(--text-muted); }
+  .v-info { flex: 1; min-width: 0; }
+  .v-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .v-chips { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+  .chip {
+    font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    letter-spacing: 0.03em; text-transform: uppercase;
   }
-
-  .vehicle-sub {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 2px;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .parts-chips {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-  }
-
-  .part-chip {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 5px;
-    letter-spacing: 0.02em;
-  }
-
-  .chip-pull { background: var(--red-dim); color: var(--red); }
-  .chip-watch { background: var(--yellow-dim); color: var(--yellow); }
-  .chip-skip { background: #1f2937; color: var(--text-faint); }
-
-  .vehicle-right {
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  .vehicle-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--green);
-  }
-
-  .vehicle-row-num {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
+  .chip-red { background: var(--red-dim); color: var(--red); }
+  .chip-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .chip-gray { background: #1f2937; color: var(--text-faint); }
+  .v-right { text-align: right; flex-shrink: 0; }
+  .v-value { font-size: 13px; font-weight: 700; color: var(--green); }
+  .v-row { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .v-parts-count { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
 
   /* Expanded view */
-  .vehicle-expanded {
-    display: none;
-    padding: 0 16px 16px;
+  .v-expanded {
+    display: none; padding: 0 14px 14px; background: var(--surface);
     border-top: 1px solid var(--border);
-    background: var(--surface);
   }
+  .v-expanded.open { display: block; }
 
-  .vehicle-expanded.open { display: block; }
-
-  .parts-table {
-    margin-top: 12px;
+  /* Part detail rows in expanded view */
+  .part-detail {
+    padding: 12px 0; border-bottom: 1px solid var(--border);
   }
-
-  .part-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
+  .part-detail:last-child { border-bottom: none; }
+  .pd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .pd-title { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-verdict {
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; margin-left: 8px;
   }
-
-  .part-row:last-child { border-bottom: none; }
-
-  .part-name {
-    font-size: 14px;
-    font-weight: 600;
-    width: 70px;
-    flex-shrink: 0;
-  }
-
-  .part-stats {
-    flex: 1;
-    padding: 0 12px;
-  }
-
-  .part-stat-row {
-    display: flex;
-    gap: 12px;
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .part-stat-row span { white-space: nowrap; }
-
-  .part-verdict {
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 6px;
-    flex-shrink: 0;
-  }
-
   .verdict-pull { background: var(--red-dim); color: var(--red); }
   .verdict-watch { background: var(--yellow-dim); color: var(--yellow); }
   .verdict-skip { background: #1f2937; color: var(--text-muted); }
-
-  /* Empty state */
-  .empty {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 14px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
+  .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+  .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
+  .pd-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .pd-actions button {
+    font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 6px;
+    border: none; cursor: pointer; min-height: 32px;
   }
+  .btn-pull { background: var(--red); color: white; }
+  .btn-pull:active { opacity: 0.8; }
+  .btn-skip { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
+  .btn-note { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
 
-  /* Scrape trigger button */
-  .scrape-btn {
-    display: block;
-    width: 100%;
-    padding: 14px;
-    background: var(--surface);
-    border: 1px dashed var(--border);
-    border-radius: 12px;
-    color: var(--text-muted);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    text-align: center;
-    margin-bottom: 16px;
-    transition: all 0.15s;
+  /* Skip dropdown */
+  .skip-dropdown {
+    display: none; margin-top: 6px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
   }
-
-  .scrape-btn:active { background: var(--surface2); }
-
-  /* Last updated bar */
-  .updated-bar {
-    padding: 8px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-muted);
-    text-align: center;
+  .skip-dropdown.open { display: block; }
+  .skip-option {
+    padding: 10px 12px; font-size: 12px; color: var(--text-mid);
+    cursor: pointer; border-bottom: 1px solid var(--border);
   }
+  .skip-option:last-child { border-bottom: none; }
+  .skip-option:active { background: var(--border); }
 
-  /* No vehicles scraped yet */
-  .no-data-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-    text-align: center;
-    margin-bottom: 16px;
+  /* Note input */
+  .note-input {
+    display: none; margin-top: 6px;
   }
-
-  .no-data-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-  .no-data-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
-
-  .trigger-btn {
-    margin-top: 14px;
-    padding: 10px 20px;
-    background: var(--red);
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
+  .note-input.open { display: flex; gap: 6px; }
+  .note-input input {
+    flex: 1; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 12px; outline: none;
   }
+  .note-input input:focus { border-color: var(--red); }
+  .note-input button { padding: 8px 12px; }
 
-  /* Part location section in expanded view */
-  .location-section {
-    margin-top: 14px;
-    padding: 12px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  /* Location section */
+  .loc-section {
+    margin-top: 10px; padding: 10px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 6px;
   }
+  .loc-header { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .loc-text { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .loc-steps { list-style: decimal; padding-left: 16px; font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+  .loc-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-size: 10px; color: var(--text-muted); }
+  .loc-hazard { margin-top: 5px; font-size: 11px; color: var(--yellow); background: var(--yellow-dim); padding: 5px 7px; border-radius: 4px; }
+  .loc-badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; text-transform: uppercase; }
+  .badge-high { background: #064e3b; color: var(--green); }
+  .badge-field { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-res { background: #1f2937; color: var(--text-muted); }
+  .loc-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .loc-actions button { font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); cursor: pointer; }
 
-  .location-header {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 8px;
-  }
+  /* Empty / loading states */
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); }
+  .empty-state h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .empty-state p { font-size: 12px; line-height: 1.5; }
+  .btn-primary { margin-top: 12px; padding: 10px 20px; background: var(--red); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-  .location-text {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 6px;
-  }
-
-  .location-steps {
-    list-style: decimal;
-    padding-left: 18px;
-    font-size: 13px;
-    color: var(--text-mid);
-    line-height: 1.6;
-  }
-
-  .location-meta {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .location-confidence {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .confidence-high { background: #064e3b; color: var(--green); }
-  .confidence-field { background: var(--yellow-dim); color: var(--yellow); }
-  .confidence-researched { background: #1f2937; color: var(--text-muted); }
-
-  .location-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-  }
-
-  .location-actions button {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 5px 10px;
-    border-radius: 5px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .location-actions button:active { opacity: 0.7; }
-
-  .location-loading {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-
-  .location-empty {
-    font-size: 12px;
-    color: var(--text-faint);
-  }
-
-  .location-hazard {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--yellow);
-    background: var(--yellow-dim);
-    padding: 6px 8px;
-    border-radius: 5px;
-  }
+  /* VIN scanner modal */
+  .vin-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .vin-modal.open { display: flex; }
+  .vin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 100%; max-width: 360px; text-align: center; }
+  .vin-card h3 { font-size: 16px; margin-bottom: 12px; }
+  .vin-result { margin-top: 12px; font-size: 13px; color: var(--text-mid); text-align: left; }
+  .vin-result .vin-str { font-family: monospace; font-size: 16px; font-weight: 700; color: var(--green); margin: 8px 0; text-align: center; }
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-left">
-    <h1>⚡ Attack List</h1>
-    <p id="headerSub">Loading yards...</p>
+    <h1>PartHawk</h1>
+    <p id="headerSub">Loading...</p>
   </div>
-  <button class="refresh-btn" onclick="loadData()">
-    <span>↻</span> Refresh
-  </button>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="openVinScanner()" title="Scan VIN">📷</button>
+    <button class="icon-btn" onclick="loadData()" title="Refresh">↻</button>
+  </div>
 </header>
 
 <div class="tabs" id="tabBar">
-  <div class="tab active" onclick="showTab('all')" id="tab-all">All Yards</div>
-  <div class="tab" onclick="showTab('yard:LKQ Raleigh')" id="tab-yard:LKQ Raleigh">LKQ Raleigh</div>
-  <div class="tab" onclick="showTab('yard:LKQ Durham')" id="tab-yard:LKQ Durham">LKQ Durham</div>
-  <div class="tab" onclick="showTab('yard:LKQ Greensboro')" id="tab-yard:LKQ Greensboro">LKQ Greensboro</div>
+  <div class="tab active" onclick="showTab('all')" id="tab-all">All</div>
+  <div class="tab" onclick="showTab('yard:LKQ Raleigh')" id="tab-yard:LKQ Raleigh">Raleigh</div>
+  <div class="tab" onclick="showTab('yard:LKQ Durham')" id="tab-yard:LKQ Durham">Durham</div>
+  <div class="tab" onclick="showTab('yard:LKQ Greensboro')" id="tab-yard:LKQ Greensboro">Greensboro</div>
   <div class="tab" onclick="showTab('day_trip')" id="tab-day_trip">Day Trip</div>
   <div class="tab" onclick="showTab('road_trip')" id="tab-road_trip">Road Trip</div>
 </div>
 
-<div class="updated-bar" id="updatedBar">—</div>
+<div class="status-bar">
+  <span id="statusLeft">—</span>
+  <span id="statusRight">—</span>
+</div>
 
-<div class="container" id="mainContent">
-  <div class="loading">
-    <div class="spinner"></div>
-    <div>Building attack list...</div>
+<div id="mainContent">
+  <div class="loading"><div class="spinner"></div><div>Building attack list...</div></div>
+</div>
+
+<!-- VIN Scanner Modal -->
+<div class="vin-modal" id="vinModal">
+  <div class="vin-card">
+    <h3>📷 Scan VIN</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Take a photo of the VIN plate</p>
+    <input type="file" accept="image/*" capture="environment" id="vinFileInput" style="display:none;" onchange="handleVinPhoto(event)">
+    <button class="btn-primary" onclick="document.getElementById('vinFileInput').click()">Open Camera</button>
+    <div class="vin-result" id="vinResult"></div>
+    <button class="icon-btn" style="margin-top:12px;width:100%;" onclick="closeVinScanner()">Close</button>
   </div>
 </div>
 
 <script>
   let allData = null;
   let currentTab = 'all';
+  // Track active pull sessions per yard
+  const activeSessions = {};
 
   async function loadData() {
-    document.getElementById('mainContent').innerHTML = `
-      <div class="loading">
-        <div class="spinner"></div>
-        <div>Scoring vehicles...</div>
-      </div>`;
-
+    document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
       const res = await fetch('/attack-list');
       const data = await res.json();
-
       if (!data.success) throw new Error(data.error);
-
       allData = data;
       renderData();
-
       const ts = new Date(data.generated_at);
-      document.getElementById('updatedBar').textContent = 
-        'Updated ' + ts.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      document.getElementById('headerSub').textContent = 
-        data.yards.length + ' yards scored';
-
+      document.getElementById('statusLeft').textContent = 'Updated ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      document.getElementById('headerSub').textContent = data.yards.length + ' yards scored';
     } catch (err) {
-      document.getElementById('mainContent').innerHTML = `
-        <div class="no-data-card">
-          <h3>Could not load attack list</h3>
-          <p>${err.message}</p>
-          <button class="trigger-btn" onclick="loadData()">Try Again</button>
-        </div>`;
+      document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>Could not load</h3><p>${err.message}</p><button class="btn-primary" onclick="loadData()">Retry</button></div>`;
     }
   }
 
@@ -574,7 +260,6 @@
 
   function renderData() {
     if (!allData) return;
-
     let yards = allData.yards;
 
     if (currentTab.startsWith('yard:')) {
@@ -586,329 +271,336 @@
       yards = yards.filter(y => y.yard.visit_frequency === 'road_trip');
     }
 
-    if (!yards.length) {
-      document.getElementById('mainContent').innerHTML = `
-        <div class="no-data-card">
-          <h3>No yards scraped yet</h3>
-          <p>LKQ scrapes run automatically at 2am. Trigger a manual scrape to build the attack list now.</p>
-          <button class="trigger-btn" onclick="triggerScrape()">Scrape LKQ Now</button>
-        </div>`;
+    if (!yards.length || !yards.some(y => y.total_vehicles > 0)) {
+      document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>No vehicles found</h3><p>LKQ scrapes run at 2am nightly.</p><button class="btn-primary" onclick="triggerScrape(this)">Scrape LKQ Now</button></div>`;
       return;
     }
 
-    // Check if any yard has vehicles
-    const hasVehicles = yards.some(y => y.total_vehicles > 0);
-    if (!hasVehicles) {
-      document.getElementById('mainContent').innerHTML = `
-        <div class="no-data-card">
-          <h3>No vehicles on lots yet</h3>
-          <p>LKQ scrapes automatically at 2am every night. Tap below to scrape now and populate the attack list.</p>
-          <button class="trigger-btn" onclick="triggerScrape()">Scrape LKQ Now</button>
-        </div>`;
-      return;
-    }
+    // Count totals for status bar
+    let totalV = 0, hotV = 0;
+    yards.forEach(y => { totalV += y.total_vehicles; hotV += y.hot_vehicles; });
+    document.getElementById('statusRight').textContent = `${totalV} vehicles · ${hotV} flagged`;
 
     let html = '';
+    for (const yd of yards) {
+      if (yd.total_vehicles === 0) continue;
 
-    for (const yardData of yards) {
-      if (yardData.total_vehicles === 0) continue;
+      const vehicles = yd.vehicles || yd.top_vehicles || [];
+      const priority = yd.top_score >= 70 ? 'GO' : yd.top_score >= 45 ? 'MAYBE' : '—';
+      const prioClass = yd.top_score >= 70 ? 'chip-red' : yd.top_score >= 45 ? 'chip-yellow' : 'chip-gray';
+      const lastScraped = yd.yard.last_scraped ? timeAgo(yd.yard.last_scraped) : 'never';
 
-      const priority = yardData.top_score >= 70 ? 'GO TODAY' :
-                       yardData.top_score >= 45 ? 'CONSIDER' : 'SKIP';
-      const priorityClass = yardData.top_score >= 70 ? 'priority-go' :
-                            yardData.top_score >= 45 ? 'priority-consider' : 'priority-skip';
-      const emoji = yardData.top_score >= 70 ? '🔴' : yardData.top_score >= 45 ? '🟡' : '⬜';
-
-      const lastScraped = yardData.yard.last_scraped ? 
-        'Scraped ' + timeAgo(yardData.yard.last_scraped) : 'Not yet scraped';
-
-      html += `
-        <div class="yard-section" id="yard-${yardData.yard.id}">
-          <div class="yard-header" onclick="toggleYard('${yardData.yard.id}')">
-            <div>
-              <div class="yard-name">${yardData.yard.name}</div>
-              <div class="yard-meta">
-                <span>${yardData.total_vehicles} vehicles</span>
-                <span>${yardData.yard.distance_from_base} mi</span>
-                <span>${lastScraped}</span>
-              </div>
-            </div>
-            <div class="yard-right">
-              <div class="yard-priority ${priorityClass}">${emoji} ${priority}</div>
-              ${yardData.est_total_value > 0 ? `<div class="yard-est">~$${yardData.est_total_value.toLocaleString()} est.</div>` : ''}
-            </div>
+      html += `<div class="yard-group">
+        <div style="padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="font-size:14px;font-weight:700;">${yd.yard.name}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${yd.total_vehicles} vehicles · ${lastScraped}</span>
           </div>
-          <div class="vehicle-list" id="vlist-${yardData.yard.id}">`;
+          <span class="chip ${prioClass}">${priority}</span>
+        </div>
+        <div class="vehicle-list">`;
 
-      const hotVehicles = yardData.top_vehicles;
-
-      if (!hotVehicles.length) {
-        html += `<div class="empty">No high-value vehicles scored on this lot today.</div>`;
-      } else {
-        for (const v of hotVehicles) {
-          html += renderVehicleRow(v, yardData.yard.id);
-        }
-
-        if (yardData.hot_vehicles > 3) {
-          html += `
-            <div style="padding:12px 16px; text-align:center;">
-              <button onclick="loadFullYard('${yardData.yard.id}')" 
-                style="background:none; border:none; color:var(--red); font-size:13px; font-weight:600; cursor:pointer;">
-                View all ${yardData.total_vehicles} vehicles →
-              </button>
-            </div>`;
-        }
+      for (const v of vehicles) {
+        html += renderVehicle(v);
       }
-
-      html += `</div></div>`;
+      html += '</div></div>';
     }
-
     document.getElementById('mainContent').innerHTML = html;
   }
 
-  function renderVehicleRow(v, yardId) {
-    const scoreClass = v.color_code === 'red' ? 'score-red' :
-                       v.color_code === 'yellow' ? 'score-yellow' : 'score-gray';
-
-    // Summary chip: show matched parts count + avg price
-    const matchCount = v.matched_parts || 0;
-    const chipClass = v.color_code === 'red' ? 'chip-pull' :
-                      v.color_code === 'yellow' ? 'chip-watch' : 'chip-skip';
-    const chipsHtml = matchCount > 0
-      ? `<span class="part-chip ${chipClass}">${matchCount} part${matchCount !== 1 ? 's' : ''} in inventory</span>` +
-        `<span class="part-chip chip-skip">~$${v.avg_part_price || 0} avg</span>`
-      : `<span class="part-chip chip-skip">No inventory match</span>`;
-
-    // Expanded detail: show actual matched inventory items
+  function renderVehicle(v) {
+    const sc = v.color_code;
     const parts = v.parts || [];
-    const partsDetailHtml = parts.length > 0
-      ? parts.map(p => `
-          <div class="part-row">
-            <div class="part-name" style="width:auto; flex:1; font-size:13px;">${p.title || p.category || 'Part'}</div>
-            <div class="part-stats">
-              <div class="part-stat-row">
-                ${p.partNumber ? `<span>🔧 ${p.partNumber}</span>` : ''}
-                <span>💰 $${p.price}</span>
-              </div>
-            </div>
-          </div>`).join('')
-      : `<div class="part-row"><div class="part-name" style="width:auto; color:var(--text-muted);">No matching parts found in inventory</div></div>`;
+    const chips = parts.slice(0, 4).map(p => {
+      const cc = p.verdict === 'PULL' ? 'chip-red' : p.verdict === 'WATCH' ? 'chip-yellow' : 'chip-gray';
+      return `<span class="chip ${cc}">${p.partType || p.category || '?'}</span>`;
+    }).join('');
 
-    return `
-      <div class="vehicle-row">
-        <div class="vehicle-collapsed" onclick="toggleVehicle('${v.id}')">
-          <div class="score-badge ${scoreClass}">${v.score}</div>
-          <div class="vehicle-info">
-            <div class="vehicle-title">${v.year} ${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''}</div>
-            <div class="vehicle-sub">
-              ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
-              ${v.color ? `<span>${v.color}</span>` : ''}
-              ${v.date_added ? `<span>Added ${timeAgo(v.date_added)}</span>` : ''}
-            </div>
-            <div class="parts-chips">${chipsHtml}</div>
+    return `<div class="vehicle-row" id="vrow-${v.id}">
+      <div class="v-collapsed" onclick="toggleV('${v.id}')">
+        <div class="v-score ${sc}">${v.score}</div>
+        <div class="v-info">
+          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''}</div>
+          <div class="v-meta">
+            ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
+            ${v.color ? `<span>${v.color}</span>` : ''}
+            ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>
-          <div class="vehicle-right">
-            ${v.est_value > 0 ? `<div class="vehicle-value">$${v.est_value}</div>` : ''}
-            ${v.row_number ? `<div class="vehicle-row-num">Row ${v.row_number}</div>` : ''}
-          </div>
+          <div class="v-chips">${chips || '<span class="chip chip-gray">No match</span>'}</div>
         </div>
-        <div class="vehicle-expanded" id="vexp-${v.id}">
-          <div class="parts-table">${partsDetailHtml}</div>
-          <div class="location-section" id="loc-${v.id}">
-            <div class="location-header">📍 Part Location</div>
-            <div class="location-loading">Tap to load location info</div>
-          </div>
+        <div class="v-right">
+          ${v.est_value > 0 ? `<div class="v-value">$${v.est_value}</div>` : ''}
+          ${v.matched_parts > 0 ? `<div class="v-parts-count">${v.matched_parts} parts</div>` : ''}
+        </div>
+      </div>
+      <div class="v-expanded" id="vexp-${v.id}">
+        ${renderExpandedParts(v)}
+      </div>
+    </div>`;
+  }
+
+  function renderExpandedParts(v) {
+    const parts = v.parts || [];
+    if (parts.length === 0) {
+      return '<div style="padding:12px 0;color:var(--text-muted);font-size:12px;">No matching inventory parts found.</div>';
+    }
+
+    let html = '';
+    for (const p of parts) {
+      const vc = p.verdict === 'PULL' ? 'verdict-pull' : p.verdict === 'WATCH' ? 'verdict-watch' : 'verdict-skip';
+      html += `<div class="part-detail" id="pd-${v.id}-${p.itemId}">
+        <div class="pd-header">
+          <div class="pd-title">${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
+          <div class="pd-verdict ${vc}">${p.verdict}</div>
+        </div>
+        <div class="pd-stats">
+          <span>💰 $${p.price} avg</span>
+          <span>📦 ${p.in_stock} in stock</span>
+          <span>📈 ${p.sold_90d} sold/90d</span>
+          ${p.partNumber ? `<span>🔧 ${p.partNumber}</span>` : ''}
+        </div>
+        <div class="pd-reason">${p.reason}</div>
+        <div class="pd-actions">
+          <button class="btn-pull" onclick="markPulled('${v.id}','${p.itemId}',event)">✓ Pulled</button>
+          <button class="btn-skip" onclick="toggleSkip('${v.id}','${p.itemId}')">✗ Skip</button>
+          <button class="btn-note" onclick="toggleNote('${v.id}','${p.itemId}')">📝 Note</button>
+        </div>
+        <div class="skip-dropdown" id="skip-${v.id}-${p.itemId}">
+          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','damaged')">Damaged</div>
+          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','missing')">Missing</div>
+          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','already_pulled')">Already Pulled</div>
+          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','not_worth_it')">Not Worth It</div>
+        </div>
+        <div class="note-input" id="note-${v.id}-${p.itemId}">
+          <input type="text" placeholder="Add note..." id="noteval-${v.id}-${p.itemId}">
+          <button class="btn-skip" onclick="saveNote('${v.id}','${p.itemId}')">Save</button>
         </div>
       </div>`;
-  }
-
-  function toggleYard(yardId) {
-    const list = document.getElementById('vlist-' + yardId);
-    const header = document.querySelector(`#yard-${yardId} .yard-header`);
-    if (list.style.display === 'none') {
-      list.style.display = 'block';
-      header.classList.remove('collapsed');
-    } else {
-      list.style.display = 'none';
-      header.classList.add('collapsed');
     }
+
+    // Location section
+    html += `<div class="loc-section" id="loc-${v.id}">
+      <div class="loc-header">📍 Part Location</div>
+      <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Tap to load</div>
+    </div>`;
+
+    return html;
   }
 
-  function toggleVehicle(vehicleId) {
-    const exp = document.getElementById('vexp-' + vehicleId);
+  function toggleV(id) {
+    const exp = document.getElementById('vexp-' + id);
     const wasOpen = exp.classList.contains('open');
     exp.classList.toggle('open');
-
-    // Load location data on first expand
-    if (!wasOpen && !exp.dataset.locationLoaded) {
-      exp.dataset.locationLoaded = '1';
-      loadLocationForVehicle(vehicleId);
+    if (!wasOpen && !exp.dataset.locLoaded) {
+      exp.dataset.locLoaded = '1';
+      loadLocation(id);
     }
   }
 
-  // Part types eligible for research
-  const RESEARCH_PARTS = ['ECM', 'PCM', 'BCM', 'TIPM', 'fuse box', 'TCM', 'ABS module', 'amplifier'];
+  // === Part actions ===
 
-  async function loadLocationForVehicle(vehicleId) {
-    // Find the vehicle data from allData
+  function markPulled(vid, itemId, evt) {
+    evt.stopPropagation();
+    const el = document.getElementById('pd-' + vid + '-' + itemId);
+    if (el) {
+      el.style.opacity = '0.4';
+      el.querySelector('.btn-pull').textContent = '✓ Logged';
+      el.querySelector('.btn-pull').disabled = true;
+    }
+    // Log to pull_session via API (best effort)
+    fetch('/attack-list/log-pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicleId: vid, itemId }),
+    }).catch(() => {});
+  }
+
+  function toggleSkip(vid, itemId) {
+    const dd = document.getElementById('skip-' + vid + '-' + itemId);
+    dd.classList.toggle('open');
+  }
+
+  function logSkip(vid, itemId, reason) {
+    const dd = document.getElementById('skip-' + vid + '-' + itemId);
+    dd.classList.remove('open');
+    const el = document.getElementById('pd-' + vid + '-' + itemId);
+    if (el) {
+      el.style.opacity = '0.3';
+      const btn = el.querySelector('.btn-skip');
+      btn.textContent = '✗ ' + reason.replace('_', ' ');
+    }
+  }
+
+  function toggleNote(vid, itemId) {
+    const ni = document.getElementById('note-' + vid + '-' + itemId);
+    ni.classList.toggle('open');
+    if (ni.classList.contains('open')) {
+      ni.querySelector('input').focus();
+    }
+  }
+
+  function saveNote(vid, itemId) {
+    const input = document.getElementById('noteval-' + vid + '-' + itemId);
+    const note = input.value.trim();
+    if (!note) return;
+    input.value = '';
+    document.getElementById('note-' + vid + '-' + itemId).classList.remove('open');
+    // Show confirmation
+    const el = document.getElementById('pd-' + vid + '-' + itemId);
+    const noteEl = document.createElement('div');
+    noteEl.style.cssText = 'font-size:11px;color:var(--yellow);margin-top:4px;';
+    noteEl.textContent = '📝 ' + note;
+    el.appendChild(noteEl);
+  }
+
+  // === Location loading ===
+
+  const RESEARCH_PARTS = ['ECM','PCM','BCM','TIPM','FUSE BOX','TCM','ABS','AMPLIFIER'];
+
+  async function loadLocation(vid) {
     let vehicle = null;
-    for (const yard of allData.yards) {
-      vehicle = yard.top_vehicles.find(v => v.id === vehicleId);
+    for (const yd of allData.yards) {
+      const vList = yd.vehicles || yd.top_vehicles || [];
+      vehicle = vList.find(v => v.id === vid);
       if (vehicle) break;
     }
     if (!vehicle) return;
 
-    const locDiv = document.getElementById('loc-' + vehicleId);
+    const locDiv = document.getElementById('loc-' + vid);
     const year = parseInt(vehicle.year) || 0;
     const make = encodeURIComponent(vehicle.make || '');
     const model = encodeURIComponent(vehicle.model || '');
     const trim = vehicle.trim ? '&trim=' + encodeURIComponent(vehicle.trim) : '';
 
-    // Determine the best part type to look up from matched parts
-    const parts = vehicle.parts || [];
-    let partType = null;
-
-    // Try to detect part type from matched item titles/categories
-    for (const p of parts) {
-      const text = ((p.title || '') + ' ' + (p.category || '')).toUpperCase();
-      for (const rt of RESEARCH_PARTS) {
-        if (text.includes(rt.toUpperCase())) { partType = rt; break; }
-      }
-      if (partType) break;
+    // Detect part type from first matched part
+    let partType = 'ECM';
+    for (const p of (vehicle.parts || [])) {
+      if (p.partType) { partType = p.partType; break; }
     }
 
-    // If no part type detected from inventory, default to ECM (most common pull)
-    if (!partType) partType = 'ECM';
-
-    // Check if eligible for research (year >= 2014 and valid part type)
     if (year < 2014) {
-      locDiv.innerHTML = `
-        <div class="location-header">📍 Part Location</div>
-        <div class="location-empty">Add location — no auto-research for pre-2014 vehicles</div>`;
+      locDiv.innerHTML = '<div class="loc-header">📍 Part Location</div><div style="font-size:11px;color:var(--text-faint);">Add location — no auto-research for pre-2014</div>';
       return;
     }
 
-    locDiv.innerHTML = `
-      <div class="location-header">📍 Part Location — ${partType}</div>
-      <div class="location-loading">Researching location...</div>`;
+    locDiv.innerHTML = '<div class="loc-header">📍 Part Location — ' + partType + '</div><div style="font-size:11px;color:var(--text-muted);font-style:italic;">Researching...</div>';
 
     try {
-      const res = await fetch(`/part-location/${encodeURIComponent(partType)}/${make}/${model}/${year}?${trim}`);
+      const res = await fetch('/part-location/' + encodeURIComponent(partType) + '/' + make + '/' + model + '/' + year + '?' + trim);
       const data = await res.json();
-
       if (!data.success) throw new Error(data.error);
-
       if (!data.found) {
-        locDiv.innerHTML = `
-          <div class="location-header">📍 Part Location — ${partType}</div>
-          <div class="location-empty">${data.eligible
-            ? 'No location data yet — research returned no results'
-            : 'Add location'}</div>`;
+        locDiv.innerHTML = '<div class="loc-header">📍 Part Location — ' + partType + '</div><div style="font-size:11px;color:var(--text-faint);">' + (data.eligible ? 'No data found' : 'Add location') + '</div>';
         return;
       }
-
-      renderLocation(locDiv, data.location, partType);
+      renderLoc(locDiv, data.location, partType);
     } catch (err) {
-      locDiv.innerHTML = `
-        <div class="location-header">📍 Part Location — ${partType}</div>
-        <div class="location-empty">Could not load: ${err.message}</div>`;
+      locDiv.innerHTML = '<div class="loc-header">📍 Part Location</div><div style="font-size:11px;color:var(--text-muted);">Could not load</div>';
     }
   }
 
-  function renderLocation(container, loc, partType) {
+  function renderLoc(el, loc, pt) {
     const steps = Array.isArray(loc.removal_steps) ? loc.removal_steps : [];
-    const stepsHtml = steps.length > 0
-      ? `<ol class="location-steps">${steps.map(s => `<li>${s}</li>`).join('')}</ol>`
-      : '';
+    const stepsHtml = steps.length ? '<ol class="loc-steps">' + steps.map(s => '<li>' + s + '</li>').join('') + '</ol>' : '';
+    const bc = loc.confidence === 'high_confidence' ? 'badge-high' : loc.confidence === 'field_confirmed' ? 'badge-field' : 'badge-res';
+    const bl = loc.confidence === 'high_confidence' ? 'Confirmed' : loc.confidence === 'field_confirmed' ? 'Field' : 'Researched';
 
-    const confClass = loc.confidence === 'high_confidence' ? 'confidence-high' :
-                       loc.confidence === 'field_confirmed' ? 'confidence-field' : 'confidence-researched';
-    const confLabel = loc.confidence === 'high_confidence' ? 'Confirmed' :
-                      loc.confidence === 'field_confirmed' ? 'Field Data' : 'Researched';
-
-    container.innerHTML = `
-      <div class="location-header">📍 Part Location — ${partType}
-        <span class="location-confidence ${confClass}">${confLabel}</span>
-      </div>
-      ${loc.location_text ? `<div class="location-text">${loc.location_text}</div>` : ''}
+    el.innerHTML = `<div class="loc-header">📍 ${pt} <span class="loc-badge ${bc}">${bl}</span></div>
+      ${loc.location_text ? '<div class="loc-text">' + loc.location_text + '</div>' : ''}
       ${stepsHtml}
-      <div class="location-meta">
-        ${loc.tools ? `<span>🔧 ${loc.tools}</span>` : ''}
-        ${loc.avg_pull_minutes ? `<span>⏱ ~${loc.avg_pull_minutes} min</span>` : ''}
-        ${loc.confirmed_count > 0 ? `<span>✓ ${loc.confirmed_count} confirmation${loc.confirmed_count !== 1 ? 's' : ''}</span>` : ''}
+      <div class="loc-meta">
+        ${loc.tools ? '<span>🔧 ' + loc.tools + '</span>' : ''}
+        ${loc.avg_pull_minutes ? '<span>⏱ ~' + loc.avg_pull_minutes + ' min</span>' : ''}
       </div>
-      ${loc.hazards ? `<div class="location-hazard">⚠️ ${loc.hazards}</div>` : ''}
-      <div class="location-actions">
-        <button onclick="confirmLocation('${loc.id}')">✓ Confirm</button>
-        <button onclick="flagLocation('${loc.id}')">✗ Wrong</button>
+      ${loc.hazards ? '<div class="loc-hazard">⚠️ ' + loc.hazards + '</div>' : ''}
+      <div class="loc-actions">
+        <button onclick="confirmLoc('${loc.id}')">✓ Confirm</button>
+        <button onclick="flagLoc('${loc.id}')">✗ Wrong</button>
       </div>`;
   }
 
-  async function confirmLocation(locId) {
+  async function confirmLoc(id) { fetch('/part-location/confirm', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) }).catch(()=>{}); }
+  async function flagLoc(id) { fetch('/part-location/flag-wrong', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) }).catch(()=>{}); }
+
+  // === VIN Scanner ===
+  function openVinScanner() { document.getElementById('vinModal').classList.add('open'); document.getElementById('vinResult').innerHTML = ''; }
+  function closeVinScanner() { document.getElementById('vinModal').classList.remove('open'); }
+
+  async function handleVinPhoto(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const resultDiv = document.getElementById('vinResult');
+    resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><div>Reading VIN...</div></div>';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
     try {
-      await fetch('/part-location/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: locId }),
-      });
-    } catch (e) { /* ignore */ }
+      const res = await fetch('/vin/decode-photo', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (!data.success) throw new Error(data.error || 'Failed');
+      if (data.vin === 'UNREADABLE') {
+        resultDiv.innerHTML = '<p style="color:var(--red);margin-top:12px;">Could not read VIN. Retake photo.</p><button class="btn-primary" onclick="document.getElementById(\'vinFileInput\').click()">Retake</button>';
+        return;
+      }
+
+      let html = '<div class="vin-str">' + data.vin + '</div>';
+      if (data.decoded) {
+        const d = data.decoded;
+        html += '<div style="font-size:12px;color:var(--text-mid);line-height:1.6;">';
+        html += d.year ? '<div><b>Year:</b> ' + d.year + '</div>' : '';
+        html += d.make ? '<div><b>Make:</b> ' + d.make + '</div>' : '';
+        html += d.model ? '<div><b>Model:</b> ' + d.model + '</div>' : '';
+        html += d.engine ? '<div><b>Engine:</b> ' + d.engine + '</div>' : '';
+        html += d.bodyStyle ? '<div><b>Body:</b> ' + d.bodyStyle + '</div>' : '';
+        html += '</div>';
+      }
+      if (data.matchedVehicle) {
+        html += '<button class="btn-primary" onclick="closeVinScanner();scrollToVehicle(\'' + data.matchedVehicle + '\')">Jump to Vehicle</button>';
+      } else {
+        html += '<div style="margin-top:8px;font-size:11px;color:var(--text-muted);">No match in current yard inventory</div>';
+      }
+      resultDiv.innerHTML = html;
+    } catch (err) {
+      resultDiv.innerHTML = '<p style="color:var(--red);">Error: ' + err.message + '</p>';
+    }
+    // Reset input so same file can be re-selected
+    evt.target.value = '';
   }
 
-  async function flagLocation(locId) {
-    try {
-      await fetch('/part-location/flag-wrong', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: locId }),
-      });
-    } catch (e) { /* ignore */ }
+  function scrollToVehicle(vid) {
+    const el = document.getElementById('vrow-' + vid);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid var(--red)';
+      setTimeout(() => { el.style.outline = ''; }, 3000);
+      toggleV(vid);
+    }
   }
 
-  async function triggerScrape() {
-    const btn = event.target;
-    btn.textContent = 'Scraping...';
-    btn.disabled = true;
+  // === Utility ===
+  async function triggerScrape(btn) {
+    btn.textContent = 'Scraping...'; btn.disabled = true;
     try {
       await fetch('/yards/scrape/lkq', { method: 'POST' });
-      btn.textContent = 'Scrape started! Refreshing in 30s...';
+      btn.textContent = 'Started! Refreshing in 30s...';
       setTimeout(() => loadData(), 30000);
-    } catch (err) {
-      btn.textContent = 'Failed — tap to retry';
-      btn.disabled = false;
-    }
+    } catch (e) { btn.textContent = 'Failed'; btn.disabled = false; }
   }
 
-  async function loadFullYard(yardId) {
-    const res = await fetch(`/attack-list/yard/${yardId}?limit=200`);
-    const data = await res.json();
-    if (!data.success) return;
-
-    const list = document.getElementById('vlist-' + yardId);
-    let html = '';
-    for (const v of data.vehicles) {
-      html += renderVehicleRow(v, yardId);
-    }
-    list.innerHTML = html;
+  function timeAgo(ds) {
+    const d = new Date(ds); const diff = Date.now() - d.getTime();
+    const h = Math.floor(diff / 3600000); const dd = Math.floor(h / 24);
+    if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now';
   }
 
-  function timeAgo(dateStr) {
-    const date = new Date(dateStr);
-    const diff = Date.now() - date.getTime();
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(hours / 24);
-    if (days > 0) return days + 'd ago';
-    if (hours > 0) return hours + 'h ago';
-    return 'just now';
-  }
-
-  // Load on start
+  // Boot
   loadData();
 
-  // Register service worker for PWA / offline support
+  // PWA service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/admin/sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.log('SW registration failed:', err));
+    navigator.serviceWorker.register('/admin/sw.js').catch(() => {});
   }
 </script>
 </body>
