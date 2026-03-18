@@ -43,6 +43,7 @@
     "playwright": "^1.58.1",
     "playwright-extra": "^4.3.6",
     "puppeteer": "^24.36.1",
+    "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react-paypal-button-v2": "^2.6.3",
     "react-select": "^5.1.0",
