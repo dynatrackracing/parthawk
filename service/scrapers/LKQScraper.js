@@ -3,32 +3,50 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { v4: uuidv4 } = require('uuid');
+const cheerio = require('cheerio');
+const axios = require('axios');
 
 /**
- * LKQ Pick Your Part Scraper — Direct API
+ * LKQ Pick Your Part Scraper — HTML Scraper (no browser needed)
  *
- * Endpoint: https://www.pyp.com/getVehicleInventory.aspx?page=PAGE&filter=&store=STOREID
+ * The pyp.com inventory pages are server-rendered HTML (DotNetNuke CMS).
+ * There is NO JSON API — the getVehicleInventory.aspx endpoint returns 404.
+ * Vehicle data is embedded in the HTML in div.pypvi_resultRow elements.
  *
- * Verified store IDs (from browser DevTools 2026-03-18):
- *   Raleigh:    1168  (slug: raleigh-1168)
- *   Durham:     1142  (slug: durham-1142)
- *   Greensboro: 1226  (slug: greensboro-1226)
- *   East NC:    1227  (slug: east-nc-1227)
+ * Page URL pattern:
+ *   https://www.pyp.com/inventory/{slug}/?page={N}
  *
- * Some stores require a session cookie from the inventory page before
- * the API will respond. We GET the inventory page first to pick up
- * set-cookie headers, then pass those cookies to the API call.
+ * Verified store slugs (confirmed 2026-03-18):
+ *   Raleigh:    raleigh-1168    (storeId 1168)
+ *   Durham:     durham-1142     (storeId 1142)
+ *   Greensboro: greensboro-1226 (storeId 1226)
+ *   East NC:    east-nc-1227    (storeId 1227)
+ *
+ * HTML structure per vehicle:
+ *   <div class="pypvi_resultRow" id="1168-62348">
+ *     <a class="pypvi_ymm" href="...">2004&nbsp;<wbr>TOYOTA&nbsp;<wbr>RAV4</a>
+ *     <div class="pypvi_detailItem"><b>Color: </b>Black</div>
+ *     <div class="pypvi_detailItem"><b>VIN: </b>JTEGD20V840030259</div>
+ *     <div class="pypvi_detailItem"><b>Section: </b>CARS &nbsp;&nbsp; <b>Row: </b>B16</div>
+ *     <div class="pypvi_detailItem"><b>Stock #:</b> 1168-62348</div>
+ *     <div class="pypvi_detailItem"><b>Available:</b> <time datetime="...">3/18/2026</time></div>
+ *
+ * Pagination: "Next Page" link present when more pages exist.
+ * ~25 vehicles per page. Stop when no vehicles with id= found.
+ *
+ * No Puppeteer, Playwright, or browser automation needed.
+ * Uses axios + cheerio only.
  */
 class LKQScraper {
   constructor() {
     this.log = log.child({ class: 'LKQScraper' }, true);
     this.locations = [
-      { name: 'LKQ Raleigh',    storeId: '1168', slug: 'raleigh-1168'    },
-      { name: 'LKQ Durham',     storeId: '1142', slug: 'durham-1142'     },
-      { name: 'LKQ Greensboro', storeId: '1226', slug: 'greensboro-1226' },
-      { name: 'LKQ East NC',    storeId: '1227', slug: 'east-nc-1227'    },
+      { name: 'LKQ Raleigh',    slug: 'raleigh-1168',    storeId: '1168' },
+      { name: 'LKQ Durham',     slug: 'durham-1142',     storeId: '1142' },
+      { name: 'LKQ Greensboro', slug: 'greensboro-1226', storeId: '1226' },
+      { name: 'LKQ East NC',    slug: 'east-nc-1227',    storeId: '1227' },
     ];
-    this.baseUrl = 'https://www.pyp.com/getVehicleInventory.aspx';
+    this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   }
 
   async scrapeAll() {
@@ -48,16 +66,17 @@ class LKQScraper {
   }
 
   async scrapeLocation(location) {
-    this.log.info({ location: location.name, storeId: location.storeId }, 'Scraping ' + location.name);
+    this.log.info({ location: location.name, slug: location.slug }, 'Scraping ' + location.name);
     const yard = await database('yard').where('name', location.name).first();
     if (!yard) return { location: location.name, success: false, error: 'Yard not in database' };
 
-    const vehicles = await this.fetchInventory(location);
+    const vehicles = await this.fetchAllPages(location);
     if (!vehicles || vehicles.length === 0) {
       this.log.warn({ location: location.name }, 'No vehicles returned');
       return { location: location.name, success: true, count: 0 };
     }
 
+    // Mark all existing as inactive, then re-activate/insert found ones
     await database('yard_vehicle').where('yard_id', yard.id).where('active', true)
       .update({ active: false, updatedAt: new Date() });
 
@@ -93,208 +112,108 @@ class LKQScraper {
   }
 
   /**
-   * Establish a session by visiting the inventory page, capture cookies,
-   * then use those cookies for API requests.
+   * Fetch and parse all pages of inventory for a location.
    */
-  async getSessionCookies(location) {
-    const pageUrl = `https://www.pyp.com/inventory/${location.slug}/`;
-    this.log.info({ pageUrl }, 'Fetching inventory page for session cookies');
-
-    try {
-      const response = await fetch(pageUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        redirect: 'follow',
-      });
-
-      // Extract all set-cookie headers
-      const setCookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [];
-      // Fallback for older Node: raw headers
-      const rawSetCookies = setCookies.length > 0 ? setCookies :
-        (response.headers.raw ? (response.headers.raw()['set-cookie'] || []) : []);
-
-      // Build cookie string from set-cookie headers
-      const cookieParts = rawSetCookies.map(c => c.split(';')[0]);
-      const cookieString = cookieParts.join('; ');
-
-      this.log.info({
-        status: response.status,
-        cookieCount: cookieParts.length,
-        cookies: cookieString.slice(0, 200),
-      }, 'Session cookies captured');
-
-      return cookieString;
-    } catch (err) {
-      this.log.warn({ err: err.message }, 'Failed to get session cookies');
-      return '';
-    }
-  }
-
-  /**
-   * Fetch all inventory pages from the PYP API for a location.
-   */
-  async fetchInventory(location) {
-    // Step 1: Get session cookies from the inventory page
-    const cookies = await this.getSessionCookies(location);
-
+  async fetchAllPages(location) {
     const allVehicles = [];
     let page = 1;
-    let debugLogged = false;
-
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': `https://www.pyp.com/inventory/${location.slug}/`,
-      'Origin': 'https://www.pyp.com',
-      'X-Requested-With': 'XMLHttpRequest',
-    };
-    if (cookies) {
-      headers['Cookie'] = cookies;
-    }
 
     while (page <= 100) {
-      const url = `${this.baseUrl}?page=${page}&filter=&store=${location.storeId}`;
+      const url = page === 1
+        ? `https://www.pyp.com/inventory/${location.slug}/`
+        : `https://www.pyp.com/inventory/${location.slug}/?page=${page}`;
 
       try {
-        const response = await fetch(url, { headers });
+        const response = await axios.get(url, {
+          headers: {
+            'User-Agent': this.userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          timeout: 30000,
+        });
 
-        if (!response.ok) {
-          // Log full response headers on 403 so we can diagnose
-          const respHeaders = {};
-          response.headers.forEach((val, key) => { respHeaders[key] = val; });
-          this.log.warn({
-            status: response.status,
-            page,
-            store: location.storeId,
-            location: location.name,
-            responseHeaders: respHeaders,
-          }, 'API returned non-OK status');
-          break;
-        }
-
-        const rawText = await response.text();
-
-        // DEBUG: Log the raw response for the first successful 200
-        if (!debugLogged) {
-          debugLogged = true;
-          console.log('RAW API RESPONSE:', JSON.stringify({ location: location.name, store: location.storeId, length: rawText.length, body: rawText.substring(0, 2000) }));
-          this.log.info({
-            location: location.name,
-            storeId: location.storeId,
-            rawLength: rawText.length,
-            rawPreview: rawText.substring(0, 2000),
-          }, 'RAW API RESPONSE (first 200 OK)');
-        }
-
-        let data;
-        try {
-          data = JSON.parse(rawText);
-        } catch (parseErr) {
-          this.log.warn({ page, rawPreview: rawText.slice(0, 500) }, 'Response is not valid JSON');
-          break;
-        }
-
-        // Find the vehicle array in the response regardless of shape
-        let vehicles = [];
-        if (Array.isArray(data)) {
-          vehicles = data;
-        } else if (data && typeof data === 'object') {
-          // Log all top-level keys on first page
-          if (page === 1) {
-            this.log.info({
-              topLevelKeys: Object.keys(data),
-              topLevelTypes: Object.fromEntries(
-                Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? `array(${v.length})` : typeof v])
-              ),
-              location: location.name,
-            }, 'API response structure');
-
-            // If there's an array, log the keys of its first element
-            for (const [key, val] of Object.entries(data)) {
-              if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
-                this.log.info({
-                  arrayKey: key,
-                  firstItemKeys: Object.keys(val[0]),
-                  firstItem: JSON.stringify(val[0]).substring(0, 500),
-                }, 'First vehicle object in response');
-              }
-            }
-          }
-
-          // Walk all values looking for the vehicle array
-          for (const val of Object.values(data)) {
-            if (Array.isArray(val) && val.length > 0) {
-              vehicles = val;
-              break;
-            }
-          }
-        }
+        const html = response.data;
+        const vehicles = this.parseInventoryPage(html);
 
         if (vehicles.length === 0) {
-          this.log.debug({ page }, 'Empty page — done');
+          this.log.debug({ page }, 'No vehicles on page — done');
           break;
         }
 
-        const parsed = vehicles.map(item => this.parseVehicle(item)).filter(Boolean);
-        allVehicles.push(...parsed);
-        this.log.info({ page, raw: vehicles.length, parsed: parsed.length, location: location.name }, 'Page parsed');
+        allVehicles.push(...vehicles);
+        this.log.info({ page, count: vehicles.length, location: location.name }, 'Page scraped');
+
+        // Check for "Next Page" link
+        const hasNext = html.includes('Next Page');
+        if (!hasNext) break;
 
         page++;
+        // 500ms delay between requests
         await new Promise(r => setTimeout(r, 500));
       } catch (err) {
-        this.log.error({ err: err.message, page }, 'Fetch failed');
+        this.log.error({ err: err.message, page, location: location.name }, 'Fetch failed');
         break;
       }
     }
 
-    this.log.info({ total: allVehicles.length, location: location.name, pages: page - 1 }, 'Inventory fetch complete');
+    this.log.info({ total: allVehicles.length, location: location.name, pages: page }, 'All pages fetched');
     return allVehicles;
   }
 
   /**
-   * Parse a single vehicle object from the API response.
-   * Covers every known PYP field name convention.
+   * Parse vehicle data from a single inventory HTML page.
+   * Extracts from div.pypvi_resultRow elements that have an id (real vehicles).
    */
-  parseVehicle(item) {
-    if (!item || typeof item !== 'object') return null;
+  parseInventoryPage(html) {
+    const $ = cheerio.load(html);
+    const vehicles = [];
 
-    const year = String(
-      item.year || item.Year || item.vehicleYear || item.vehicle_year ||
-      item.VehicleYear || item.yr || ''
-    ).trim();
-    const make = String(
-      item.make || item.Make || item.vehicleMake || item.vehicle_make ||
-      item.VehicleMake || item.mk || ''
-    ).trim();
-    const model = String(
-      item.model || item.Model || item.vehicleModel || item.vehicle_model ||
-      item.VehicleModel || item.mdl || ''
-    ).trim();
+    // Only select result rows with an id attribute (template row has no id)
+    $('div.pypvi_resultRow[id]').each((i, el) => {
+      const $row = $(el);
 
-    if (!year || !make || !model || !/^\d{4}$/.test(year)) return null;
+      // Year Make Model from the pypvi_ymm link text
+      // Format: "2004&nbsp;TOYOTA&nbsp;RAV4" — cheerio converts &nbsp; to spaces
+      const ymmText = $row.find('.pypvi_ymm').text().replace(/\s+/g, ' ').trim();
+      const ymmMatch = ymmText.match(/^(\d{4})\s+(.+?)\s+(.+)$/);
+      if (!ymmMatch) return;
 
-    return {
-      year,
-      make,
-      model,
-      trim: item.trim || item.Trim || item.subModel || item.sub_model ||
-            item.SubModel || null,
-      row: item.row || item.Row || item.rowNumber || item.row_number ||
-           item.RowNumber || item.location || item.Location ||
-           item.aisle || item.Aisle || null,
-      color: item.color || item.Color || item.exteriorColor || item.exterior_color ||
-             item.ExteriorColor || null,
-      vin: item.vin || item.VIN || item.vinNumber || item.Vin || null,
-      dateAdded: item.dateAdded || item.date_added || item.arrivalDate ||
-                 item.arrival_date || item.DateAdded || item.ArrivalDate ||
-                 item.displayDate || item.DisplayDate || null,
-      stockNumber: item.stockNumber || item.stock_number || item.StockNumber ||
-                   item.stockNo || item.StockNo || null,
-    };
+      const year = ymmMatch[1];
+      const make = ymmMatch[2].trim();
+      const model = ymmMatch[3].trim();
+
+      // Parse detail items
+      let color = null, vin = null, row = null, stockNumber = null, dateAdded = null, section = null;
+
+      $row.find('.pypvi_detailItem').each((j, detail) => {
+        const text = $(detail).text().replace(/\s+/g, ' ').trim();
+
+        if (text.startsWith('Color:')) {
+          color = text.replace('Color:', '').trim();
+        } else if (text.startsWith('VIN:')) {
+          vin = text.replace('VIN:', '').trim();
+        } else if (text.includes('Row:')) {
+          const rowMatch = text.match(/Row:\s*(\S+)/);
+          if (rowMatch) row = rowMatch[1];
+          const sectionMatch = text.match(/Section:\s*(\S+)/);
+          if (sectionMatch) section = sectionMatch[1];
+        } else if (text.includes('Stock #:') || text.includes('Stock#:')) {
+          stockNumber = text.replace(/Stock\s*#:\s*/, '').trim();
+        } else if (text.includes('Available:')) {
+          const timeEl = $(detail).find('time');
+          if (timeEl.length) {
+            dateAdded = timeEl.attr('datetime') || timeEl.text().trim();
+          } else {
+            dateAdded = text.replace('Available:', '').trim();
+          }
+        }
+      });
+
+      vehicles.push({ year, make, model, color, vin, row, stockNumber, dateAdded });
+    });
+
+    return vehicles;
   }
 }
 
