@@ -81,7 +81,12 @@ async function start() {
     log.info(`Running as process: ${process.env.NODE_ENV}`);
 
     log.debug('running latest database migrations');
-    await database.migrate.latest(database.client.config.migration);
+    try {
+      await database.migrate.latest(database.client.config.migration);
+      log.info('Migrations complete');
+    } catch (migrationErr) {
+      log.error({ err: migrationErr }, 'Migration failed — server will start anyway');
+    }
 
     app.listen(PORT, function () {
       log.info(`Server started at port ${PORT}`);

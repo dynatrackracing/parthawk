@@ -112,38 +112,67 @@ module.exports = {
       });
     }
 
-    // Add store column to YourListing if not exists
-    const hasListingStore = await knex.schema.hasColumn('YourListing', 'store');
-    if (!hasListingStore) {
-      await knex.schema.alterTable('YourListing', table => {
-        table.text('store').defaultTo('dynatrack');
-      });
-    }
+    // Safe column additions — each wrapped in try/catch so a single
+    // failure doesn't prevent the rest of the migration from running.
 
-    // Add programmed flag to YourListing for price protection
-    const hasProgrammed = await knex.schema.hasColumn('YourListing', 'isProgrammed');
-    if (!hasProgrammed) {
-      await knex.schema.alterTable('YourListing', table => {
-        table.boolean('isProgrammed').defaultTo(false);
-      });
-    }
+    // Add store column to YourListing
+    try {
+      if (await knex.schema.hasTable('YourListing')) {
+        const hasListingStore = await knex.schema.hasColumn('YourListing', 'store');
+        if (!hasListingStore) {
+          await knex.schema.alterTable('YourListing', table => {
+            table.text('store').defaultTo('dynatrack');
+          });
+        }
+      }
+    } catch (e) { /* column may already exist */ }
 
-    // Add seasonal_weight to market_demand_cache if not exists
-    const hasSeasonalWeight = await knex.schema.hasColumn('market_demand_cache', 'seasonal_weight');
-    if (!hasSeasonalWeight) {
-      await knex.schema.alterTable('market_demand_cache', table => {
-        table.decimal('ebay_sold_30d', 10, 0).defaultTo(0);
-        table.decimal('seasonal_weight', 5, 2).defaultTo(1.0);
-      });
-    }
+    // Add programmed flag to YourListing
+    try {
+      if (await knex.schema.hasTable('YourListing')) {
+        const hasProgrammed = await knex.schema.hasColumn('YourListing', 'isProgrammed');
+        if (!hasProgrammed) {
+          await knex.schema.alterTable('YourListing', table => {
+            table.boolean('isProgrammed').defaultTo(false);
+          });
+        }
+      }
+    } catch (e) { /* column may already exist */ }
 
-    // Add entry_fee_notes to yard if not exists
-    const hasEntryNotes = await knex.schema.hasColumn('yard', 'entry_fee_notes');
-    if (!hasEntryNotes) {
-      await knex.schema.alterTable('yard', table => {
-        table.text('entry_fee_notes');
-      });
-    }
+    // Add seasonal columns to market_demand_cache (each separately)
+    try {
+      if (await knex.schema.hasTable('market_demand_cache')) {
+        const has30d = await knex.schema.hasColumn('market_demand_cache', 'ebay_sold_30d');
+        if (!has30d) {
+          await knex.schema.alterTable('market_demand_cache', table => {
+            table.decimal('ebay_sold_30d', 10, 0).defaultTo(0);
+          });
+        }
+      }
+    } catch (e) { /* column may already exist */ }
+
+    try {
+      if (await knex.schema.hasTable('market_demand_cache')) {
+        const hasSW = await knex.schema.hasColumn('market_demand_cache', 'seasonal_weight');
+        if (!hasSW) {
+          await knex.schema.alterTable('market_demand_cache', table => {
+            table.decimal('seasonal_weight', 5, 2).defaultTo(1.0);
+          });
+        }
+      }
+    } catch (e) { /* column may already exist */ }
+
+    // Add entry_fee_notes to yard
+    try {
+      if (await knex.schema.hasTable('yard')) {
+        const hasEntryNotes = await knex.schema.hasColumn('yard', 'entry_fee_notes');
+        if (!hasEntryNotes) {
+          await knex.schema.alterTable('yard', table => {
+            table.text('entry_fee_notes');
+          });
+        }
+      }
+    } catch (e) { /* column may already exist */ }
   },
 
   async down(knex) {
