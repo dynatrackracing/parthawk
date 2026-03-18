@@ -105,6 +105,18 @@ async function start() {
       await priceCheckRunner.work({ batchSize: 15 });
     });
 
+    // Market demand cache - runs nightly at 3:00 AM after LKQ scrape
+    const MarketDemandCronRunner = require('./lib/MarketDemandCronRunner');
+    const marketDemandJob = schedule.scheduleJob('0 3 * * *', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting nightly market demand cache update');
+      try {
+        const runner = new MarketDemandCronRunner();
+        await runner.work();
+      } catch (err) {
+        log.error({ err }, 'Market demand cache update failed');
+      }
+    });
+
     // LKQ scrape cron - runs every night at 2:00 AM (spec section 4.3)
     const LKQScraper = require('./scrapers/LKQScraper');
     const lkqScrapeJob = schedule.scheduleJob('0 2 * * *', async function (scheduledTime) {
