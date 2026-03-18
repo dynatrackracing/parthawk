@@ -414,8 +414,11 @@
 
 <div class="tabs" id="tabBar">
   <div class="tab active" onclick="showTab('all')" id="tab-all">All Yards</div>
-  <div class="tab" onclick="showTab('local')" id="tab-local">Local</div>
+  <div class="tab" onclick="showTab('yard:LKQ Raleigh')" id="tab-yard:LKQ Raleigh">LKQ Raleigh</div>
+  <div class="tab" onclick="showTab('yard:LKQ Durham')" id="tab-yard:LKQ Durham">LKQ Durham</div>
+  <div class="tab" onclick="showTab('yard:LKQ Greensboro')" id="tab-yard:LKQ Greensboro">LKQ Greensboro</div>
   <div class="tab" onclick="showTab('day_trip')" id="tab-day_trip">Day Trip</div>
+  <div class="tab" onclick="showTab('road_trip')" id="tab-road_trip">Road Trip</div>
 </div>
 
 <div class="updated-bar" id="updatedBar">—</div>
@@ -475,10 +478,13 @@
 
     let yards = allData.yards;
 
-    if (currentTab === 'local') {
-      yards = yards.filter(y => y.yard.visit_frequency === 'local');
+    if (currentTab.startsWith('yard:')) {
+      const yardName = currentTab.slice(5);
+      yards = yards.filter(y => y.yard.name === yardName);
     } else if (currentTab === 'day_trip') {
       yards = yards.filter(y => y.yard.visit_frequency === 'day_trip');
+    } else if (currentTab === 'road_trip') {
+      yards = yards.filter(y => y.yard.visit_frequency === 'road_trip');
     }
 
     if (!yards.length) {
@@ -562,34 +568,32 @@
   }
 
   function renderVehicleRow(v, yardId) {
-    const scoreClass = v.color_code === 'red' ? 'score-red' : 
+    const scoreClass = v.color_code === 'red' ? 'score-red' :
                        v.color_code === 'yellow' ? 'score-yellow' : 'score-gray';
-    
-    const pullParts = v.parts.filter(p => p.verdict === 'PULL');
-    const watchParts = v.parts.filter(p => p.verdict === 'WATCH');
 
-    const chipsHtml = v.parts.slice(0, 5).map(p => {
-      const chipClass = p.verdict === 'PULL' ? 'chip-pull' : 
-                        p.verdict === 'WATCH' ? 'chip-watch' : 'chip-skip';
-      return `<span class="part-chip ${chipClass}">${p.type}</span>`;
-    }).join('');
+    // Summary chip: show matched parts count + avg price
+    const matchCount = v.matched_parts || 0;
+    const chipClass = v.color_code === 'red' ? 'chip-pull' :
+                      v.color_code === 'yellow' ? 'chip-watch' : 'chip-skip';
+    const chipsHtml = matchCount > 0
+      ? `<span class="part-chip ${chipClass}">${matchCount} part${matchCount !== 1 ? 's' : ''} in inventory</span>` +
+        `<span class="part-chip chip-skip">~$${v.avg_part_price || 0} avg</span>`
+      : `<span class="part-chip chip-skip">No inventory match</span>`;
 
-    const partsDetailHtml = v.parts.map(p => {
-      const verdictClass = p.verdict === 'PULL' ? 'verdict-pull' : 
-                           p.verdict === 'WATCH' ? 'verdict-watch' : 'verdict-skip';
-      return `
-        <div class="part-row">
-          <div class="part-name">${p.type}</div>
-          <div class="part-stats">
-            <div class="part-stat-row">
-              <span>📦 ${p.in_stock} in stock</span>
-              <span>📈 ${p.demand_90d} sold/90d</span>
-              <span>💰 ~$${p.avg_price}</span>
+    // Expanded detail: show actual matched inventory items
+    const parts = v.parts || [];
+    const partsDetailHtml = parts.length > 0
+      ? parts.map(p => `
+          <div class="part-row">
+            <div class="part-name" style="width:auto; flex:1; font-size:13px;">${p.title || p.category || 'Part'}</div>
+            <div class="part-stats">
+              <div class="part-stat-row">
+                ${p.partNumber ? `<span>🔧 ${p.partNumber}</span>` : ''}
+                <span>💰 $${p.price}</span>
+              </div>
             </div>
-          </div>
-          <div class="part-verdict ${verdictClass}">${p.verdict}</div>
-        </div>`;
-    }).join('');
+          </div>`).join('')
+      : `<div class="part-row"><div class="part-name" style="width:auto; color:var(--text-muted);">No matching parts found in inventory</div></div>`;
 
     return `
       <div class="vehicle-row">

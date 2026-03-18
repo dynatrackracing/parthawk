@@ -2,35 +2,81 @@
 
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
-const { raw } = require('objection');
 
 /**
  * AttackListService - Scores yard vehicles by pull value
- * 
- * Score = (Demand × AvgPrice) / ActiveStock
- * 
- * Demand: how many times this year/make/model/part combo sold in your history
- * AvgPrice: average sale price from your history
- * ActiveStock: how many you currently have listed (from YourListing)
- * 
+ *
+ * Matches scraped yard vehicles (year/make/model) against the Auto table
+ * to find compatible Items in inventory. Scores each vehicle by:
+ *   - How many matching parts we have in inventory (Item table via AutoItemCompatibility)
+ *   - Average price of those parts
+ *   - Recent sales history (YourSale)
+ *   - Current active stock (YourListing)
+ *
  * Score 80-100 = Pull every time (RED)
- * Score 60-79  = Pull if price is right (YELLOW)  
- * Score 40-59  = Caution (GRAY)
- * Score 0-39   = Skip
+ * Score 60-79  = Pull if price is right (YELLOW)
+ * Score 0-59   = Low demand / no history (GRAY)
  */
 
-// High value parts to look for on each vehicle
-// Based on spec section 1.1 part mix: ECMs, ABS, BCM/TCM, fuse boxes
-const PART_TARGETS = [
-  { type: 'ECM',        keywords: ['ECM', 'ECU', 'PCM', 'engine control'],           avgPull: 35, baseValue: 180 },
-  { type: 'BCM',        keywords: ['BCM', 'body control'],                            avgPull: 25, baseValue: 120 },
-  { type: 'TCM',        keywords: ['TCM', 'TCU', 'transmission control'],             avgPull: 25, baseValue: 130 },
-  { type: 'ABS',        keywords: ['ABS', 'anti lock', 'brake pump', 'brake module'], avgPull: 20, baseValue: 110 },
-  { type: 'TIPM',       keywords: ['TIPM', 'fuse box', 'junction', 'relay box'],      avgPull: 20, baseValue: 95  },
-  { type: 'Amplifier',  keywords: ['amp', 'amplifier', 'bose', 'harman', 'alpine', 'b&o', 'bang'], avgPull: 15, baseValue: 85 },
-  { type: 'Cluster',    keywords: ['cluster', 'speedometer', 'instrument panel'],     avgPull: 20, baseValue: 75 },
-  { type: 'Radio',      keywords: ['radio', 'head unit', 'infotainment', 'sync'],     avgPull: 15, baseValue: 65 },
-];
+// Make aliases: map common variants to the canonical name used in the Auto table.
+// Auto table uses title-case eBay taxonomy names (see service/lib/constants.js).
+const MAKE_ALIASES = {
+  'chevy':         'Chevrolet',
+  'chevrolet':     'Chevrolet',
+  'dodge':         'Dodge',
+  'ram':           'Ram',
+  'chrysler':      'Chrysler',
+  'jeep':          'Jeep',
+  'ford':          'Ford',
+  'gmc':           'GMC',
+  'toyota':        'Toyota',
+  'honda':         'Honda',
+  'nissan':        'Nissan',
+  'bmw':           'BMW',
+  'mercedes':      'Mercedes-Benz',
+  'mercedes-benz': 'Mercedes-Benz',
+  'mazda':         'Mazda',
+  'kia':           'Kia',
+  'hyundai':       'Hyundai',
+  'subaru':        'Subaru',
+  'mitsubishi':    'Mitsubishi',
+  'infiniti':      'Infiniti',
+  'lexus':         'Lexus',
+  'acura':         'Acura',
+  'cadillac':      'Cadillac',
+  'buick':         'Buick',
+  'lincoln':       'Lincoln',
+  'volvo':         'Volvo',
+  'audi':          'Audi',
+  'volkswagen':    'Volkswagen',
+  'vw':            'Volkswagen',
+  'mini':          'Mini',
+  'pontiac':       'Pontiac',
+  'saturn':        'Saturn',
+  'mercury':       'Mercury',
+  'scion':         'Scion',
+  'land rover':    'Land Rover',
+  'porsche':       'Porsche',
+  'jaguar':        'Jaguar',
+  'saab':          'Saab',
+};
+
+// Secondary alias: makes that should ALSO match each other for demand.
+// e.g. a Ram 1500 in the yard should match Dodge Ram parts in inventory.
+const MAKE_ALSO_CHECK = {
+  'Ram':   ['Dodge'],
+  'Dodge': ['Ram'],
+};
+
+/**
+ * Normalize a make name from any source (LKQ, CSV, etc.) to the
+ * canonical Auto-table form. Case-insensitive, alias-aware.
+ */
+function normalizeMake(make) {
+  if (!make) return null;
+  const lower = make.toLowerCase().trim();
+  return MAKE_ALIASES[lower] || null;
+}
 
 class AttackListService {
   constructor() {
@@ -38,15 +84,15 @@ class AttackListService {
   }
 
   /**
-   * Generate attack list for a specific yard
-   * Returns scored vehicles sorted by pull value
+   * Generate attack list for a specific yard.
+   * Returns scored vehicles sorted by pull value.
    */
   async getAttackList(yardId, options = {}) {
     const { daysBack = 90, limit = 50 } = options;
 
     this.log.info({ yardId, daysBack }, 'Generating attack list');
 
-    // Get vehicles at this yard
+    // Get active vehicles at this yard
     const vehicles = await database('yard_vehicle')
       .where('yard_id', yardId)
       .where('active', true)
@@ -57,15 +103,20 @@ class AttackListService {
       return { vehicles: [], scored_at: new Date().toISOString(), total: 0 };
     }
 
-    // Get your sales history for the past N days
-    const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    const salesHistory = await this.getSalesHistory(cutoff);
+    // Build inventory index: what parts do we have for each year/make/model?
+    const inventoryIndex = await this.buildInventoryIndex();
 
-    // Get current stock from YourListing
-    const currentStock = await this.getCurrentStock();
+    // Get recent sales from YourSale for extra demand signal
+    const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    const salesIndex = await this.buildSalesIndex(cutoff);
+
+    // Get current active listing counts
+    const stockIndex = await this.buildStockIndex();
 
     // Score each vehicle
-    const scored = vehicles.map(v => this.scoreVehicle(v, salesHistory, currentStock));
+    const scored = vehicles.map(v =>
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex)
+    );
 
     // Sort by score descending
     scored.sort((a, b) => b.score - a.score);
@@ -79,162 +130,242 @@ class AttackListService {
   }
 
   /**
-   * Get your sales history grouped by make/model/part type
+   * Build an index of inventory parts keyed by "make|model|year".
+   * Uses Auto + AutoItemCompatibility + Item tables for structured matching.
+   *
+   * Returns: { "Dodge|Ram 1500|2017": { items: [...], count, avgPrice, totalValue } }
    */
-  async getSalesHistory(cutoff) {
-    const sales = await database('YourSale')
-      .where('soldDate', '>=', cutoff)
-      .whereNotNull('title')
-      .select('title', 'salePrice', 'soldDate');
+  async buildInventoryIndex() {
+    const index = {};
 
-    // Build a lookup: "make|model|partType" -> { count, totalRevenue, avgPrice }
-    const history = {};
+    const hasAIC = await database.schema.hasTable('AutoItemCompatibility');
+    if (!hasAIC) return index;
 
-    for (const sale of sales) {
-      const title = (sale.title || '').toLowerCase();
-      
-      // Extract year/make/model from title
-      const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-      const year = yearMatch ? yearMatch[0] : null;
+    // Join Auto -> AutoItemCompatibility -> Item to get parts with fitment data
+    const rows = await database('Auto')
+      .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+      .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+      .where('Item.price', '>', 0)
+      .select(
+        'Auto.year',
+        'Auto.make',
+        'Auto.model',
+        'Item.id as itemId',
+        'Item.title',
+        'Item.price',
+        'Item.categoryTitle',
+        'Item.manufacturerPartNumber'
+      );
 
-      // Detect part type
-      let partType = null;
-      for (const part of PART_TARGETS) {
-        if (part.keywords.some(k => title.includes(k.toLowerCase()))) {
-          partType = part.type;
-          break;
-        }
+    for (const row of rows) {
+      const key = `${row.make}|${row.model}|${row.year}`;
+      if (!index[key]) {
+        index[key] = { items: [], count: 0, totalValue: 0, avgPrice: 0 };
       }
-
-      if (!partType) continue;
-
-      // Extract make from common makes
-      const makes = ['dodge', 'chrysler', 'jeep', 'ram', 'ford', 'chevy', 'chevrolet', 'gmc', 
-                     'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'mazda', 'kia', 'hyundai',
-                     'subaru', 'mitsubishi', 'infiniti', 'lexus', 'acura', 'cadillac', 'buick',
-                     'lincoln', 'volvo', 'audi', 'volkswagen', 'vw', 'mini', 'pontiac', 'saturn'];
-      
-      let make = null;
-      for (const m of makes) {
-        if (title.includes(m)) { make = m; break; }
+      const entry = index[key];
+      // Deduplicate by item ID
+      if (!entry.items.some(i => i.itemId === row.itemId)) {
+        entry.items.push({
+          itemId: row.itemId,
+          title: row.title,
+          price: parseFloat(row.price) || 0,
+          category: row.categoryTitle,
+          partNumber: row.manufacturerPartNumber,
+        });
+        entry.count++;
+        entry.totalValue += parseFloat(row.price) || 0;
+        entry.avgPrice = entry.totalValue / entry.count;
       }
-
-      if (!make) continue;
-
-      const key = `${make}|${partType}`;
-      if (!history[key]) {
-        history[key] = { count: 0, totalRevenue: 0, avgPrice: 0, make, partType };
-      }
-      history[key].count++;
-      history[key].totalRevenue += parseFloat(sale.salePrice) || 0;
-      history[key].avgPrice = history[key].totalRevenue / history[key].count;
     }
 
-    return history;
+    return index;
   }
 
   /**
-   * Get current active listings count by make/partType
+   * Build a sales demand index from YourSale (eBay CSV/API) keyed by normalized make.
+   * Returns: { "Dodge": { count, totalRevenue, avgPrice } }
    */
-  async getCurrentStock() {
+  async buildSalesIndex(cutoff) {
+    const index = {};
+
+    const hasYourSale = await database.schema.hasTable('YourSale');
+    if (!hasYourSale) return index;
+
+    const sales = await database('YourSale')
+      .where('soldDate', '>=', cutoff)
+      .whereNotNull('title')
+      .select('title', 'salePrice');
+
+    for (const sale of sales) {
+      const title = (sale.title || '').toLowerCase();
+
+      // Extract make from title
+      let make = null;
+      for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+        if (title.includes(alias)) { make = canonical; break; }
+      }
+      if (!make) continue;
+
+      if (!index[make]) {
+        index[make] = { count: 0, totalRevenue: 0, avgPrice: 0 };
+      }
+      index[make].count++;
+      index[make].totalRevenue += parseFloat(sale.salePrice) || 0;
+      index[make].avgPrice = index[make].totalRevenue / index[make].count;
+    }
+
+    return index;
+  }
+
+  /**
+   * Build a stock index from YourListing keyed by normalized make.
+   * Returns: { "Dodge": totalQuantity }
+   */
+  async buildStockIndex() {
+    const index = {};
+
     const hasListings = await database.schema.hasTable('YourListing');
-    if (!hasListings) return {};
+    if (!hasListings) return index;
 
     const listings = await database('YourListing')
       .where('listingStatus', 'Active')
       .whereNotNull('title')
       .select('title', 'quantityAvailable');
 
-    const stock = {};
     for (const listing of listings) {
       const title = (listing.title || '').toLowerCase();
-      
-      let partType = null;
-      for (const part of PART_TARGETS) {
-        if (part.keywords.some(k => title.includes(k.toLowerCase()))) {
-          partType = part.type;
-          break;
-        }
-      }
-      if (!partType) continue;
 
-      const makes = ['dodge', 'chrysler', 'jeep', 'ram', 'ford', 'chevy', 'chevrolet', 'gmc',
-                     'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'mazda', 'kia', 'hyundai',
-                     'subaru', 'mitsubishi', 'infiniti', 'lexus', 'acura', 'cadillac', 'buick',
-                     'lincoln', 'volvo', 'audi', 'volkswagen', 'vw', 'mini', 'pontiac', 'saturn'];
-      
       let make = null;
-      for (const m of makes) {
-        if (title.includes(m)) { make = m; break; }
+      for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+        if (title.includes(alias)) { make = canonical; break; }
       }
       if (!make) continue;
 
-      const key = `${make}|${partType}`;
-      stock[key] = (stock[key] || 0) + (listing.quantityAvailable || 1);
+      index[make] = (index[make] || 0) + (listing.quantityAvailable || 1);
     }
 
-    return stock;
+    return index;
   }
 
   /**
-   * Score a single vehicle
+   * Score a single yard vehicle against inventory, sales, and stock data.
    */
-  scoreVehicle(vehicle, salesHistory, currentStock) {
-    const make = (vehicle.make || '').toLowerCase();
-    const model = (vehicle.model || '').toLowerCase();
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex) {
+    const make = normalizeMake(vehicle.make);
+    const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
 
-    const parts = [];
-    let totalEstValue = 0;
-    let topScore = 0;
-
-    for (const partTarget of PART_TARGETS) {
-      const key = `${make}|${partTarget.type}`;
-      const history = salesHistory[key];
-      const stock = currentStock[key] || 0;
-
-      // Demand score: based on your sell history
-      const demandCount = history ? history.count : 0;
-      const avgPrice = history ? history.avgPrice : partTarget.baseValue;
-
-      // Market score formula from spec:
-      // Score = (Units sold 90d × avg price) / active listings
-      // Normalize to 0-100
-      let score = 0;
-      if (demandCount > 0) {
-        const rawScore = (demandCount * avgPrice) / Math.max(stock + 1, 1);
-        score = Math.min(100, Math.round(rawScore / 20)); // normalize
-      } else {
-        // No history — use base value as signal, low score
-        score = Math.min(30, Math.round(partTarget.baseValue / 20));
+    // Find matching inventory parts via structured Auto fitment
+    let matchedParts = [];
+    if (make && model && year) {
+      // Try exact make match
+      const exactKey = `${make}|${model}|${year}`;
+      const exactMatch = inventoryIndex[exactKey];
+      if (exactMatch) {
+        matchedParts = exactMatch.items;
       }
 
-      // Stock penalty — if we have 5+ already, reduce score significantly
-      if (stock >= 5) score = Math.round(score * 0.3);
-      else if (stock >= 3) score = Math.round(score * 0.6);
-      else if (stock >= 1) score = Math.round(score * 0.85);
+      // Also check alias makes (e.g. Ram <-> Dodge)
+      const alsoCheck = MAKE_ALSO_CHECK[make] || [];
+      for (const altMake of alsoCheck) {
+        const altKey = `${altMake}|${model}|${year}`;
+        const altMatch = inventoryIndex[altKey];
+        if (altMatch) {
+          for (const item of altMatch.items) {
+            if (!matchedParts.some(p => p.itemId === item.itemId)) {
+              matchedParts.push(item);
+            }
+          }
+        }
+      }
 
-      if (score > 0) {
-        parts.push({
-          type: partTarget.type,
-          score,
-          demand_90d: demandCount,
-          avg_price: Math.round(avgPrice),
-          in_stock: stock,
-          verdict: score >= 70 ? 'PULL' : score >= 45 ? 'WATCH' : 'SKIP',
-        });
-        totalEstValue += score >= 45 ? avgPrice : 0;
-        topScore = Math.max(topScore, score);
+      // Fuzzy model match: try matching with model as substring
+      // e.g. yard has "Ram 1500", Auto table has "1500" or "Ram 1500"
+      if (matchedParts.length === 0) {
+        const modelLower = model.toLowerCase();
+        for (const [key, entry] of Object.entries(inventoryIndex)) {
+          const [iMake, iModel, iYear] = key.split('|');
+          if (parseInt(iYear) !== year) continue;
+
+          // Check if makes are compatible
+          const makesMatch = iMake === make || (alsoCheck.includes(iMake));
+          if (!makesMatch) continue;
+
+          // Fuzzy model: either contains the other
+          const iModelLower = iModel.toLowerCase();
+          if (iModelLower.includes(modelLower) || modelLower.includes(iModelLower)) {
+            for (const item of entry.items) {
+              if (!matchedParts.some(p => p.itemId === item.itemId)) {
+                matchedParts.push(item);
+              }
+            }
+          }
+        }
       }
     }
 
-    // Sort parts by score
-    parts.sort((a, b) => b.score - a.score);
+    const partCount = matchedParts.length;
+    const avgPrice = partCount > 0
+      ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount
+      : 0;
+
+    // Get sales demand for this make (from YourSale)
+    const salesDemand = (make && salesIndex[make]) || { count: 0, avgPrice: 0 };
+
+    // Also check alias makes for sales
+    const alsoCheck = make ? (MAKE_ALSO_CHECK[make] || []) : [];
+    for (const altMake of alsoCheck) {
+      if (salesIndex[altMake]) {
+        salesDemand.count += salesIndex[altMake].count;
+      }
+    }
+
+    // Current stock for this make
+    let stock = (make && stockIndex[make]) || 0;
+    for (const altMake of alsoCheck) {
+      stock += stockIndex[altMake] || 0;
+    }
+
+    // Scoring: combine inventory match strength + sales demand
+    let score = 0;
+
+    if (partCount > 0) {
+      // We have parts in inventory that fit this vehicle
+      // Base score from inventory: more parts + higher prices = higher score
+      const inventorySignal = (partCount * avgPrice) / Math.max(stock + 1, 1);
+      score = Math.min(100, Math.round(inventorySignal / 15));
+
+      // Boost from recent sales demand
+      if (salesDemand.count > 0) {
+        const demandBoost = Math.min(20, Math.round(salesDemand.count / 2));
+        score = Math.min(100, score + demandBoost);
+      }
+    } else if (salesDemand.count > 0) {
+      // No inventory match but we have sales history for this make
+      const rawScore = (salesDemand.count * salesDemand.avgPrice) / Math.max(stock + 1, 1);
+      score = Math.min(70, Math.round(rawScore / 20));
+    } else if (make) {
+      // No inventory match, no sales — base score from make recognition
+      score = 15;
+    }
+
+    // Stock penalty
+    if (stock >= 5) score = Math.round(score * 0.3);
+    else if (stock >= 3) score = Math.round(score * 0.6);
+    else if (stock >= 1) score = Math.round(score * 0.85);
 
     // Vehicle level color
     let color = 'gray';
-    if (topScore >= 70) color = 'red';
-    else if (topScore >= 45) color = 'yellow';
+    if (score >= 70) color = 'red';
+    else if (score >= 45) color = 'yellow';
+
+    // Build parts summary (top 6 matched items)
+    const partsDisplay = matchedParts.slice(0, 6).map(p => ({
+      title: p.title,
+      category: p.category,
+      partNumber: p.partNumber,
+      price: Math.round(p.price),
+    }));
 
     return {
       id: vehicle.id,
@@ -245,21 +376,29 @@ class AttackListService {
       row_number: vehicle.row_number,
       color: vehicle.color,
       date_added: vehicle.date_added,
-      score: topScore,
+      score,
       color_code: color,
-      est_value: Math.round(totalEstValue),
-      parts: parts.slice(0, 6), // top 6 parts
+      est_value: Math.round(partCount > 0 ? avgPrice * partCount : 0),
+      matched_parts: partCount,
+      avg_part_price: Math.round(avgPrice),
+      parts: partsDisplay,
     };
   }
 
   /**
-   * Get attack list summary across all yards
+   * Get attack list summary across all yards.
    */
   async getAllYardsAttackList(options = {}) {
     const yards = await database('yard')
       .where('enabled', true)
       .where('flagged', false)
       .orderBy('distance_from_base', 'asc');
+
+    // Build indexes once, shared across all yards
+    const inventoryIndex = await this.buildInventoryIndex();
+    const cutoff = new Date(Date.now() - (options.daysBack || 90) * 24 * 60 * 60 * 1000);
+    const salesIndex = await this.buildSalesIndex(cutoff);
+    const stockIndex = await this.buildStockIndex();
 
     const results = [];
     for (const yard of yards) {
@@ -271,8 +410,19 @@ class AttackListService {
 
       if (parseInt(count.total) === 0) continue;
 
-      const list = await this.getAttackList(yard.id, options);
-      const topVehicles = list.vehicles.filter(v => v.color_code !== 'gray').slice(0, 3);
+      // Get vehicles and score them using shared indexes
+      const vehicles = await database('yard_vehicle')
+        .where('yard_id', yard.id)
+        .where('active', true)
+        .orderBy('date_added', 'desc')
+        .limit(200);
+
+      const scored = vehicles.map(v =>
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex)
+      );
+      scored.sort((a, b) => b.score - a.score);
+
+      const topVehicles = scored.slice(0, 5);
 
       results.push({
         yard: {
@@ -284,8 +434,8 @@ class AttackListService {
           last_scraped: yard.last_scraped,
         },
         total_vehicles: parseInt(count.total),
-        hot_vehicles: topVehicles.length,
-        top_score: list.vehicles[0]?.score || 0,
+        hot_vehicles: topVehicles.filter(v => v.color_code !== 'gray').length,
+        top_score: scored[0]?.score || 0,
         est_total_value: topVehicles.reduce((sum, v) => sum + v.est_value, 0),
         top_vehicles: topVehicles,
       });
