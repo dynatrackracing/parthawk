@@ -1,0 +1,314 @@
+{
+  "Chrysler_LX_2005_2010": {
+    "platform": "Chrysler LX",
+    "years": "2005-2010",
+    "vehicles": [
+      "Chrysler 300",
+      "Dodge Charger",
+      "Dodge Magnum",
+      "Dodge Challenger"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box",
+      "Steering"
+    ],
+    "notes": "300/Charger share nearly everything. Challenger joins 2008+."
+  },
+  "Chrysler_LX_2011_2023": {
+    "platform": "Chrysler LX/LD",
+    "years": "2011-2023",
+    "vehicles": [
+      "Chrysler 300",
+      "Dodge Charger",
+      "Dodge Challenger"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box",
+      "Steering",
+      "TIPM"
+    ],
+    "notes": "300 and Charger are nearly identical electronically."
+  },
+  "Chrysler_WK_2005_2010": {
+    "platform": "Chrysler WK",
+    "years": "2005-2010",
+    "vehicles": [
+      "Jeep Grand Cherokee",
+      "Jeep Commander"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "TIPM",
+      "Fuse Box"
+    ],
+    "notes": "Commander is a 3-row Grand Cherokee. Same electronics."
+  },
+  "Chrysler_KJ_KK": {
+    "platform": "Chrysler KJ/KK",
+    "years": "2008-2012",
+    "vehicles": [
+      "Jeep Liberty",
+      "Dodge Nitro"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "TIPM"
+    ],
+    "notes": "Liberty and Nitro share the same platform completely."
+  },
+  "Chrysler_MK_JS": {
+    "platform": "Chrysler JS/MK",
+    "years": "2007-2012",
+    "vehicles": [
+      "Dodge Avenger",
+      "Chrysler Sebring",
+      "Chrysler 200"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box"
+    ],
+    "notes": "200 replaced Sebring mid-2010. Same platform."
+  },
+  "Chrysler_Minivan": {
+    "platform": "Chrysler RT",
+    "years": "2008-2020",
+    "vehicles": [
+      "Dodge Grand Caravan",
+      "Chrysler Town & Country",
+      "Chrysler Pacifica"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "TIPM",
+      "ABS"
+    ],
+    "notes": "Caravan and T&C are the same vehicle. Pacifica replaced T&C 2017+."
+  },
+  "Ram_DS_DJ": {
+    "platform": "Ram DS/DJ",
+    "years": "2009-2018",
+    "vehicles": [
+      "Ram 1500",
+      "Ram 2500",
+      "Ram 3500"
+    ],
+    "shared_parts": [
+      "BCM",
+      "TIPM",
+      "Fuse Box",
+      "Steering"
+    ],
+    "notes": "1500 ECM differs from HD. TIPM often shared across all. ABS differs by 2WD/4WD."
+  },
+  "GM_GMT900": {
+    "platform": "GM GMT900",
+    "years": "2007-2014",
+    "vehicles": [
+      "Chevrolet Silverado",
+      "GMC Sierra",
+      "Chevrolet Tahoe",
+      "GMC Yukon",
+      "Chevrolet Suburban",
+      "Cadillac Escalade"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box",
+      "Amplifier"
+    ],
+    "notes": "Silverado/Sierra share everything. Tahoe/Yukon/Suburban share most. ECM varies by engine."
+  },
+  "GM_Lambda": {
+    "platform": "GM Lambda/C1XX",
+    "years": "2007-2017",
+    "vehicles": [
+      "Chevrolet Traverse",
+      "GMC Acadia",
+      "Buick Enclave",
+      "Saturn Outlook"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box",
+      "Amplifier"
+    ],
+    "notes": "All four are the same vehicle with different badges."
+  },
+  "GM_GMT800": {
+    "platform": "GM GMT800",
+    "years": "2003-2009",
+    "vehicles": [
+      "Chevrolet Trailblazer",
+      "GMC Envoy",
+      "Buick Rainier",
+      "Isuzu Ascender",
+      "Saab 9-7X"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box"
+    ],
+    "notes": "Same platform, same electronics. Trailblazer is the volume model."
+  },
+  "Ford_CD3": {
+    "platform": "Ford CD3/CD4",
+    "years": "2007-2014",
+    "vehicles": [
+      "Ford Edge",
+      "Lincoln MKX"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS"
+    ],
+    "notes": "MKX is a rebadged Edge with luxury trim."
+  },
+  "Ford_Explorer_11": {
+    "platform": "Ford D4",
+    "years": "2011-2019",
+    "vehicles": [
+      "Ford Explorer",
+      "Ford Flex",
+      "Lincoln MKT",
+      "Ford Taurus"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS"
+    ],
+    "notes": "Explorer and Taurus share the D4 platform. Flex/MKT are related."
+  },
+  "Ford_SuperDuty": {
+    "platform": "Ford P2",
+    "years": "1999-2007",
+    "vehicles": [
+      "Ford F-250",
+      "Ford F-350",
+      "Ford Excursion"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "IDM",
+      "Fuse Box"
+    ],
+    "notes": "F-250 and F-350 share nearly everything. Excursion is an SUV on the same frame."
+  },
+  "Honda_Civic_06": {
+    "platform": "Honda 8th Gen Civic",
+    "years": "2006-2011",
+    "vehicles": [
+      "Honda Civic"
+    ],
+    "shared_parts": [
+      "ECM"
+    ],
+    "notes": "Civic ECMs are engine/trans specific. DX/LX/EX may share."
+  },
+  "Toyota_Truck_07": {
+    "platform": "Toyota IMV",
+    "years": "2007-2014",
+    "vehicles": [
+      "Toyota Tundra",
+      "Toyota Sequoia"
+    ],
+    "shared_parts": [
+      "ECM",
+      "ABS"
+    ],
+    "notes": "Tundra and Sequoia share the same platform and many electronics."
+  },
+  "Hyundai_Kia_Tucson": {
+    "platform": "Hyundai/Kia LM",
+    "years": "2010-2015",
+    "vehicles": [
+      "Hyundai Tucson",
+      "Kia Sportage"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS",
+      "Fuse Box"
+    ],
+    "notes": "Same platform. Most electronics are interchangeable."
+  },
+  "Hyundai_Kia_Sonata": {
+    "platform": "Hyundai/Kia YF",
+    "years": "2011-2014",
+    "vehicles": [
+      "Hyundai Sonata",
+      "Kia Optima"
+    ],
+    "shared_parts": [
+      "ECM",
+      "ABS"
+    ],
+    "notes": "Same platform and drivetrain."
+  },
+  "Nissan_FM": {
+    "platform": "Nissan FM",
+    "years": "2003-2008",
+    "vehicles": [
+      "Nissan 350Z",
+      "Infiniti G35"
+    ],
+    "shared_parts": [
+      "ECM",
+      "ABS"
+    ],
+    "notes": "Same platform. VQ35DE engine shared."
+  },
+  "Mazda_3_BL": {
+    "platform": "Mazda BL",
+    "years": "2010-2013",
+    "vehicles": [
+      "Mazda 3",
+      "Mazda 5"
+    ],
+    "shared_parts": [
+      "ECM",
+      "ABS",
+      "BCM"
+    ],
+    "notes": "Mazda 3 and 5 share the C platform."
+  },
+  "VW_MQB": {
+    "platform": "VW MQB",
+    "years": "2011-2018",
+    "vehicles": [
+      "Volkswagen Jetta",
+      "Volkswagen Golf",
+      "Volkswagen Passat"
+    ],
+    "shared_parts": [
+      "ECM",
+      "BCM",
+      "ABS"
+    ],
+    "notes": "Golf and Jetta share heavily. Passat differs on some modules."
+  }
+}

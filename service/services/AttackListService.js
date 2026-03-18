@@ -2,6 +2,7 @@
 
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
+const { getPlatformMatches } = require('../lib/platformMatch');
 
 /**
  * AttackListService - Scores yard vehicles by pull value
@@ -397,7 +398,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -426,6 +427,29 @@ class AttackListService {
         if (sModel && (modelUpper.includes(sModel) || sModel.includes(modelUpper))) {
           candidateKeys.add(sKey);
         }
+      }
+    }
+
+    // Platform cross-reference: add sibling make+model keys
+    // e.g., Chrysler 300 → also match Dodge Charger, Dodge Challenger, Dodge Magnum
+    const platformKey = `${make}|${modelUpper}`;
+    const siblings = platformIndex[platformKey] || [];
+    let platformSiblingNames = [];
+    for (const sib of siblings) {
+      // Only include siblings whose year range covers this vehicle
+      if (year >= sib.yearStart && year <= sib.yearEnd) {
+        const sibModel = sib.model.toUpperCase();
+        const sibKey = `${sib.make}|${sibModel}`;
+        if (salesIndex[sibKey]) candidateKeys.add(sibKey);
+        // Also partial match siblings
+        for (const sKey of Object.keys(salesIndex)) {
+          if (!sKey.startsWith(sib.make + '|')) continue;
+          const sModel = sKey.split('|')[1];
+          if (sModel && (sibModel.includes(sModel) || sModel.includes(sibModel))) {
+            candidateKeys.add(sKey);
+          }
+        }
+        platformSiblingNames.push(`${sib.make} ${sib.model}`);
       }
     }
 
@@ -566,8 +590,49 @@ class AttackListService {
       matched_parts: parts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,
+      platform_siblings: platformSiblingNames.length > 0 ? platformSiblingNames : null,
       parts,
     };
+  }
+
+  /**
+   * Build platform sibling index from platform_group/platform_vehicle tables.
+   * Returns a Map: "make|model" → [{ make, model, partTypes }]
+   * This allows scoreVehicle to find platform siblings without async queries.
+   */
+  async buildPlatformIndex() {
+    const index = {};
+    try {
+      const rows = await database.raw(`
+        SELECT pv1.make as source_make, pv1.model as source_model,
+               pv2.make as sibling_make, pv2.model as sibling_model,
+               pg.year_start, pg.year_end, pg.platform,
+               array_agg(DISTINCT psp.part_type) as part_types
+        FROM platform_vehicle pv1
+        JOIN platform_group pg ON pv1.platform_group_id = pg.id
+        JOIN platform_vehicle pv2 ON pv2.platform_group_id = pg.id AND pv2.id != pv1.id
+        JOIN platform_shared_part psp ON psp.platform_group_id = pg.id
+        GROUP BY pv1.make, pv1.model, pv2.make, pv2.model, pg.year_start, pg.year_end, pg.platform
+      `);
+
+      for (const row of (rows.rows || rows)) {
+        const key = `${row.source_make}|${row.source_model}`.toUpperCase();
+        if (!index[key]) index[key] = [];
+        index[key].push({
+          make: row.sibling_make,
+          model: row.sibling_model,
+          yearStart: row.year_start,
+          yearEnd: row.year_end,
+          platform: row.platform,
+          partTypes: row.part_types || [],
+        });
+      }
+      this.log.info({ entries: Object.keys(index).length }, 'Platform index built');
+    } catch (err) {
+      // Tables may not exist yet
+      this.log.debug({ err: err.message }, 'Platform index build skipped (tables may not exist)');
+    }
+    return index;
   }
 
   /**
@@ -585,6 +650,7 @@ class AttackListService {
     const cutoff = new Date(Date.now() - (options.daysBack || 90) * 24 * 60 * 60 * 1000);
     const salesIndex = await this.buildSalesIndex(cutoff);
     const stockIndex = await this.buildStockIndex();
+    const platformIndex = await this.buildPlatformIndex();
 
     // 7-day retention: show vehicles last seen within 7 days
     const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -613,7 +679,7 @@ class AttackListService {
       if (vehicles.length === 0) continue;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex)
       );
       // Sort: active vehicles first, then by score descending
       scored.sort((a, b) => {

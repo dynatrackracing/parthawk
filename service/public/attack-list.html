@@ -388,37 +388,33 @@
       return '<div style="padding:12px 0;color:var(--text-muted);font-size:12px;">No matching inventory parts found.</div>';
     }
 
-    let html = '';
+    // Show platform siblings if any
+    if (v.platform_siblings && v.platform_siblings.length > 0) {
+      html += `<div style="padding:8px 0;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">
+        <span style="color:var(--yellow);font-weight:600;">PLATFORM:</span> Also fits ${v.platform_siblings.join(', ')}
+      </div>`;
+    }
+
     for (const p of parts) {
+      if (!p) continue;
+      const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
       const vc = p.verdict === 'PULL' ? 'verdict-pull' : p.verdict === 'WATCH' ? 'verdict-watch' : 'verdict-skip';
-      html += `<div class="part-detail" id="pd-${v.id}-${p.itemId}">
+      const price = p.price != null ? p.price : 0;
+      const inStock = p.in_stock != null ? p.in_stock : 0;
+      const sold90d = p.sold_90d != null ? p.sold_90d : 0;
+      html += `<div class="part-detail" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
-          <div class="pd-verdict ${vc}">${p.verdict}</div>
+          <div class="pd-verdict ${vc}">${p.verdict || 'N/A'}</div>
         </div>
         <div class="pd-stats">
-          <span>💰 $${p.price} avg</span>
-          <span>📦 ${p.in_stock} in stock</span>
-          <span>📈 ${p.sold_90d} sold/90d</span>
-          ${p.partNumber ? `<span>🔧 ${p.partNumber}</span>` : ''}
+          <span>$${price} avg</span>
+          <span>${inStock} in stock</span>
+          <span>${sold90d} sold/90d</span>
+          ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
         </div>
-        <div class="pd-reason">${p.reason}</div>
-        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#7f1d1d;border-radius:4px;font-size:10px;color:#ef4444;font-weight:600;">⚠ DEAD INVENTORY: ${p.deadWarning.failureReason} — listed ${p.deadWarning.daysListed}d, sold $${p.deadWarning.finalPrice || '?'}${p.deadWarning.marketAvg ? ', market avg $' + p.deadWarning.marketAvg : ''}</div>` : ''}
-        <div class="pd-actions">
-          <button class="btn-pull" onclick="markPulled('${v.id}','${p.itemId}',event)">✓ Pulled</button>
-          <button class="btn-skip" onclick="toggleSkip('${v.id}','${p.itemId}')">✗ Skip</button>
-          <button class="btn-note" onclick="toggleNote('${v.id}','${p.itemId}')">📝 Note</button>
-        </div>
-        <div class="skip-dropdown" id="skip-${v.id}-${p.itemId}">
-          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','damaged')">Damaged</div>
-          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','missing')">Missing</div>
-          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','already_pulled')">Already Pulled</div>
-          <div class="skip-option" onclick="logSkip('${v.id}','${p.itemId}','not_worth_it')">Not Worth It</div>
-        </div>
-        <div class="note-input" id="note-${v.id}-${p.itemId}">
-          <input type="text" placeholder="Add note..." id="noteval-${v.id}-${p.itemId}">
-          <button class="btn-skip" onclick="saveNote('${v.id}','${p.itemId}')">Save</button>
-        </div>
+        <div class="pd-reason">${p.reason || ''}</div>
+        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#7f1d1d;border-radius:4px;font-size:10px;color:#ef4444;font-weight:600;">DEAD: ${p.deadWarning.failureReason || 'unknown'}</div>` : ''}
       </div>`;
     }
 
@@ -441,6 +437,7 @@
 
   function toggleV(id) {
     const exp = document.getElementById('vexp-' + id);
+    if (!exp) return; // guard: element may not exist
     const wasOpen = exp.classList.contains('open');
     exp.classList.toggle('open');
     if (!wasOpen && !exp.dataset.locLoaded) {
