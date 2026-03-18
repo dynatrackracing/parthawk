@@ -10,6 +10,7 @@ const Joi = require('@hapi/joi');
 const { v4: uuidv4 } = require('uuid');
 const AutoService = require('./AutoService');
 const CacheManager = require('../middleware/CacheManager');
+const { normalizePartNumber } = require('../lib/partNumberUtils');
 
 const CUSTOM_EBAY_ID = 'custom';
 const CUSTOM_CATEGORY_ID = '0';
@@ -117,6 +118,9 @@ class ItemLookupService {
     const autoCompatibilities = await autoService.getOrCreateAutos({ autos: auto });
 
     body.autoCompatibilities = autoCompatibilities;
+    if (body.manufacturerPartNumber) {
+      body.partNumberBase = normalizePartNumber(body.manufacturerPartNumber);
+    }
 
     delete body.auto;
 
@@ -168,6 +172,7 @@ class ItemLookupService {
       notes: body.notes,
       pictureUrl: body.pictureUrl,
       manufacturerPartNumber: body.manufacturerPartNumber,
+      partNumberBase: normalizePartNumber(body.manufacturerPartNumber),
       autoCompatibilities,
     };
 
