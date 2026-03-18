@@ -491,32 +491,33 @@ class AttackListService {
       : salesDemand.avgPrice;
 
     // === SCORING ===
-    // Primary signal: YourSale matches (count * avgPrice / stock)
-    // Secondary signal: Item table matches (partCount * avgPrice)
+    // Score 0-100 based on real sales demand.
+    // 1 sale = 30 base. Each additional sale adds ~10. Avg price scales it.
+    // Having stock reduces score (we already have it). No stock = bonus.
     let score = 0;
 
     if (salesDemand.count > 0) {
-      // Real sales data — strongest signal
-      const rawScore = (salesDemand.count * salesDemand.avgPrice) / Math.max(stock + 1, 1);
-      score = Math.min(100, Math.round(rawScore / 10));
-      score = Math.max(score, 15); // floor: we've sold this make+model before
+      // Base: 30 for first sale, +10 per additional, capped at 70 from count alone
+      const countScore = Math.min(70, 30 + (salesDemand.count - 1) * 10);
+      // Price bonus: avg price > $150 → up to +30 more
+      const priceBonus = Math.min(30, Math.round(salesDemand.avgPrice / 10));
+      score = Math.min(100, countScore + priceBonus);
+
+      // Stock penalty: if we already have a lot in stock, reduce urgency
+      if (stock >= 5) score = Math.round(score * 0.5);
+      else if (stock >= 3) score = Math.round(score * 0.7);
+      else if (stock >= 1) score = Math.round(score * 0.85);
     } else if (partCount > 0) {
-      // Inventory match but no YourSale history
-      const inventorySignal = (partCount * avgPrice) / Math.max(stock + 1, 1);
-      score = Math.min(60, Math.round(inventorySignal / 20));
-      score = Math.max(score, 10);
+      // Competitor items exist but we haven't sold this make+model
+      score = Math.min(40, 15 + partCount * 3);
     } else if (make) {
       // Recognized make, no data
       score = 5;
     }
 
-    // Stock penalty
-    if (stock >= 5) score = Math.round(score * 0.3);
-    else if (stock >= 3) score = Math.round(score * 0.6);
-    else if (stock >= 1) score = Math.round(score * 0.85);
-
-    // Floor enforcement
-    if ((partCount > 0 || salesDemand.count > 0) && score < 10) score = 10;
+    // Floor: if we have any sales data, never score below 15
+    if (salesDemand.count > 0 && score < 15) score = 15;
+    else if (partCount > 0 && score < 10) score = 10;
 
     // Vehicle color: green=pull(80+), yellow=watch(60-79), red=skip(0-39), gray=no data
     let color = 'gray';
