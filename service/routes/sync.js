@@ -465,4 +465,105 @@ router.get('/stats', authMiddleware, async (req, res, next) => {
   }
 });
 
+/**
+ * POST /sync/import-sales
+ * Bulk import sales records from JSON body.
+ * Body: { records: [...] } — array of sale objects
+ */
+router.post('/import-sales', async (req, res) => {
+  const { records } = req.body;
+  if (!records || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'records array required' });
+  }
+
+  const { database } = require('../database/database');
+  let imported = 0, skipped = 0, errors = 0;
+
+  for (const r of records) {
+    const orderId = r.ebayOrderId || r.orderId || r.orderNumber;
+    if (!orderId) { errors++; continue; }
+    try {
+      const existing = await database('YourSale').where('ebayOrderId', orderId).first();
+      if (existing) { skipped++; continue; }
+      await database('YourSale').insert({
+        ebayOrderId: orderId,
+        ebayItemId: r.ebayItemId || r.itemId || null,
+        title: r.title || null,
+        sku: r.sku || r.customLabel || null,
+        quantity: parseInt(r.quantity) || 1,
+        salePrice: parseFloat(r.salePrice || r.price || 0) || null,
+        soldDate: r.soldDate ? new Date(r.soldDate) : null,
+        buyerUsername: r.buyerUsername || r.buyer || null,
+        shippedDate: r.shippedDate ? new Date(r.shippedDate) : null,
+        store: r.store || 'dynatrack',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      imported++;
+    } catch (err) {
+      if (err.message?.includes('duplicate') || err.message?.includes('unique')) skipped++;
+      else errors++;
+    }
+  }
+
+  res.json({ success: true, imported, skipped, errors, total: records.length });
+});
+
+/**
+ * POST /sync/import-listings
+ * Bulk import listing records from JSON body.
+ * Body: { records: [...] } — array of listing objects
+ */
+router.post('/import-listings', async (req, res) => {
+  const { records } = req.body;
+  if (!records || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'records array required' });
+  }
+
+  const { database } = require('../database/database');
+  let imported = 0, updated = 0, errors = 0;
+
+  for (const r of records) {
+    const itemId = r.ebayItemId || r.itemId;
+    if (!itemId) { errors++; continue; }
+    try {
+      const existing = await database('YourListing').where('ebayItemId', itemId).first();
+      if (existing) {
+        await database('YourListing').where('ebayItemId', itemId).update({
+          title: r.title || existing.title,
+          sku: r.sku || existing.sku,
+          quantityAvailable: parseInt(r.quantityAvailable || r.quantity) || existing.quantityAvailable,
+          currentPrice: parseFloat(r.currentPrice || r.price || 0) || existing.currentPrice,
+          listingStatus: r.listingStatus || r.status || existing.listingStatus,
+          startTime: r.startTime ? new Date(r.startTime) : existing.startTime,
+          viewItemUrl: r.viewItemUrl || r.url || existing.viewItemUrl,
+          syncedAt: new Date(),
+          updatedAt: new Date(),
+        });
+        updated++;
+        continue;
+      }
+      await database('YourListing').insert({
+        ebayItemId: itemId,
+        title: r.title || null,
+        sku: r.sku || null,
+        quantityAvailable: parseInt(r.quantityAvailable || r.quantity) || 1,
+        currentPrice: parseFloat(r.currentPrice || r.price || 0) || null,
+        listingStatus: r.listingStatus || r.status || 'Active',
+        startTime: r.startTime ? new Date(r.startTime) : new Date(),
+        viewItemUrl: r.viewItemUrl || r.url || null,
+        syncedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      imported++;
+    } catch (err) {
+      if (err.message?.includes('duplicate') || err.message?.includes('unique')) updated++;
+      else errors++;
+    }
+  }
+
+  res.json({ success: true, imported, updated, errors, total: records.length });
+});
+
 module.exports = router;
