@@ -17,10 +17,10 @@ class LKQScraper {
   constructor() {
     this.log = log.child({ class: 'LKQScraper' }, true);
     this.locations = [
-      { name: 'LKQ Raleigh',    storeId: '1226' },
-      { name: 'LKQ Durham',     storeId: '1227' },
-      { name: 'LKQ Greensboro', storeId: '1228' },
-      { name: 'LKQ East NC',    storeId: '1229' },
+      { name: 'LKQ Raleigh',    storeId: '1168' },
+      { name: 'LKQ Durham',     storeId: '1142' },
+      { name: 'LKQ Greensboro', storeId: '1226' },
+      { name: 'LKQ East NC',    storeId: '1227' },
     ];
     this.baseUrl = 'https://www.pyp.com/getVehicleInventory.aspx';
     this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
