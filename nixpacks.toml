@@ -11,3 +11,10 @@ aptPkgs = [
   "libpango-1.0-0", "libcairo2",
   "fonts-liberation", "xdg-utils"
 ]
+
+# Use npm install instead of npm ci to avoid lockfile version mismatch
+[phases.install]
+cmds = ["npm install --legacy-peer-deps"]
+
+[start]
+cmd = "node service/index.js"
