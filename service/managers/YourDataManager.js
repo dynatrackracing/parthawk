@@ -1,0 +1,180 @@
+'use strict';
+
+const { log } = require('../lib/logger');
+const SellerAPI = require('../ebay/SellerAPI');
+const YourSale = require('../models/YourSale');
+const YourListing = require('../models/YourListing');
+const Promise = require('bluebird');
+
+/**
+ * YourDataManager - Syncs YOUR eBay seller data (orders and listings) to database
+ */
+class YourDataManager {
+  constructor() {
+    this.log = log.child({ class: 'YourDataManager' }, true);
+    this.sellerAPI = new SellerAPI();
+  }
+
+  /**
+   * Sync all your data (orders and listings)
+   */
+  async syncAll({ daysBack = 365 } = {}) {
+    this.log.info({ daysBack }, 'Starting full sync of your eBay data');
+
+    const results = {
+      orders: { synced: 0, errors: 0 },
+      listings: { synced: 0, errors: 0 },
+    };
+
+    try {
+      const orderResults = await this.syncOrders({ daysBack });
+      results.orders = orderResults;
+    } catch (err) {
+      this.log.error({ err }, 'Error syncing orders');
+      results.orders.errors = 1;
+    }
+
+    try {
+      const listingResults = await this.syncListings();
+      results.listings = listingResults;
+    } catch (err) {
+      this.log.error({ err }, 'Error syncing listings');
+      results.listings.errors = 1;
+    }
+
+    this.log.info({ results }, 'Completed full sync of your eBay data');
+    return results;
+  }
+
+  /**
+   * Sync your orders/sales from eBay
+   * @param {Object} options
+   * @param {number} options.daysBack - Number of days back to fetch (default: 365)
+   */
+  async syncOrders({ daysBack = 365 } = {}) {
+    this.log.info({ daysBack }, 'Syncing orders from eBay');
+
+    let synced = 0;
+    let errors = 0;
+
+    try {
+      const orders = await this.sellerAPI.getOrders({ daysBack });
+      this.log.info({ orderCount: orders.length }, 'Fetched orders from eBay');
+
+      // Flatten orders into individual line items (each item sold is a YourSale record)
+      await Promise.mapSeries(orders, async (order) => {
+        await Promise.mapSeries(order.lineItems, async (lineItem) => {
+          try {
+            const toInsert = {
+              ebayOrderId: `${order.orderId}-${lineItem.itemId}`, // Unique per line item
+              ebayItemId: lineItem.itemId,
+              title: lineItem.title,
+              sku: lineItem.sku,
+              quantity: lineItem.quantity,
+              salePrice: lineItem.price,
+              soldDate: order.createdTime ? new Date(order.createdTime) : null,
+              buyerUsername: order.buyerUsername,
+              shippedDate: order.shippedTime ? new Date(order.shippedTime) : null,
+            };
+
+            // Upsert on conflict (order ID + item ID)
+            // id omitted from insert so DB generates it via gen_random_uuid(),
+            // and .merge() won't touch id on conflict — preserving FK references
+            await YourSale.query()
+              .insert(toInsert)
+              .onConflict('ebayOrderId')
+              .merge();
+
+            synced++;
+          } catch (err) {
+            this.log.error({ err, orderId: order.orderId, itemId: lineItem.itemId }, 'Error inserting sale');
+            errors++;
+          }
+        });
+      });
+
+      this.log.info({ synced, errors }, 'Completed syncing orders');
+    } catch (err) {
+      this.log.error({ err }, 'Error fetching orders from eBay');
+      throw err;
+    }
+
+    return { synced, errors };
+  }
+
+  /**
+   * Sync your active listings from eBay
+   */
+  async syncListings() {
+    this.log.info('Syncing active listings from eBay');
+
+    let synced = 0;
+    let errors = 0;
+
+    try {
+      const listings = await this.sellerAPI.getActiveListings();
+      this.log.info({ listingCount: listings.length }, 'Fetched listings from eBay');
+
+      await Promise.mapSeries(listings, async (listing) => {
+        try {
+          const toInsert = {
+            ebayItemId: listing.itemId,
+            title: listing.title,
+            sku: listing.sku,
+            quantityAvailable: listing.quantityAvailable,
+            currentPrice: listing.currentPrice,
+            listingStatus: listing.listingStatus,
+            startTime: listing.startTime ? new Date(listing.startTime) : null,
+            viewItemUrl: listing.viewItemUrl,
+            syncedAt: new Date(),
+          };
+
+          // Upsert on conflict (item ID)
+          // id omitted from insert so DB generates it via gen_random_uuid(),
+          // and .merge() won't touch id on conflict — preserving FK references from PriceCheck
+          await YourListing.query()
+            .insert(toInsert)
+            .onConflict('ebayItemId')
+            .merge();
+
+          synced++;
+        } catch (err) {
+          this.log.error({ err, itemId: listing.itemId }, 'Error inserting listing');
+          errors++;
+        }
+      });
+
+      // Optionally: Mark listings that are no longer active
+      // This could be done by setting listingStatus = 'Ended' for items not in the current sync
+
+      this.log.info({ synced, errors }, 'Completed syncing listings');
+    } catch (err) {
+      this.log.error({ err }, 'Error fetching listings from eBay');
+      throw err;
+    }
+
+    return { synced, errors };
+  }
+
+  /**
+   * Get sync statistics
+   */
+  async getStats() {
+    const [salesCount, listingsCount, recentSales] = await Promise.all([
+      YourSale.query().count('* as count').first(),
+      YourListing.query().count('* as count').first(),
+      YourSale.query()
+        .where('soldDate', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+        .count('* as count')
+        .first(),
+    ]);
+
+    return {
+      totalSales: parseInt(salesCount.count, 10),
+      totalListings: parseInt(listingsCount.count, 10),
+      salesLast30Days: parseInt(recentSales.count, 10),
+    };
+  }
+}
+
+module.exports = YourDataManager;

@@ -1,0 +1,33 @@
+
+
+
+@import "variables";
+
+@import "base/base";
+@import "base/typography";
+@import "base/utilities";
+
+@import "components/button";
+@import "./components/form";
+@import "components/item";
+@import "components/table";
+@import "components/modal";
+@import "components/header";
+
+@import "layout/style";
+@import "layout/footer";
+
+@import "pages/home";
+@import "pages/item-detail";
+@import "pages/edit-item";
+@import "pages/auth";
+
+
+@tailwind base;
+// Additional styles
+@import 'additional-styles/utility-patterns.scss';
+@import 'additional-styles/toggle-switch.scss';
+@import 'additional-styles/theme.scss';
+
+@tailwind utilities;
+@tailwind components;

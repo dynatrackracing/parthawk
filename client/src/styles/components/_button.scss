@@ -1,0 +1,145 @@
+.button {
+  @extend .no-select;
+  display: inline-block;
+  cursor: pointer;
+  color: $color-dark;
+  background: $color-white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: all 0.2s ease-in-out;
+  text-align: center;
+  font-weight: 500;
+  font-size: 0.875rem;
+  font-family: $CodeFont;
+  height: auto;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &--white {
+    color: $color-dark;
+    background: $color-white;
+    border: 1px solid #e5e7eb;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+  }
+
+  &--dark {
+    border: 1px solid #4f46e5;
+    color: $color-white;
+    background: #6366f1;
+
+    &:hover {
+      background: #4f46e5;
+      border-color: #4338ca;
+    }
+  }
+
+  &--light {
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    background: #f9fafb;
+
+    &:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+  }
+
+  &--logout {
+    button {
+      position: absolute;
+      left: 0;
+      right: 0;
+      margin-left: auto;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+      margin-right: auto;
+      bottom: 0;
+      width: 50%;
+      margin-bottom: 20px;
+      border-radius: 8px !important;
+    }
+  }
+
+  &--danger {
+    border: 1px solid #dc2626;
+    color: $color-white;
+    background: #ef4444;
+
+    &:hover {
+      background: #dc2626;
+      border-color: #b91c1c;
+    }
+  }
+
+  &:disabled,
+  &[disabled] {
+    background: #9ca3af;
+    color: $color-white;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 0.875rem;
+    padding: 8px 16px;
+  }
+}
+
+.button-group {
+  display: flex;
+  gap: 20px;
+
+  &--right {
+    justify-content: flex-end;
+  }
+
+  @media screen and (max-width: $phone - 200) {
+    flex-direction: column;
+    justify-content: center;
+
+    button {
+      width: 100%;
+    }
+  }
+}
+
+.google-btn {
+  background-color: rgb(255, 255, 255);
+  display: inline-flex;
+  align-items: center;
+  color: #374151;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  padding: 0px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    cursor: pointer;
+  }
+
+  .inner {
+    margin-right: 10px;
+    background: rgb(255, 255, 255);
+    padding: 10px;
+    border-radius: 6px 0 0 6px;
+  }
+
+  .text {
+    padding: 10px 12px 10px 0px;
+    font-weight: 500;
+  }
+}

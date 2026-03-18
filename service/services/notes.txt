@@ -1,0 +1,18 @@
+// Use this code to generate auto compatibilities from looking up autos
+
+// res.itemCompatibilities.forEach((item) => {
+//   // get the item from the map or create an empty object
+//   const retItem = itemAutoMap.get(item.id) || {};
+//   // Create the grouped object. In this case, group down from year -> make -> model -> trim -> engine
+//   // This is more interesting than seeing an array of auto objects
+//   const g = retItem.autos || {};
+
+//   g[res.year] = g[res.year] || {};
+//   g[res.year][res.make] = g[res.year][res.make] || {};
+//   g[res.year][res.make][res.model] = g[res.year][res.make][res.model] || {};
+//   g[res.year][res.make][res.model][res.trim] = g[res.year][res.make][res.model][res.trim] || []
+//   g[res.year][res.make][res.model][res.trim].push(res.engine);
+
+//   const finalItem = Object.assign(retItem, item);
+//   // finalItem.autos = g; // remove auto compatibility from final item - can be toggled with future flag if required
+//   itemAutoMap.set(item.id, finalItem);

@@ -1,0 +1,13 @@
+[phases.setup]
+aptPkgs = [
+  "libnss3", "libnss3-tools", "libnspr4",
+  "libatk1.0-0t64", "libatk-bridge2.0-0t64", "libatspi2.0-0t64",
+  "libdrm2", "libgbm1",
+  "libasound2t64",
+  "libxkbcommon0",
+  "libxcomposite1", "libxdamage1", "libxfixes3", "libxrandr2",
+  "libx11-xcb1", "libxshmfence1",
+  "libcups2t64",
+  "libpango-1.0-0", "libcairo2",
+  "fonts-liberation", "xdg-utils"
+]

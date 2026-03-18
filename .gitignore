@@ -1,0 +1,8 @@
+.env
+node_modules
+data/**.db
+secrets.js
+service/lib/logs/*
+service/data/*.db
+.vscode/*.*
+service/middleware/firebase/serviceAccountKey.json

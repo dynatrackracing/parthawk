@@ -1,0 +1,178 @@
+body {
+  font-family: $PrimaryFont;
+}
+
+.divider {
+  &--dark {
+    width: 100%;
+    padding: 1px 0;
+    margin: 20px 0;
+    border-bottom: 1px solid #1e1f20;
+  }
+
+  &--white {
+    width: 100%;
+    padding: 1px 0;
+    margin: 20px 0;
+    border-bottom: 1px solid #e9e9e9;
+  }
+}
+
+h1 {
+  margin-top: 0px;
+  margin-bottom: 30px;
+  font-size: 52px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: $color-white;
+  font-family: $SerifFont;
+
+  @media screen and (max-width: 987px) {
+    font-size: 44px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-land) {
+    font-size: 40px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-port) {
+    font-size: 36px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 30px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 350px) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 280px) {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+}
+
+h2 {
+  margin-top: 0px;
+  margin-bottom: 30px;
+  font-size: 44px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: $color-white;
+  font-family: $SerifFont;
+
+  @media screen and (max-width: 1290px) {
+    font-size: 40px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 987px) {
+    font-size: 36px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-land) {
+    font-size: 36px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-port) {
+    font-size: 36px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 30px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 350px) {
+    font-size: 28px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 280px) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+}
+
+h3 {
+  font-size: 28px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: $color-white;
+  font-family: $SerifFont;
+
+  @media screen and (max-width: 1290px) {
+    font-size: 26px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: 987px) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-land) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $tab-port) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 22px;
+    line-height: 1.4;
+  }
+}
+
+h4 {
+  font-size: 24px;
+  line-height: 1.5;
+  font-weight: 400;
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: $color-white;
+  font-family: $SerifFont;
+
+  @media screen and (max-width: $tab-land) {
+    font-size: 22px;
+    line-height: 1.4;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+}
+
+a,
+p {
+  @media screen and (max-width: $tab-port) {
+    font-size: 16px;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 14px;
+  }
+}
+
+li {
+  @media screen and (max-width: $tab-port) {
+    font-size: 16px;
+  }
+
+  @media screen and (max-width: $phone) {
+    font-size: 14px;
+  }
+}

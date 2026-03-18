@@ -1,0 +1,73 @@
+.item-detail {
+  padding: 40px 0;
+
+  .container-80 {
+    position: relative;
+    max-width: 80%;
+    margin-right: auto;
+    margin-left: auto;
+
+    .picture {
+      display: flex;
+      margin-bottom: 30px;
+
+      p {
+        margin: 0;
+        color: black;
+      }
+
+      h4{
+        color: black;
+      }
+
+      img {
+        width: 300px;
+        margin-right: 10px;
+      }
+
+      @media screen and (max-width: $phone) {
+        flex-direction: column;
+
+        div {
+          p {
+            margin-bottom: 5px;
+          }
+        }
+
+        img {
+          width: 100%;
+          max-width: 300px;
+          margin: auto;
+          margin-bottom: 10px;
+        }
+
+        p {
+          margin: 0;
+        }
+      }
+    }
+
+    @media screen and (max-width: $tab-land) {
+      max-width: 90%;
+    }
+
+    @media screen and (max-width: $tab-port) {
+      max-width: 100%;
+    }
+  }
+}
+
+.delete-item-action {
+  display: flex;
+  justify-content: space-between;
+
+  button {
+    min-width: 100px;
+  }
+
+  @media screen and (max-width: $phone - 250) {
+    margin-top: 20px;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>PartHawk — Attack List</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1c1c1c;
+    --border: #2a2a2a;
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --yellow: #eab308;
+    --yellow-dim: #713f12;
+    --green: #22c55e;
+    --gray: #374151;
+    --text: #f9fafb;
+    --text-mid: #d1d5db;
+    --text-muted: #6b7280;
+    --text-faint: #374151;
+    --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-left h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  .header-left p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-mid);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .refresh-btn:active { opacity: 0.7; }
+
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--red);
+  }
+
+  .container { padding: 16px; }
+
+  /* Loading state */
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--red);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Yard cards */
+  .yard-section {
+    margin-bottom: 20px;
+  }
+
+  .yard-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .yard-header.collapsed {
+    border-radius: 12px;
+  }
+
+  .yard-name {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .yard-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .yard-right {
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .yard-priority {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  .priority-go { background: var(--red-dim); color: var(--red); }
+  .priority-consider { background: var(--yellow-dim); color: var(--yellow); }
+  .priority-skip { background: var(--gray); color: var(--text-muted); }
+
+  .yard-est {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Vehicle list */
+  .vehicle-list {
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+  }
+
+  .vehicle-row {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .vehicle-row:last-child { border-bottom: none; }
+  .vehicle-row:active { background: var(--surface); }
+
+  .vehicle-collapsed {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .score-badge {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .score-red { background: var(--red-dim); color: var(--red); }
+  .score-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .score-gray { background: #1f2937; color: var(--text-muted); }
+
+  .vehicle-info { flex: 1; min-width: 0; }
+
+  .vehicle-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vehicle-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .parts-chips {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .part-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 5px;
+    letter-spacing: 0.02em;
+  }
+
+  .chip-pull { background: var(--red-dim); color: var(--red); }
+  .chip-watch { background: var(--yellow-dim); color: var(--yellow); }
+  .chip-skip { background: #1f2937; color: var(--text-faint); }
+
+  .vehicle-right {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .vehicle-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green);
+  }
+
+  .vehicle-row-num {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Expanded view */
+  .vehicle-expanded {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .vehicle-expanded.open { display: block; }
+
+  .parts-table {
+    margin-top: 12px;
+  }
+
+  .part-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .part-row:last-child { border-bottom: none; }
+
+  .part-name {
+    font-size: 14px;
+    font-weight: 600;
+    width: 70px;
+    flex-shrink: 0;
+  }
+
+  .part-stats {
+    flex: 1;
+    padding: 0 12px;
+  }
+
+  .part-stat-row {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .part-stat-row span { white-space: nowrap; }
+
+  .part-verdict {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .verdict-pull { background: var(--red-dim); color: var(--red); }
+  .verdict-watch { background: var(--yellow-dim); color: var(--yellow); }
+  .verdict-skip { background: #1f2937; color: var(--text-muted); }
+
+  /* Empty state */
+  .empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+  }
+
+  /* Scrape trigger button */
+  .scrape-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 16px;
+    transition: all 0.15s;
+  }
+
+  .scrape-btn:active { background: var(--surface2); }
+
+  /* Last updated bar */
+  .updated-bar {
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* No vehicles scraped yet */
+  .no-data-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .no-data-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .no-data-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  .trigger-btn {
+    margin-top: 14px;
+    padding: 10px 20px;
+    background: var(--red);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>⚡ Attack List</h1>
+    <p id="headerSub">Loading yards...</p>
+  </div>
+  <button class="refresh-btn" onclick="loadData()">
+    <span>↻</span> Refresh
+  </button>
+</header>
+
+<div class="tabs" id="tabBar">
+  <div class="tab active" onclick="showTab('all')" id="tab-all">All Yards</div>
+  <div class="tab" onclick="showTab('local')" id="tab-local">Local</div>
+  <div class="tab" onclick="showTab('day_trip')" id="tab-day_trip">Day Trip</div>
+</div>
+
+<div class="updated-bar" id="updatedBar">—</div>
+
+<div class="container" id="mainContent">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div>Building attack list...</div>
+  </div>
+</div>
+
+<script>
+  let allData = null;
+  let currentTab = 'all';
+
+  async function loadData() {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="loading">
+        <div class="spinner"></div>
+        <div>Scoring vehicles...</div>
+      </div>`;
+
+    try {
+      const res = await fetch('/attack-list');
+      const data = await res.json();
+
+      if (!data.success) throw new Error(data.error);
+
+      allData = data;
+      renderData();
+
+      const ts = new Date(data.generated_at);
+      document.getElementById('updatedBar').textContent = 
+        'Updated ' + ts.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      document.getElementById('headerSub').textContent = 
+        data.yards.length + ' yards scored';
+
+    } catch (err) {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="no-data-card">
+          <h3>Could not load attack list</h3>
+          <p>${err.message}</p>
+          <button class="trigger-btn" onclick="loadData()">Try Again</button>
+        </div>`;
+    }
+  }
+
+  function showTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    renderData();
+  }
+
+  function renderData() {
+    if (!allData) return;
+
+    let yards = allData.yards;
+
+    if (currentTab === 'local') {
+      yards = yards.filter(y => y.yard.visit_frequency === 'local');
+    } else if (currentTab === 'day_trip') {
+      yards = yards.filter(y => y.yard.visit_frequency === 'day_trip');
+    }
+
+    if (!yards.length) {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="no-data-card">
+          <h3>No yards scraped yet</h3>
+          <p>LKQ scrapes run automatically at 2am. Trigger a manual scrape to build the attack list now.</p>
+          <button class="trigger-btn" onclick="triggerScrape()">Scrape LKQ Now</button>
+        </div>`;
+      return;
+    }
+
+    // Check if any yard has vehicles
+    const hasVehicles = yards.some(y => y.total_vehicles > 0);
+    if (!hasVehicles) {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="no-data-card">
+          <h3>No vehicles on lots yet</h3>
+          <p>LKQ scrapes automatically at 2am every night. Tap below to scrape now and populate the attack list.</p>
+          <button class="trigger-btn" onclick="triggerScrape()">Scrape LKQ Now</button>
+        </div>`;
+      return;
+    }
+
+    let html = '';
+
+    for (const yardData of yards) {
+      if (yardData.total_vehicles === 0) continue;
+
+      const priority = yardData.top_score >= 70 ? 'GO TODAY' :
+                       yardData.top_score >= 45 ? 'CONSIDER' : 'SKIP';
+      const priorityClass = yardData.top_score >= 70 ? 'priority-go' :
+                            yardData.top_score >= 45 ? 'priority-consider' : 'priority-skip';
+      const emoji = yardData.top_score >= 70 ? '🔴' : yardData.top_score >= 45 ? '🟡' : '⬜';
+
+      const lastScraped = yardData.yard.last_scraped ? 
+        'Scraped ' + timeAgo(yardData.yard.last_scraped) : 'Not yet scraped';
+
+      html += `
+        <div class="yard-section" id="yard-${yardData.yard.id}">
+          <div class="yard-header" onclick="toggleYard('${yardData.yard.id}')">
+            <div>
+              <div class="yard-name">${yardData.yard.name}</div>
+              <div class="yard-meta">
+                <span>${yardData.total_vehicles} vehicles</span>
+                <span>${yardData.yard.distance_from_base} mi</span>
+                <span>${lastScraped}</span>
+              </div>
+            </div>
+            <div class="yard-right">
+              <div class="yard-priority ${priorityClass}">${emoji} ${priority}</div>
+              ${yardData.est_total_value > 0 ? `<div class="yard-est">~$${yardData.est_total_value.toLocaleString()} est.</div>` : ''}
+            </div>
+          </div>
+          <div class="vehicle-list" id="vlist-${yardData.yard.id}">`;
+
+      const hotVehicles = yardData.top_vehicles;
+
+      if (!hotVehicles.length) {
+        html += `<div class="empty">No high-value vehicles scored on this lot today.</div>`;
+      } else {
+        for (const v of hotVehicles) {
+          html += renderVehicleRow(v, yardData.yard.id);
+        }
+
+        if (yardData.hot_vehicles > 3) {
+          html += `
+            <div style="padding:12px 16px; text-align:center;">
+              <button onclick="loadFullYard('${yardData.yard.id}')" 
+                style="background:none; border:none; color:var(--red); font-size:13px; font-weight:600; cursor:pointer;">
+                View all ${yardData.total_vehicles} vehicles →
+              </button>
+            </div>`;
+        }
+      }
+
+      html += `</div></div>`;
+    }
+
+    document.getElementById('mainContent').innerHTML = html;
+  }
+
+  function renderVehicleRow(v, yardId) {
+    const scoreClass = v.color_code === 'red' ? 'score-red' : 
+                       v.color_code === 'yellow' ? 'score-yellow' : 'score-gray';
+    
+    const pullParts = v.parts.filter(p => p.verdict === 'PULL');
+    const watchParts = v.parts.filter(p => p.verdict === 'WATCH');
+
+    const chipsHtml = v.parts.slice(0, 5).map(p => {
+      const chipClass = p.verdict === 'PULL' ? 'chip-pull' : 
+                        p.verdict === 'WATCH' ? 'chip-watch' : 'chip-skip';
+      return `<span class="part-chip ${chipClass}">${p.type}</span>`;
+    }).join('');
+
+    const partsDetailHtml = v.parts.map(p => {
+      const verdictClass = p.verdict === 'PULL' ? 'verdict-pull' : 
+                           p.verdict === 'WATCH' ? 'verdict-watch' : 'verdict-skip';
+      return `
+        <div class="part-row">
+          <div class="part-name">${p.type}</div>
+          <div class="part-stats">
+            <div class="part-stat-row">
+              <span>📦 ${p.in_stock} in stock</span>
+              <span>📈 ${p.demand_90d} sold/90d</span>
+              <span>💰 ~$${p.avg_price}</span>
+            </div>
+          </div>
+          <div class="part-verdict ${verdictClass}">${p.verdict}</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="vehicle-row">
+        <div class="vehicle-collapsed" onclick="toggleVehicle('${v.id}')">
+          <div class="score-badge ${scoreClass}">${v.score}</div>
+          <div class="vehicle-info">
+            <div class="vehicle-title">${v.year} ${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''}</div>
+            <div class="vehicle-sub">
+              ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
+              ${v.color ? `<span>${v.color}</span>` : ''}
+              ${v.date_added ? `<span>Added ${timeAgo(v.date_added)}</span>` : ''}
+            </div>
+            <div class="parts-chips">${chipsHtml}</div>
+          </div>
+          <div class="vehicle-right">
+            ${v.est_value > 0 ? `<div class="vehicle-value">$${v.est_value}</div>` : ''}
+            ${v.row_number ? `<div class="vehicle-row-num">Row ${v.row_number}</div>` : ''}
+          </div>
+        </div>
+        <div class="vehicle-expanded" id="vexp-${v.id}">
+          <div class="parts-table">${partsDetailHtml}</div>
+        </div>
+      </div>`;
+  }
+
+  function toggleYard(yardId) {
+    const list = document.getElementById('vlist-' + yardId);
+    const header = document.querySelector(`#yard-${yardId} .yard-header`);
+    if (list.style.display === 'none') {
+      list.style.display = 'block';
+      header.classList.remove('collapsed');
+    } else {
+      list.style.display = 'none';
+      header.classList.add('collapsed');
+    }
+  }
+
+  function toggleVehicle(vehicleId) {
+    const exp = document.getElementById('vexp-' + vehicleId);
+    exp.classList.toggle('open');
+  }
+
+  async function triggerScrape() {
+    const btn = event.target;
+    btn.textContent = 'Scraping...';
+    btn.disabled = true;
+    try {
+      await fetch('/yards/scrape/lkq', { method: 'POST' });
+      btn.textContent = 'Scrape started! Refreshing in 30s...';
+      setTimeout(() => loadData(), 30000);
+    } catch (err) {
+      btn.textContent = 'Failed — tap to retry';
+      btn.disabled = false;
+    }
+  }
+
+  async function loadFullYard(yardId) {
+    const res = await fetch(`/attack-list/yard/${yardId}?limit=200`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    const list = document.getElementById('vlist-' + yardId);
+    let html = '';
+    for (const v of data.vehicles) {
+      html += renderVehicleRow(v, yardId);
+    }
+    list.innerHTML = html;
+  }
+
+  function timeAgo(dateStr) {
+    const date = new Date(dateStr);
+    const diff = Date.now() - date.getTime();
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return days + 'd ago';
+    if (hours > 0) return hours + 'h ago';
+    return 'just now';
+  }
+
+  // Load on start
+  loadData();
+</script>
+</body>
+</html>

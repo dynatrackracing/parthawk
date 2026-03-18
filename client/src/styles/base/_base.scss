@@ -1,0 +1,127 @@
+body {
+  font-family: $PrimaryFont;
+  color: #fff;
+  background: #121313;
+}
+
+@keyframes zoomInAnimation {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 100ms 100ms ease, transform 400ms ease;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 100ms 100ms ease, transform 400ms ease;
+  }
+}
+
+@keyframes zoomOutAnimation {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.zoomIn {
+  animation: zoomInAnimation 0.3s ease;
+}
+
+.zoomOut {
+  animation: zoomOutAnimation 0.3s ease;
+}
+
+// Modern Toast Styles
+.Toastify__toast-container {
+  padding: 16px !important;
+}
+
+.Toastify__toast {
+  padding: 16px 20px !important;
+  min-height: auto !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+
+  &--default {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    color: #f1f5f9 !important;
+  }
+
+  &--success {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: #fff !important;
+  }
+
+  &--error {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    color: #fff !important;
+  }
+
+  &--warning {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%) !important;
+    color: #fff !important;
+  }
+
+  &--info {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
+    color: #fff !important;
+  }
+}
+
+.Toastify__toast-body {
+  font-family: $PrimaryFont;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.Toastify__toast-icon {
+  margin-right: 12px !important;
+  width: 22px !important;
+
+  svg {
+    fill: currentColor !important;
+  }
+}
+
+.Toastify__close-button {
+  color: rgba(255, 255, 255, 0.7) !important;
+  opacity: 1 !important;
+
+  &:hover {
+    color: #fff !important;
+  }
+}
+
+.Toastify__progress-bar {
+  height: 3px !important;
+  background: rgba(255, 255, 255, 0.3) !important;
+
+  &--success {
+    background: rgba(255, 255, 255, 0.4) !important;
+  }
+
+  &--error {
+    background: rgba(255, 255, 255, 0.4) !important;
+  }
+
+  &--info {
+    background: rgba(255, 255, 255, 0.4) !important;
+  }
+}
+
+
+.s-base {
+  &__background{
+    background: $background-light-grey;
+  }
+ 
+}

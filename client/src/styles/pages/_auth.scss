@@ -1,0 +1,13 @@
+.s-auth {
+    &__img {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    &__sectionRight{
+        display: block;
+        @media(max-width: 767px){
+            display: none;
+        }
+    }
+}

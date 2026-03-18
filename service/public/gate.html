@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PartHawk — Gate Calculator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c;
+    --border: #2a2a2a; --red: #ef4444; --red-dim: #7f1d1d;
+    --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
+    --green-dim: #14532d; --text: #f9fafb; --text-mid: #d1d5db;
+    --text-muted: #6b7280;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 20px; }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
+  header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .container { padding: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+  select, input[type="number"], input[type="text"] {
+    width: 100%; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 15px; margin-bottom: 12px; appearance: none;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--red); }
+  .part-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
+  .part-row .field { flex: 1; }
+  .part-row .field label { margin-bottom: 5px; }
+  .part-row .field input, .part-row .field select { margin-bottom: 0; }
+  .remove-btn { background: var(--red-dim); border: none; color: var(--red); border-radius: 8px; padding: 10px 12px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+  .add-btn { width: 100%; padding: 10px; background: var(--surface2); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }
+  .calc-btn { width: 100%; padding: 14px; background: var(--red); border: none; border-radius: 10px; color: white; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+  .calc-btn:disabled { opacity: 0.5; }
+  .result-card { display: none; }
+  .result-card.visible { display: block; }
+  .result-hero { text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 12px; }
+  .result-hero.excellent { background: var(--green-dim); }
+  .result-hero.acceptable { background: var(--yellow-dim); }
+  .result-hero.leave { background: var(--red-dim); }
+  .result-hero .max-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .result-hero .max-amount { font-size: 52px; font-weight: 800; letter-spacing: -0.04em; margin: 4px 0; }
+  .result-hero.excellent .max-amount { color: var(--green); }
+  .result-hero.acceptable .max-amount { color: var(--yellow); }
+  .result-hero.leave .max-amount { color: var(--red); }
+  .result-hero .max-sub { font-size: 13px; color: var(--text-muted); }
+  .breakdown-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-label { color: var(--text-muted); }
+  .breakdown-value { font-weight: 600; }
+  .cogs-bar { height: 8px; background: var(--surface2); border-radius: 4px; margin: 12px 0; overflow: hidden; }
+  .cogs-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .cogs-fill.excellent { background: var(--green); }
+  .cogs-fill.acceptable { background: var(--yellow); }
+  .cogs-fill.leave { background: var(--red); }
+  .cogs-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>💰 Gate Calculator</h1>
+  <p>Max spend to stay under 35% COGS</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="card-title">Yard</div>
+    <label>Select yard</label>
+    <select id="yardSelect">
+      <option value="">Loading yards...</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Parts You Plan to Pull</div>
+    <div id="partsList"></div>
+    <button class="add-btn" onclick="addPart()">+ Add Part</button>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()" id="calcBtn">
+    Calculate Max Spend
+  </button>
+
+  <div class="card result-card" id="resultCard">
+    <div class="result-hero" id="resultHero">
+      <div class="max-label">Max Parts Spend</div>
+      <div class="max-amount" id="maxAmount">$0</div>
+      <div class="max-sub" id="maxSub"></div>
+    </div>
+    <div class="cogs-bar"><div class="cogs-fill" id="cogsFill" style="width:0%"></div></div>
+    <div class="cogs-labels"><span>0%</span><span>35% ceiling</span><span>100%</span></div>
+    <div id="breakdownRows" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<script>
+  const PART_TYPES = [
+    { type: 'ECM', label: 'ECM/PCM/ECU', defaultValue: 180 },
+    { type: 'BCM', label: 'BCM', defaultValue: 120 },
+    { type: 'TCM', label: 'TCM/TCU', defaultValue: 130 },
+    { type: 'ABS', label: 'ABS Module', defaultValue: 110 },
+    { type: 'TIPM', label: 'TIPM/Fuse Box', defaultValue: 95 },
+    { type: 'Amplifier', label: 'Amplifier', defaultValue: 85 },
+    { type: 'Cluster', label: 'Cluster', defaultValue: 75 },
+    { type: 'Radio', label: 'Radio', defaultValue: 65 },
+    { type: 'Mirror', label: 'Side Mirror', defaultValue: 55 },
+    { type: 'Other', label: 'Other', defaultValue: 50 },
+  ];
+
+  let partCount = 0;
+  let yards = [];
+
+  async function loadYards() {
+    const res = await fetch('/cogs/yards');
+    const data = await res.json();
+    yards = data.yards || [];
+    const sel = document.getElementById('yardSelect');
+    sel.innerHTML = '<option value="">Select a yard...</option>' +
+      yards.map(y => `<option value="${y.id}">${y.name} (${y.distance_from_base}mi — $${y.entry_fee} gate)</option>`).join('');
+  }
+
+  function addPart(type = 'ECM', value = 180) {
+    partCount++;
+    const id = partCount;
+    const div = document.createElement('div');
+    div.className = 'part-row';
+    div.id = 'part-' + id;
+    div.innerHTML = `
+      <div class="field">
+        <label>Part Type</label>
+        <select onchange="updateDefaultValue(${id})">
+          ${PART_TYPES.map(p => `<option value="${p.type}" ${p.type === type ? 'selected' : ''} data-default="${p.defaultValue}">${p.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Est. Value ($)</label>
+        <input type="number" id="val-${id}" value="${value}" min="0" step="5" />
+      </div>
+      <button class="remove-btn" onclick="removePart(${id})">✕</button>`;
+    document.getElementById('partsList').appendChild(div);
+  }
+
+  function updateDefaultValue(id) {
+    const sel = document.querySelector(`#part-${id} select`);
+    const opt = sel.options[sel.selectedIndex];
+    const defVal = opt.getAttribute('data-default');
+    document.getElementById('val-' + id).value = defVal;
+  }
+
+  function removePart(id) {
+    document.getElementById('part-' + id)?.remove();
+  }
+
+  async function calculate() {
+    const yardId = document.getElementById('yardSelect').value;
+    if (!yardId) { alert('Select a yard first'); return; }
+
+    const parts = [];
+    document.querySelectorAll('.part-row').forEach(row => {
+      const sel = row.querySelector('select');
+      const val = row.querySelector('input[type="number"]');
+      if (sel && val) {
+        parts.push({ partType: sel.value, marketValue: parseFloat(val.value) || 0 });
+      }
+    });
+
+    if (!parts.length) { alert('Add at least one part'); return; }
+
+    const btn = document.getElementById('calcBtn');
+    btn.disabled = true;
+    btn.textContent = 'Calculating...';
+
+    try {
+      const res = await fetch('/cogs/gate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yardId, parts }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      renderResult(data);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Calculate Max Spend';
+  }
+
+  function renderResult(data) {
+    const card = document.getElementById('resultCard');
+    const hero = document.getElementById('resultHero');
+    const maxAmount = document.getElementById('maxAmount');
+    const maxSub = document.getElementById('maxSub');
+    const cogsFill = document.getElementById('cogsFill');
+    const breakdown = document.getElementById('breakdownRows');
+
+    card.classList.add('visible');
+    hero.className = 'result-hero ' + data.status;
+    cogsFill.className = 'cogs-fill ' + data.status;
+
+    maxAmount.textContent = data.status === 'leave' ? 'SKIP' : '$' + data.maxPartSpend;
+    maxSub.textContent = data.message;
+
+    // COGS bar — show what 35% of market value represents
+    const cogsPercent = Math.min(100, (data.maxTotalCost / data.totalMarketValue) * 100);
+    cogsFill.style.width = Math.min(100, cogsPercent) + '%';
+
+    breakdown.innerHTML = `
+      <div class="breakdown-row"><span class="breakdown-label">Total market value</span><span class="breakdown-value">$${data.totalMarketValue}</span></div>
+      <div class="breakdown-row"><span class="breakdown-label">35% COGS ceiling</span><span class="breakdown-value">$${data.maxTotalCost}</span></div>
+      <div class="breakdown-row"><span class="breakdown-label">Gate fee</span><span class="breakdown-value">$${data.entryFee}</span></div>
+      <div class="breakdown-row"><span class="breakdown-label">Mileage (${data.yardName})</span><span class="breakdown-value">$${data.mileageCost}</span></div>
+      <div class="breakdown-row"><span class="breakdown-label">Tax rate</span><span class="breakdown-value">${data.taxRate}</span></div>
+      <div class="breakdown-row" style="font-weight:700;"><span class="breakdown-label">Max you should pay</span><span class="breakdown-value" style="color:${data.status === 'leave' ? '#ef4444' : data.status === 'acceptable' ? '#eab308' : '#22c55e'}">$${data.maxPartSpend}</span></div>`;
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Init
+  loadYards();
+  addPart('ECM', 180);
+  addPart('BCM', 120);
+</script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+input:not([type="checkbox"]),
+select {
+  border: 1px solid #d1d5db;
+  height: 44px;
+  width: 100%;
+  font-size: 0.875rem !important;
+  border-radius: 8px;
+  padding: 0 16px !important;
+  color: #111827 !important;
+  font-family: $CodeFont !important;
+  background-color: white;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+select {
+  width: 100%;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' viewBox='0 0 24 24' stroke='%236b7280'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7' /></svg>")
+    no-repeat right 12px center;
+  background-color: white;
+  -webkit-appearance: none;
+  padding-right: 40px !important;
+  cursor: pointer;
+}
+
+textarea {
+  border: 1px solid #d1d5db;
+  resize: vertical;
+  width: 100%;
+  min-height: 100px;
+  font-size: 0.875rem !important;
+  border-radius: 8px;
+  padding: 12px 16px !important;
+  color: #111827 !important;
+  font-family: $CodeFont !important;
+  tab-size: 4;
+  transition: all 0.2s ease;
+  background-color: white;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.form-title {
+  font-family: $CodeFont;
+  color: #374151;
+  font-weight: 500;
+}
+
+.checkbox--large {
+  transform: scale(1.2);
+  padding: 10px;
+  cursor: pointer;
+}
+
+// React Select overrides for modern styling
+.select__control,
+.css-1s2u09g-control,
+.css-16at1w7-control {
+  border-radius: 8px !important;
+  border-color: #d1d5db !important;
+  min-height: 44px !important;
+
+  &:hover {
+    border-color: #9ca3af !important;
+  }
+}
+
+.select__control--is-focused,
+.css-1pahdxg-control {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+.select__control input,
+.css-16at1w7-control input {
+  height: 30px !important;
+}
+
+.select__option {
+  color: #111827;
+}
+
+.select__option--is-focused {
+  background-color: #f3f4f6;
+}
+
+.select__option--is-selected {
+  background-color: #6366f1;
+}
+
+.select__group-heading,
+.select__group-heading .css-18ng2q5-group {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}

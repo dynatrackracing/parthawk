@@ -1,0 +1,105 @@
+// // .table-wrapper {
+// // }
+
+// .table-filter {
+//   margin: 10px 0;
+//   padding: 10px 0;
+
+//   &__search {
+//     input {
+//       width: 200px;
+//       margin-right: 10px;
+//     }
+
+//     display: flex;
+
+//     @media screen and (max-width: $phone) {
+//       flex-direction: column;
+
+//       input {
+//         width: calc(100% - 56px);
+//         margin-right: 0;
+//       }
+
+//       button {
+//         margin-top: 10px;
+//       }
+//     }
+//   }
+
+//   p {
+//     margin-top: 0;
+//     margin-bottom: 5px;
+//   }
+// }
+
+// .table-pagination {
+//   margin: 10px 0;
+//   padding: 20px 0;
+//   width: 100%;
+//   display: flex;
+//   margin: auto;
+//   justify-content: center;
+//   align-items: center;
+//   gap: 10px;
+
+//   @media screen and (max-width: $phone - 100) {
+//     flex-direction: column;
+//   }
+
+//   &__button-group {
+//     display: flex;
+//     gap: 10px;
+//   }
+// }
+
+// table {
+//   display: table;
+//   border-collapse: collapse;
+//   width: 100%;
+// }
+
+// table td,
+// table th {
+//   border: 1px solid $color-darker;
+//   padding: 8px;
+// }
+
+// table tr:nth-child(even) {
+//   background-color: $color-dark;
+// }
+
+// table tr {
+//   @media screen and (max-width: $tab-port - 200) {
+//     display: flex;
+//     flex-direction: column;
+//     margin-bottom: 30px;
+//   }
+
+//   transition: background-color 0.05s ease-in-out;
+
+//   &:hover {
+//     background-color: $color-darker-hover;
+//   }
+// }
+
+// table th,
+// tfoot td {
+//   padding-top: 12px;
+//   padding-bottom: 12px;
+//   padding-right: 28px;
+//   text-align: left;
+//   background-color: white;
+//   border-color: $color-darker-hover;
+//   color: $color-white;
+// }
+
+// .table-auto {
+//   table tr {
+//     cursor: pointer;
+//     a {
+//       text-decoration: none;
+//       color: $color-white;
+//     }
+//   }
+// }

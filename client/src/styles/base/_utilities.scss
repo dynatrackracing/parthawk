@@ -1,0 +1,133 @@
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.hide {
+  display: none;
+}
+
+.hide-md {
+  @media screen and (max-width: $tab-port) {
+    display: none !important;
+  }
+}
+
+.show-md {
+  display: none !important;
+
+  @media screen and (max-width: $tab-port) {
+    display: flex !important;
+  }
+}
+
+// COLOR
+
+.color-dark {
+  color: $color-dark;
+}
+
+.color-white {
+  color: $color-white;
+}
+
+.color-light-blue {
+  color: #7b9bfb;
+}
+
+.color-blue {
+  color: #0c2647;
+}
+
+.color-grey {
+  color: #a6a6a8;
+}
+
+.color-dark-grey {
+  color: #555;
+}
+
+.color-green {
+  color: #54d115;
+}
+
+// FONT STYLE
+
+.f-w-300 {
+  font-weight: 300;
+}
+
+.f-w-400 {
+  font-weight: 400;
+}
+
+.f-w-500 {
+  font-weight: 500;
+}
+
+.f-w-600 {
+  font-weight: 600;
+}
+
+.f-w-700 {
+  font-weight: 700;
+}
+
+.text-center {
+  text-align: center;
+}
+
+// MARGIN
+.mt-0 {
+  margin-top: 0;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.mt-30 {
+  margin-top: 30px;
+}
+
+.ml-20 {
+  margin-left: 20px;
+}
+
+.ml-30 {
+  margin-left: 30px;
+}
+
+.mb-30 {
+  margin-bottom: 30px;
+}
+
+.mt-50 {
+  margin-top: 50px;
+}
+
+.mb-50 {
+  margin-bottom: 50px;
+}
