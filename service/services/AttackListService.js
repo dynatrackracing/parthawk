@@ -181,7 +181,11 @@ class AttackListService {
   }
 
   /**
-   * Build sales index keyed by normalized make.
+   * Build sales index keyed by "make|model" from YourSale title parsing.
+   *
+   * Parses each sale title to extract make, model, and part type.
+   * Groups by make|model so we can match against yard_vehicle (year, make, model).
+   * Each entry includes per-part-type breakdowns with prices and counts.
    */
   async buildSalesIndex(cutoff) {
     const index = {};
@@ -189,27 +193,107 @@ class AttackListService {
       const sales = await database('YourSale')
         .where('soldDate', '>=', cutoff)
         .whereNotNull('title')
-        .select('title', 'salePrice');
+        .select('title', 'salePrice', 'soldDate');
 
       for (const sale of sales) {
-        const title = (sale.title || '').toLowerCase();
+        const title = (sale.title || '');
+        const titleLower = title.toLowerCase();
+        const price = parseFloat(sale.salePrice) || 0;
+
+        // Extract make from title
         let make = null;
         for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-          if (title.includes(alias)) { make = canonical; break; }
+          if (titleLower.includes(alias)) { make = canonical; break; }
         }
         if (!make) continue;
 
-        if (!index[make]) {
-          index[make] = { count: 0, totalRevenue: 0, avgPrice: 0 };
+        // Extract model from title — find the word(s) after the make name
+        const model = this.extractModelFromTitle(title, make);
+        if (!model) continue;
+
+        const partType = detectPartType(title);
+
+        const key = `${make}|${model}`;
+        if (!index[key]) {
+          index[key] = {
+            make, model,
+            count: 0, totalRevenue: 0, avgPrice: 0,
+            partTypes: {},
+            firstSale: sale.soldDate,
+            lastSale: sale.soldDate,
+          };
         }
-        index[make].count++;
-        index[make].totalRevenue += parseFloat(sale.salePrice) || 0;
-        index[make].avgPrice = index[make].totalRevenue / index[make].count;
+        const entry = index[key];
+        entry.count++;
+        entry.totalRevenue += price;
+        entry.avgPrice = entry.totalRevenue / entry.count;
+        if (sale.soldDate < entry.firstSale) entry.firstSale = sale.soldDate;
+        if (sale.soldDate > entry.lastSale) entry.lastSale = sale.soldDate;
+
+        // Track per-part-type
+        if (partType) {
+          if (!entry.partTypes[partType]) {
+            entry.partTypes[partType] = { count: 0, totalPrice: 0, avgPrice: 0, titles: [] };
+          }
+          const pt = entry.partTypes[partType];
+          pt.count++;
+          pt.totalPrice += price;
+          pt.avgPrice = pt.totalPrice / pt.count;
+          if (pt.titles.length < 3) pt.titles.push(title);
+        }
       }
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildSalesIndex: YourSale table not ready');
     }
     return index;
+  }
+
+  /**
+   * Extract model name from a sale title given the known make.
+   * Handles patterns like:
+   *   "Dodge Ram 1500 2012 5.7L ECU ECM PCM..."  → "Ram 1500"
+   *   "Honda Civic 1.8L 2012-2013 ABS..."        → "Civic"
+   *   "Chevrolet Silverado Sierra Tahoe 2005..."  → "Silverado"
+   */
+  extractModelFromTitle(title, make) {
+    const titleUpper = title.toUpperCase();
+    const makeUpper = make.toUpperCase();
+
+    // Find make position in title
+    const makeIdx = titleUpper.indexOf(makeUpper);
+    if (makeIdx === -1) {
+      // Try aliases
+      for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+        if (canonical === make && titleUpper.includes(alias.toUpperCase())) {
+          return this.extractModelFromTitle(
+            title.substring(titleUpper.indexOf(alias.toUpperCase()) + alias.length),
+            ''
+          );
+        }
+      }
+      return null;
+    }
+
+    // Get text after make name
+    const afterMake = title.substring(makeIdx + makeUpper.length).trim();
+
+    // Take words until we hit a year (4 digits), engine spec (digit.digitL), or part keyword
+    const words = afterMake.split(/\s+/);
+    const modelWords = [];
+    for (const word of words) {
+      // Stop at year patterns, engine specs, or part type keywords
+      if (/^\d{4}$/.test(word)) break;
+      if (/^\d{4}-\d{4}$/.test(word)) break;
+      if (/^\d+\.\d+[lL]$/.test(word)) break;
+      if (/^(ECU|ECM|PCM|BCM|TCM|ABS|TIPM|OEM|NEW|USED|REMAN)$/i.test(word)) break;
+      if (/^(Engine|Body|Control|Module|Anti|Fuse|Power|Brake|Amplifier|Radio|Cluster)$/i.test(word)) break;
+      modelWords.push(word);
+      // Most models are 1-2 words, max 3
+      if (modelWords.length >= 3) break;
+    }
+
+    if (modelWords.length === 0) return null;
+    return modelWords.join(' ').replace(/[^A-Za-z0-9 \-]/g, '').trim();
   }
 
   /**
@@ -288,54 +372,77 @@ class AttackListService {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
+    const modelUpper = model.toUpperCase();
 
-    // Find matching inventory parts
+    // Find matching inventory parts (from Auto+Item tables — may be empty)
     let matchedParts = [];
     if (make && model && year) {
       matchedParts = this.findMatchedParts(make, model, year, inventoryIndex);
     }
 
-    const partCount = matchedParts.length;
-    const avgPrice = partCount > 0
-      ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount
-      : 0;
-
-    // Get sales demand for this make
-    const salesDemand = { count: 0, avgPrice: 0 };
+    // Find matching sales from YourSale by make+model title match
+    const salesDemand = { count: 0, avgPrice: 0, partTypes: {} };
     const alsoCheck = make ? (MAKE_ALSO_CHECK[make] || []) : [];
-    for (const m of [make, ...alsoCheck]) {
-      if (m && salesIndex[m]) {
-        salesDemand.count += salesIndex[m].count;
-        salesDemand.avgPrice = salesIndex[m].avgPrice; // use last match's avg
+    const allMakes = [make, ...alsoCheck].filter(Boolean);
+
+    for (const m of allMakes) {
+      // Exact make+model match
+      const key = `${m}|${modelUpper}`;
+      if (salesIndex[key]) {
+        salesDemand.count += salesIndex[key].count;
+        salesDemand.avgPrice = salesIndex[key].avgPrice;
+        Object.assign(salesDemand.partTypes, salesIndex[key].partTypes);
+      }
+      // Also try partial model match (e.g., yard has "RAM 1500", sales have "Ram")
+      for (const [sKey, sVal] of Object.entries(salesIndex)) {
+        if (sKey.startsWith(m + '|')) {
+          const sModel = sKey.split('|')[1];
+          if (sModel && modelUpper.includes(sModel) || sModel.includes(modelUpper)) {
+            if (sKey !== key) { // avoid double-counting exact match
+              salesDemand.count += sVal.count;
+              if (sVal.avgPrice > salesDemand.avgPrice) salesDemand.avgPrice = sVal.avgPrice;
+              for (const [pt, ptData] of Object.entries(sVal.partTypes)) {
+                if (!salesDemand.partTypes[pt]) salesDemand.partTypes[pt] = { ...ptData };
+                else {
+                  salesDemand.partTypes[pt].count += ptData.count;
+                  salesDemand.partTypes[pt].totalPrice += ptData.totalPrice;
+                  salesDemand.partTypes[pt].avgPrice = salesDemand.partTypes[pt].totalPrice / salesDemand.partTypes[pt].count;
+                }
+              }
+            }
+          }
+        }
       }
     }
 
-    // Current stock
+    // Current stock from YourListing
     let stock = 0;
-    for (const m of [make, ...alsoCheck]) {
+    for (const m of allMakes) {
       if (m) stock += stockIndex[m] || 0;
     }
 
-    // Scoring per spec: (units sold 90d × avg price) / active listings
-    // Floor at 10 when Item table has matching parts (Task 3 requirement)
+    const partCount = matchedParts.length;
+    const avgPrice = partCount > 0
+      ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount
+      : salesDemand.avgPrice;
+
+    // === SCORING ===
+    // Primary signal: YourSale matches (count * avgPrice / stock)
+    // Secondary signal: Item table matches (partCount * avgPrice)
     let score = 0;
 
-    if (partCount > 0 && salesDemand.count > 0) {
-      // Full signal: inventory + sales
-      const rawScore = (salesDemand.count * avgPrice) / Math.max(stock + 1, 1);
-      score = Math.min(100, Math.round(rawScore / 15));
-      score = Math.max(score, 10); // floor
+    if (salesDemand.count > 0) {
+      // Real sales data — strongest signal
+      const rawScore = (salesDemand.count * salesDemand.avgPrice) / Math.max(stock + 1, 1);
+      score = Math.min(100, Math.round(rawScore / 10));
+      score = Math.max(score, 15); // floor: we've sold this make+model before
     } else if (partCount > 0) {
-      // Inventory match but no sales history — floor at 10, scale by part value
+      // Inventory match but no YourSale history
       const inventorySignal = (partCount * avgPrice) / Math.max(stock + 1, 1);
       score = Math.min(60, Math.round(inventorySignal / 20));
-      score = Math.max(score, 10); // floor: never gray if we have matching parts
-    } else if (salesDemand.count > 0) {
-      // No inventory match but sales history exists
-      const rawScore = (salesDemand.count * salesDemand.avgPrice) / Math.max(stock + 1, 1);
-      score = Math.min(70, Math.round(rawScore / 20));
+      score = Math.max(score, 10);
     } else if (make) {
-      // Recognized make, no data — base score
+      // Recognized make, no data
       score = 5;
     }
 
@@ -344,24 +451,23 @@ class AttackListService {
     else if (stock >= 3) score = Math.round(score * 0.6);
     else if (stock >= 1) score = Math.round(score * 0.85);
 
-    // Floor enforcement after penalty
-    if (partCount > 0 && score < 10) score = 10;
+    // Floor enforcement
+    if ((partCount > 0 || salesDemand.count > 0) && score < 10) score = 10;
 
     // Vehicle color
     let color = 'gray';
     if (score >= 70) color = 'red';
     else if (score >= 45) color = 'yellow';
 
-    // Build per-part detail with verdicts and dead inventory warnings
-    const parts = matchedParts.slice(0, 8).map(p => {
-      // Per-part score based on price relative to avg
+    // === BUILD PARTS LIST ===
+    // Combine Item-based parts + YourSale part type breakdowns
+    const parts = [];
+
+    // From Item table (if any)
+    for (const p of matchedParts.slice(0, 4)) {
       const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
       const verdict = partScore >= 70 ? 'PULL' : partScore >= 45 ? 'WATCH' : 'SKIP';
-      const reason = verdict === 'PULL' ? 'High value, strong demand'
-        : verdict === 'WATCH' ? 'Moderate value, check condition'
-        : salesDemand.count === 0 ? 'No sales history yet' : 'Low relative value';
-
-      return {
+      parts.push({
         itemId: p.itemId,
         title: p.title,
         category: p.category,
@@ -371,11 +477,36 @@ class AttackListService {
         in_stock: p.quantity || 0,
         sold_90d: salesDemand.count,
         verdict,
-        reason,
-        // Dead inventory warning checked async in route handler
+        reason: verdict === 'PULL' ? 'High value, strong demand'
+          : verdict === 'WATCH' ? 'Moderate value, check condition'
+          : 'Low relative value',
         deadWarning: null,
-      };
-    });
+      });
+    }
+
+    // From YourSale part type breakdowns — these are the real signals
+    for (const [partType, ptData] of Object.entries(salesDemand.partTypes)) {
+      // Skip if already covered by Item-based parts
+      if (parts.some(p => p.partType === partType)) continue;
+      const ptScore = score; // inherit vehicle score
+      const verdict = ptScore >= 70 ? 'PULL' : ptScore >= 45 ? 'WATCH' : 'SKIP';
+      parts.push({
+        itemId: null,
+        title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
+        category: null,
+        partNumber: null,
+        partType,
+        price: Math.round(ptData.avgPrice),
+        in_stock: 0,
+        sold_90d: ptData.count,
+        verdict,
+        reason: `Sold ${ptData.count}x @ $${Math.round(ptData.avgPrice)} avg`,
+        deadWarning: null,
+      });
+    }
+
+    // Sort parts: highest sold count first
+    parts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
 
     return {
       id: vehicle.id,
@@ -390,9 +521,10 @@ class AttackListService {
       is_active: vehicle.active,
       score,
       color_code: color,
-      est_value: Math.round(partCount > 0 ? avgPrice * partCount : 0),
-      matched_parts: partCount,
-      avg_part_price: Math.round(avgPrice),
+      est_value: Math.round(salesDemand.count > 0 ? salesDemand.avgPrice * Object.keys(salesDemand.partTypes).length : (partCount > 0 ? avgPrice * partCount : 0)),
+      matched_parts: parts.length,
+      avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
+      sales_count: salesDemand.count,
       parts,
     };
   }

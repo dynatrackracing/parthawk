@@ -90,7 +90,45 @@ app.get('/api/debug/makes', async (req, res) => {
       }
     }
 
-    res.json({ table_counts: counts });
+    // Check if specific order exists
+    let orderCheck = null;
+    try {
+      orderCheck = await database('YourSale')
+        .where('ebayOrderId', '18-14345-57629-286936703557').first();
+    } catch (e) { orderCheck = { error: e.message }; }
+
+    // Sample: Dodge Ram sales
+    let dodgeRamSales = [];
+    try {
+      dodgeRamSales = await database('YourSale')
+        .whereRaw('title ILIKE ?', ['%Dodge%'])
+        .whereRaw('title ILIKE ?', ['%Ram%'])
+        .select('title', 'salePrice', 'soldDate')
+        .limit(10);
+    } catch (e) { dodgeRamSales = [{ error: e.message }]; }
+
+    // Distinct makes from yard_vehicle
+    let yardMakes = [];
+    try {
+      yardMakes = (await database('yard_vehicle').distinct('make').orderBy('make')).map(r => r.make);
+    } catch (e) {}
+
+    // Sample YourSale titles
+    let saleSamples = [];
+    try {
+      saleSamples = await database('YourSale')
+        .select('title', 'salePrice', 'soldDate', 'sku')
+        .orderBy('soldDate', 'desc').limit(5);
+    } catch (e) {}
+
+    res.json({
+      table_counts: counts,
+      order_18_14345_exists: orderCheck ? true : false,
+      order_18_14345_data: orderCheck,
+      dodge_ram_sales: dodgeRamSales,
+      yard_vehicle_makes: yardMakes,
+      recent_sale_samples: saleSamples,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
