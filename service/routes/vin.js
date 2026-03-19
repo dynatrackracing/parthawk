@@ -294,20 +294,25 @@ router.post('/scan', async (req, res) => {
 
     // --- Step 2: Parts Intelligence (3 separate sections) ---
     const make = decoded.make;
-    const model = decoded.model;
+    const fullModel = decoded.model;
     const year = decoded.year;
+
+    // Strip NHTSA model to base name: "Tacoma Access Cab" → "Tacoma", "Camry LE" → "Camry"
+    // Keep compound models like "Grand Cherokee", "CR-V", "RAV4", "4Runner"
+    const baseModel = extractBaseModel(fullModel);
+    log.info({ make, fullModel, baseModel, year }, 'VIN scan: searching with base model');
 
     let salesHistory = [];  // YOUR SALES HISTORY
     let currentStock = [];  // YOUR CURRENT STOCK
     let marketRef = [];     // MARKET REFERENCE (competitors)
 
-    if (make && model) {
+    if (make && baseModel) {
       // 2a: YourSale — parts we've SOLD for this vehicle
       try {
         const sales = await database('YourSale')
           .whereNotNull('title')
           .whereRaw('"title" ILIKE ?', [`%${make}%`])
-          .whereRaw('"title" ILIKE ?', [`%${model}%`])
+          .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
           .select('title', 'salePrice', 'soldDate')
           .orderBy('soldDate', 'desc');
 
@@ -339,7 +344,7 @@ router.post('/scan', async (req, res) => {
           .whereNotNull('title')
           .where('listingStatus', 'Active')
           .whereRaw('"title" ILIKE ?', [`%${make}%`])
-          .whereRaw('"title" ILIKE ?', [`%${model}%`])
+          .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
           .select('title', 'currentPrice', 'quantityAvailable', 'sku');
 
         const byType = {};
@@ -374,7 +379,7 @@ router.post('/scan', async (req, res) => {
             .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
             .where('Auto.year', year)
             .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
-            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + model.toUpperCase() + '%'])
+            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
             .where('Item.price', '>', 0)
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber')
             .limit(200);
@@ -384,7 +389,7 @@ router.post('/scan', async (req, res) => {
           items = await database('Item')
             .where('price', '>', 0)
             .whereRaw('"title" ILIKE ?', [`%${make}%`])
-            .whereRaw('"title" ILIKE ?', [`%${model}%`])
+            .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
             .select('title', 'price', 'seller', 'manufacturerPartNumber')
             .limit(200);
         }
@@ -426,7 +431,7 @@ router.post('/scan', async (req, res) => {
         .where('active', true)
         .where('year', String(year))
         .whereRaw('UPPER(make) = ?', [(make || '').toUpperCase()])
-        .whereRaw('UPPER(model) LIKE ?', ['%' + (model || '').toUpperCase() + '%'])
+        .whereRaw('UPPER(model) LIKE ?', ['%' + (baseModel || '').toUpperCase() + '%'])
         .first();
       if (match) {
         const yard = await database('yard').where('id', match.yard_id).first();
@@ -449,7 +454,7 @@ router.post('/scan', async (req, res) => {
     } catch (e) { /* table may not exist yet */ }
 
     res.json({
-      success: true, vin, decoded, totalValue, yardMatch,
+      success: true, vin, decoded, baseModel, totalValue, yardMatch,
       salesHistory, currentStock, marketRef,
     });
   } catch (err) {
@@ -474,6 +479,59 @@ router.get('/history', async (req, res) => {
     res.json({ success: true, scans: [] });
   }
 });
+
+/**
+ * Extract base model from NHTSA full model string.
+ * "Tacoma Access Cab" → "Tacoma"
+ * "Camry LE" → "Camry"
+ * "Grand Cherokee" → "Grand Cherokee"
+ * "CR-V" → "CR-V"
+ * "RAV4" → "RAV4"
+ * "Ram 1500" → "Ram 1500"
+ */
+function extractBaseModel(model) {
+  if (!model) return null;
+  const m = model.trim();
+
+  // Known compound models — keep as-is
+  const compounds = ['Grand Cherokee','Grand Caravan','Town & Country','Town and Country',
+    'Land Cruiser','Ram 1500','Ram 2500','Ram 3500','CR-V','CX-5','CX-9','HR-V',
+    'RAV4','4Runner','MR2','RX-8','FR-S','BR-Z','WR-X','NX 200','RX 350',
+    'IS 250','GS 350','ES 350','CT 200','LS 460','GX 460','LX 570',
+    'Q50','Q60','QX60','QX80','G35','G37','M35','M37','FX35','FX45',
+    'MKX','MKZ','MKS','MKC','MKT','GL450','ML350','GLE 350','GLC 300',
+    'C 300','E 350','S 550','CLA 250','GLA 250','GLK 350',
+    'X5','X3','X1','Z4','M3','M5'];
+
+  for (const c of compounds) {
+    if (m.toUpperCase().startsWith(c.toUpperCase())) return c;
+  }
+
+  // Trim suffixes: "Tacoma Access Cab" → "Tacoma", "Camry LE" → "Camry"
+  // Keep first word, plus second word if it's a number (e.g. "Ram 1500", "F-150")
+  const words = m.split(/\s+/);
+  if (words.length === 1) return words[0];
+
+  // If second word is a number/trim code, keep both: "Silverado 1500", "F-150"
+  if (/^\d/.test(words[1]) || /^[A-Z]-?\d/.test(words[1])) {
+    return words.slice(0, 2).join(' ');
+  }
+
+  // If second word is a known trim/body suffix, drop it
+  const trimSuffixes = ['LE','SE','XLE','XSE','SR','SR5','LX','EX','DX','SX','LT','LS','SS',
+    'SXT','RT','GT','SL','SV','S','Limited','Platinum','Premium','Sport','Base',
+    'Touring','Laredo','Overland','Trailhawk','Sahara','Rubicon','Willys',
+    'Access','Double','Crew','Regular','Cab','Extended','SuperCrew','SuperCab',
+    'Sedan','Coupe','Hatchback','Wagon','Convertible','Van','Cargo','Passenger',
+    'Short','Long','Bed','Box','4dr','2dr','4D','2D'];
+
+  if (trimSuffixes.some(s => words[1].toUpperCase() === s.toUpperCase())) {
+    return words[0];
+  }
+
+  // Default: keep first word only
+  return words[0];
+}
 
 function detectPartTypeForVin(title) {
   const t = (title || '').toUpperCase();

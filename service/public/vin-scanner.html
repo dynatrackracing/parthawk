@@ -128,10 +128,14 @@ function render(data){
   const d=data.decoded;const sh=data.salesHistory||[];const cs=data.currentStock||[];const mr=data.marketRef||[];
   let h='';
 
-  // Vehicle card
+  // Vehicle card — prominent display with all specs
+  const headline = [d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
+  const specLine = [d.engine,d.engineType,d.drivetrain,d.trim].filter(Boolean).join(' · ');
   h+='<div class="card">';
-  h+='<div class="vh">'+[d.year,d.make,d.model,d.trim].filter(Boolean).join(' ')+'</div>';
+  h+='<div style="font-size:24px;font-weight:900;letter-spacing:-0.03em;color:#111">'+headline+'</div>';
+  if(specLine) h+='<div style="font-size:14px;font-weight:600;color:#374151;margin-top:2px">'+specLine+'</div>';
   h+='<div class="vin-str">'+data.vin+'</div>';
+  if(data.baseModel && data.baseModel !== d.model) h+='<div style="font-size:10px;color:#9ca3af">NHTSA model: '+d.model+' · Searching: '+data.baseModel+'</div>';
   h+='<div class="badges">';
   if(d.engine)h+='<span class="b b-gy">'+d.engine+'</span>';
   if(d.engineType)h+='<span class="b '+(d.engineType==='Gas'?'b-gy':d.engineType==='Hybrid'?'b-yl':d.engineType==='Diesel'?'b-or':'b-bl')+'">'+d.engineType+'</span>';
