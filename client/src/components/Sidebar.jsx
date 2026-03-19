@@ -62,6 +62,12 @@ const SalesIcon = () => (
   </svg>
 );
 
+const TargetIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
 // NavItem component for consistent styling
 const NavItem = ({ to, icon: Icon, label, isActive }) => (
   <NavLink
@@ -190,6 +196,10 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </h3>
             <nav className="space-y-1">
               <NavItem to="/intelligence" icon={ChartIcon} label="Dashboard" isActive={page === "/intelligence"} />
+              <a href="/admin/pull" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <TargetIcon />
+                <span className="text-xs font-semibold tracking-wide">Attack List</span>
+              </a>
               <NavItem to="/intelligence/price-check" icon={DollarIcon} label="Price Check" isActive={page === "/intelligence/price-check"} />
               <NavItem to="/intelligence/stale-inventory" icon={ClockIcon} label="Stale Inventory" isActive={page === "/intelligence/stale-inventory"} />
               <NavItem to="/intelligence/your-sales" icon={SalesIcon} label="Your Sales" isActive={page === "/intelligence/your-sales"} />

@@ -388,6 +388,8 @@
       return '<div style="padding:12px 0;color:var(--text-muted);font-size:12px;">No matching inventory parts found.</div>';
     }
 
+    let html = '';
+
     // Show platform siblings if any
     if (v.platform_siblings && v.platform_siblings.length > 0) {
       html += `<div style="padding:8px 0;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">
