@@ -38,6 +38,10 @@ app.use('/attack-list', require('./routes/attack-list'));
 app.use('/cogs', require('./routes/cogs'));
 app.use('/api/parts', require('./routes/parts'));
 app.use('/api/parts-lookup', require('./routes/partsLookup'));
+app.use('/restock', require('./routes/restockReport'));
+app.get('/admin/restock', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
+});
 
 // Build scrape queue from sales data
 app.post('/api/build-scrape-queue', async (req, res) => {

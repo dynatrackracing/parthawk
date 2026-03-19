@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PartHawk — Restock Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;--border:#2a2a2a;--green:#22c55e;--green-dim:#064e3b;--yellow:#eab308;--yellow-dim:#713f12;--gray:#6b7280;--text:#f9fafb;--text-mid:#d1d5db;--text-muted:#6b7280}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em}
+  header p{font-size:11px;color:var(--text-muted);margin-top:1px}
+  .summary{display:flex;gap:10px;padding:16px 20px;flex-wrap:wrap}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:100px}
+  .stat-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em}
+  .stat-value{font-size:20px;font-weight:800;margin-top:2px}
+  .stat-value.g{color:var(--green)}.stat-value.y{color:var(--yellow)}.stat-value.gr{color:var(--gray)}
+  .section{padding:0 20px 16px}
+  .section-header{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .section-header.green{color:var(--green)}.section-header.yellow{color:var(--yellow)}.section-header.grey{color:var(--gray)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)}
+  td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text-mid)}
+  tr:hover td{background:var(--surface2)}
+  .badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+  .badge-green{background:var(--green-dim);color:var(--green)}.badge-yellow{background:var(--yellow-dim);color:var(--yellow)}.badge-grey{background:#1f2937;color:var(--gray)}
+  .mono{font-family:monospace;font-size:11px}
+  .loading{text-align:center;padding:40px;color:var(--text-muted)}
+  .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Restock Report</h1><p id="sub">Loading...</p></div>
+  <a href="/admin/pull" style="font-size:12px;color:var(--text-muted);text-decoration:none">← Attack List</a>
+</header>
+<div class="summary" id="summary"></div>
+<div id="content"><div class="loading"><div class="spinner"></div>Generating report...</div></div>
+<script>
+async function load(){
+  try{
+    const res=await fetch('/restock/report');
+    const d=await res.json();
+    if(!d.success)throw new Error(d.error);
+    document.getElementById('sub').textContent=`${d.summary.greenCount+d.summary.yellowCount+d.summary.greyCount} parts flagged`;
+    document.getElementById('summary').innerHTML=`
+      <div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value g">${d.summary.greenCount}</div></div>
+      <div class="stat"><div class="stat-label">Consider</div><div class="stat-value y">${d.summary.yellowCount}</div></div>
+      <div class="stat"><div class="stat-label">On Radar</div><div class="stat-value gr">${d.summary.greyCount}</div></div>
+      <div class="stat"><div class="stat-label">Total Parts Sold</div><div class="stat-value">${d.summary.totalParts}</div></div>`;
+    let html='';
+    if(d.green.length)html+=renderSection('green','Restock Now','badge-green',d.green);
+    if(d.yellow.length)html+=renderSection('yellow','Consider Restocking','badge-yellow',d.yellow);
+    if(d.grey.length)html+=renderSection('grey','On Radar','badge-grey',d.grey);
+    if(!html)html='<div class="loading">No restock flags. All parts adequately stocked.</div>';
+    document.getElementById('content').innerHTML=html;
+  }catch(e){document.getElementById('content').innerHTML='<div class="loading">Error: '+e.message+'</div>';}
+}
+function renderSection(cls,title,badge,items){
+  let h=`<div class="section"><div class="section-header ${cls}">${title} (${items.length})</div><table><tr><th>Action</th><th>Part</th><th>Title</th><th>Sold 90d</th><th>Stock</th><th>Ratio</th><th>Avg $</th><th>Revenue</th></tr>`;
+  for(const i of items){
+    h+=`<tr><td><span class="badge ${badge}">${i.action}</span></td><td class="mono">${i.partNumber||''}</td><td>${(i.title||'').substring(0,50)}</td><td>${i.sold90d}</td><td>${i.activeStock}</td><td>${i.ratio}x</td><td>$${i.avgPrice}</td><td>$${i.revenue90d}</td></tr>`;
+  }
+  h+='</table></div>';
+  return h;
+}
+load();
+</script>
+</body>
+</html>

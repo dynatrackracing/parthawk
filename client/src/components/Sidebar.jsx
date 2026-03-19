@@ -203,6 +203,10 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <NavItem to="/intelligence/price-check" icon={DollarIcon} label="Price Check" isActive={page === "/intelligence/price-check"} />
               <NavItem to="/intelligence/stale-inventory" icon={ClockIcon} label="Stale Inventory" isActive={page === "/intelligence/stale-inventory"} />
               <NavItem to="/intelligence/your-sales" icon={SalesIcon} label="Your Sales" isActive={page === "/intelligence/your-sales"} />
+              <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <AddIcon />
+                <span className="text-xs font-semibold tracking-wide">Restock Report</span>
+              </a>
             </nav>
           </div>
 
