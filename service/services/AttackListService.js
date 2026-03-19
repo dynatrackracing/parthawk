@@ -742,7 +742,7 @@ class AttackListService {
       trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
       date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
       vin: vehicle.vin || null,
-      engine: vehicle.engine || null,
+      engine: (vehicle.engine || '').replace(/\s*\d{2,3}cyl/i, '').trim() || null,
       engine_type: vehicle.engine_type || null,
       drivetrain: vehicle.drivetrain || null,
       trim_level: vehicle.trim_level || null,
