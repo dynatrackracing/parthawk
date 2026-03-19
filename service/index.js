@@ -63,6 +63,62 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
+// Build Auto + AutoItemCompatibility from Item titles
+app.post('/api/build-auto-index', async (req, res) => {
+  const { database } = require('./database/database');
+  const { v4: uuidv4 } = require('uuid');
+  const MAKES = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chevy','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Mazda','Mercedes-Benz','Mercedes','Mercury','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Subaru','Suzuki','Toyota','Volkswagen','VW','Volvo'];
+  try {
+    const items = await database('Item').whereNotNull('title').select('id','ebayId','title').limit(50000);
+    const autoCache = {};
+    let autosCreated = 0, linksCreated = 0, skipped = 0;
+    for (const item of items) {
+      const title = item.title || '';
+      const yearMatch = title.match(/\b((?:19|20)\d{2})\b/);
+      if (!yearMatch) { skipped++; continue; }
+      const year = parseInt(yearMatch[1]);
+      let make = null;
+      const tu = title.toUpperCase();
+      for (const m of MAKES) { if (tu.includes(m.toUpperCase())) { make = m; break; } }
+      if (!make) { skipped++; continue; }
+      if (make === 'Chevy') make = 'Chevrolet';
+      if (make === 'VW') make = 'Volkswagen';
+      if (make === 'Mercedes') make = 'Mercedes-Benz';
+      const mi = tu.indexOf(make.toUpperCase());
+      const after = title.substring(mi + make.length).trim().split(/\s+/);
+      const mw = [];
+      for (const w of after) {
+        if (/^\d{4}$/.test(w)||/^\d+\.\d+[lL]$/.test(w)||/^(ECU|ECM|PCM|BCM|TCM|ABS|TIPM|OEM|Engine|Body|Control|Module|Anti|Fuse|Power|Brake)$/i.test(w)) break;
+        mw.push(w);
+        if (mw.length >= 3) break;
+      }
+      if (!mw.length) { skipped++; continue; }
+      const model = mw.join(' ').replace(/[^A-Za-z0-9 \-]/g,'').trim();
+      if (!model) { skipped++; continue; }
+      const engine = 'N/A';
+      const ak = `${year}|${make}|${model}|${engine}`;
+      let autoId = autoCache[ak];
+      if (!autoId) {
+        const ex = await database('Auto').where({year,make,model,engine}).first();
+        if (ex) { autoId = ex.id; }
+        else {
+          autoId = uuidv4();
+          try { await database('Auto').insert({id:autoId,year,make,model,trim:'',engine,createdAt:new Date(),updatedAt:new Date()}); autosCreated++; }
+          catch(e) { const f=await database('Auto').where({year,make,model,engine}).first(); autoId=f?.id||autoId; }
+        }
+        autoCache[ak] = autoId;
+      }
+      try {
+        const le = await database('AutoItemCompatibility').where({autoId,itemId:item.ebayId}).first();
+        if (!le) { await database('AutoItemCompatibility').insert({autoId,itemId:item.ebayId}); linksCreated++; }
+      } catch(e) {}
+    }
+    const ac = await database('Auto').count('* as cnt').first();
+    const lc = await database('AutoItemCompatibility').count('* as cnt').first();
+    res.json({success:true,itemsProcessed:items.length,autosCreated,linksCreated,skipped,totalAutos:parseInt(ac?.cnt||0),totalLinks:parseInt(lc?.cnt||0)});
+  } catch(err) { res.status(500).json({error:err.message}); }
+});
+
 // TEMPORARY debug endpoint — remove after use
 app.get('/api/debug/makes', async (req, res) => {
   try {
