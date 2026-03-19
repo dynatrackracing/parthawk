@@ -204,6 +204,60 @@ app.post('/api/build-auto-index', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Data verification — confirms table access matches original app
+app.get('/api/debug/verify-tables', async (req, res) => {
+  try {
+    const { database } = require('./database/database');
+    const results = {};
+
+    // YourSale: count total and last 180 days
+    try {
+      const total = await database('YourSale').count('* as cnt').first();
+      const cutoff = new Date(Date.now() - 180 * 86400000);
+      const recent = await database('YourSale').where('soldDate', '>=', cutoff).count('* as cnt').first();
+      const sample = await database('YourSale').orderBy('soldDate', 'desc').select('title', 'salePrice', 'soldDate', 'sku').limit(3);
+      results.YourSale = { total: parseInt(total?.cnt || 0), last180d: parseInt(recent?.cnt || 0), sample };
+    } catch (e) { results.YourSale = { error: e.message }; }
+
+    // YourListing: count total and active
+    try {
+      const total = await database('YourListing').count('* as cnt').first();
+      const active = await database('YourListing').where('listingStatus', 'Active').count('* as cnt').first();
+      const sample = await database('YourListing').where('listingStatus', 'Active').select('title', 'currentPrice', 'sku', 'quantityAvailable', 'listingStatus').limit(3);
+      results.YourListing = { total: parseInt(total?.cnt || 0), active: parseInt(active?.cnt || 0), sample };
+    } catch (e) { results.YourListing = { error: e.message }; }
+
+    // Column verification — show actual columns
+    try {
+      const saleCols = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourSale' ORDER BY ordinal_position");
+      results.YourSaleColumns = (saleCols.rows || saleCols).map(r => `${r.column_name} (${r.data_type})`);
+    } catch (e) { results.YourSaleColumns = { error: e.message }; }
+
+    try {
+      const listCols = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourListing' ORDER BY ordinal_position");
+      results.YourListingColumns = (listCols.rows || listCols).map(r => `${r.column_name} (${r.data_type})`);
+    } catch (e) { results.YourListingColumns = { error: e.message }; }
+
+    // Auto + AutoItemCompatibility counts
+    try {
+      const ac = await database('Auto').count('* as cnt').first();
+      const aic = await database('AutoItemCompatibility').count('* as cnt').first();
+      const itemC = await database('Item').count('* as cnt').first();
+      results.Auto = parseInt(ac?.cnt || 0);
+      results.AutoItemCompatibility = parseInt(aic?.cnt || 0);
+      results.Item = parseInt(itemC?.cnt || 0);
+    } catch (e) { results.AutoItemError = e.message; }
+
+    // Yard vehicle counts
+    try {
+      const yv = await database('yard_vehicle').where('active', true).count('* as cnt').first();
+      results.activeYardVehicles = parseInt(yv?.cnt || 0);
+    } catch (e) { results.yardVehicleError = e.message; }
+
+    res.json(results);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // TEMPORARY debug endpoint — remove after use
 app.get('/api/debug/makes', async (req, res) => {
   try {
