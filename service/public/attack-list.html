@@ -665,12 +665,12 @@
     resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><div>Resizing & reading VIN...</div></div>';
 
     try {
-      // Resize to max 1024px wide to prevent mobile memory crash
+      // Resize to max 1024px wide, convert to base64
       const resized = await resizeImage(file, 1024);
-      const formData = new FormData();
-      formData.append('photo', resized, 'vin.jpg');
+      const reader = new FileReader();
+      const b64 = await new Promise((ok,no) => { reader.onload = () => ok(reader.result.split(',')[1]); reader.onerror = no; reader.readAsDataURL(resized); });
 
-      const res = await fetch('/vin/decode-photo', { method: 'POST', body: formData });
+      const res = await fetch('/vin/decode-photo', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({image: b64}) });
       const data = await res.json();
 
       if (!data.success) throw new Error(data.error || 'Failed');

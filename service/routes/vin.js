@@ -23,30 +23,16 @@ function formatEngineStr(displacement, cylinders) {
 
 /**
  * POST /vin/decode-photo
- * Accepts multipart form with 'photo' file field.
+ * Accepts JSON body: { image: "base64-encoded-jpeg" }
  * Uses Claude API to read VIN from photo, then NHTSA to decode.
  */
 router.post('/decode-photo', async (req, res) => {
   try {
-    // Read the file from the raw request body
-    // Since we don't have multer, parse the multipart manually
-    const chunks = [];
-    await new Promise((resolve, reject) => {
-      req.on('data', chunk => chunks.push(chunk));
-      req.on('end', resolve);
-      req.on('error', reject);
-    });
-
-    const body = Buffer.concat(chunks);
-    if (body.length === 0) {
-      return res.status(400).json({ error: 'No photo provided' });
+    const imageBase64 = req.body?.image;
+    if (!imageBase64 || imageBase64.length < 1000) {
+      return res.status(400).json({ error: 'No image provided or image too small' });
     }
-
-    // Extract image data from multipart form
-    const imageBase64 = extractImageFromMultipart(body, req.headers['content-type']);
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'Could not extract image from upload' });
-    }
+    log.info({ imageSize: imageBase64.length }, 'VIN photo received');
 
     // Step 1: Send to Claude API for VIN reading
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -169,38 +155,7 @@ router.post('/decode-photo', async (req, res) => {
   }
 });
 
-/**
- * Extract base64 image data from a multipart/form-data request body.
- * Simple parser — assumes single file field named 'photo'.
- */
-function extractImageFromMultipart(body, contentType) {
-  try {
-    const boundaryMatch = (contentType || '').match(/boundary=(.+)/);
-    if (!boundaryMatch) {
-      // Not multipart — assume raw image bytes
-      return body.toString('base64');
-    }
-
-    const boundary = boundaryMatch[1].trim();
-    const bodyStr = body.toString('latin1');
-    const parts = bodyStr.split('--' + boundary);
-
-    for (const part of parts) {
-      if (part.includes('filename=')) {
-        // Find the blank line separating headers from body
-        const headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd === -1) continue;
-        const fileData = part.substring(headerEnd + 4);
-        // Remove trailing \r\n--
-        const clean = fileData.replace(/\r\n$/, '');
-        return Buffer.from(clean, 'latin1').toString('base64');
-      }
-    }
-  } catch (e) {
-    log.warn({ err: e.message }, 'Failed to parse multipart');
-  }
-  return null;
-}
+// Image is now sent as JSON base64, no multipart parsing needed
 
 /**
  * POST /vin/scan
@@ -385,7 +340,7 @@ router.post('/scan', async (req, res) => {
       // 2c: Item table — specific parts with verdicts, rebuild separated
       try {
         let items = [];
-        // Try Auto join first (exact year match)
+        // Try Auto join — exact year first, then any year for same make+model
         if (year) {
           items = await database('Auto')
             .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
@@ -397,8 +352,22 @@ router.post('/scan', async (req, res) => {
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
             .orderBy('Item.price', 'desc')
             .limit(200);
+          log.info({ count: items.length, year, make, baseModel }, 'VIN scan: Auto join exact year');
         }
-        // Fallback: direct title search
+        // Broaden: any year for same make+model
+        if (items.length === 0) {
+          items = await database('Auto')
+            .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+            .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+            .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
+            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
+            .where('Item.price', '>', 0)
+            .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
+            .orderBy('Item.price', 'desc')
+            .limit(200);
+          log.info({ count: items.length, make, baseModel }, 'VIN scan: Auto join any year');
+        }
+        // Last fallback: ILIKE title search on Item table
         if (items.length === 0) {
           items = await database('Item')
             .where('price', '>', 0)
