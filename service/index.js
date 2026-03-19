@@ -215,6 +215,7 @@ app.get('/api/debug/makes', async (req, res) => {
       'YourSale', 'YourListing',
       'yard', 'yard_vehicle', 'vin_cache', 'vin_scan_log',
       'market_demand_cache', 'fitment_data',
+      'platform_group', 'platform_vehicle', 'platform_shared_part',
     ];
 
     const counts = {};
@@ -258,9 +259,19 @@ app.get('/api/debug/makes', async (req, res) => {
       listingColumns = (lc.rows || lc).map(r => r.column_name + ':' + r.data_type);
     } catch (e) { listingColumns = [e.message]; }
 
-    // Yard vehicle makes
-    let yardMakes = [];
+    // Yard vehicle makes + samples
+    let yardMakes = [], yardSamples = [];
     try { yardMakes = (await database('yard_vehicle').where('active', true).distinct('make').orderBy('make')).map(r => r.make); } catch (e) {}
+    try { yardSamples = await database('yard_vehicle').select('year','make','model','vin','color','row_number','active','engine','engine_type','drivetrain','trim_level','vin_decoded').limit(3); } catch (e) { yardSamples = [{error: e.message}]; }
+
+    // Dashboard stats verification (90-day)
+    let dashboardStats = {};
+    try {
+      const cutoff90 = new Date(Date.now() - 90 * 86400000);
+      const stats = await database('YourSale').where('soldDate', '>=', cutoff90)
+        .select(database.raw('COUNT(*) as sold'), database.raw('COALESCE(SUM("salePrice"), 0) as revenue'), database.raw('ROUND(AVG("salePrice"), 2) as avg_price'));
+      dashboardStats = stats[0] || {};
+    } catch (e) { dashboardStats = { error: e.message }; }
 
     res.json({
       table_counts: counts,
@@ -271,6 +282,8 @@ app.get('/api/debug/makes', async (req, res) => {
       recent_sales: saleSamples,
       active_listing_samples: listingSamples,
       yard_vehicle_makes: yardMakes,
+      yard_vehicle_samples: yardSamples,
+      dashboard_stats_90d: dashboardStats,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
