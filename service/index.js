@@ -240,6 +240,33 @@ app.get('/api/debug/full', async (req, res) => {
   res.json(results);
 });
 
+// One-time dedup YourSale — removes duplicate ebayItemId+soldDate rows
+app.post('/api/admin/dedup-sales', async (req, res) => {
+  const { database } = require('./database/database');
+  try {
+    const before = await database.raw('SELECT COUNT(*) as count FROM "YourSale"');
+    const before90 = await database.raw('SELECT COUNT(*) as count, ROUND(SUM("salePrice"::numeric),2) as revenue FROM "YourSale" WHERE "soldDate" >= NOW() - INTERVAL \'90 days\'');
+
+    // Delete duplicates: keep the row with the smallest id (first inserted)
+    const deleted = await database.raw(`
+      DELETE FROM "YourSale" a USING "YourSale" b
+      WHERE a.id > b.id
+        AND a."ebayItemId" = b."ebayItemId"
+        AND a."soldDate"::date = b."soldDate"::date
+    `);
+
+    const after = await database.raw('SELECT COUNT(*) as count FROM "YourSale"');
+    const after90 = await database.raw('SELECT COUNT(*) as count, ROUND(SUM("salePrice"::numeric),2) as revenue FROM "YourSale" WHERE "soldDate" >= NOW() - INTERVAL \'90 days\'');
+
+    res.json({
+      success: true,
+      before: { total: before.rows[0].count, ...before90.rows[0] },
+      after: { total: after.rows[0].count, ...after90.rows[0] },
+      deleted: parseInt(before.rows[0].count) - parseInt(after.rows[0].count),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
   const { database } = require('./database/database');
