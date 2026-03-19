@@ -204,75 +204,17 @@ app.post('/api/build-auto-index', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Data verification — confirms table access matches original app
-app.get('/api/debug/verify-tables', async (req, res) => {
-  try {
-    const { database } = require('./database/database');
-    const results = {};
 
-    // YourSale: count total and last 180 days
-    try {
-      const total = await database('YourSale').count('* as cnt').first();
-      const cutoff = new Date(Date.now() - 180 * 86400000);
-      const recent = await database('YourSale').where('soldDate', '>=', cutoff).count('* as cnt').first();
-      const sample = await database('YourSale').orderBy('soldDate', 'desc').select('title', 'salePrice', 'soldDate', 'sku').limit(3);
-      results.YourSale = { total: parseInt(total?.cnt || 0), last180d: parseInt(recent?.cnt || 0), sample };
-    } catch (e) { results.YourSale = { error: e.message }; }
-
-    // YourListing: count total and active
-    try {
-      const total = await database('YourListing').count('* as cnt').first();
-      const active = await database('YourListing').where('listingStatus', 'Active').count('* as cnt').first();
-      const sample = await database('YourListing').where('listingStatus', 'Active').select('title', 'currentPrice', 'sku', 'quantityAvailable', 'listingStatus').limit(3);
-      results.YourListing = { total: parseInt(total?.cnt || 0), active: parseInt(active?.cnt || 0), sample };
-    } catch (e) { results.YourListing = { error: e.message }; }
-
-    // Column verification — show actual columns
-    try {
-      const saleCols = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourSale' ORDER BY ordinal_position");
-      results.YourSaleColumns = (saleCols.rows || saleCols).map(r => `${r.column_name} (${r.data_type})`);
-    } catch (e) { results.YourSaleColumns = { error: e.message }; }
-
-    try {
-      const listCols = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourListing' ORDER BY ordinal_position");
-      results.YourListingColumns = (listCols.rows || listCols).map(r => `${r.column_name} (${r.data_type})`);
-    } catch (e) { results.YourListingColumns = { error: e.message }; }
-
-    // Auto + AutoItemCompatibility counts
-    try {
-      const ac = await database('Auto').count('* as cnt').first();
-      const aic = await database('AutoItemCompatibility').count('* as cnt').first();
-      const itemC = await database('Item').count('* as cnt').first();
-      results.Auto = parseInt(ac?.cnt || 0);
-      results.AutoItemCompatibility = parseInt(aic?.cnt || 0);
-      results.Item = parseInt(itemC?.cnt || 0);
-    } catch (e) { results.AutoItemError = e.message; }
-
-    // Yard vehicle counts
-    try {
-      const yv = await database('yard_vehicle').where('active', true).count('* as cnt').first();
-      results.activeYardVehicles = parseInt(yv?.cnt || 0);
-    } catch (e) { results.yardVehicleError = e.message; }
-
-    res.json(results);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// TEMPORARY debug endpoint — remove after use
+// Debug endpoint — table verification and data access check
 app.get('/api/debug/makes', async (req, res) => {
   try {
     const { database } = require('./database/database');
 
     const tables = [
-      'Auto', 'AutoItemCompatibility', 'Item', 'InterchangeNumber',
-      'ItemInterchangeNumber', 'Competitor', 'CompetitorListing',
-      'YourSale', 'YourListing', 'SoldItem', 'SoldItemSeller',
-      'yard', 'yard_vehicle', 'yard_visit_feedback',
-      'pull_session', 'vin_cache', 'trim_intelligence',
-      'part_location', 'dead_inventory', 'market_demand_cache',
-      'PriceCheck', 'PriceSnapshot', 'MarketResearchRun',
-      'Cron', 'Users',
-      'stale_inventory_action', 'return_intake', 'restock_flag', 'competitor_alert',
+      'Auto', 'AutoItemCompatibility', 'Item',
+      'YourSale', 'YourListing',
+      'yard', 'yard_vehicle', 'vin_cache', 'vin_scan_log',
+      'market_demand_cache', 'fitment_data',
     ];
 
     const counts = {};
@@ -280,49 +222,55 @@ app.get('/api/debug/makes', async (req, res) => {
       try {
         const r = await database(t).count('* as cnt').first();
         counts[t] = parseInt(r?.cnt || 0);
-      } catch (e) {
-        counts[t] = 0;
-      }
+      } catch (e) { counts[t] = 'ERROR: ' + e.message.substring(0, 60); }
     }
 
-    // Check if specific order exists
-    let orderCheck = null;
+    // YourSale verification: 180-day count + sample
+    let yourSale180d = 0, saleSamples = [];
     try {
-      orderCheck = await database('YourSale')
-        .where('ebayOrderId', '18-14345-57629-286936703557').first();
-    } catch (e) { orderCheck = { error: e.message }; }
-
-    // Sample: Dodge Ram sales
-    let dodgeRamSales = [];
-    try {
-      dodgeRamSales = await database('YourSale')
-        .whereRaw('title ILIKE ?', ['%Dodge%'])
-        .whereRaw('title ILIKE ?', ['%Ram%'])
-        .select('title', 'salePrice', 'soldDate')
-        .limit(10);
-    } catch (e) { dodgeRamSales = [{ error: e.message }]; }
-
-    // Distinct makes from yard_vehicle
-    let yardMakes = [];
-    try {
-      yardMakes = (await database('yard_vehicle').distinct('make').orderBy('make')).map(r => r.make);
-    } catch (e) {}
-
-    // Sample YourSale titles
-    let saleSamples = [];
-    try {
+      const cutoff = new Date(Date.now() - 180 * 86400000);
+      const r = await database('YourSale').where('soldDate', '>=', cutoff).count('* as cnt').first();
+      yourSale180d = parseInt(r?.cnt || 0);
       saleSamples = await database('YourSale')
         .select('title', 'salePrice', 'soldDate', 'sku')
         .orderBy('soldDate', 'desc').limit(5);
-    } catch (e) {}
+    } catch (e) { saleSamples = [{ error: e.message }]; }
+
+    // YourListing verification: active count + sample
+    let activeListings = 0, listingSamples = [];
+    try {
+      const r = await database('YourListing').where('listingStatus', 'Active').count('* as cnt').first();
+      activeListings = parseInt(r?.cnt || 0);
+      listingSamples = await database('YourListing')
+        .where('listingStatus', 'Active')
+        .select('title', 'currentPrice', 'sku', 'quantityAvailable')
+        .limit(3);
+    } catch (e) { listingSamples = [{ error: e.message }]; }
+
+    // Column schema for YourSale and YourListing
+    let saleColumns = [], listingColumns = [];
+    try {
+      const sc = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourSale' ORDER BY ordinal_position");
+      saleColumns = (sc.rows || sc).map(r => r.column_name + ':' + r.data_type);
+    } catch (e) { saleColumns = [e.message]; }
+    try {
+      const lc = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourListing' ORDER BY ordinal_position");
+      listingColumns = (lc.rows || lc).map(r => r.column_name + ':' + r.data_type);
+    } catch (e) { listingColumns = [e.message]; }
+
+    // Yard vehicle makes
+    let yardMakes = [];
+    try { yardMakes = (await database('yard_vehicle').where('active', true).distinct('make').orderBy('make')).map(r => r.make); } catch (e) {}
 
     res.json({
       table_counts: counts,
-      order_18_14345_exists: orderCheck ? true : false,
-      order_18_14345_data: orderCheck,
-      dodge_ram_sales: dodgeRamSales,
+      YourSale_last180d: yourSale180d,
+      YourListing_active: activeListings,
+      YourSale_columns: saleColumns,
+      YourListing_columns: listingColumns,
+      recent_sales: saleSamples,
+      active_listing_samples: listingSamples,
       yard_vehicle_makes: yardMakes,
-      recent_sale_samples: saleSamples,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
