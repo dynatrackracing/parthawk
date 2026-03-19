@@ -589,14 +589,48 @@ class AttackListService {
       if (parts.length >= 8) break;
     }
 
-    parts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
+    // === FILTER by VIN-decoded drivetrain and engine type ===
+    // Remove parts that don't fit this specific vehicle's configuration
+    const vDrivetrain = (vehicle.drivetrain || '').toUpperCase();
+    const vEngineType = (vehicle.engine_type || '').toUpperCase();
 
-    // === TOTAL VALUE: sum of all part prices ===
-    const totalValue = parts.reduce((sum, p) => sum + (p.price || 0), 0);
+    const filteredParts = parts.filter(p => {
+      const title = (p.title || '').toUpperCase();
+
+      // Hybrid filter: don't show hybrid parts on gas vehicles
+      if (vEngineType === 'GAS' || vEngineType === '') {
+        if (title.includes('HYBRID') && !title.includes('NON-HYBRID') && !title.includes('NON HYBRID')) return false;
+      }
+      // Gas filter: don't show gas-only parts on hybrid/diesel vehicles
+      if (vEngineType === 'HYBRID' || vEngineType === 'DIESEL') {
+        // Only filter if part title explicitly says "GAS ONLY" — most parts fit both
+      }
+      // Diesel filter: don't show diesel parts on gas vehicles
+      if (vEngineType === 'GAS' || vEngineType === '') {
+        if (title.includes('DIESEL') || title.includes('CUMMINS') || title.includes('DURAMAX') || title.includes('POWERSTROKE')) return false;
+      }
+
+      // Drivetrain filter for ABS modules (these are drivetrain-specific)
+      if (p.partType === 'ABS' && vDrivetrain) {
+        if (vDrivetrain === '2WD' || vDrivetrain === 'FWD' || vDrivetrain === 'RWD') {
+          if (title.includes('4WD') || title.includes('4X4') || title.includes('AWD')) return false;
+        }
+        if (vDrivetrain === '4WD' || vDrivetrain === 'AWD') {
+          if (title.includes('2WD') || (title.includes('FWD') && !title.includes('4WD'))) return false;
+        }
+      }
+
+      return true;
+    });
+
+    filteredParts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
+
+    // === TOTAL VALUE: sum of all FILTERED part prices ===
+    const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
     // === SCORING: factors in part count AND total value ===
     let score = 0;
-    const numPullableParts = parts.filter(p => p.sold_90d > 0).length;
+    const numPullableParts = filteredParts.filter(p => p.sold_90d > 0).length;
 
     if (salesDemand.count > 0) {
       // Volume: up to 30 from total sales across all part types
@@ -655,11 +689,11 @@ class AttackListService {
       stock_number: vehicle.stock_number || null,
       score, color_code: color, vehicle_verdict,
       est_value: totalValue,
-      matched_parts: parts.length,
+      matched_parts: filteredParts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,
       platform_siblings: platformSiblingNames.length > 0 ? platformSiblingNames : null,
-      parts,
+      parts: filteredParts,
     };
   }
 
