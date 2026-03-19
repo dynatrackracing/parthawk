@@ -38,6 +38,7 @@ class AutoService {
 
     const key = this.getDistinctKey(constraints);
 
+    // Cache TTL: 5 minutes (was indefinite, stale after Auto table changes)
     return this.cacheManager.get(key, async () => {
       // Query Auto table only — clean curated year/make/model data
       const statement = Auto.query()

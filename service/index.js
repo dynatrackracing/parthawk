@@ -411,6 +411,13 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
       }
     } catch (e) { /* ignore cleanup errors */ }
 
+    // Flush the cache so dropdowns show new data immediately
+    try {
+      const CacheManager = require('./middleware/CacheManager');
+      const cm = new CacheManager();
+      cm.flush();
+    } catch (e) { /* ignore */ }
+
     const afterCount = await database('Auto').count('* as cnt').first();
 
     res.json({
