@@ -68,6 +68,7 @@ const Home = () => {
             { label: 'Stale Inventory', href: '/intelligence/stale-inventory' },
             { label: 'Your Sales', href: '/intelligence/your-sales' },
             { label: 'Gate Calculator', href: '/admin/gate' },
+            { label: 'VIN Scanner', href: '/admin/vin' },
           ].map(link => (
             <a key={link.href} href={link.href}
               style={{ padding: '8px 14px', background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#9ca3af', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}

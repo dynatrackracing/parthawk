@@ -36,6 +36,8 @@ app.use('/price-check', require('./routes/price-check'));
 app.use('/yards', require('./routes/yards'));
 app.use('/attack-list', require('./routes/attack-list'));
 app.use('/cogs', require('./routes/cogs'));
+// partsLookup mounted first so its /lookup takes priority over old parts.js /lookup
+app.use('/api/parts', require('./routes/partsLookup'));
 app.use('/api/parts', require('./routes/parts'));
 app.use('/api/parts-lookup', require('./routes/partsLookup'));
 app.use('/restock', require('./routes/restockReport'));
@@ -126,6 +128,9 @@ app.get('/admin/pull', (req, res) => {
 });
 app.get('/admin/gate', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'gate.html'));
+});
+app.get('/admin/vin', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'vin-scanner.html'));
 });
 // private routes for admin only
 app.use('/private', require('./routes/private'));

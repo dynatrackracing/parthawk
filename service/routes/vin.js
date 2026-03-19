@@ -185,4 +185,283 @@ function extractImageFromMultipart(body, contentType) {
   return null;
 }
 
+/**
+ * POST /vin/scan
+ * Full VIN decode with parts intelligence. Used by the standalone VIN scanner page.
+ * Body: { vin: "...", source: "manual"|"camera", scannedBy: "..." }
+ */
+router.post('/scan', async (req, res) => {
+  try {
+    let { vin, source, scannedBy } = req.body || {};
+    if (!vin || vin.length < 11) return res.status(400).json({ error: 'Valid VIN required (11-17 chars)' });
+    vin = vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+
+    // --- Step 1: Decode via cache or NHTSA ---
+    let decoded = null;
+    let rawResults = null;
+
+    try {
+      const cached = await database('vin_cache').where('vin', vin).first();
+      if (cached) {
+        decoded = {
+          year: cached.year, make: cached.make, model: cached.model,
+          trim: cached.trim, engine: cached.engine, drivetrain: cached.drivetrain,
+          bodyStyle: cached.body_style,
+        };
+        if (cached.raw_nhtsa) {
+          try { rawResults = JSON.parse(cached.raw_nhtsa); } catch (e) {}
+        }
+      }
+    } catch (e) { /* table may not exist */ }
+
+    if (!decoded) {
+      const nhtsaRes = await axios.get(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`,
+        { timeout: 10000 }
+      );
+      rawResults = nhtsaRes.data?.Results || [];
+      const get = (varId) => {
+        const item = rawResults.find(r => r.VariableId === varId);
+        const val = item?.Value?.trim();
+        return (val && val !== '' && val !== 'Not Applicable') ? val : null;
+      };
+
+      const displacement = get(13);
+      const cylinders = get(71);
+      let engine = null;
+      if (displacement) {
+        engine = displacement.includes('L') ? displacement : displacement + 'L';
+        if (cylinders) engine += ' ' + cylinders + 'cyl';
+      }
+
+      const fuelType = get(24);
+      let engineType = 'Gas';
+      if (fuelType) {
+        const ft = fuelType.toLowerCase();
+        if (ft.includes('diesel')) engineType = 'Diesel';
+        else if (ft.includes('hybrid')) engineType = 'Hybrid';
+        else if (ft.includes('electric') && !ft.includes('hybrid')) engineType = 'Electric';
+        else if (ft.includes('flex')) engineType = 'Flex Fuel';
+      }
+
+      const driveType = get(15);
+      let drivetrain = null;
+      if (driveType) {
+        const dt = driveType.toUpperCase();
+        if (dt.includes('4WD') || dt.includes('4X4') || dt.includes('4-WHEEL')) drivetrain = '4WD';
+        else if (dt.includes('AWD') || dt.includes('ALL-WHEEL') || dt.includes('ALL WHEEL')) drivetrain = 'AWD';
+        else if (dt.includes('FWD') || dt.includes('FRONT-WHEEL') || dt.includes('FRONT WHEEL')) drivetrain = 'FWD';
+        else if (dt.includes('RWD') || dt.includes('REAR-WHEEL') || dt.includes('REAR WHEEL')) drivetrain = 'RWD';
+      }
+
+      decoded = {
+        year: get(29) ? parseInt(get(29)) : null,
+        make: get(26), model: get(28), trim: get(38),
+        engine, engineType, drivetrain,
+        bodyStyle: get(5), plantCity: get(31), plantCountry: get(75),
+        paintCode: null, // NHTSA doesn't provide paint code
+      };
+
+      // Cache it
+      try {
+        await database('vin_cache').insert({
+          vin, year: decoded.year, make: decoded.make, model: decoded.model,
+          trim: decoded.trim, engine: decoded.engine, drivetrain: decoded.drivetrain,
+          body_style: decoded.bodyStyle, raw_nhtsa: JSON.stringify(rawResults),
+          decoded_at: new Date(), createdAt: new Date(),
+        }).onConflict('vin').ignore();
+      } catch (e) { /* ignore */ }
+    }
+
+    // Extract extra fields from raw NHTSA if available
+    if (rawResults && !decoded.engineType) {
+      const get = (varId) => {
+        const item = rawResults.find(r => r.VariableId === varId);
+        const val = item?.Value?.trim();
+        return (val && val !== '' && val !== 'Not Applicable') ? val : null;
+      };
+      const fuelType = get(24);
+      decoded.engineType = 'Gas';
+      if (fuelType) {
+        const ft = fuelType.toLowerCase();
+        if (ft.includes('diesel')) decoded.engineType = 'Diesel';
+        else if (ft.includes('hybrid')) decoded.engineType = 'Hybrid';
+        else if (ft.includes('electric')) decoded.engineType = 'Electric';
+      }
+      if (!decoded.plantCity) decoded.plantCity = get(31);
+      if (!decoded.plantCountry) decoded.plantCountry = get(75);
+    }
+
+    // --- Step 2: Parts Intelligence ---
+    const partsIntel = [];
+    const make = decoded.make;
+    const model = decoded.model;
+    const year = decoded.year;
+
+    if (make && model && year) {
+      // 2a: YourSale — what parts from this vehicle have we sold?
+      try {
+        const sales = await database('YourSale')
+          .whereNotNull('title')
+          .whereRaw('title ILIKE ?', [`%${make}%`])
+          .whereRaw('title ILIKE ?', [`%${model}%`])
+          .select('title', 'salePrice', 'soldDate');
+
+        const partTypes = {};
+        for (const sale of sales) {
+          const pt = detectPartTypeForVin(sale.title);
+          if (!partTypes[pt]) partTypes[pt] = { type: pt, sold: 0, totalPrice: 0, prices: [], source: 'YourSale' };
+          partTypes[pt].sold++;
+          const p = parseFloat(sale.salePrice) || 0;
+          partTypes[pt].totalPrice += p;
+          partTypes[pt].prices.push(p);
+        }
+        for (const [pt, data] of Object.entries(partTypes)) {
+          const avg = data.sold > 0 ? Math.round(data.totalPrice / data.sold) : 0;
+          partsIntel.push({
+            partType: pt, source: 'Your Sales', sold: data.sold, avgPrice: avg,
+            color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
+          });
+        }
+      } catch (e) { /* ignore */ }
+
+      // 2b: Item table — competitor/reference listings
+      try {
+        const items = await database('Auto')
+          .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+          .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+          .where('Auto.year', year)
+          .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
+          .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + model.toUpperCase() + '%'])
+          .where('Item.price', '>', 0)
+          .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber');
+
+        const byType = {};
+        for (const item of items) {
+          const pt = detectPartTypeForVin(item.title);
+          if (!byType[pt]) byType[pt] = { count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [] };
+          byType[pt].count++;
+          byType[pt].totalPrice += parseFloat(item.price) || 0;
+          if (item.seller) byType[pt].sellers.add(item.seller);
+          if (item.manufacturerPartNumber) byType[pt].partNumbers.push(item.manufacturerPartNumber);
+        }
+        for (const [pt, data] of Object.entries(byType)) {
+          // Don't duplicate if already in partsIntel from YourSale
+          const existing = partsIntel.find(p => p.partType === pt);
+          const avg = data.count > 0 ? Math.round(data.totalPrice / data.count) : 0;
+          if (existing) {
+            existing.competitorCount = data.count;
+            existing.competitorAvg = avg;
+            existing.sellers = [...data.sellers];
+            existing.partNumbers = [...new Set(data.partNumbers)].slice(0, 5);
+          } else {
+            partsIntel.push({
+              partType: pt, source: 'Competitors', sold: 0, avgPrice: avg,
+              competitorCount: data.count, competitorAvg: avg,
+              sellers: [...data.sellers], partNumbers: [...new Set(data.partNumbers)].slice(0, 5),
+              color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
+            });
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      // 2c: Programming requirements from fitment_data
+      try {
+        for (const part of partsIntel) {
+          if (part.partNumbers && part.partNumbers.length > 0) {
+            for (const pn of part.partNumbers) {
+              const fd = await database('fitment_data')
+                .where('part_number', pn)
+                .first();
+              if (fd && fd.programming_required) {
+                part.programmingRequired = fd.programming_required;
+                part.programmingNote = fd.programming_note;
+                part.programmingTool = fd.programming_tool;
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // Sort by avgPrice descending
+    partsIntel.sort((a, b) => (b.avgPrice || 0) - (a.avgPrice || 0));
+
+    // Total estimated value
+    const totalValue = partsIntel.reduce((sum, p) => sum + (p.avgPrice || 0), 0);
+
+    // --- Step 3: Check if vehicle is in yard inventory ---
+    let yardMatch = null;
+    try {
+      const match = await database('yard_vehicle')
+        .where('active', true)
+        .where('year', String(year))
+        .whereRaw('UPPER(make) = ?', [(make || '').toUpperCase()])
+        .whereRaw('UPPER(model) LIKE ?', ['%' + (model || '').toUpperCase() + '%'])
+        .first();
+      if (match) {
+        const yard = await database('yard').where('id', match.yard_id).first();
+        yardMatch = {
+          vehicleId: match.id, yardName: yard?.name || 'Unknown',
+          row: match.row_number, color: match.color,
+        };
+      }
+    } catch (e) { /* ignore */ }
+
+    // --- Step 4: Log the scan ---
+    try {
+      await database('vin_scan_log').insert({
+        vin, year: decoded.year, make: decoded.make, model: decoded.model,
+        trim: decoded.trim, engine: decoded.engine,
+        engine_type: decoded.engineType, drivetrain: decoded.drivetrain,
+        scanned_by: scannedBy || null, source: source || 'manual',
+        scanned_at: new Date(),
+      });
+    } catch (e) { /* table may not exist yet */ }
+
+    res.json({
+      success: true, vin, decoded, partsIntel, totalValue, yardMatch,
+    });
+  } catch (err) {
+    log.error({ err }, 'VIN scan failed');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /vin/history
+ * Recent scan history
+ */
+router.get('/history', async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    const scans = await database('vin_scan_log')
+      .orderBy('scanned_at', 'desc')
+      .limit(parseInt(limit))
+      .select('*');
+    res.json({ success: true, scans });
+  } catch (err) {
+    res.json({ success: true, scans: [] });
+  }
+});
+
+function detectPartTypeForVin(title) {
+  const t = (title || '').toUpperCase();
+  if (t.includes('ECM') || t.includes('ECU') || t.includes('PCM') || t.includes('ENGINE CONTROL')) return 'ECM';
+  if (t.includes('BCM') || t.includes('BODY CONTROL')) return 'BCM';
+  if (t.includes('TCM') || t.includes('TCU') || t.includes('TRANSMISSION CONTROL')) return 'TCM';
+  if (t.includes('ABS') || t.includes('ANTI LOCK') || t.includes('BRAKE MODULE')) return 'ABS';
+  if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX')) return 'TIPM';
+  if (t.includes('AMPLIFIER') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE')) return 'AMP';
+  if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT')) return 'CLUSTER';
+  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT')) return 'RADIO';
+  if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
+  if (t.includes('THROTTLE')) return 'THROTTLE';
+  if (t.includes('STEERING')) return 'STEERING';
+  if (t.includes('TRANSFER CASE')) return 'XFER CASE';
+  if (t.includes('MIRROR')) return 'MIRROR';
+  return 'OTHER';
+}
+
 module.exports = router;
