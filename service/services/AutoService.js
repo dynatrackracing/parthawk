@@ -39,7 +39,7 @@ class AutoService {
     const key = this.getDistinctKey(constraints);
 
     return this.cacheManager.get(key, async () => {
-      // Query Auto table for all vehicles (not just those with linked Items)
+      // Query Auto table only — clean curated year/make/model data
       const statement = Auto.query()
         .distinct('id', 'year', 'make', 'model', 'trim', 'engine');
 
@@ -54,76 +54,8 @@ class AutoService {
         response = this.processForUnique(response);
       }
 
-      // Also pull year/make/model from YourSale titles to fill gaps
-      try {
-        const { database } = require('../database/database');
-        const extraModels = await this.extractFromSales(database, { year, make, model });
-        if (extraModels && !ungroup) {
-          for (const y of extraModels.year) response.year.includes(y) || response.year.push(y);
-          for (const m of extraModels.make) response.make.includes(m) || response.make.push(m);
-          for (const m of extraModels.model) response.model.includes(m) || response.model.push(m);
-          response.year.sort();
-          response.make.sort();
-          response.model.sort();
-        }
-      } catch (e) { /* ignore — YourSale enrichment is best-effort */ }
-
       return response;
     });
-  }
-
-  /**
-   * Extract distinct year/make/model from YourSale titles to supplement Auto table.
-   * This catches vehicles we've sold parts for but haven't catalogued in Auto yet.
-   */
-  async extractFromSales(database, filters) {
-    const MAKE_LIST = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Mazda','Mercedes-Benz','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Subaru','Suzuki','Toyota','Volkswagen','Volvo'];
-    const result = { year: [], make: [], model: [] };
-
-    let query = database('YourSale').whereNotNull('title');
-    // Only recent sales (last 365 days)
-    query = query.where('soldDate', '>=', new Date(Date.now() - 365 * 86400000));
-
-    if (filters.year) query = query.whereRaw('"title" ~ ?', [`\\m${filters.year}\\M`]);
-    if (filters.make) query = query.whereRaw('"title" ILIKE ?', [`%${filters.make}%`]);
-    if (filters.model) query = query.whereRaw('"title" ILIKE ?', [`%${filters.model}%`]);
-
-    const sales = await query.select('title').limit(5000);
-
-    const years = new Set(), makes = new Set(), models = new Set();
-    for (const sale of sales) {
-      const t = sale.title || '';
-      // Extract year
-      const ym = t.match(/\b((?:19|20)\d{2})\b/);
-      if (ym) { const y = parseInt(ym[1]); if (y >= 1990 && y <= 2030) years.add(y); }
-      // Extract make
-      const tu = t.toUpperCase();
-      for (const mk of MAKE_LIST) {
-        if (tu.includes(mk.toUpperCase())) {
-          makes.add(mk);
-          // Extract model (word after make)
-          const idx = tu.indexOf(mk.toUpperCase());
-          const after = t.substring(idx + mk.length).trim().split(/\s+/);
-          const mw = [];
-          for (const w of after) {
-            if (/^\d{4}/.test(w) || /^\d+\.\d+[lL]/.test(w)) break;
-            if (/^(ECU|ECM|PCM|BCM|TCM|ABS|TIPM|OEM|Engine|Body|Control|Module)$/i.test(w)) break;
-            mw.push(w);
-            if (mw.length >= 2) break;
-          }
-          if (mw.length > 0) {
-            const model = mw.join(' ').replace(/[^A-Za-z0-9 \-]/g, '').trim();
-            if (model.length >= 2) models.add(model);
-          }
-          break;
-        }
-      }
-    }
-
-    result.year = [...years].sort();
-    result.make = [...makes].sort();
-    result.model = [...models].sort();
-    return result;
   }
 
   processForUnique(arr) {
