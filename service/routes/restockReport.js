@@ -123,12 +123,12 @@ async function generateRestockReport() {
     .whereNotNull('title')
     .select('sku', 'title', 'salePrice', 'soldDate');
 
-  // Group by make + model + partType — strict matching
+  // Group by make + model + partType — strict matching, track year ranges
   const groups = {};
   for (const sale of sales) {
     const title = sale.title || '';
     const veh = extractMakeModel(title);
-    if (!veh) continue; // Skip if can't extract make+model
+    if (!veh) continue;
 
     const partType = detectPartType(title);
     const key = `${veh.make}|${veh.model}|${partType}`;
@@ -138,49 +138,72 @@ async function generateRestockReport() {
         make: veh.make, model: veh.model, partType,
         specificity: extractSpecificity(title),
         sold: 0, revenue: 0, partNumbers: new Set(), titles: [],
+        yearMin: null, yearMax: null,
       };
     }
     groups[key].sold++;
     groups[key].revenue += parseFloat(sale.salePrice) || 0;
     if (groups[key].titles.length < 3) groups[key].titles.push(title);
 
-    // Extract and collect part numbers
+    // Extract year range from this title
+    const yearMatches = title.match(/\b((?:19|20)\d{2})\b/g);
+    if (yearMatches) {
+      for (const ym of yearMatches) {
+        const y = parseInt(ym);
+        if (y >= 1990 && y <= 2030) {
+          if (!groups[key].yearMin || y < groups[key].yearMin) groups[key].yearMin = y;
+          if (!groups[key].yearMax || y > groups[key].yearMax) groups[key].yearMax = y;
+        }
+      }
+    }
+
     for (const pn of extractPartNumbers(title)) {
       groups[key].partNumbers.add(normalizePartNumber(pn));
     }
   }
 
-  // Get stock — index by part number base for exact matching
+  // Get stock — store raw listings for strict matching
   const listings = await database('YourListing')
     .where('listingStatus', 'Active')
     .whereNotNull('title')
     .select('title', 'sku', 'quantityAvailable');
 
-  // Build stock index by make|model|partType AND by part number
-  const stockByKey = {};
+  // Index by part number for precise matching
   const stockByPN = {};
   for (const l of listings) {
-    const veh = extractMakeModel(l.title);
-    if (veh) {
-      const pt = detectPartType(l.title);
-      const key = `${veh.make}|${veh.model}|${pt}`;
-      stockByKey[key] = (stockByKey[key] || 0) + (parseInt(l.quantityAvailable) || 1);
-    }
-    // Also index by SKU/part number for precise matching
+    const qty = parseInt(l.quantityAvailable) || 1;
     if (l.sku) {
       const base = normalizePartNumber(l.sku);
-      stockByPN[base] = (stockByPN[base] || 0) + (parseInt(l.quantityAvailable) || 1);
+      if (base && base.length >= 5) stockByPN[base] = (stockByPN[base] || 0) + qty;
     }
     for (const pn of extractPartNumbers(l.title)) {
       const base = normalizePartNumber(pn);
-      stockByPN[base] = (stockByPN[base] || 0) + (parseInt(l.quantityAvailable) || 1);
+      if (base) stockByPN[base] = (stockByPN[base] || 0) + qty;
     }
   }
+
+  // Part type keywords for strict title matching
+  const PART_TYPE_KEYWORDS = {
+    ECM: ['ecm','ecu','pcm','engine control','engine computer'],
+    ABS: ['abs','anti-lock','anti lock','brake pump','brake module'],
+    BCM: ['bcm','body control'],
+    TIPM: ['tipm','integrated power'],
+    'Fuse Box': ['fuse box','junction','relay box','ipdm'],
+    Amplifier: ['amplifier','bose','harman','alpine','jbl'],
+    Radio: ['radio','stereo','head unit','infotainment'],
+    Cluster: ['cluster','speedometer','instrument','gauge'],
+    TCM: ['tcm','tcu','transmission control'],
+    Throttle: ['throttle body'],
+    Steering: ['steering','power steering','eps'],
+    Mirror: ['mirror','side view'],
+    'Seat Belt': ['seat belt','seatbelt'],
+    'Window Motor': ['window motor','regulator'],
+  };
 
   // Score and tier each group
   const items = [];
   for (const [key, data] of Object.entries(groups)) {
-    // Stock: prefer part-number-based count, fall back to make|model|partType
+    // Stock: first try part numbers, then strict title match
     let stock = 0;
     if (data.partNumbers.size > 0) {
       const counted = new Set();
@@ -191,7 +214,20 @@ async function generateRestockReport() {
         }
       }
     }
-    if (stock === 0) stock = stockByKey[key] || 0;
+    // Fallback: count listings whose title contains make AND model AND part type keyword
+    if (stock === 0) {
+      const makeLower = data.make.toLowerCase();
+      const modelLower = data.model.toLowerCase();
+      const ptKeywords = PART_TYPE_KEYWORDS[data.partType] || [];
+      for (const l of listings) {
+        const lt = (l.title || '').toLowerCase();
+        if (lt.includes(makeLower) && lt.includes(modelLower)) {
+          if (ptKeywords.length === 0 || ptKeywords.some(kw => lt.includes(kw))) {
+            stock += parseInt(l.quantityAvailable) || 1;
+          }
+        }
+      }
+    }
 
     const avgPrice = data.sold > 0 ? Math.round(data.revenue / data.sold * 100) / 100 : 0;
     const profit = calcProfit(avgPrice, data.partType);
@@ -210,10 +246,18 @@ async function generateRestockReport() {
     else if (score >= 20) { tier = 'red'; action = 'LOW PRIORITY'; }
     else { tier = 'grey'; action = 'ON RADAR'; }
 
+    // Build vehicle string with year range
+    let yearStr = '';
+    if (data.yearMin && data.yearMax) {
+      yearStr = data.yearMin === data.yearMax ? `${data.yearMin} ` : `${data.yearMin}-${data.yearMax} `;
+    }
+    const vehicleDisplay = `${yearStr}${data.make} ${data.model}`;
+
     items.push({
       partType: data.partType,
-      vehicle: `${data.make} ${data.model}`,
+      vehicle: vehicleDisplay,
       make: data.make, model: data.model,
+      yearRange: data.yearMin && data.yearMax ? (data.yearMin === data.yearMax ? `${data.yearMin}` : `${data.yearMin}-${data.yearMax}`) : null,
       specificity: data.specificity,
       partNumbers: [...data.partNumbers].slice(0, 5),
       score, tier, action,
