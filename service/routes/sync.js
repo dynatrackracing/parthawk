@@ -466,6 +466,131 @@ router.get('/stats', authMiddleware, async (req, res, next) => {
 });
 
 /**
+ * POST /sync/build-auto-index
+ * Build Auto + AutoItemCompatibility from Item._year/_make/_model fields.
+ * The Item table has 21K items with year/make/model parsed from titles,
+ * but the Auto table (used by search dropdowns) is empty.
+ * This creates Auto records and links them to Items.
+ */
+router.post('/build-auto-index', async (req, res) => {
+  const { database } = require('../database/database');
+  const { v4: uuidv4 } = require('uuid');
+
+  try {
+    // Get all items - the _year, _make, _model fields were in the JSON export
+    // but the Item table doesn't have those columns. We need to parse from title.
+    // Actually, check if those columns exist first:
+    let items;
+    try {
+      items = await database('Item')
+        .whereNotNull('title')
+        .select('id', 'ebayId', 'title')
+        .limit(50000);
+    } catch (e) {
+      return res.status(500).json({ error: 'Could not query Item table: ' + e.message });
+    }
+
+    // Parse year/make/model from titles
+    const MAKES = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chevy','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Maserati','Mazda','Mercedes-Benz','Mercedes','Mercury','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Smart','Subaru','Suzuki','Toyota','Volkswagen','VW','Volvo'];
+
+    const autoCache = {}; // "year|make|model|engine" → autoId
+    let autosCreated = 0, linksCreated = 0, skipped = 0;
+
+    for (const item of items) {
+      const title = item.title || '';
+      // Extract year
+      const yearMatch = title.match(/\b((?:19|20)\d{2})\b/);
+      if (!yearMatch) { skipped++; continue; }
+      const year = parseInt(yearMatch[1]);
+
+      // Extract make
+      let make = null;
+      const titleUpper = title.toUpperCase();
+      for (const m of MAKES) {
+        if (titleUpper.includes(m.toUpperCase())) { make = m; break; }
+      }
+      if (!make) { skipped++; continue; }
+      // Normalize Chevy → Chevrolet, VW → Volkswagen
+      if (make === 'Chevy') make = 'Chevrolet';
+      if (make === 'VW') make = 'Volkswagen';
+      if (make === 'Mercedes') make = 'Mercedes-Benz';
+
+      // Extract model: words after make until year/part keywords
+      const makeIdx = titleUpper.indexOf(make.toUpperCase());
+      const afterMake = title.substring(makeIdx + make.length).trim();
+      const words = afterMake.split(/\s+/);
+      const modelWords = [];
+      for (const w of words) {
+        if (/^\d{4}$/.test(w)) break;
+        if (/^\d+\.\d+[lL]$/.test(w)) break;
+        if (/^(ECU|ECM|PCM|BCM|TCM|ABS|TIPM|OEM|Engine|Body|Control|Module|Anti|Fuse|Power|Brake)$/i.test(w)) break;
+        modelWords.push(w);
+        if (modelWords.length >= 3) break;
+      }
+      if (modelWords.length === 0) { skipped++; continue; }
+      const model = modelWords.join(' ').replace(/[^A-Za-z0-9 \-]/g, '').trim();
+      if (!model) { skipped++; continue; }
+
+      const engine = 'N/A';
+      const autoKey = `${year}|${make}|${model}|${engine}`;
+
+      // Get or create Auto
+      let autoId = autoCache[autoKey];
+      if (!autoId) {
+        const existing = await database('Auto')
+          .where({ year, make, model, engine }).first();
+        if (existing) {
+          autoId = existing.id;
+        } else {
+          autoId = uuidv4();
+          try {
+            await database('Auto').insert({
+              id: autoId, year, make, model, trim: '', engine,
+              createdAt: new Date(), updatedAt: new Date(),
+            });
+            autosCreated++;
+          } catch (e) {
+            if (e.message?.includes('duplicate') || e.message?.includes('unique')) {
+              const found = await database('Auto').where({ year, make, model, engine }).first();
+              autoId = found?.id || autoId;
+            } else { skipped++; continue; }
+          }
+        }
+        autoCache[autoKey] = autoId;
+      }
+
+      // Create AutoItemCompatibility link
+      try {
+        const linkExists = await database('AutoItemCompatibility')
+          .where({ autoId, itemId: item.ebayId }).first();
+        if (!linkExists) {
+          await database('AutoItemCompatibility').insert({ autoId, itemId: item.ebayId });
+          linksCreated++;
+        }
+      } catch (e) {
+        // Ignore duplicate links
+      }
+    }
+
+    // Verify counts
+    const autoCount = await database('Auto').count('* as cnt').first();
+    const linkCount = await database('AutoItemCompatibility').count('* as cnt').first();
+
+    res.json({
+      success: true,
+      itemsProcessed: items.length,
+      autosCreated,
+      linksCreated,
+      skipped,
+      totalAutos: parseInt(autoCount?.cnt || 0),
+      totalLinks: parseInt(linkCount?.cnt || 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /sync/import-items
  * Bulk import competitor/reference items.
  * Body: { records: [...] }
