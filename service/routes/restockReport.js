@@ -219,20 +219,20 @@ async function generateRestockReport() {
         }
       }
     }
-    // Fallback: count listings whose title contains make AND first model word AND part type keyword
+    // Fallback: count listings by extracting make+model+partType from each listing title
+    // and checking if it matches this group exactly
     if (stock === 0) {
-      const makeLower = data.make.toLowerCase();
-      // Use first word of model only — "Grand Cherokee" → match on "Grand", "4Runner" → "4Runner"
-      const modelFirst = data.model.split(/\s+/)[0].toLowerCase();
-      const ptKeywords = PART_TYPE_KEYWORDS[data.partType] || [];
       for (const l of listings) {
-        const lt = (l.title || '').toLowerCase();
-        // Must contain make AND model first word AND at least one part type keyword
-        if (lt.includes(makeLower) && lt.includes(modelFirst)) {
-          if (ptKeywords.length > 0 && ptKeywords.some(kw => lt.includes(kw))) {
+        const lVeh = extractMakeModel(l.title);
+        if (!lVeh) continue;
+        const lPt = detectPartType(l.title);
+        // Must match same make, same first model word, same part type
+        if (lVeh.make === data.make && lPt === data.partType) {
+          const dataModelFirst = data.model.split(/\s+/)[0].toLowerCase();
+          const lModelFirst = lVeh.model.split(/\s+/)[0].toLowerCase();
+          if (dataModelFirst === lModelFirst) {
             stock += parseInt(l.quantityAvailable) || 1;
           }
-          // If no keywords defined for this part type, don't count (too broad)
         }
       }
     }
