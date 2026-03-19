@@ -621,16 +621,32 @@ class AttackListService {
 
     if (salesDemand.count > 0 && score < 15) score = 15;
 
+    // Color based on TOTAL ESTIMATED VALUE, not score number
     let color = 'gray';
-    if (score >= 80) color = 'green';
-    else if (score >= 60) color = 'yellow';
-    else if (score >= 1) color = 'red';
+    if (totalValue >= 800) color = 'green';
+    else if (totalValue >= 500) color = 'yellow';
+    else if (totalValue >= 250) color = 'orange';
+    else if (totalValue > 0) color = 'red';
+
+    // Vehicle-level verdict based on total value
+    let vehicle_verdict = 'SKIP';
+    if (totalValue >= 800) vehicle_verdict = 'PULL';
+    else if (totalValue >= 500) vehicle_verdict = 'WATCH';
+    else if (totalValue >= 250) vehicle_verdict = 'CONSIDER';
+
+    // Set per-part verdict based on individual part price
+    for (const p of parts) {
+      if (p.price >= 300) p.verdict = 'PULL';
+      else if (p.price >= 200) p.verdict = 'WATCH';
+      else if (p.price >= 100) p.verdict = 'CONSIDER';
+      else p.verdict = 'SKIP';
+    }
 
     return {
       id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model,
       trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
       date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
-      score, color_code: color,
+      score, color_code: color, vehicle_verdict,
       est_value: totalValue,
       matched_parts: parts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
