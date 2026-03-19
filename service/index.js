@@ -293,6 +293,8 @@ app.get('/api/debug/makes', async (req, res) => {
     await q('dodge_ram_sales_90d', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE title ILIKE '%dodge%' AND title ILIKE '%ram%' AND \"soldDate\" >= NOW() - INTERVAL '90 days' ORDER BY \"soldDate\" DESC LIMIT 5");
     await q('auto_sample', "SELECT year, make, model, engine FROM \"Auto\" LIMIT 5");
     await q('auto_item_join', "SELECT a.year, a.make, a.model, i.title, i.price FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON a.id = aic.\"autoId\" JOIN \"Item\" i ON aic.\"itemId\" = i.id LIMIT 5");
+    await q('market_demand_cache_sample', "SELECT part_number, ebay_sold_90d, ebay_avg_price, ebay_active_listings, last_updated FROM market_demand_cache ORDER BY last_updated DESC LIMIT 10");
+    await q('market_demand_cache_freshness', "SELECT COUNT(*) as total, COUNT(CASE WHEN last_updated >= NOW() - INTERVAL '7 days' THEN 1 END) as last_7d, COUNT(CASE WHEN last_updated >= NOW() - INTERVAL '30 days' THEN 1 END) as last_30d, MIN(last_updated) as oldest, MAX(last_updated) as newest FROM market_demand_cache");
     res.json(R);
   } catch(e) { res.status(500).json({error: e.message, stack: e.stack}); }
 });

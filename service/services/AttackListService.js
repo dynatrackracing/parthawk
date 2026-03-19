@@ -95,6 +95,33 @@ function detectPartType(title) {
   return null;
 }
 
+/**
+ * Recency weight for a sale based on how recently it sold.
+ * Last 30 days = 1.0, 30-90 days = 0.75, 90-180 days = 0.5, older = 0.25
+ */
+function recencyWeight(soldDate) {
+  if (!soldDate) return 0.25;
+  const daysAgo = Math.floor((Date.now() - new Date(soldDate).getTime()) / 86400000);
+  if (daysAgo <= 30) return 1.0;
+  if (daysAgo <= 90) return 0.75;
+  if (daysAgo <= 180) return 0.5;
+  return 0.25;
+}
+
+/**
+ * Calculate recency-weighted average price from an array of {price, soldDate}.
+ */
+function weightedAvgPrice(sales) {
+  if (!sales || sales.length === 0) return 0;
+  let weightedSum = 0, weightSum = 0;
+  for (const s of sales) {
+    const w = recencyWeight(s.soldDate);
+    weightedSum += (s.price || 0) * w;
+    weightSum += w;
+  }
+  return weightSum > 0 ? Math.round(weightedSum / weightSum) : 0;
+}
+
 class AttackListService {
   constructor() {
     this.log = log.child({ class: 'AttackListService' }, true);
@@ -487,6 +514,7 @@ class AttackListService {
     }
 
     // Filter each candidate's individual sales by year range
+    const allMatchedSales = []; // for weighted avg across all types
     for (const cKey of candidateKeys) {
       const entry = salesIndex[cKey];
       for (const sale of entry.sales) {
@@ -497,20 +525,21 @@ class AttackListService {
         // Year matches — count this sale
         salesDemand.count++;
         salesDemand.totalRevenue += sale.price;
-        salesDemand.avgPrice = salesDemand.totalRevenue / salesDemand.count;
+        allMatchedSales.push(sale);
 
         if (sale.partType) {
           if (!salesDemand.partTypes[sale.partType]) {
-            salesDemand.partTypes[sale.partType] = { count: 0, totalPrice: 0, avgPrice: 0, titles: [] };
+            salesDemand.partTypes[sale.partType] = { count: 0, sales: [], titles: [] };
           }
           const pt = salesDemand.partTypes[sale.partType];
           pt.count++;
-          pt.totalPrice += sale.price;
-          pt.avgPrice = pt.totalPrice / pt.count;
+          pt.sales.push({ price: sale.price, soldDate: sale.soldDate });
           if (pt.titles.length < 3) pt.titles.push(sale.title);
         }
       }
     }
+    // Recency-weighted avg across all matched sales
+    salesDemand.avgPrice = weightedAvgPrice(allMatchedSales.map(s => ({ price: s.price, soldDate: s.soldDate })));
 
     // Current stock from YourListing — match by make+model, not just make
     let stock = 0;
@@ -560,13 +589,15 @@ class AttackListService {
         }
       }
 
+      // Recency-weighted avg price for this part type
+      const ptWeightedAvg = weightedAvgPrice(ptData.sales);
       const verdict = ptData.count >= 3 ? 'PULL' : ptData.count >= 1 ? 'WATCH' : 'SKIP';
       parts.push({
         itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
         category: null, partNumber: null, partType,
-        price: Math.round(ptData.avgPrice), in_stock: ptStock,
+        price: ptWeightedAvg, in_stock: ptStock,
         sold_90d: ptData.count, verdict,
-        reason: `Sold ${ptData.count}x @ $${Math.round(ptData.avgPrice)} avg`,
+        reason: `Sold ${ptData.count}x @ $${ptWeightedAvg} avg (recency-weighted)`,
         deadWarning: null,
       });
     }

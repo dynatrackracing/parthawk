@@ -329,14 +329,14 @@ router.post('/scan', async (req, res) => {
         const byType = {};
         for (const sale of sales) {
           const pt = detectPartTypeForVin(sale.title);
-          if (!byType[pt]) byType[pt] = { partType: pt, sold: 0, totalPrice: 0, lastSoldDate: null, titles: [] };
+          if (!byType[pt]) byType[pt] = { partType: pt, sold: 0, salesData: [], lastSoldDate: null, titles: [] };
           byType[pt].sold++;
-          byType[pt].totalPrice += parseFloat(sale.salePrice) || 0;
+          byType[pt].salesData.push({ price: parseFloat(sale.salePrice) || 0, soldDate: sale.soldDate });
           if (!byType[pt].lastSoldDate && sale.soldDate) byType[pt].lastSoldDate = sale.soldDate;
           if (byType[pt].titles.length < 2) byType[pt].titles.push(sale.title);
         }
         for (const [pt, data] of Object.entries(byType)) {
-          const avg = data.sold > 0 ? Math.round(data.totalPrice / data.sold) : 0;
+          const avg = vinWeightedAvg(data.salesData);
           salesHistory.push({
             partType: pt, sold: data.sold, avgPrice: avg, lastSoldDate: data.lastSoldDate,
             sampleTitle: data.titles[0] || null,
@@ -495,6 +495,21 @@ router.get('/history', async (req, res) => {
     res.json({ success: true, scans: [] });
   }
 });
+
+/**
+ * Recency-weighted avg price. Recent sales count more.
+ */
+function vinWeightedAvg(sales) {
+  if (!sales || sales.length === 0) return 0;
+  let ws = 0, wt = 0;
+  for (const s of sales) {
+    const d = s.soldDate ? Math.floor((Date.now() - new Date(s.soldDate).getTime()) / 86400000) : 999;
+    const w = d <= 30 ? 1.0 : d <= 90 ? 0.75 : d <= 180 ? 0.5 : 0.25;
+    ws += (s.price || 0) * w;
+    wt += w;
+  }
+  return wt > 0 ? Math.round(ws / wt) : 0;
+}
 
 /**
  * Extract base model from NHTSA full model string.

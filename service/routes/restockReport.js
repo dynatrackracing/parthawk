@@ -115,6 +115,22 @@ function extractPartNumbers(title) {
   return pns;
 }
 
+function recencyWeight(soldDate) {
+  if (!soldDate) return 0.25;
+  const daysAgo = Math.floor((Date.now() - new Date(soldDate).getTime()) / 86400000);
+  if (daysAgo <= 30) return 1.0;
+  if (daysAgo <= 90) return 0.75;
+  if (daysAgo <= 180) return 0.5;
+  return 0.25;
+}
+
+function weightedAvgPrice(sales) {
+  if (!sales || sales.length === 0) return 0;
+  let ws = 0, wt = 0;
+  for (const s of sales) { const w = recencyWeight(s.soldDate); ws += (s.price || 0) * w; wt += w; }
+  return wt > 0 ? Math.round(ws / wt * 100) / 100 : 0;
+}
+
 async function generateRestockReport() {
   const cutoff180 = new Date(Date.now() - 180 * 86400000);
 
@@ -139,10 +155,12 @@ async function generateRestockReport() {
         specificity: extractSpecificity(title),
         sold: 0, revenue: 0, partNumbers: new Set(), titles: [],
         yearMin: null, yearMax: null, lastSoldDate: null,
+        salesForWeighting: [],
       };
     }
     groups[key].sold++;
     groups[key].revenue += parseFloat(sale.salePrice) || 0;
+    groups[key].salesForWeighting.push({ price: parseFloat(sale.salePrice) || 0, soldDate: sale.soldDate });
     if (groups[key].titles.length < 3) groups[key].titles.push(title);
     // Track most recent sale date
     if (sale.soldDate) {
@@ -243,7 +261,7 @@ async function generateRestockReport() {
       console.log(`[RESTOCK STOCK] ${data.make} ${data.model} ${data.partType}: stock=${stock} (PN-matched: ${[...data.partNumbers].join(',')})`);
     }
 
-    const avgPrice = data.sold > 0 ? Math.round(data.revenue / data.sold * 100) / 100 : 0;
+    const avgPrice = data.salesForWeighting.length > 0 ? weightedAvgPrice(data.salesForWeighting) : 0;
     const profit = calcProfit(avgPrice, data.partType);
 
     let score = 0;
