@@ -327,7 +327,8 @@ class AttackListService {
   }
 
   /**
-   * Build stock index keyed by normalized make.
+   * Build stock index keyed by "make|model" from YourListing titles.
+   * Counts active inventory per make+model combination.
    */
   async buildStockIndex() {
     const index = {};
@@ -344,7 +345,12 @@ class AttackListService {
           if (title.includes(alias)) { make = canonical; break; }
         }
         if (!make) continue;
-        index[make] = (index[make] || 0) + (listing.quantityAvailable || 1);
+
+        const model = this.extractModelFromTitle(listing.title, make);
+        if (!model) continue;
+
+        const key = `${make}|${model.toUpperCase()}`;
+        index[key] = (index[key] || 0) + (listing.quantityAvailable || 1);
       }
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildStockIndex: YourListing table not ready');
@@ -479,16 +485,25 @@ class AttackListService {
       }
     }
 
-    // Current stock from YourListing
+    // Current stock from YourListing — match by make+model, not just make
     let stock = 0;
     for (const m of allMakes) {
-      if (m) stock += stockIndex[m] || 0;
+      const stockKey = `${m}|${modelUpper}`;
+      stock += stockIndex[stockKey] || 0;
+      // Also check partial model matches
+      for (const [sk, sv] of Object.entries(stockIndex)) {
+        if (!sk.startsWith(m + '|')) continue;
+        const sModel = sk.split('|')[1];
+        if (sModel !== modelUpper && (modelUpper.includes(sModel) || sModel.includes(modelUpper))) {
+          stock += sv;
+        }
+      }
     }
 
     const partCount = matchedParts.length;
-    const avgPrice = partCount > 0
-      ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount
-      : salesDemand.avgPrice;
+    // Use YOUR sold prices for value estimation, not competitor listing prices
+    const avgPrice = salesDemand.avgPrice > 0 ? salesDemand.avgPrice
+      : (partCount > 0 ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount : 0);
 
     // === SCORING ===
     // Score 0-100 based on real sales demand.
@@ -526,35 +541,18 @@ class AttackListService {
     else if (score >= 1) color = 'red';
 
     // === BUILD PARTS LIST ===
-    // Combine Item-based parts + YourSale part type breakdowns
+    // Deduplicate by partType — one entry per part type, prefer YourSale data
     const parts = [];
+    const seenTypes = new Set();
 
-    // From Item table (if any)
-    for (const p of matchedParts.slice(0, 4)) {
-      const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
-      const verdict = partScore >= 80 ? 'PULL' : partScore >= 60 ? 'WATCH' : 'SKIP';
-      parts.push({
-        itemId: p.itemId,
-        title: p.title,
-        category: p.category,
-        partNumber: p.partNumber,
-        partType: p.partType,
-        price: Math.round(p.price),
-        in_stock: p.quantity || 0,
-        sold_90d: salesDemand.count,
-        verdict,
-        reason: verdict === 'PULL' ? 'High value, strong demand'
-          : verdict === 'WATCH' ? 'Moderate value, check condition'
-          : 'Low relative value',
-        deadWarning: null,
-      });
-    }
-
-    // From YourSale part type breakdowns — these are the real signals
+    // YourSale part types first — these are the real signals with YOUR sold prices
     for (const [partType, ptData] of Object.entries(salesDemand.partTypes)) {
-      // Skip if already covered by Item-based parts
-      if (parts.some(p => p.partType === partType)) continue;
-      const ptScore = score; // inherit vehicle score
+      if (seenTypes.has(partType)) continue;
+      seenTypes.add(partType);
+
+      // Look up stock for this specific part type+make+model
+      const ptStock = stockIndex[`${make}|${modelUpper}`] || 0;
+      const ptScore = score;
       const verdict = ptScore >= 80 ? 'PULL' : ptScore >= 60 ? 'WATCH' : 'SKIP';
       parts.push({
         itemId: null,
@@ -563,12 +561,41 @@ class AttackListService {
         partNumber: null,
         partType,
         price: Math.round(ptData.avgPrice),
-        in_stock: 0,
+        in_stock: ptStock,
         sold_90d: ptData.count,
         verdict,
         reason: `Sold ${ptData.count}x @ $${Math.round(ptData.avgPrice)} avg`,
         deadWarning: null,
       });
+    }
+
+    // Add Item-based parts only if their partType isn't already covered
+    const seenBasePNs = new Set();
+    for (const p of matchedParts) {
+      if (!p.partType || seenTypes.has(p.partType)) continue;
+      // Dedupe by base part number
+      const { normalizePartNumber } = require('../lib/partNumberUtils');
+      const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
+      if (basePn && seenBasePNs.has(basePn)) continue;
+      if (basePn) seenBasePNs.add(basePn);
+
+      seenTypes.add(p.partType);
+      const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
+      const verdict = partScore >= 80 ? 'PULL' : partScore >= 60 ? 'WATCH' : 'SKIP';
+      parts.push({
+        itemId: p.itemId,
+        title: p.title,
+        category: p.category,
+        partNumber: p.partNumber,
+        partType: p.partType,
+        price: Math.round(salesDemand.avgPrice > 0 ? salesDemand.avgPrice : p.price),
+        in_stock: p.quantity || 0,
+        sold_90d: 0,
+        verdict,
+        reason: 'Competitor priced, no recent sales',
+        deadWarning: null,
+      });
+      if (parts.length >= 8) break;
     }
 
     // Sort parts: highest sold count first
@@ -587,7 +614,7 @@ class AttackListService {
       is_active: vehicle.active,
       score,
       color_code: color,
-      est_value: Math.round(salesDemand.count > 0 ? salesDemand.avgPrice * Object.keys(salesDemand.partTypes).length : (partCount > 0 ? avgPrice * partCount : 0)),
+      est_value: Math.round(salesDemand.count > 0 ? salesDemand.avgPrice * Math.min(Object.keys(salesDemand.partTypes).length, 5) : 0),
       matched_parts: parts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,

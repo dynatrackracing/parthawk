@@ -350,7 +350,14 @@
   function renderVehicle(v) {
     const sc = v.color_code;
     const parts = v.parts || [];
-    const chips = parts.slice(0, 4).map(p => {
+    // Deduplicate chips by partType
+    const chipTypes = new Set();
+    const chips = parts.filter(p => {
+      const t = p.partType || p.category || '?';
+      if (chipTypes.has(t)) return false;
+      chipTypes.add(t);
+      return true;
+    }).slice(0, 4).map(p => {
       const cc = p.verdict === 'PULL' ? 'chip-green' : p.verdict === 'WATCH' ? 'chip-yellow' : 'chip-red';
       return `<span class="chip ${cc}">${p.partType || p.category || '?'}</span>`;
     }).join('');
