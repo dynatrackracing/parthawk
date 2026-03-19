@@ -416,7 +416,8 @@
 
   function renderExpandedParts(v) {
     const parts = v.parts || [];
-    if (parts.length === 0) {
+    const rebuildParts = v.rebuild_parts || [];
+    if (parts.length === 0 && rebuildParts.length === 0) {
       return '<div style="padding:12px 0;color:var(--text-muted);font-size:12px;">No matching inventory parts found.</div>';
     }
 
@@ -429,6 +430,7 @@
       </div>`;
     }
 
+    // Pullable parts
     for (const p of parts) {
       if (!p) continue;
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
@@ -448,8 +450,24 @@
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
         </div>
         <div class="pd-reason">${p.reason || ''}</div>
-        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#7f1d1d;border-radius:4px;font-size:10px;color:#ef4444;font-weight:600;">DEAD: ${p.deadWarning.failureReason || 'unknown'}</div>` : ''}
+        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">DEAD: ${p.deadWarning.failureReason || 'unknown'}</div>` : ''}
       </div>`;
+    }
+
+    // Rebuild reference section — visually distinct, not counted in value
+    if (rebuildParts.length > 0) {
+      html += `<div style="margin-top:10px;padding-top:8px;border-top:2px dashed var(--border);">
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Rebuild Reference (not included in pull value)</div>`;
+      for (const p of rebuildParts) {
+        html += `<div style="padding:6px 0;border-bottom:1px solid #f3f4f6;opacity:0.6;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:12px;color:#9ca3af;">[REBUILD] ${p.seller || 'pro-rebuild'} — ${p.partType || 'Part'}</div>
+            <div style="font-size:12px;color:#9ca3af;font-weight:600;">$${p.price}</div>
+          </div>
+          ${p.partNumber ? `<div style="font-size:10px;color:#d1d5db;font-family:monospace;">${p.partNumber}</div>` : ''}
+        </div>`;
+      }
+      html += '</div>';
     }
 
     // Trim + Location sections — only for 2016+ vehicles (rolling 10-year window)
@@ -457,12 +475,12 @@
     if (vYear >= 2016) {
       if (v.trim) {
         html += `<div class="loc-section" id="trim-${v.id}" style="margin-top:10px;">
-          <div class="loc-header">✨ Trim Parts</div>
+          <div class="loc-header">Trim Parts</div>
           <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Loading...</div>
         </div>`;
       }
       html += `<div class="loc-section" id="loc-${v.id}">
-        <div class="loc-header">📍 Part Location</div>
+        <div class="loc-header">Part Location</div>
         <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Tap to load</div>
       </div>`;
     }

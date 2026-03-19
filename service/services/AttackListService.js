@@ -151,7 +151,7 @@ class AttackListService {
           'Auto.year', 'Auto.make', 'Auto.model',
           'Item.id as itemId', 'Item.title', 'Item.price',
           'Item.categoryTitle', 'Item.manufacturerPartNumber',
-          'Item.quantity'
+          'Item.quantity', 'Item.seller', 'Item.isRepair'
         );
 
       for (const row of rows) {
@@ -161,6 +161,7 @@ class AttackListService {
         }
         const entry = index[key];
         if (!entry.items.some(i => i.itemId === row.itemId)) {
+          const isRebuild = row.seller === 'pro-rebuild' || row.isRepair === true;
           entry.items.push({
             itemId: row.itemId,
             title: row.title,
@@ -169,10 +170,15 @@ class AttackListService {
             partNumber: row.manufacturerPartNumber,
             quantity: parseInt(row.quantity) || 1,
             partType: detectPartType(row.title + ' ' + (row.categoryTitle || '')),
+            seller: row.seller || null,
+            isRebuild,
           });
           entry.count++;
-          entry.totalValue += parseFloat(row.price) || 0;
-          entry.avgPrice = entry.totalValue / entry.count;
+          // Only count non-rebuild parts in value/avg
+          if (!isRebuild) {
+            entry.totalValue += parseFloat(row.price) || 0;
+            entry.avgPrice = entry.count > 0 ? entry.totalValue / entry.count : 0;
+          }
         }
       }
     } catch (err) {
@@ -566,26 +572,40 @@ class AttackListService {
     }
 
     // Item-based parts — only if partType not already covered
+    // Separate rebuild (pro-rebuild / isRepair) from pullable parts
     const seenBasePNs = new Set();
+    const rebuildParts = [];
     for (const p of matchedParts) {
       if (!p.partType || seenTypes.has(p.partType)) continue;
       const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
       if (basePn && seenBasePNs.has(basePn)) continue;
       if (basePn) seenBasePNs.add(basePn);
-      seenTypes.add(p.partType);
 
       // Stock: check by this specific part number
       let ptStock = 0;
       if (basePn && stockPartNumbers) ptStock = stockPartNumbers[basePn] || 0;
 
-      parts.push({
-        itemId: p.itemId, title: p.title, category: p.category,
-        partNumber: p.partNumber, partType: p.partType,
-        price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
-        verdict: 'SKIP',
-        reason: 'Competitor listed, check YourSale for demand',
-        deadWarning: null,
-      });
+      if (p.isRebuild) {
+        // Rebuild reference — do NOT add to parts array or scoring
+        rebuildParts.push({
+          itemId: p.itemId, title: p.title, category: p.category,
+          partNumber: p.partNumber, partType: p.partType,
+          price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
+          verdict: 'REBUILD', seller: p.seller || 'pro-rebuild',
+          reason: 'Rebuild reference — not included in pull value',
+          isRebuild: true, deadWarning: null,
+        });
+      } else {
+        seenTypes.add(p.partType);
+        parts.push({
+          itemId: p.itemId, title: p.title, category: p.category,
+          partNumber: p.partNumber, partType: p.partType,
+          price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
+          verdict: 'SKIP', seller: p.seller || null,
+          reason: 'Competitor listed, check YourSale for demand',
+          isRebuild: false, deadWarning: null,
+        });
+      }
       if (parts.length >= 8) break;
     }
 
@@ -692,6 +712,7 @@ class AttackListService {
       sales_count: salesDemand.count,
       platform_siblings: platformSiblingNames.length > 0 ? platformSiblingNames : null,
       parts: filteredParts,
+      rebuild_parts: rebuildParts.length > 0 ? rebuildParts : null,
     };
   }
 
