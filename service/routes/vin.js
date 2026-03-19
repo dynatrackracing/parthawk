@@ -57,7 +57,7 @@ router.post('/decode-photo', async (req, res) => {
           },
           {
             type: 'text',
-            text: 'Read the VIN from this photo. Return only the 17-character VIN string, nothing else. If you cannot read it clearly, return UNREADABLE.',
+            text: 'Read the Vehicle Identification Number (VIN) from this photo. The photo may have glare, be at an angle, be dirty, partially obscured, rotated, tilted, or taken through a windshield. Rules: A VIN is exactly 17 characters (letters and numbers only). VINs never contain I, O, or Q. Position 9 is always a check digit (0-9 or X). Common misreads: 0↔O↔Q↔D, 1↔I↔L, 5↔S, 8↔B, 2↔Z. If a character is unclear, use VIN rules to determine the most likely character. If reading through a windshield with glare, focus on the metal plate beneath. The photo may be sideways or upside down — read the VIN regardless of orientation. Return ONLY the 17-character VIN string. If you can read at least 14 characters, return what you can with ? for unreadable positions. If you cannot read the VIN at all, return UNREADABLE.',
           },
         ],
       }],
@@ -68,10 +68,15 @@ router.post('/decode-photo', async (req, res) => {
       if (block.type === 'text') vin += block.text.trim();
     }
 
-    vin = vin.replace(/[^A-HJ-NPR-Z0-9]/gi, '').toUpperCase();
+    vin = vin.replace(/[^A-HJ-NPR-Z0-9?]/gi, '').toUpperCase();
 
-    if (vin === 'UNREADABLE' || vin.length !== 17) {
+    if (vin === 'UNREADABLE' || vin.length < 14) {
       return res.json({ success: true, vin: 'UNREADABLE' });
+    }
+
+    // Partial VIN (has ? characters) — return for manual completion
+    if (vin.includes('?')) {
+      return res.json({ success: true, vin, partial: true });
     }
 
     // Step 2: Check vin_cache first
