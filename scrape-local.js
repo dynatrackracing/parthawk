@@ -51,8 +51,12 @@ async function scrapeYard(location) {
       : `https://www.pyp.com/inventory/${location.slug}/?page=${page}`;
 
     try {
-      const res = await axios.get(url, { headers: { 'User-Agent': UA }, timeout: 30000 });
-      const $ = cheerio.load(res.data);
+      // Use curl to bypass CloudFlare TLS fingerprinting (axios gets 403)
+      const { execSync } = require('child_process');
+      const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${UA}" "${url}"`;
+      const html = execSync(cmd, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8' });
+      if (html.includes('Just a moment')) { console.log('  CloudFlare challenge — retrying...'); break; }
+      const $ = cheerio.load(html);
       let pageCount = 0;
 
       $('div.pypvi_resultRow[id]').each((i, el) => {

@@ -150,16 +150,9 @@ class LKQScraper {
         : `https://www.pyp.com/inventory/${location.slug}/?page=${page}`;
 
       try {
-        const response = await axios.get(url, {
-          headers: {
-            'User-Agent': this.userAgent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-          timeout: 30000,
-        });
-
-        const html = response.data;
+        // Use curl subprocess to bypass CloudFlare TLS fingerprinting
+        // Node.js axios/fetch gets 403 from CF but curl passes
+        const html = await this.fetchWithCurl(url);
         const vehicles = this.parseInventoryPage(html);
 
         if (vehicles.length === 0) {
@@ -185,6 +178,26 @@ class LKQScraper {
 
     this.log.info({ total: allVehicles.length, location: location.name, pages: page }, 'All pages fetched');
     return allVehicles;
+  }
+
+  /**
+   * Fetch a URL using curl subprocess to bypass CloudFlare TLS fingerprinting.
+   * Node.js HTTP clients (axios, fetch, undici) get 403 from CloudFlare because
+   * their TLS fingerprint is flagged as bot traffic. curl uses OpenSSL which passes.
+   */
+  fetchWithCurl(url) {
+    const { execSync } = require('child_process');
+    const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${this.userAgent}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" "${url}"`;
+    try {
+      const result = execSync(cmd, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8' });
+      if (result.includes('Just a moment') || result.includes('cf-challenge')) {
+        throw new Error('CloudFlare challenge page returned');
+      }
+      return result;
+    } catch (err) {
+      this.log.warn({ err: err.message?.substring(0, 100), url }, 'curl fetch failed');
+      throw err;
+    }
   }
 
   /**
