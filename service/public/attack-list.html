@@ -208,7 +208,7 @@
   </div>
   <div class="header-actions">
     <button class="icon-btn" onclick="openVinScanner()" title="Scan VIN">📷</button>
-    <button class="icon-btn" onclick="loadData()" title="Refresh">↻</button>
+    <button class="icon-btn" id="scrapeBtn" onclick="triggerScrapeAll(this)" title="Refresh inventory from LKQ">🔄</button>
   </div>
 </header>
 
@@ -318,7 +318,7 @@
     }
 
     if (!yards.length || !yards.some(y => y.total_vehicles > 0)) {
-      document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>No vehicles found</h3><p>LKQ scrapes run at 2am nightly.</p><button class="btn-primary" onclick="triggerScrape(this)">Scrape LKQ Now</button></div>`;
+      document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>No vehicles found</h3><p>LKQ scrapes run at 2am nightly.</p><button class="btn-primary" onclick="triggerScrape(this)">Refresh Inventory Now</button></div>`;
       return;
     }
 
@@ -687,9 +687,47 @@
     btn.textContent = 'Scraping...'; btn.disabled = true;
     try {
       await fetch('/yards/scrape/lkq', { method: 'POST' });
-      btn.textContent = 'Started! Refreshing in 30s...';
-      setTimeout(() => loadData(), 30000);
+      pollScrapeStatus(btn);
     } catch (e) { btn.textContent = 'Failed'; btn.disabled = false; }
+  }
+
+  async function triggerScrapeAll(btn) {
+    btn.disabled = true; btn.title = 'Scraping all yards...';
+    btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;margin:0;border-width:2px;"></div>';
+    document.getElementById('statusLeft').textContent = 'Scraping LKQ...';
+    try {
+      const res = await fetch('/yards/scrape/lkq', { method: 'POST' });
+      const data = await res.json();
+      if (data.already_running) {
+        document.getElementById('statusLeft').textContent = 'Scrape already running...';
+      }
+      pollScrapeStatus(btn);
+    } catch (e) {
+      btn.textContent = '🔄'; btn.disabled = false; btn.title = 'Refresh inventory from LKQ';
+      document.getElementById('statusLeft').textContent = 'Scrape failed to start';
+    }
+  }
+
+  function pollScrapeStatus(btn) {
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch('/yards/scrape/status');
+        const status = await res.json();
+        if (!status.running) {
+          clearInterval(poll);
+          btn.textContent = '🔄'; btn.disabled = false; btn.title = 'Refresh inventory from LKQ';
+          if (status.error) {
+            document.getElementById('statusLeft').textContent = 'Scrape error: ' + status.error;
+          } else {
+            document.getElementById('statusLeft').textContent = 'Scrape complete — reloading...';
+            loadData();
+          }
+        }
+      } catch (e) {
+        clearInterval(poll);
+        btn.textContent = '🔄'; btn.disabled = false;
+      }
+    }, 5000);
   }
 
   // Load trim intelligence for a vehicle (triggered on expand)

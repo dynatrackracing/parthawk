@@ -5,6 +5,9 @@ const router = require('express-promise-router')();
 const LKQScraper = require('../scrapers/LKQScraper');
 const { database } = require('../database/database');
 
+// In-memory scrape status tracking
+let scrapeStatus = { running: false, started_at: null, finished_at: null, error: null };
+
 /**
  * Yard Routes
  * 
@@ -54,18 +57,36 @@ router.get('/:id/vehicles', async (req, res) => {
 
 // Trigger LKQ scrape for all NC locations
 router.post('/scrape/lkq', async (req, res) => {
+  if (scrapeStatus.running) {
+    return res.json({ message: 'Scrape already in progress', already_running: true, started_at: scrapeStatus.started_at });
+  }
+
   log.info('Manual LKQ scrape triggered');
-  
+  scrapeStatus = { running: true, started_at: new Date().toISOString(), finished_at: null, error: null };
+
   // Run async - don't wait for it to finish
   const scraper = new LKQScraper();
-  scraper.scrapeAll().catch(err => {
-    log.error({ err }, 'LKQ scrape failed');
-  });
+  scraper.scrapeAll()
+    .then(() => {
+      scrapeStatus.running = false;
+      scrapeStatus.finished_at = new Date().toISOString();
+    })
+    .catch(err => {
+      log.error({ err }, 'LKQ scrape failed');
+      scrapeStatus.running = false;
+      scrapeStatus.finished_at = new Date().toISOString();
+      scrapeStatus.error = err.message;
+    });
 
-  res.json({ 
+  res.json({
     message: 'LKQ scrape started for all 4 NC locations',
     locations: ['LKQ Raleigh', 'LKQ Durham', 'LKQ Greensboro', 'LKQ East NC']
   });
+});
+
+// Get current scrape status (for polling)
+router.get('/scrape/status', async (req, res) => {
+  res.json(scrapeStatus);
 });
 
 // Trigger scrape for a specific yard by ID
