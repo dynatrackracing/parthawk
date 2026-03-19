@@ -69,6 +69,52 @@ function calcProfit(avgSellPrice, partType) {
   return Math.round((avgSellPrice - trueCogs - ebayFees - SHIPPING) * 100) / 100;
 }
 
+// Make aliases for extracting make from titles
+const MAKES = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chevy','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Mazda','Mercedes-Benz','Mercedes','Mercury','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Subaru','Suzuki','Toyota','Volkswagen','VW','Volvo'];
+
+function extractMakeModel(title) {
+  if (!title) return null;
+  const tu = title.toUpperCase();
+  let make = null;
+  for (const m of MAKES) {
+    if (tu.includes(m.toUpperCase())) { make = m; break; }
+  }
+  if (!make) return null;
+  if (make === 'Chevy') make = 'Chevrolet';
+  if (make === 'VW') make = 'Volkswagen';
+  if (make === 'Mercedes') make = 'Mercedes-Benz';
+
+  const makeIdx = tu.indexOf(make.toUpperCase());
+  const after = title.substring(makeIdx + make.length).trim().split(/\s+/);
+  const modelWords = [];
+  for (const w of after) {
+    if (/^\d{4}$/.test(w) || /^\d{4}-\d{4}$/.test(w)) break;
+    if (/^\d+\.\d+[lL]$/.test(w)) break;
+    if (/^(ECU|ECM|PCM|BCM|TCM|ABS|TIPM|OEM|Engine|Body|Control|Module|Anti|Fuse|Power|Brake|Amplifier|Radio|Cluster|Steering|Throttle)$/i.test(w)) break;
+    modelWords.push(w);
+    if (modelWords.length >= 3) break;
+  }
+  if (modelWords.length === 0) return null;
+  const model = modelWords.join(' ').replace(/[^A-Za-z0-9 \-]/g, '').trim();
+  if (!model || model.length < 2) return null;
+  return { make, model };
+}
+
+function extractPartNumbers(title) {
+  if (!title) return [];
+  const pns = [];
+  // Chrysler: 56044691AA
+  const chrysler = title.match(/\b(\d{8}[A-Z]{2})\b/g);
+  if (chrysler) pns.push(...chrysler);
+  // Toyota/Honda: 89661-48250
+  const toyota = title.match(/\b(\d{5}-[A-Z0-9]{3,7})\b/g);
+  if (toyota) pns.push(...toyota);
+  // Ford: BC3T-14B476-CG
+  const ford = title.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{4,6}-[A-Z]{2})\b/g);
+  if (ford) pns.push(...ford);
+  return pns;
+}
+
 async function generateRestockReport() {
   const cutoff180 = new Date(Date.now() - 180 * 86400000);
 
@@ -77,52 +123,84 @@ async function generateRestockReport() {
     .whereNotNull('title')
     .select('sku', 'title', 'salePrice', 'soldDate');
 
-  // Group by title-based key (part type + vehicle)
+  // Group by make + model + partType — strict matching
   const groups = {};
   for (const sale of sales) {
     const title = sale.title || '';
+    const veh = extractMakeModel(title);
+    if (!veh) continue; // Skip if can't extract make+model
+
     const partType = detectPartType(title);
-    const vehicle = extractVehicle(title) || 'Unknown';
-    const key = `${partType}|${vehicle}`;
+    const key = `${veh.make}|${veh.model}|${partType}`;
+
     if (!groups[key]) {
-      groups[key] = { partType, vehicle, specificity: extractSpecificity(title), titles: [], sold: 0, revenue: 0, skus: new Set() };
+      groups[key] = {
+        make: veh.make, model: veh.model, partType,
+        specificity: extractSpecificity(title),
+        sold: 0, revenue: 0, partNumbers: new Set(), titles: [],
+      };
     }
     groups[key].sold++;
     groups[key].revenue += parseFloat(sale.salePrice) || 0;
-    if (sale.sku) groups[key].skus.add(sale.sku);
-    if (groups[key].titles.length < 2) groups[key].titles.push(title);
+    if (groups[key].titles.length < 3) groups[key].titles.push(title);
+
+    // Extract and collect part numbers
+    for (const pn of extractPartNumbers(title)) {
+      groups[key].partNumbers.add(normalizePartNumber(pn));
+    }
   }
 
-  // Get stock
+  // Get stock — index by part number base for exact matching
   const listings = await database('YourListing')
     .where('listingStatus', 'Active')
     .whereNotNull('title')
-    .select('title', 'quantityAvailable');
+    .select('title', 'sku', 'quantityAvailable');
 
+  // Build stock index by make|model|partType AND by part number
   const stockByKey = {};
+  const stockByPN = {};
   for (const l of listings) {
-    const pt = detectPartType(l.title);
-    const veh = extractVehicle(l.title) || 'Unknown';
-    const key = `${pt}|${veh}`;
-    stockByKey[key] = (stockByKey[key] || 0) + (parseInt(l.quantityAvailable) || 1);
+    const veh = extractMakeModel(l.title);
+    if (veh) {
+      const pt = detectPartType(l.title);
+      const key = `${veh.make}|${veh.model}|${pt}`;
+      stockByKey[key] = (stockByKey[key] || 0) + (parseInt(l.quantityAvailable) || 1);
+    }
+    // Also index by SKU/part number for precise matching
+    if (l.sku) {
+      const base = normalizePartNumber(l.sku);
+      stockByPN[base] = (stockByPN[base] || 0) + (parseInt(l.quantityAvailable) || 1);
+    }
+    for (const pn of extractPartNumbers(l.title)) {
+      const base = normalizePartNumber(pn);
+      stockByPN[base] = (stockByPN[base] || 0) + (parseInt(l.quantityAvailable) || 1);
+    }
   }
 
-  // Score and tier
+  // Score and tier each group
   const items = [];
   for (const [key, data] of Object.entries(groups)) {
-    const stock = stockByKey[key] || 0;
+    // Stock: prefer part-number-based count, fall back to make|model|partType
+    let stock = 0;
+    if (data.partNumbers.size > 0) {
+      const counted = new Set();
+      for (const pn of data.partNumbers) {
+        if (!counted.has(pn) && stockByPN[pn]) {
+          stock += stockByPN[pn];
+          counted.add(pn);
+        }
+      }
+    }
+    if (stock === 0) stock = stockByKey[key] || 0;
+
     const avgPrice = data.sold > 0 ? Math.round(data.revenue / data.sold * 100) / 100 : 0;
     const profit = calcProfit(avgPrice, data.partType);
-    const ratio = stock > 0 ? data.sold / stock : data.sold;
 
-    // Score: demand (sold count) + profit margin + scarcity (low stock)
     let score = 0;
-    score += Math.min(40, data.sold * 4); // up to 40 from volume
-    score += Math.min(30, profit > 0 ? Math.round(profit / 5) : 0); // up to 30 from profit
-    score += stock === 0 ? 20 : stock === 1 ? 10 : 0; // scarcity bonus
+    score += Math.min(40, data.sold * 4);
+    score += Math.min(30, profit > 0 ? Math.round(profit / 5) : 0);
+    score += stock === 0 ? 20 : stock === 1 ? 10 : 0;
     score = Math.min(100, score);
-
-    // High value override: $300+ avg sell → floor at 75
     if (avgPrice >= 300 && data.sold >= 1) score = Math.max(score, 75);
 
     let tier, action;
@@ -133,10 +211,15 @@ async function generateRestockReport() {
     else { tier = 'grey'; action = 'ON RADAR'; }
 
     items.push({
-      partType: data.partType, vehicle: data.vehicle, specificity: data.specificity,
+      partType: data.partType,
+      vehicle: `${data.make} ${data.model}`,
+      make: data.make, model: data.model,
+      specificity: data.specificity,
+      partNumbers: [...data.partNumbers].slice(0, 5),
       score, tier, action,
       sold180d: data.sold, activeStock: stock, avgPrice, profit,
-      revenue180d: Math.round(data.revenue), ratio: Math.round(ratio * 10) / 10,
+      revenue180d: Math.round(data.revenue),
+      ratio: stock > 0 ? Math.round(data.sold / stock * 10) / 10 : data.sold,
       sampleTitle: data.titles[0] || null,
     });
   }

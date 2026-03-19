@@ -93,15 +93,17 @@ function renderSection(tier, cfg, items) {
       <span style="font-size:9px;color:var(--text-muted)">Score ${tier === 'green' ? '80-100' : tier === 'yellow' ? '60-79' : tier === 'orange' ? '40-59' : tier === 'red' ? '20-39' : '0-19'}</span>
     </div>
     <table><tr>
-      <th>Score</th><th>Part Type</th><th>Vehicle</th><th>Specificity</th>
-      <th>Sold 180d</th><th>Stock</th><th>Avg $</th><th>Est Profit</th><th>Revenue</th>
+      <th>Score</th><th>Part Type</th><th>Vehicle</th><th>Part #s</th><th>Spec</th>
+      <th>Sold</th><th>Stock</th><th>Avg $</th><th>Profit</th><th>Rev</th>
     </tr>`;
   for (const i of items) {
     const profitClass = i.profit >= 0 ? 'profit-pos' : 'profit-neg';
+    const pns = (i.partNumbers || []).join(', ') || '—';
     h += `<tr>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
       <td style="font-weight:600">${i.partType}</td>
       <td>${i.vehicle || '—'}</td>
+      <td class="mono" style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${pns}">${pns}</td>
       <td class="mono">${i.specificity || '—'}</td>
       <td style="font-weight:600">${i.sold180d}</td>
       <td>${i.activeStock}</td>
