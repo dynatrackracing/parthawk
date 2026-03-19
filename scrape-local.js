@@ -8,8 +8,8 @@
  *   set DATABASE_URL=postgres://...    (from Railway Variables tab)
  *   node scrape-local.js
  *
- * Scrapes all 4 LKQ yards, stores vehicles with VINs in Railway Postgres,
- * then decodes VINs via NHTSA API.
+ * Only saves vehicles added in the last 7 days.
+ * Only decodes VINs for vehicles added TODAY.
  */
 
 const axios = require('axios');
@@ -35,14 +35,38 @@ const LOCATIONS = [
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Parse LKQ date strings like "3/18/2026" or ISO dates
+function parseDate(str) {
+  if (!str) return null;
+  // Try ISO first
+  const iso = new Date(str);
+  if (!isNaN(iso.getTime())) return iso;
+  // Try M/D/YYYY
+  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+  return null;
+}
+
+function daysAgo(date) {
+  if (!date) return 999;
+  return Math.floor((Date.now() - date.getTime()) / 86400000);
+}
+
 // ── SCRAPE ──────────────────────────────────────────────
 
 async function scrapeYard(location) {
   console.log(`\n━━━ ${location.name} ━━━`);
   const yard = await knex('yard').where('name', location.name).first();
-  if (!yard) { console.log('  Yard not in database — skipping'); return { name: location.name, vehicles: 0 }; }
+  if (!yard) {
+    console.log('  ERROR: Yard not in database — skipping');
+    return { name: location.name, scraped: 0, saved: 0, skipped: 0, errors: 0, vins: 0 };
+  }
+  console.log(`  Yard ID: ${yard.id}`);
 
-  const vehicles = [];
+  // Scrape all pages
+  const allVehicles = [];
   let page = 1;
 
   while (page <= 100) {
@@ -51,11 +75,15 @@ async function scrapeYard(location) {
       : `https://www.pyp.com/inventory/${location.slug}/?page=${page}`;
 
     try {
-      // Use curl to bypass CloudFlare TLS fingerprinting (axios gets 403)
       const { execSync } = require('child_process');
       const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${UA}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Referer: https://www.lkqpickyourpart.com/" -H "sec-ch-ua-platform: \\"Windows\\"" "${url}"`;
       const html = execSync(cmd, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8' });
-      if (html.includes('Just a moment')) { console.log('  CloudFlare challenge — retrying...'); break; }
+
+      if (html.includes('Just a moment') || html.includes('cf-challenge')) {
+        console.log('  CloudFlare challenge — stopping pagination');
+        break;
+      }
+
       const $ = cheerio.load(html);
       let pageCount = 0;
 
@@ -76,120 +104,184 @@ async function scrapeYard(location) {
           else if (text.includes('Available:')) {
             const timeEl = $(detail).find('time');
             if (timeEl.length) dateAdded = timeEl.attr('datetime') || timeEl.text().trim();
+            else dateAdded = text.replace('Available:', '').trim();
           }
         });
 
-        // Photo URL from the main image
-        const imgSrc = $row.find('img').attr('src') || null;
-
-        vehicles.push({
+        allVehicles.push({
           year: ymmMatch[1], make: ymmMatch[2].trim(), model: ymmMatch[3].trim(),
-          color, vin, row, stockNumber, dateAdded, photoUrl: imgSrc,
+          color, vin, row, stockNumber, dateAdded,
         });
         pageCount++;
       });
 
       if (pageCount === 0) break;
-      process.stdout.write(`  Page ${page}: ${pageCount} vehicles (total: ${vehicles.length})\r`);
+      process.stdout.write(`  Page ${page}: ${pageCount} vehicles (total: ${allVehicles.length})\n`);
 
       if (!html.includes('Next Page')) break;
       page++;
       await sleep(500);
     } catch (err) {
-      console.log(`  Page ${page} error: ${err.message}`);
+      console.log(`  Page ${page} fetch error: ${err.message.substring(0, 120)}`);
       break;
     }
   }
 
-  console.log(`  Scraped ${vehicles.length} vehicles from ${page} pages`);
+  console.log(`  Scraped ${allVehicles.length} vehicles from ${page} pages`);
 
-  // Store in database
+  // Filter: only vehicles added in last 7 days
   const now = new Date();
-  await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
-    .update({ active: false, updatedAt: now });
+  const recentVehicles = [];
+  let oldSkipped = 0;
 
-  let inserted = 0, updated = 0, vinsFound = 0;
-  for (const v of vehicles) {
+  for (const v of allVehicles) {
+    const addedDate = parseDate(v.dateAdded);
+    const age = daysAgo(addedDate);
+    if (age <= 7) {
+      v._parsedDate = addedDate;
+      v._daysAgo = age;
+      recentVehicles.push(v);
+    } else {
+      oldSkipped++;
+    }
+  }
+
+  console.log(`  Filtered: ${recentVehicles.length} in last 7 days, ${oldSkipped} older (skipped)`);
+
+  // Mark all current active vehicles as inactive first
+  try {
+    const deactivated = await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
+      .update({ active: false, updatedAt: now });
+    console.log(`  Deactivated ${deactivated} previously active vehicles`);
+  } catch (e) {
+    console.log(`  ERROR deactivating: ${e.message}`);
+  }
+
+  // Insert/update recent vehicles
+  let inserted = 0, updated = 0, errors = 0, vinsFound = 0;
+
+  for (const v of recentVehicles) {
     if (v.vin && v.vin.length >= 11) vinsFound++;
+
     try {
-      const existing = await knex('yard_vehicle')
-        .where('yard_id', yard.id).where('year', v.year)
-        .where('make', v.make).where('model', v.model).first();
+      // Match on year+make+model+yard (could be multiple of same YMM with different VINs,
+      // so also match on stockNumber if available)
+      let query = knex('yard_vehicle')
+        .where('yard_id', yard.id)
+        .where('year', v.year)
+        .where('make', v.make)
+        .where('model', v.model);
+
+      if (v.stockNumber) {
+        query = query.where('stock_number', v.stockNumber);
+      }
+
+      const existing = await query.first();
 
       if (existing) {
         const upd = {
           color: v.color || existing.color,
           row_number: v.row || existing.row_number,
-          date_added: v.dateAdded || existing.date_added,
-          active: true, last_seen: now, scraped_at: now, updatedAt: now,
+          active: true,
+          last_seen: now,
+          scraped_at: now,
+          updatedAt: now,
         };
+        if (v._parsedDate) upd.date_added = v._parsedDate;
         if (v.vin && v.vin.length >= 11) upd.vin = v.vin;
         if (v.stockNumber) upd.stock_number = v.stockNumber;
-        try { if (v.photoUrl) upd.photo_url = v.photoUrl; } catch (e) {}
+
         await knex('yard_vehicle').where('id', existing.id).update(upd);
         updated++;
       } else {
         const rec = {
-          id: uuidv4(), yard_id: yard.id, year: v.year, make: v.make, model: v.model,
-          trim: null, color: v.color || null, row_number: v.row || null,
-          date_added: v.dateAdded || null,
-          active: true, first_seen: now, last_seen: now,
-          scraped_at: now, createdAt: now, updatedAt: now,
+          id: uuidv4(),
+          yard_id: yard.id,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          trim: null,
+          color: v.color || null,
+          row_number: v.row || null,
+          date_added: v._parsedDate || null,
+          active: true,
+          first_seen: now,
+          last_seen: now,
+          scraped_at: now,
+          createdAt: now,
+          updatedAt: now,
         };
         if (v.vin && v.vin.length >= 11) rec.vin = v.vin;
         if (v.stockNumber) rec.stock_number = v.stockNumber;
-        try { if (v.photoUrl) rec.photo_url = v.photoUrl; } catch (e) {}
+
         await knex('yard_vehicle').insert(rec);
         inserted++;
       }
     } catch (err) {
-      // ignore insert errors
+      errors++;
+      console.log(`  DB ERROR [${v.year} ${v.make} ${v.model}]: ${err.message}`);
     }
   }
 
-  await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
-  console.log(`  DB: ${inserted} inserted, ${updated} updated, ${vinsFound} VINs captured`);
-  return { name: location.name, vehicles: vehicles.length, vinsFound, inserted, updated };
+  // Update yard last_scraped
+  try {
+    await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
+  } catch (e) {
+    console.log(`  ERROR updating yard: ${e.message}`);
+  }
+
+  console.log(`  DB: ${inserted} inserted, ${updated} updated, ${errors} errors, ${vinsFound} VINs found`);
+  return { name: location.name, scraped: allVehicles.length, saved: inserted + updated, skipped: oldSkipped, errors, vins: vinsFound };
 }
 
-// ── VIN DECODE ──────────────────────────────────────────
+// ── VIN DECODE (TODAY only) ─────────────────────────────
 
 async function decodeVins() {
-  console.log('\n━━━ VIN DECODE ━━━');
+  console.log('\n━━━ VIN DECODE (today only) ━━━');
+
+  // Only decode VINs for vehicles added today (last 24 hours)
+  const todayCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   let vehicles;
   try {
     vehicles = await knex('yard_vehicle')
-      .whereNotNull('vin').where('vin', '!=', '')
+      .whereNotNull('vin')
+      .where('vin', '!=', '')
       .where(function() { this.where('vin_decoded', false).orWhereNull('vin_decoded'); })
-      .select('id', 'vin')
-      .limit(500);
+      .where('scraped_at', '>=', todayCutoff)
+      .select('id', 'vin', 'year', 'make', 'model')
+      .limit(200);
   } catch (e) {
-    console.log('  Could not query undecoded VINs:', e.message);
+    console.log(`  ERROR querying undecoded VINs: ${e.message}`);
     return { decoded: 0, errors: 0 };
   }
 
-  console.log(`  ${vehicles.length} VINs to decode`);
+  console.log(`  ${vehicles.length} today-VINs to decode`);
+  if (vehicles.length === 0) return { decoded: 0, cached: 0, errors: 0 };
+
   let decoded = 0, errors = 0, cached = 0;
 
   for (const v of vehicles) {
     const vin = v.vin.trim().toUpperCase();
+    console.log(`  [${decoded + cached + errors + 1}/${vehicles.length}] ${vin} (${v.year} ${v.make} ${v.model})`);
 
     // Check cache first
     try {
       const c = await knex('vin_cache').where('vin', vin).first();
       if (c) {
-        await knex('yard_vehicle').where('id', v.id).update({
-          engine: c.engine || null,
-          drivetrain: c.drivetrain || null,
-          trim_level: c.trim || null,
-          body_style: c.body_style || null,
-          vin_decoded: true, updatedAt: new Date(),
-        });
+        const upd = { vin_decoded: true, updatedAt: new Date() };
+        if (c.engine) upd.engine = c.engine;
+        if (c.drivetrain) upd.drivetrain = c.drivetrain;
+        if (c.trim) upd.trim_level = c.trim;
+        if (c.body_style) upd.body_style = c.body_style;
+        await knex('yard_vehicle').where('id', v.id).update(upd);
         cached++;
+        console.log(`    Cached: ${c.engine || '?'} ${c.drivetrain || '?'}`);
         continue;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log(`    Cache check error: ${e.message}`);
+    }
 
     // Call NHTSA
     try {
@@ -234,6 +326,8 @@ async function decodeVins() {
       const trim = get(38);
       const bodyStyle = get(5);
 
+      console.log(`    NHTSA: ${engine || '?'} ${engineType} ${drivetrain || '?'} ${trim || ''}`);
+
       // Cache
       try {
         await knex('vin_cache').insert({
@@ -242,7 +336,9 @@ async function decodeVins() {
           drivetrain, body_style: bodyStyle,
           decoded_at: new Date(), createdAt: new Date(),
         }).onConflict('vin').ignore();
-      } catch (e) {}
+      } catch (e) {
+        console.log(`    Cache insert error: ${e.message}`);
+      }
 
       // Update yard_vehicle
       const upd = { vin_decoded: true, updatedAt: new Date() };
@@ -251,12 +347,18 @@ async function decodeVins() {
       if (drivetrain) upd.drivetrain = drivetrain;
       if (trim) upd.trim_level = trim;
       if (bodyStyle) upd.body_style = bodyStyle;
-      await knex('yard_vehicle').where('id', v.id).update(upd);
-      decoded++;
 
-      if (decoded % 20 === 0) process.stdout.write(`  Decoded: ${decoded}/${vehicles.length}\r`);
+      try {
+        await knex('yard_vehicle').where('id', v.id).update(upd);
+        decoded++;
+      } catch (e) {
+        console.log(`    yard_vehicle update error: ${e.message}`);
+        errors++;
+      }
+
       await sleep(200); // NHTSA rate limit
     } catch (err) {
+      console.log(`    NHTSA error: ${err.message}`);
       errors++;
     }
   }
@@ -267,20 +369,31 @@ async function decodeVins() {
 
 // ── MAIN ────────────────────────────────────────────────
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 async function main() {
   console.log('PartHawk Local Scraper');
   console.log('Database:', process.env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
+  console.log('Time:', new Date().toISOString());
   console.log('');
 
-  // Run migrations
+  // Test DB connection
   try {
-    await knex.migrate.latest({ directory: './service/database/migrations' });
-    console.log('Migrations up to date');
+    const test = await knex.raw('SELECT 1 as ok');
+    console.log('DB connection: OK');
   } catch (e) {
-    console.log('Migration warning:', e.message.substring(0, 80));
+    console.error('DB connection FAILED:', e.message);
+    process.exit(1);
   }
+
+  // Check yard count
+  try {
+    const yards = await knex('yard').where('enabled', true).select('name', 'id');
+    console.log(`Yards in DB: ${yards.length}`);
+    for (const y of yards) console.log(`  ${y.name} (${y.id})`);
+  } catch (e) {
+    console.log('Yard query error:', e.message);
+  }
+
+  console.log('');
 
   // Scrape all yards
   const results = [];
@@ -291,33 +404,42 @@ async function main() {
 
   // Summary
   console.log('\n━━━ SCRAPE SUMMARY ━━━');
-  let totalVehicles = 0, totalVins = 0;
+  let totalScraped = 0, totalSaved = 0, totalVins = 0, totalErrors = 0;
   for (const r of results) {
-    console.log(`  ${r.name}: ${r.vehicles} vehicles, ${r.vinsFound} VINs`);
-    totalVehicles += r.vehicles || 0;
-    totalVins += r.vinsFound || 0;
+    console.log(`  ${r.name}: scraped ${r.scraped}, saved ${r.saved}, skipped ${r.skipped}, errors ${r.errors}, VINs ${r.vins}`);
+    totalScraped += r.scraped || 0;
+    totalSaved += r.saved || 0;
+    totalVins += r.vins || 0;
+    totalErrors += r.errors || 0;
   }
-  console.log(`  TOTAL: ${totalVehicles} vehicles, ${totalVins} VINs`);
+  console.log(`  TOTAL: ${totalScraped} scraped, ${totalSaved} saved, ${totalVins} VINs, ${totalErrors} errors`);
 
-  // Decode VINs
-  const decodeResult = await decodeVins();
+  // Decode VINs (today only)
+  await decodeVins();
 
   // Final counts
-  const counts = await knex('yard_vehicle').where('active', true).count('* as cnt').first();
-  const vinCounts = await knex('yard_vehicle').whereNotNull('vin').where('vin', '!=', '').count('* as cnt').first();
-  const decodedCounts = await knex('yard_vehicle').where('vin_decoded', true).count('* as cnt').first();
+  try {
+    const active = await knex('yard_vehicle').where('active', true).count('* as cnt').first();
+    const withVin = await knex('yard_vehicle').whereNotNull('vin').where('vin', '!=', '').count('* as cnt').first();
+    const vinDecoded = await knex('yard_vehicle').where('vin_decoded', true).count('* as cnt').first();
+    const total = await knex('yard_vehicle').count('* as cnt').first();
 
-  console.log('\n━━━ FINAL STATUS ━━━');
-  console.log(`  Active vehicles: ${counts?.cnt}`);
-  console.log(`  With VIN: ${vinCounts?.cnt}`);
-  console.log(`  VIN decoded: ${decodedCounts?.cnt}`);
+    console.log('\n━━━ FINAL STATUS ━━━');
+    console.log(`  Total vehicles in DB: ${total?.cnt}`);
+    console.log(`  Active vehicles: ${active?.cnt}`);
+    console.log(`  With VIN: ${withVin?.cnt}`);
+    console.log(`  VIN decoded: ${vinDecoded?.cnt}`);
+  } catch (e) {
+    console.log('Final count error:', e.message);
+  }
 
   await knex.destroy();
   console.log('\nDone!');
 }
 
 main().catch(err => {
-  console.error('Fatal:', err);
+  console.error('Fatal:', err.message);
+  console.error(err.stack);
   knex.destroy();
   process.exit(1);
 });
