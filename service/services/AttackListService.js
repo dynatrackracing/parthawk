@@ -122,10 +122,10 @@ class AttackListService {
     const inventoryIndex = await this.buildInventoryIndex();
     const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
     const salesIndex = await this.buildSalesIndex(cutoff);
-    const stockIndex = await this.buildStockIndex();
+    const { byMakeModel: stockIdx, byPartNumber: stockPNs } = await this.buildStockIndex();
 
     const scored = vehicles.map(v =>
-      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex)
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs)
     );
     scored.sort((a, b) => b.score - a.score);
 
@@ -327,35 +327,56 @@ class AttackListService {
   }
 
   /**
-   * Build stock index keyed by "make|model" from YourListing titles.
-   * Counts active inventory per make+model combination.
+   * Build stock indexes from YourListing:
+   * 1. byMakeModel: keyed by "make|MODEL" — counts per make+model
+   * 2. byPartNumber: keyed by normalized base part number — counts per PN
    */
   async buildStockIndex() {
-    const index = {};
+    const byMakeModel = {};
+    const byPartNumber = {};
     try {
       const listings = await database('YourListing')
         .where('listingStatus', 'Active')
         .whereNotNull('title')
-        .select('title', 'quantityAvailable');
+        .select('title', 'sku', 'quantityAvailable');
+
+      const { normalizePartNumber } = require('../lib/partNumberUtils');
 
       for (const listing of listings) {
-        const title = (listing.title || '').toLowerCase();
+        const qty = parseInt(listing.quantityAvailable) || 1;
+        const title = listing.title || '';
+        const titleLower = title.toLowerCase();
+
+        // Index by make|model
         let make = null;
         for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-          if (title.includes(alias)) { make = canonical; break; }
+          if (titleLower.includes(alias)) { make = canonical; break; }
         }
-        if (!make) continue;
+        if (make) {
+          const model = this.extractModelFromTitle(title, make);
+          if (model) {
+            const key = `${make}|${model.toUpperCase()}`;
+            byMakeModel[key] = (byMakeModel[key] || 0) + qty;
+          }
+        }
 
-        const model = this.extractModelFromTitle(listing.title, make);
-        if (!model) continue;
-
-        const key = `${make}|${model.toUpperCase()}`;
-        index[key] = (index[key] || 0) + (listing.quantityAvailable || 1);
+        // Index by part number (from SKU and title)
+        if (listing.sku) {
+          const base = normalizePartNumber(listing.sku);
+          if (base && base.length >= 5) byPartNumber[base] = (byPartNumber[base] || 0) + qty;
+        }
+        // Extract PNs from title
+        const chrysler = title.match(/\b(\d{8})[A-Z]{2}\b/);
+        if (chrysler) byPartNumber[chrysler[1]] = (byPartNumber[chrysler[1]] || 0) + qty;
+        const toyota = title.match(/\b(\d{5}-[A-Z0-9]{3,5})/);
+        if (toyota) byPartNumber[toyota[1]] = (byPartNumber[toyota[1]] || 0) + qty;
+        const ford = title.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{4,6})/);
+        if (ford) byPartNumber[ford[1]] = (byPartNumber[ford[1]] || 0) + qty;
       }
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildStockIndex: YourListing table not ready');
     }
-    return index;
+    return { byMakeModel, byPartNumber };
   }
 
   /**
@@ -404,7 +425,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -501,120 +522,116 @@ class AttackListService {
     }
 
     const partCount = matchedParts.length;
-    // Use YOUR sold prices for value estimation, not competitor listing prices
     const avgPrice = salesDemand.avgPrice > 0 ? salesDemand.avgPrice
       : (partCount > 0 ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount : 0);
 
-    // === SCORING ===
-    // Score 0-100 based on real sales demand.
-    // 1 sale = 30 base. Each additional sale adds ~10. Avg price scales it.
-    // Having stock reduces score (we already have it). No stock = bonus.
-    let score = 0;
-
-    if (salesDemand.count > 0) {
-      // Base: 30 for first sale, +10 per additional, capped at 70 from count alone
-      const countScore = Math.min(70, 30 + (salesDemand.count - 1) * 10);
-      // Price bonus: avg price > $150 → up to +30 more
-      const priceBonus = Math.min(30, Math.round(salesDemand.avgPrice / 10));
-      score = Math.min(100, countScore + priceBonus);
-
-      // Stock penalty: if we already have a lot in stock, reduce urgency
-      if (stock >= 5) score = Math.round(score * 0.5);
-      else if (stock >= 3) score = Math.round(score * 0.7);
-      else if (stock >= 1) score = Math.round(score * 0.85);
-    } else if (partCount > 0) {
-      // Competitor items exist but we haven't sold this make+model
-      score = Math.min(40, 15 + partCount * 3);
-    } else if (make) {
-      // Recognized make, no data
-      score = 5;
-    }
-
-    // Floor: if we have any sales data, never score below 15
-    if (salesDemand.count > 0 && score < 15) score = 15;
-    else if (partCount > 0 && score < 10) score = 10;
-
-    // Vehicle color: green=pull(80+), yellow=watch(60-79), red=skip(0-39), gray=no data
-    let color = 'gray';
-    if (score >= 80) color = 'green';
-    else if (score >= 60) color = 'yellow';
-    else if (score >= 1) color = 'red';
-
-    // === BUILD PARTS LIST ===
-    // Deduplicate by partType — one entry per part type, prefer YourSale data
+    // === BUILD PARTS LIST FIRST (needed for scoring) ===
     const parts = [];
     const seenTypes = new Set();
+    const { normalizePartNumber } = require('../lib/partNumberUtils');
 
-    // YourSale part types first — these are the real signals with YOUR sold prices
+    // YourSale part types — real signals with YOUR sold prices
     for (const [partType, ptData] of Object.entries(salesDemand.partTypes)) {
       if (seenTypes.has(partType)) continue;
       seenTypes.add(partType);
 
-      // Look up stock for this specific part type+make+model
-      const ptStock = stockIndex[`${make}|${modelUpper}`] || 0;
-      const ptScore = score;
-      const verdict = ptScore >= 80 ? 'PULL' : ptScore >= 60 ? 'WATCH' : 'SKIP';
+      // Stock: check by part numbers extracted from sale titles, not by make alone
+      let ptStock = 0;
+      // Extract part numbers from the sale titles for this part type
+      const salePartNums = new Set();
+      for (const t of (ptData.titles || [])) {
+        const chrysler = t.match(/\b(\d{8})[A-Z]{2}\b/);
+        if (chrysler) salePartNums.add(chrysler[1]);
+        const toyota = t.match(/\b(\d{5}-[A-Z0-9]{3,5})/);
+        if (toyota) salePartNums.add(toyota[1]);
+        const ford = t.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{4,6})/);
+        if (ford) salePartNums.add(ford[1]);
+      }
+      // Check stock by part number match in stockPartNumbers index
+      if (salePartNums.size > 0 && stockPartNumbers) {
+        for (const spn of salePartNums) {
+          ptStock += stockPartNumbers[spn] || 0;
+        }
+      }
+
+      const verdict = ptData.count >= 3 ? 'PULL' : ptData.count >= 1 ? 'WATCH' : 'SKIP';
       parts.push({
-        itemId: null,
-        title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
-        category: null,
-        partNumber: null,
-        partType,
-        price: Math.round(ptData.avgPrice),
-        in_stock: ptStock,
-        sold_90d: ptData.count,
-        verdict,
+        itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
+        category: null, partNumber: null, partType,
+        price: Math.round(ptData.avgPrice), in_stock: ptStock,
+        sold_90d: ptData.count, verdict,
         reason: `Sold ${ptData.count}x @ $${Math.round(ptData.avgPrice)} avg`,
         deadWarning: null,
       });
     }
 
-    // Add Item-based parts only if their partType isn't already covered
+    // Item-based parts — only if partType not already covered
     const seenBasePNs = new Set();
     for (const p of matchedParts) {
       if (!p.partType || seenTypes.has(p.partType)) continue;
-      // Dedupe by base part number
-      const { normalizePartNumber } = require('../lib/partNumberUtils');
       const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
       if (basePn && seenBasePNs.has(basePn)) continue;
       if (basePn) seenBasePNs.add(basePn);
-
       seenTypes.add(p.partType);
-      const partScore = avgPrice > 0 ? Math.round((p.price / avgPrice) * score) : score;
-      const verdict = partScore >= 80 ? 'PULL' : partScore >= 60 ? 'WATCH' : 'SKIP';
+
+      // Stock: check by this specific part number
+      let ptStock = 0;
+      if (basePn && stockPartNumbers) ptStock = stockPartNumbers[basePn] || 0;
+
       parts.push({
-        itemId: p.itemId,
-        title: p.title,
-        category: p.category,
-        partNumber: p.partNumber,
-        partType: p.partType,
-        price: Math.round(salesDemand.avgPrice > 0 ? salesDemand.avgPrice : p.price),
-        in_stock: p.quantity || 0,
-        sold_90d: 0,
-        verdict,
-        reason: 'Competitor priced, no recent sales',
+        itemId: p.itemId, title: p.title, category: p.category,
+        partNumber: p.partNumber, partType: p.partType,
+        price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
+        verdict: 'SKIP',
+        reason: 'Competitor listed, check YourSale for demand',
         deadWarning: null,
       });
       if (parts.length >= 8) break;
     }
 
-    // Sort parts: highest sold count first
     parts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
 
+    // === TOTAL VALUE: sum of all part prices ===
+    const totalValue = parts.reduce((sum, p) => sum + (p.price || 0), 0);
+
+    // === SCORING: factors in part count AND total value ===
+    let score = 0;
+    const numPullableParts = parts.filter(p => p.sold_90d > 0).length;
+
+    if (salesDemand.count > 0) {
+      // Volume: up to 30 from total sales across all part types
+      const volumeScore = Math.min(30, salesDemand.count * 3);
+      // Parts breadth: up to 25 from number of different sellable part types
+      const breadthScore = Math.min(25, numPullableParts * 8);
+      // Value: up to 25 from total pull value
+      const valueScore = Math.min(25, Math.round(totalValue / 40));
+      // Price: up to 20 from avg price per part
+      const priceScore = Math.min(20, Math.round(salesDemand.avgPrice / 15));
+      score = Math.min(100, volumeScore + breadthScore + valueScore + priceScore);
+
+      // Stock penalty
+      if (stock >= 5) score = Math.round(score * 0.5);
+      else if (stock >= 3) score = Math.round(score * 0.7);
+      else if (stock >= 1) score = Math.round(score * 0.9);
+    } else if (partCount > 0) {
+      score = Math.min(30, 10 + partCount * 3);
+    } else if (make) {
+      score = 5;
+    }
+
+    if (salesDemand.count > 0 && score < 15) score = 15;
+
+    let color = 'gray';
+    if (score >= 80) color = 'green';
+    else if (score >= 60) color = 'yellow';
+    else if (score >= 1) color = 'red';
+
     return {
-      id: vehicle.id,
-      year: vehicle.year,
-      make: vehicle.make,
-      model: vehicle.model,
-      trim: vehicle.trim,
-      row_number: vehicle.row_number,
-      color: vehicle.color,
-      date_added: vehicle.date_added,
-      last_seen: vehicle.last_seen,
-      is_active: vehicle.active,
-      score,
-      color_code: color,
-      est_value: Math.round(salesDemand.count > 0 ? salesDemand.avgPrice * Math.min(Object.keys(salesDemand.partTypes).length, 5) : 0),
+      id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model,
+      trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
+      date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
+      score, color_code: color,
+      est_value: totalValue,
       matched_parts: parts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,
@@ -677,7 +694,7 @@ class AttackListService {
     const inventoryIndex = await this.buildInventoryIndex();
     const cutoff = new Date(Date.now() - (options.daysBack || 90) * 24 * 60 * 60 * 1000);
     const salesIndex = await this.buildSalesIndex(cutoff);
-    const stockIndex = await this.buildStockIndex();
+    const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
 
     // 7-day retention: show vehicles last seen within 7 days
@@ -692,10 +709,8 @@ class AttackListService {
         .limit(500);
 
       if (activeOnly) {
-        // Only vehicles confirmed in latest scrape
         vQuery = vQuery.where('active', true);
       } else {
-        // All vehicles seen within 7 days (active OR recently gone)
         vQuery = vQuery.where(function() {
           this.where('active', true)
             .orWhere('last_seen', '>=', retentionCutoff);
@@ -707,7 +722,7 @@ class AttackListService {
       if (vehicles.length === 0) continue;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
       );
       // Sort: active vehicles first, then by score descending
       scored.sort((a, b) => {

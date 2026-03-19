@@ -427,19 +427,20 @@
       </div>`;
     }
 
-    // Trim intelligence section (loads on expand)
-    if (v.trim) {
-      html += `<div class="loc-section" id="trim-${v.id}" style="margin-top:10px;">
-        <div class="loc-header">✨ Trim Parts</div>
-        <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Loading...</div>
+    // Trim + Location sections — only for 2016+ vehicles (rolling 10-year window)
+    const vYear = parseInt(v.year) || 0;
+    if (vYear >= 2016) {
+      if (v.trim) {
+        html += `<div class="loc-section" id="trim-${v.id}" style="margin-top:10px;">
+          <div class="loc-header">✨ Trim Parts</div>
+          <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Loading...</div>
+        </div>`;
+      }
+      html += `<div class="loc-section" id="loc-${v.id}">
+        <div class="loc-header">📍 Part Location</div>
+        <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Tap to load</div>
       </div>`;
     }
-
-    // Location section
-    html += `<div class="loc-section" id="loc-${v.id}">
-      <div class="loc-header">📍 Part Location</div>
-      <div style="font-size:11px;color:var(--text-muted);font-style:italic;">Tap to load</div>
-    </div>`;
 
     return html;
   }
