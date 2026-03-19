@@ -1,5 +1,7 @@
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   setPersistence,
   browserSessionPersistence,
 } from "firebase/auth";
@@ -15,9 +17,31 @@ const Login = () => {
   const history = useHistory();
   const { setUser } = useUserData();
 
+  // Handle redirect result on page load (mobile flow returns here after Google sign-in)
+  React.useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          login(result.user);
+        }
+      })
+      .catch((error) => {
+        if (error.code !== 'auth/null-user') {
+          console.log('Redirect result error:', error.message);
+        }
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   const loginWithGoogle = () => {
     setPersistence(auth, browserSessionPersistence)
       .then(() => {
+        if (isMobile) {
+          // Mobile: use redirect (popups are blocked on mobile browsers)
+          return signInWithRedirect(auth, provider);
+        }
+        // Desktop: use popup
         return signInWithPopup(auth, provider)
           .then((result) => {
             login(result.user);
