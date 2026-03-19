@@ -257,8 +257,8 @@ async function decodeVins() {
       const results = res.data?.Results || [];
       const get = (id) => { const r = results.find(x => x.VariableId === id); const v = r?.Value?.trim(); return (v && v !== '' && v !== 'Not Applicable') ? v : null; };
 
-      const disp = get(13); let engine = null;
-      if (disp) { const dn = parseFloat(disp); engine = (!isNaN(dn) ? dn.toFixed(1) : disp) + 'L'; const cyl = parseInt(get(71)); if (cyl >= 2 && cyl <= 16) engine += ' ' + cyl + '-cyl'; }
+      const disp = get(13); const rawCyl = get(71); let engine = null;
+      if (disp) { const dn = parseFloat(disp); engine = (!isNaN(dn) ? dn.toFixed(1) : disp) + 'L'; const c = parseInt(rawCyl); if (c >= 2 && c <= 16) { const lb = c <= 4 ? '4-cyl' : c === 5 ? '5-cyl' : c === 6 ? 'V6' : c === 8 ? 'V8' : c === 10 ? 'V10' : c + '-cyl'; engine += ' ' + lb; } }
       const ft = (get(24)||'').toLowerCase();
       let engineType = 'Gas';
       if (ft.includes('diesel')) engineType = 'Diesel';

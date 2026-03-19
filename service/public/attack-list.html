@@ -393,11 +393,11 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.engine ? ' ' + v.engine : ''}${v.engine_type ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
-            ${v.engine_type ? `<span class="chip chip-age ${v.engine_type === 'Gas' ? 'age-old' : v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
+            ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age ${v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
             ${v.drivetrain ? `<span class="chip chip-age age-recent" style="font-size:9px;font-weight:700">${v.drivetrain}</span>` : ''}
             ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>

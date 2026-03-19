@@ -645,30 +645,37 @@ class AttackListService {
     const vDrivetrain = (vehicle.drivetrain || '').toUpperCase();
     const vEngineType = (vehicle.engine_type || '').toUpperCase();
 
+    const vEngine = (vehicle.engine || '').toUpperCase();
+
     const filteredParts = parts.filter(p => {
       const title = (p.title || '').toUpperCase();
 
-      // Hybrid filter: don't show hybrid parts on gas vehicles
+      // Fuel type filters
       if (vEngineType === 'GAS' || vEngineType === '') {
         if (title.includes('HYBRID') && !title.includes('NON-HYBRID') && !title.includes('NON HYBRID')) return false;
-      }
-      // Gas filter: don't show gas-only parts on hybrid/diesel vehicles
-      if (vEngineType === 'HYBRID' || vEngineType === 'DIESEL') {
-        // Only filter if part title explicitly says "GAS ONLY" — most parts fit both
-      }
-      // Diesel filter: don't show diesel parts on gas vehicles
-      if (vEngineType === 'GAS' || vEngineType === '') {
         if (title.includes('DIESEL') || title.includes('CUMMINS') || title.includes('DURAMAX') || title.includes('POWERSTROKE')) return false;
       }
 
-      // Drivetrain filter for ABS modules (these are drivetrain-specific)
-      if (p.partType === 'ABS' && vDrivetrain) {
+      // Drivetrain filter (applies to all drivetrain-specific parts, not just ABS)
+      if (vDrivetrain) {
         if (vDrivetrain === '2WD' || vDrivetrain === 'FWD' || vDrivetrain === 'RWD') {
           if (title.includes('4WD') || title.includes('4X4') || title.includes('AWD')) return false;
         }
         if (vDrivetrain === '4WD' || vDrivetrain === 'AWD') {
           if (title.includes('2WD') || (title.includes('FWD') && !title.includes('4WD'))) return false;
         }
+      }
+
+      // Engine size mismatch filter — V6 parts shouldn't match V8 vehicles and vice versa
+      if (vEngine) {
+        const vIsV6 = vEngine.includes('V6') || vEngine.includes('4-CYL') || /\b(3\.[0-7]|2\.[0-9]|4\.0)L/.test(vEngine);
+        const vIsV8 = vEngine.includes('V8') || /\b(4\.[6-9]|5\.[0-9]|6\.[0-9])L/.test(vEngine);
+        const pHasV6 = title.includes('V6') || title.includes('3.6L') || title.includes('3.5L') || title.includes('4.0L') || title.includes('3.0L') || title.includes('2.4L') || title.includes('2.5L');
+        const pHasV8 = title.includes('V8') || title.includes('5.7L') || title.includes('5.0L') || title.includes('4.6L') || title.includes('5.3L') || title.includes('6.0L') || title.includes('6.2L') || title.includes('HEMI') || title.includes(' GT ');
+        // V6 vehicle + V8 part = mismatch
+        if (vIsV6 && pHasV8 && !pHasV6) return false;
+        // V8 vehicle + V6 part = mismatch
+        if (vIsV8 && pHasV6 && !pHasV8) return false;
       }
 
       return true;

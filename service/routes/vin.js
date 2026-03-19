@@ -6,6 +6,18 @@ const { database } = require('../database/database');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 
+function formatEngineStr(displacement, cylinders) {
+  if (!displacement) return null;
+  const d = parseFloat(displacement);
+  let e = (!isNaN(d) ? d.toFixed(1) : displacement) + 'L';
+  const c = parseInt(cylinders);
+  if (c >= 2 && c <= 16) {
+    const label = c <= 4 ? '4-cyl' : c === 5 ? '5-cyl' : c === 6 ? 'V6' : c === 8 ? 'V8' : c === 10 ? 'V10' : c === 12 ? 'V12' : c + '-cyl';
+    e += ' ' + label;
+  }
+  return e;
+}
+
 // Multer-free: read raw body as base64 from multipart form data
 // Assumption: body-parser is configured with 50mb limit in index.js
 
@@ -233,21 +245,7 @@ router.post('/scan', async (req, res) => {
 
       const displacement = get(13);
       const cylinders = get(71);
-      let engine = null;
-      if (displacement) {
-        // Round displacement to 1 decimal: "1.589545208" → "1.6L"
-        const dispNum = parseFloat(displacement);
-        if (!isNaN(dispNum)) {
-          engine = dispNum.toFixed(1) + 'L';
-        } else {
-          engine = displacement.includes('L') ? displacement : displacement + 'L';
-        }
-        // Cylinders: only append if it's a reasonable number (not hp)
-        if (cylinders) {
-          const cylNum = parseInt(cylinders);
-          if (cylNum >= 2 && cylNum <= 16) engine += ' ' + cylNum + '-cyl';
-        }
-      }
+      const engine = formatEngineStr(displacement, cylinders);
 
       const fuelType = get(24);
       let engineType = 'Gas';

@@ -5,6 +5,23 @@ const { database } = require('../database/database');
 const axios = require('axios');
 
 /**
+ * Format engine from NHTSA displacement + cylinder count.
+ * "3.211864544" + "6" → "3.2L V6"
+ * "4.0" + "210" → "4.0L" (210 is hp, not cyl — dropped)
+ */
+function formatEngine(displacement, cylinders) {
+  if (!displacement) return null;
+  const dispNum = parseFloat(displacement);
+  let engine = (!isNaN(dispNum) ? dispNum.toFixed(1) : displacement) + 'L';
+  const cylNum = parseInt(cylinders);
+  if (cylNum >= 2 && cylNum <= 16) {
+    const cylLabel = cylNum <= 4 ? '4-cyl' : cylNum === 5 ? '5-cyl' : cylNum === 6 ? 'V6' : cylNum === 8 ? 'V8' : cylNum === 10 ? 'V10' : cylNum === 12 ? 'V12' : cylNum + '-cyl';
+    engine += ' ' + cylLabel;
+  }
+  return engine;
+}
+
+/**
  * VinDecodeService — Decode VINs via NHTSA API with caching.
  * Same VIN never decoded twice (vin_cache table).
  */
@@ -65,13 +82,7 @@ class VinDecodeService {
 
     const displacement = get(13); // Displacement (L)
     const cylinders = get(71);    // Cylinders
-    let engine = null;
-    if (displacement) {
-      const dispNum = parseFloat(displacement);
-      engine = (!isNaN(dispNum) ? dispNum.toFixed(1) : displacement) + 'L';
-      const cylNum = parseInt(cylinders);
-      if (cylNum >= 2 && cylNum <= 16) engine += ' ' + cylNum + '-cyl';
-    }
+    let engine = formatEngine(displacement, cylinders);
 
     const fuelType = get(24);     // Fuel Type
     let engineType = 'Gas';
