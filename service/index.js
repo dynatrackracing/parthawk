@@ -326,7 +326,7 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
   const { v4: uuidv4 } = require('uuid');
   try {
     const MAKES = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Mazda','Mercedes-Benz','Mercury','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Subaru','Suzuki','Toyota','Volkswagen','Volvo'];
-    const STOP = new Set(['ECU','ECM','PCM','BCM','TCM','ABS','TIPM','OEM','NEW','USED','REMAN','Engine','Body','Control','Module','Anti','Fuse','Power','Brake','Amplifier','Radio','Cluster','Steering','Throttle','Programmed','Plug','Play','AT','MT','4WD','AWD','2WD','FWD','RWD']);
+    const STOP = new Set(['ECU','ECM','PCM','BCM','TCM','ABS','TIPM','OEM','NEW','USED','REMAN','Engine','Body','Control','Module','Anti','Fuse','Power','Brake','Amplifier','Radio','Cluster','Steering','Throttle','Programmed','Plug','Play','AT','MT','4WD','AWD','2WD','FWD','RWD','EX','LX','DX','SE','LE','XLE','SXT','RT','GT','LT','LS','SS','SL','SV','SR','SR5','Limited','Sport','Base','Touring','Laredo','Overland','Trailhawk','Sahara','Rubicon','Premium','Platinum','Hybrid','Diesel','Hemi','Turbo','Supercharged','Sedan','Coupe','Hatchback','Wagon','Van','Cab','Crew','Access','Double','Regular','Extended','SuperCrew','SuperCab','Short','Long','Bed','4dr','2dr','V6','V8','Dodge','Chrysler','Jeep','Ford','Chevy','Toyota','Honda','Nissan','Kia','Hyundai','Lincoln','Mercury','Mazda','Subaru','BMW','Audi','Acura','Lexus','Infiniti','GMC','Buick','Cadillac','Saturn','Pontiac','Volvo','VW','Volkswagen','Mini','Scion','Ram','Mitsubishi','Isuzu','Suzuki','Fiat','Jaguar','Porsche','Saab','Genesis','Hummer','Land','Rover','Oldsmobile']);
 
     // Load all existing Auto year+make+model
     const existing = new Set();
@@ -356,14 +356,22 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
       if (make === 'Chevy') make = 'Chevrolet';
       if (make === 'VW') make = 'Volkswagen';
 
-      // Extract model: first 1-2 words after make, before any stop word or engine spec
+      // Extract model: words after make, before stop word/engine/year
+      // Keep compound models (Grand Cherokee, CR-V, Ram 1500) but stop at trims
+      const COMPOUNDS = new Set(['GRAND','TOWN','LAND']);
       const makeIdx = tu.indexOf(make.toUpperCase());
       const after = t.substring(makeIdx + make.length).trim().split(/\s+/);
       const mw = [];
       for (const w of after) {
-        if (/^\d{4}/.test(w) || /^\d+\.\d+[lL]/.test(w)) break;
-        if (STOP.has(w) || STOP.has(w.replace(/[^A-Za-z]/g,''))) break;
-        mw.push(w.replace(/[^A-Za-z0-9\-]/g, ''));
+        const clean = w.replace(/[^A-Za-z0-9\-]/g, '');
+        if (/^\d{4}$/.test(clean) || /^\d+\.\d+[lL]?$/.test(clean)) break;
+        if (STOP.has(clean) || STOP.has(clean.toUpperCase())) break;
+        mw.push(clean);
+        // Only take 2nd word if first is a compound prefix (Grand, Town, Land)
+        if (mw.length === 1 && COMPOUNDS.has(clean.toUpperCase())) continue;
+        // Also keep 2nd word if it's a number (Ram 1500, F-150)
+        if (mw.length === 2 && /^\d/.test(clean)) break;
+        if (mw.length >= 1 && !COMPOUNDS.has(mw[0].toUpperCase())) break;
         if (mw.length >= 2) break;
       }
       if (mw.length === 0 || mw[0].length < 2) continue;
@@ -389,6 +397,20 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
       } catch (e) { errors++; }
     }
 
+    // Cleanup: delete bad entries from previous backfill (multi-word non-compound models)
+    const VALID_COMPOUNDS = new Set(['Grand Cherokee','Grand Caravan','Grand Prix','Town & Country','Town Country','Land Cruiser','Ram 1500','Ram 2500','Ram 3500','CR-V','CX-5','CX-9','HR-V','RAV4','4Runner','F-150','F-250','F-350','Super Duty','Monte Carlo','Park Avenue','El Camino','Trans Am','Le Sabre']);
+    let cleaned = 0;
+    try {
+      const allAutos = await database('Auto').where('engine', 'N/A').select('id', 'model');
+      for (const a of allAutos) {
+        if (a.model && a.model.includes(' ') && !VALID_COMPOUNDS.has(a.model)) {
+          // Multi-word model that's not a known compound — delete it
+          await database('Auto').where('id', a.id).delete();
+          cleaned++;
+        }
+      }
+    } catch (e) { /* ignore cleanup errors */ }
+
     const afterCount = await database('Auto').count('* as cnt').first();
 
     res.json({
@@ -398,6 +420,7 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
       parsed: toInsert.size,
       inserted,
       errors,
+      cleaned,
       sample: [...toInsert.values()].slice(0, 20),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
