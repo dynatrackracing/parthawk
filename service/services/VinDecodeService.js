@@ -67,8 +67,10 @@ class VinDecodeService {
     const cylinders = get(71);    // Cylinders
     let engine = null;
     if (displacement) {
-      engine = displacement.includes('L') ? displacement : displacement + 'L';
-      if (cylinders) engine += ' ' + cylinders + 'cyl';
+      const dispNum = parseFloat(displacement);
+      engine = (!isNaN(dispNum) ? dispNum.toFixed(1) : displacement) + 'L';
+      const cylNum = parseInt(cylinders);
+      if (cylNum >= 2 && cylNum <= 16) engine += ' ' + cylNum + '-cyl';
     }
 
     const fuelType = get(24);     // Fuel Type

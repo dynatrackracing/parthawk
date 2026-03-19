@@ -230,8 +230,18 @@ router.post('/scan', async (req, res) => {
       const cylinders = get(71);
       let engine = null;
       if (displacement) {
-        engine = displacement.includes('L') ? displacement : displacement + 'L';
-        if (cylinders) engine += ' ' + cylinders + 'cyl';
+        // Round displacement to 1 decimal: "1.589545208" → "1.6L"
+        const dispNum = parseFloat(displacement);
+        if (!isNaN(dispNum)) {
+          engine = dispNum.toFixed(1) + 'L';
+        } else {
+          engine = displacement.includes('L') ? displacement : displacement + 'L';
+        }
+        // Cylinders: only append if it's a reasonable number (not hp)
+        if (cylinders) {
+          const cylNum = parseInt(cylinders);
+          if (cylNum >= 2 && cylNum <= 16) engine += ' ' + cylNum + '-cyl';
+        }
       }
 
       const fuelType = get(24);
@@ -369,7 +379,7 @@ router.post('/scan', async (req, res) => {
         log.warn({ err: e.message, make, model }, 'VIN scan: YourListing query failed');
       }
 
-      // 2c: Item table — competitor/reference (direct ILIKE on title for broad match)
+      // 2c: Item table — competitor/reference, separated by rebuild vs used
       try {
         let items = [];
         // Try Auto join first (exact year match)
@@ -381,7 +391,7 @@ router.post('/scan', async (req, res) => {
             .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
             .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
             .where('Item.price', '>', 0)
-            .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber')
+            .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
             .limit(200);
         }
         // Fallback: direct title search on Item table
@@ -390,33 +400,39 @@ router.post('/scan', async (req, res) => {
             .where('price', '>', 0)
             .whereRaw('"title" ILIKE ?', [`%${make}%`])
             .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
-            .select('title', 'price', 'seller', 'manufacturerPartNumber')
+            .select('title', 'price', 'seller', 'manufacturerPartNumber', 'isRepair')
             .limit(200);
         }
 
         const byType = {};
         for (const item of items) {
           const pt = detectPartTypeForVin(item.title);
-          if (!byType[pt]) byType[pt] = { partType: pt, count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [] };
-          byType[pt].count++;
-          byType[pt].totalPrice += parseFloat(item.price) || 0;
-          if (item.seller) byType[pt].sellers.add(item.seller);
-          if (item.manufacturerPartNumber && byType[pt].partNumbers.length < 5) {
-            byType[pt].partNumbers.push(item.manufacturerPartNumber);
+          const isRebuild = item.seller === 'pro-rebuild' || item.isRepair === true;
+          const key = pt + (isRebuild ? '_rebuild' : '');
+          if (!byType[key]) byType[key] = { partType: pt, count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [], isRebuild };
+          byType[key].count++;
+          byType[key].totalPrice += parseFloat(item.price) || 0;
+          if (item.seller) byType[key].sellers.add(item.seller);
+          if (item.manufacturerPartNumber && byType[key].partNumbers.length < 5) {
+            byType[key].partNumbers.push(item.manufacturerPartNumber);
           }
         }
-        for (const [pt, data] of Object.entries(byType)) {
+        for (const [key, data] of Object.entries(byType)) {
           const avg = data.count > 0 ? Math.round(data.totalPrice / data.count) : 0;
           marketRef.push({
-            partType: pt, count: data.count, avgPrice: avg,
+            partType: data.partType, count: data.count, avgPrice: avg,
             sellers: [...data.sellers].slice(0, 5),
             partNumbers: [...new Set(data.partNumbers)].slice(0, 5),
+            isRebuild: data.isRebuild,
             color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
           });
         }
-        marketRef.sort((a, b) => b.avgPrice - a.avgPrice);
+        marketRef.sort((a, b) => {
+          if (a.isRebuild !== b.isRebuild) return a.isRebuild ? 1 : -1;
+          return b.avgPrice - a.avgPrice;
+        });
       } catch (e) {
-        log.warn({ err: e.message, make, model }, 'VIN scan: Item query failed');
+        log.warn({ err: e.message, make, baseModel }, 'VIN scan: Item query failed');
       }
     }
 
