@@ -240,89 +240,34 @@ app.get('/api/debug/full', async (req, res) => {
   res.json(results);
 });
 
-// Debug endpoint — table verification and data access check
+// Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
+  const { database } = require('./database/database');
+  const R = {};
+  const q = async (k, sql) => { try { const r = await database.raw(sql); R[k] = r.rows || r; } catch(e) { R[k] = {ERROR: e.message}; } };
   try {
-    const { database } = require('./database/database');
-
-    const tables = [
-      'Auto', 'AutoItemCompatibility', 'Item',
-      'YourSale', 'YourListing',
-      'yard', 'yard_vehicle', 'vin_cache', 'vin_scan_log',
-      'market_demand_cache', 'fitment_data',
-      'platform_group', 'platform_vehicle', 'platform_shared_part',
-    ];
-
-    const counts = {};
-    for (const t of tables) {
-      try {
-        const r = await database(t).count('* as cnt').first();
-        counts[t] = parseInt(r?.cnt || 0);
-      } catch (e) { counts[t] = 'ERROR: ' + e.message.substring(0, 60); }
-    }
-
-    // YourSale verification: 180-day count + sample
-    let yourSale180d = 0, saleSamples = [];
-    try {
-      const cutoff = new Date(Date.now() - 180 * 86400000);
-      const r = await database('YourSale').where('soldDate', '>=', cutoff).count('* as cnt').first();
-      yourSale180d = parseInt(r?.cnt || 0);
-      saleSamples = await database('YourSale')
-        .select('title', 'salePrice', 'soldDate', 'sku')
-        .orderBy('soldDate', 'desc').limit(5);
-    } catch (e) { saleSamples = [{ error: e.message }]; }
-
-    // YourListing verification: active count + sample
-    let activeListings = 0, listingSamples = [];
-    try {
-      const r = await database('YourListing').where('listingStatus', 'Active').count('* as cnt').first();
-      activeListings = parseInt(r?.cnt || 0);
-      listingSamples = await database('YourListing')
-        .where('listingStatus', 'Active')
-        .select('title', 'currentPrice', 'sku', 'quantityAvailable')
-        .limit(3);
-    } catch (e) { listingSamples = [{ error: e.message }]; }
-
-    // Column schema for YourSale and YourListing
-    let saleColumns = [], listingColumns = [];
-    try {
-      const sc = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourSale' ORDER BY ordinal_position");
-      saleColumns = (sc.rows || sc).map(r => r.column_name + ':' + r.data_type);
-    } catch (e) { saleColumns = [e.message]; }
-    try {
-      const lc = await database.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourListing' ORDER BY ordinal_position");
-      listingColumns = (lc.rows || lc).map(r => r.column_name + ':' + r.data_type);
-    } catch (e) { listingColumns = [e.message]; }
-
-    // Yard vehicle makes + samples
-    let yardMakes = [], yardSamples = [];
-    try { yardMakes = (await database('yard_vehicle').where('active', true).distinct('make').orderBy('make')).map(r => r.make); } catch (e) {}
-    try { yardSamples = await database('yard_vehicle').select('year','make','model','vin','color','row_number','active','engine','engine_type','drivetrain','trim_level','vin_decoded').limit(3); } catch (e) { yardSamples = [{error: e.message}]; }
-
-    // Dashboard stats verification (90-day)
-    let dashboardStats = {};
-    try {
-      const cutoff90 = new Date(Date.now() - 90 * 86400000);
-      const stats = await database('YourSale').where('soldDate', '>=', cutoff90)
-        .select(database.raw('COUNT(*) as sold'), database.raw('COALESCE(SUM("salePrice"), 0) as revenue'), database.raw('ROUND(AVG("salePrice"), 2) as avg_price'));
-      dashboardStats = stats[0] || {};
-    } catch (e) { dashboardStats = { error: e.message }; }
-
-    res.json({
-      table_counts: counts,
-      YourSale_last180d: yourSale180d,
-      YourListing_active: activeListings,
-      YourSale_columns: saleColumns,
-      YourListing_columns: listingColumns,
-      recent_sales: saleSamples,
-      active_listing_samples: listingSamples,
-      yard_vehicle_makes: yardMakes,
-      yard_vehicle_samples: yardSamples,
-      dashboard_stats_90d: dashboardStats,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    await q('all_tables', "SELECT tablename, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC");
+    await q('yard_vehicle_schema', "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'yard_vehicle' ORDER BY ordinal_position");
+    await q('yard_vehicle_sample', "SELECT * FROM yard_vehicle ORDER BY scraped_at DESC LIMIT 3");
+    await q('yard_vehicle_vin_status', "SELECT COUNT(*) as total, COUNT(vin) as has_vin, SUM(CASE WHEN vin_decoded = true THEN 1 ELSE 0 END) as decoded FROM yard_vehicle");
+    await q('your_sale_schema', "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourSale' ORDER BY ordinal_position");
+    await q('your_sale_90d', "SELECT COUNT(*) as count, ROUND(SUM(\"salePrice\"::numeric), 2) as revenue, ROUND(AVG(\"salePrice\"::numeric), 2) as avg_price FROM \"YourSale\" WHERE \"soldDate\" >= NOW() - INTERVAL '90 days'");
+    await q('your_sale_180d', "SELECT COUNT(*) as count FROM \"YourSale\" WHERE \"soldDate\" >= NOW() - INTERVAL '180 days'");
+    await q('your_sale_sample', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE title IS NOT NULL ORDER BY \"soldDate\" DESC LIMIT 3");
+    await q('your_listing_schema', "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'YourListing' ORDER BY ordinal_position");
+    await q('your_listing_active', "SELECT COUNT(*) as count FROM \"YourListing\" WHERE \"listingStatus\" = 'Active'");
+    await q('your_listing_sample', "SELECT title, \"currentPrice\", \"quantityAvailable\", sku FROM \"YourListing\" WHERE \"listingStatus\" = 'Active' LIMIT 3");
+    await q('item_schema', "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'Item' ORDER BY ordinal_position");
+    await q('item_sample', "SELECT title, price, seller, \"manufacturerPartNumber\" FROM \"Item\" LIMIT 3");
+    await q('platform_counts', "SELECT (SELECT COUNT(*) FROM platform_group) as groups, (SELECT COUNT(*) FROM platform_vehicle) as vehicles, (SELECT COUNT(*) FROM platform_shared_part) as shared_parts");
+    await q('platform_sample', "SELECT pg.name, pg.platform, pg.year_start, pg.year_end FROM platform_group pg LIMIT 5");
+    await q('mustang_sales', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE title ILIKE '%mustang%' ORDER BY \"soldDate\" DESC LIMIT 5");
+    await q('mustang_stock', "SELECT title, \"currentPrice\", \"quantityAvailable\" FROM \"YourListing\" WHERE title ILIKE '%mustang%' AND \"listingStatus\" = 'Active' LIMIT 5");
+    await q('dodge_ram_sales_90d', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE title ILIKE '%dodge%' AND title ILIKE '%ram%' AND \"soldDate\" >= NOW() - INTERVAL '90 days' ORDER BY \"soldDate\" DESC LIMIT 5");
+    await q('auto_sample', "SELECT year, make, model, engine FROM \"Auto\" LIMIT 5");
+    await q('auto_item_join', "SELECT a.year, a.make, a.model, i.title, i.price FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON a.id = aic.\"autoId\" JOIN \"Item\" i ON aic.\"itemId\" = i.id LIMIT 5");
+    res.json(R);
+  } catch(e) { res.status(500).json({error: e.message, stack: e.stack}); }
 });
 
 
