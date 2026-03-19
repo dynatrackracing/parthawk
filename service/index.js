@@ -320,6 +320,89 @@ app.post('/api/admin/fix-engines', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// One-time: backfill Auto table from YourSale titles
+app.post('/api/admin/backfill-auto', async (req, res) => {
+  const { database } = require('./database/database');
+  const { v4: uuidv4 } = require('uuid');
+  try {
+    const MAKES = ['Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Fiat','Ford','Genesis','GMC','Honda','Hummer','Hyundai','Infiniti','Isuzu','Jaguar','Jeep','Kia','Land Rover','Lexus','Lincoln','Mazda','Mercedes-Benz','Mercury','Mini','Mitsubishi','Nissan','Oldsmobile','Pontiac','Porsche','Ram','Saab','Saturn','Scion','Subaru','Suzuki','Toyota','Volkswagen','Volvo'];
+    const STOP = new Set(['ECU','ECM','PCM','BCM','TCM','ABS','TIPM','OEM','NEW','USED','REMAN','Engine','Body','Control','Module','Anti','Fuse','Power','Brake','Amplifier','Radio','Cluster','Steering','Throttle','Programmed','Plug','Play','AT','MT','4WD','AWD','2WD','FWD','RWD']);
+
+    // Load all existing Auto year+make+model
+    const existing = new Set();
+    const autos = await database('Auto').select('year','make','model');
+    for (const a of autos) existing.add(`${a.year}|${a.make}|${a.model}`);
+    const beforeCount = existing.size;
+
+    // Parse YourSale titles
+    const sales = await database('YourSale').whereNotNull('title').select('title');
+    const toInsert = new Map(); // key → {year, make, model}
+
+    for (const sale of sales) {
+      const t = sale.title || '';
+      // Extract year
+      const ym = t.match(/\b((?:19|20)\d{2})\b/);
+      if (!ym) continue;
+      const year = parseInt(ym[1]);
+      if (year < 1990 || year > 2030) continue;
+
+      // Extract make
+      const tu = t.toUpperCase();
+      let make = null;
+      for (const mk of MAKES) {
+        if (tu.includes(mk.toUpperCase())) { make = mk; break; }
+      }
+      if (!make) continue;
+      if (make === 'Chevy') make = 'Chevrolet';
+      if (make === 'VW') make = 'Volkswagen';
+
+      // Extract model: first 1-2 words after make, before any stop word or engine spec
+      const makeIdx = tu.indexOf(make.toUpperCase());
+      const after = t.substring(makeIdx + make.length).trim().split(/\s+/);
+      const mw = [];
+      for (const w of after) {
+        if (/^\d{4}/.test(w) || /^\d+\.\d+[lL]/.test(w)) break;
+        if (STOP.has(w) || STOP.has(w.replace(/[^A-Za-z]/g,''))) break;
+        mw.push(w.replace(/[^A-Za-z0-9\-]/g, ''));
+        if (mw.length >= 2) break;
+      }
+      if (mw.length === 0 || mw[0].length < 2) continue;
+      let model = mw.join(' ').trim();
+      if (model.length < 2 || model.length > 30) continue;
+
+      const key = `${year}|${make}|${model}`;
+      if (!existing.has(key) && !toInsert.has(key)) {
+        toInsert.set(key, { year: String(year), make, model });
+      }
+    }
+
+    // Batch insert
+    let inserted = 0, errors = 0;
+    for (const [key, v] of toInsert) {
+      try {
+        // Double-check not exists (race condition safety)
+        const ex = await database('Auto').where({ year: v.year, make: v.make, model: v.model }).first();
+        if (!ex) {
+          await database('Auto').insert({ id: uuidv4(), year: v.year, make: v.make, model: v.model, trim: '', engine: 'N/A', createdAt: new Date(), updatedAt: new Date() });
+          inserted++;
+        }
+      } catch (e) { errors++; }
+    }
+
+    const afterCount = await database('Auto').count('* as cnt').first();
+
+    res.json({
+      success: true,
+      before: beforeCount,
+      after: parseInt(afterCount?.cnt || 0),
+      parsed: toInsert.size,
+      inserted,
+      errors,
+      sample: [...toInsert.values()].slice(0, 20),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
   const { database } = require('./database/database');
