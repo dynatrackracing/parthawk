@@ -376,10 +376,13 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span>${v.color}</span>` : ''}
+            ${v.engine ? `<span>${v.engine}</span>` : ''}
+            ${v.drivetrain ? `<span class="chip chip-age age-recent" style="font-size:9px">${v.drivetrain}</span>` : ''}
+            ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age age-old" style="font-size:9px">${v.engine_type}</span>` : ''}
             ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>
           <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>

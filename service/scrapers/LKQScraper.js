@@ -91,17 +91,23 @@ class LKQScraper {
           .where('yard_id', yard.id).where('year', v.year)
           .where('make', v.make).where('model', v.model).first();
         if (existing) {
-          await database('yard_vehicle').where('id', existing.id).update({
-            trim: v.trim || null, color: v.color || null, row_number: v.row || null,
-            date_added: v.dateAdded || null, active: true,
+          const upd = {
+            trim: v.trim || existing.trim, color: v.color || existing.color,
+            row_number: v.row || existing.row_number,
+            date_added: v.dateAdded || existing.date_added, active: true,
             last_seen: now, scraped_at: now, updatedAt: now,
-          });
+          };
+          // Preserve VIN and stock_number if already set, update if new
+          if (v.vin && v.vin.length >= 11) upd.vin = v.vin;
+          if (v.stockNumber) upd.stock_number = v.stockNumber;
+          await database('yard_vehicle').where('id', existing.id).update(upd);
           updated++;
         } else {
           await database('yard_vehicle').insert({
             id: uuidv4(), yard_id: yard.id, year: v.year, make: v.make, model: v.model,
             trim: v.trim || null, color: v.color || null, row_number: v.row || null,
-            vin: v.vin || null, date_added: v.dateAdded || null,
+            vin: v.vin || null, stock_number: v.stockNumber || null,
+            date_added: v.dateAdded || null,
             active: true, first_seen: now, last_seen: now,
             scraped_at: now, createdAt: now, updatedAt: now,
           });
@@ -118,6 +124,16 @@ class LKQScraper {
 
     await database('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
     this.log.info({ location: location.name, total: vehicles.length, inserted, updated }, 'Complete');
+
+    // Decode VINs in background (non-blocking)
+    try {
+      const VinDecodeService = require('../services/VinDecodeService');
+      const vinService = new VinDecodeService();
+      vinService.decodeAllUndecoded().catch(err => {
+        this.log.warn({ err: err.message }, 'VIN decode batch failed');
+      });
+    } catch (e) { /* ignore */ }
+
     return { location: location.name, success: true, total: vehicles.length, inserted, updated };
   }
 

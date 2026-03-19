@@ -43,6 +43,18 @@ app.get('/admin/restock', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
 });
 
+// Decode all undecoded VINs in yard_vehicle
+app.post('/api/decode-vins', async (req, res) => {
+  try {
+    const VinDecodeService = require('./services/VinDecodeService');
+    const service = new VinDecodeService();
+    const result = await service.decodeAllUndecoded();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Build scrape queue from sales data
 app.post('/api/build-scrape-queue', async (req, res) => {
   try {
