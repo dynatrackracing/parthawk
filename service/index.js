@@ -411,6 +411,33 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
       }
     } catch (e) { /* ignore cleanup errors */ }
 
+    // Direct insert of commonly missing vehicles
+    const MISSING = [
+      ['Honda','Civic'],['Honda','Accord'],['Honda','Odyssey'],['Honda','Prelude'],['Honda','Element'],['Honda','Fit'],['Honda','Pilot'],
+      ['Toyota','Camry'],['Toyota','Corolla'],['Toyota','Tacoma'],['Toyota','Tundra'],['Toyota','4Runner'],['Toyota','Sienna'],['Toyota','Highlander'],['Toyota','Matrix'],['Toyota','Prius'],['Toyota','Avalon'],['Toyota','Celica'],
+      ['Nissan','Altima'],['Nissan','Maxima'],['Nissan','Sentra'],['Nissan','Pathfinder'],['Nissan','Frontier'],['Nissan','Xterra'],['Nissan','Murano'],['Nissan','Rogue'],['Nissan','Versa'],['Nissan','Quest'],
+      ['Ford','Mustang'],['Ford','Explorer'],['Ford','Expedition'],['Ford','Ranger'],['Ford','Focus'],['Ford','Taurus'],['Ford','Escape'],['Ford','Crown Victoria'],
+      ['Chevrolet','Impala'],['Chevrolet','Malibu'],['Chevrolet','Cruze'],['Chevrolet','Cobalt'],['Chevrolet','Cavalier'],['Chevrolet','Monte Carlo'],['Chevrolet','Blazer'],['Chevrolet','TrailBlazer'],['Chevrolet','Colorado'],
+      ['Dodge','Durango'],['Dodge','Dakota'],['Dodge','Neon'],['Dodge','Stratus'],['Dodge','Intrepid'],['Dodge','Caravan'],
+      ['Hyundai','Elantra'],['Hyundai','Sonata'],['Hyundai','Tucson'],['Hyundai','Santa Fe'],['Hyundai','Accent'],
+      ['Kia','Optima'],['Kia','Sorento'],['Kia','Sportage'],['Kia','Soul'],['Kia','Forte'],['Kia','Rio'],
+    ];
+    let directInserted = 0;
+    for (const [mk, md] of MISSING) {
+      for (let yr = 1995; yr <= 2025; yr++) {
+        const key = `${yr}|${mk}|${md}`;
+        if (!existing.has(key)) {
+          try {
+            const ex = await database('Auto').where({ year: String(yr), make: mk, model: md }).first();
+            if (!ex) {
+              await database('Auto').insert({ id: uuidv4(), year: String(yr), make: mk, model: md, trim: '', engine: 'N/A', createdAt: new Date(), updatedAt: new Date() });
+              directInserted++;
+            }
+          } catch (e) { /* dup */ }
+        }
+      }
+    }
+
     // Flush the cache so dropdowns show new data immediately
     try {
       const CacheManager = require('./middleware/CacheManager');
