@@ -569,18 +569,18 @@ function extractBaseModel(model) {
 
 function detectPartTypeForVin(title) {
   const t = (title || '').toUpperCase();
-  if (t.includes('ECM') || t.includes('ECU') || t.includes('PCM') || t.includes('ENGINE CONTROL')) return 'ECM';
-  if (t.includes('BCM') || t.includes('BODY CONTROL')) return 'BCM';
   if (t.includes('TCM') || t.includes('TCU') || t.includes('TRANSMISSION CONTROL')) return 'TCM';
-  if (t.includes('ABS') || t.includes('ANTI LOCK') || t.includes('BRAKE MODULE')) return 'ABS';
-  if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX')) return 'TIPM';
-  if (t.includes('AMPLIFIER') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE')) return 'AMP';
-  if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT')) return 'CLUSTER';
-  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT')) return 'RADIO';
-  if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
+  if (t.includes('BCM') || t.includes('BODY CONTROL')) return 'BCM';
+  if (t.includes('ECM') || t.includes('ECU') || t.includes('PCM') || t.includes('ENGINE CONTROL') || t.includes('ENGINE COMPUTER')) return 'ECM';
+  if (t.includes('ABS') || t.includes('ANTI LOCK') || t.includes('ANTI-LOCK') || t.includes('BRAKE MODULE')) return 'ABS';
+  if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX') || t.includes('IPDM')) return 'TIPM';
+  if (t.includes('AMPLIFIER') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE') || t.includes('JBL')) return 'AMP';
+  if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT') || t.includes('GAUGE')) return 'CLUSTER';
+  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO')) return 'RADIO';
   if (t.includes('THROTTLE')) return 'THROTTLE';
-  if (t.includes('STEERING')) return 'STEERING';
+  if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
   if (t.includes('TRANSFER CASE')) return 'XFER CASE';
+  if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
   if (t.includes('MIRROR')) return 'MIRROR';
   return 'OTHER';
 }

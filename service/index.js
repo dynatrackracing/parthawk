@@ -267,6 +267,57 @@ app.post('/api/admin/dedup-sales', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Re-format engine strings for already-decoded vehicles (fix "210cyl" → "V6")
+// Also retry decoding for failed VINs
+app.post('/api/admin/fix-engines', async (req, res) => {
+  const { database } = require('./database/database');
+  try {
+    // Step 1: Fix engine strings in existing decoded vehicles using vin_cache
+    const decoded = await database('yard_vehicle')
+      .where('vin_decoded', true)
+      .whereNotNull('vin')
+      .select('id', 'vin', 'engine');
+
+    let fixed = 0, cacheHits = 0;
+    for (const v of decoded) {
+      // Check if engine has raw NHTSA format (contains long decimals or raw cyl count)
+      if (v.engine && (/\d{3}cyl/.test(v.engine) || /\.\d{2,}L/.test(v.engine))) {
+        // Look up vin_cache for raw NHTSA data to re-parse
+        try {
+          const cached = await database('vin_cache').where('vin', v.vin.trim().toUpperCase()).first();
+          if (cached && cached.raw_nhtsa) {
+            let results;
+            try { results = JSON.parse(cached.raw_nhtsa); } catch(e) { continue; }
+            if (!Array.isArray(results)) continue;
+            const get = (varId) => { const r = results.find(x => x.VariableId === varId); const val = r?.Value?.trim(); return (val && val !== '' && val !== 'Not Applicable') ? val : null; };
+            const disp = get(13), cyl = get(71);
+            if (disp) {
+              const dn = parseFloat(disp);
+              let eng = (!isNaN(dn) ? dn.toFixed(1) : disp) + 'L';
+              const cn = parseInt(cyl);
+              if (cn >= 2 && cn <= 16) {
+                const lb = cn <= 4 ? '4-cyl' : cn === 5 ? '5-cyl' : cn === 6 ? 'V6' : cn === 8 ? 'V8' : cn === 10 ? 'V10' : cn === 12 ? 'V12' : cn + '-cyl';
+                eng += ' ' + lb;
+              }
+              await database('yard_vehicle').where('id', v.id).update({ engine: eng.substring(0, 50), updatedAt: new Date() });
+              fixed++;
+            }
+            cacheHits++;
+          }
+        } catch (e) { /* skip */ }
+      }
+    }
+
+    // Step 2: Count remaining undecoded
+    const undecoded = await database('yard_vehicle')
+      .whereNotNull('vin').where('vin', '!=', '')
+      .where(function() { this.where('vin_decoded', false).orWhereNull('vin_decoded'); })
+      .count('* as cnt').first();
+
+    res.json({ success: true, enginesFixed: fixed, cacheChecked: cacheHits, stillUndecoded: parseInt(undecoded?.cnt || 0) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
   const { database } = require('./database/database');
@@ -293,7 +344,8 @@ app.get('/api/debug/makes', async (req, res) => {
     await q('dodge_ram_sales_90d', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE title ILIKE '%dodge%' AND title ILIKE '%ram%' AND \"soldDate\" >= NOW() - INTERVAL '90 days' ORDER BY \"soldDate\" DESC LIMIT 5");
     await q('auto_sample', "SELECT year, make, model, engine FROM \"Auto\" LIMIT 5");
     await q('auto_item_join', "SELECT a.year, a.make, a.model, i.title, i.price FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON a.id = aic.\"autoId\" JOIN \"Item\" i ON aic.\"itemId\" = i.id LIMIT 5");
-    await q('market_demand_cache_sample', "SELECT part_number, ebay_sold_90d, ebay_avg_price, ebay_active_listings, last_updated FROM market_demand_cache ORDER BY last_updated DESC LIMIT 10");
+    await q('yard_vehicle_engine_samples', "SELECT engine, engine_type, drivetrain, vin_decoded, COUNT(*) as cnt FROM yard_vehicle WHERE active = true AND engine IS NOT NULL GROUP BY engine, engine_type, drivetrain, vin_decoded ORDER BY cnt DESC LIMIT 15");
+    await q('yard_vehicle_decode_status', "SELECT COUNT(*) as total, SUM(CASE WHEN vin_decoded THEN 1 ELSE 0 END) as decoded, SUM(CASE WHEN vin_decoded AND engine IS NOT NULL THEN 1 ELSE 0 END) as has_engine, SUM(CASE WHEN vin IS NOT NULL AND NOT COALESCE(vin_decoded, false) THEN 1 ELSE 0 END) as vin_not_decoded FROM yard_vehicle WHERE active = true");
     await q('market_demand_cache_freshness', "SELECT COUNT(*) as total, COUNT(CASE WHEN last_updated >= NOW() - INTERVAL '7 days' THEN 1 END) as last_7d, COUNT(CASE WHEN last_updated >= NOW() - INTERVAL '30 days' THEN 1 END) as last_30d, MIN(last_updated) as oldest, MAX(last_updated) as newest FROM market_demand_cache");
     res.json(R);
   } catch(e) { res.status(500).json({error: e.message, stack: e.stack}); }
