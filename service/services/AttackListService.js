@@ -127,7 +127,7 @@ class AttackListService {
     const scored = vehicles.map(v =>
       this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs)
     );
-    scored.sort((a, b) => b.score - a.score);
+    scored.sort((a, b) => b.est_value - a.est_value);
 
     return {
       vehicles: scored,
@@ -628,32 +628,30 @@ class AttackListService {
     // === TOTAL VALUE: sum of all FILTERED part prices ===
     const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
-    // === SCORING: factors in part count AND total value ===
+    // === SCORING: driven primarily by total dollar value ===
     let score = 0;
-    const numPullableParts = filteredParts.filter(p => p.sold_90d > 0).length;
 
-    if (salesDemand.count > 0) {
-      // Volume: up to 30 from total sales across all part types
-      const volumeScore = Math.min(30, salesDemand.count * 3);
-      // Parts breadth: up to 25 from number of different sellable part types
-      const breadthScore = Math.min(25, numPullableParts * 8);
-      // Value: up to 25 from total pull value
-      const valueScore = Math.min(25, Math.round(totalValue / 40));
-      // Price: up to 20 from avg price per part
-      const priceScore = Math.min(20, Math.round(salesDemand.avgPrice / 15));
-      score = Math.min(100, volumeScore + breadthScore + valueScore + priceScore);
+    if (totalValue >= 1000) score = 90 + Math.min(10, Math.round((totalValue - 1000) / 100));
+    else if (totalValue >= 800) score = 80 + Math.round((totalValue - 800) / 22);
+    else if (totalValue >= 600) score = 70 + Math.round((totalValue - 600) / 22);
+    else if (totalValue >= 400) score = 60 + Math.round((totalValue - 400) / 22);
+    else if (totalValue >= 250) score = 50 + Math.round((totalValue - 250) / 17);
+    else if (totalValue >= 150) score = 40 + Math.round((totalValue - 150) / 11);
+    else if (totalValue > 0) score = 20 + Math.round(totalValue / 8);
+    else score = 5;
 
-      // Stock penalty
-      if (stock >= 5) score = Math.round(score * 0.5);
-      else if (stock >= 3) score = Math.round(score * 0.7);
-      else if (stock >= 1) score = Math.round(score * 0.9);
-    } else if (partCount > 0) {
-      score = Math.min(30, 10 + partCount * 3);
-    } else if (make) {
-      score = 5;
+    // Bonus: extra parts beyond 1
+    score += Math.min(15, (filteredParts.length - 1) * 3);
+    // Bonus: any part sold 2+ times in 90d
+    if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
+    // Bonus: fresh arrival (today)
+    if (vehicle.date_added) {
+      const addedDate = new Date(vehicle.date_added);
+      const daysSinceAdded = Math.floor((Date.now() - addedDate.getTime()) / 86400000);
+      if (daysSinceAdded <= 1) score += 5;
     }
 
-    if (salesDemand.count > 0 && score < 15) score = 15;
+    score = Math.min(100, score);
 
     // Color based on TOTAL ESTIMATED VALUE, not score number
     let color = 'gray';
@@ -669,7 +667,7 @@ class AttackListService {
     else if (totalValue >= 250) vehicle_verdict = 'CONSIDER';
 
     // Set per-part verdict based on individual part price
-    for (const p of parts) {
+    for (const p of filteredParts) {
       if (p.price >= 300) p.verdict = 'PULL';
       else if (p.price >= 200) p.verdict = 'WATCH';
       else if (p.price >= 100) p.verdict = 'CONSIDER';
@@ -782,9 +780,10 @@ class AttackListService {
         this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
       );
       // Sort: active vehicles first, then by score descending
+      // Sort by total estimated value, highest first
       scored.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-        return b.score - a.score;
+        return b.est_value - a.est_value;
       });
 
       results.push({
