@@ -272,7 +272,8 @@ app.post('/api/admin/dedup-sales', async (req, res) => {
 app.post('/api/admin/fix-engines', async (req, res) => {
   const { database } = require('./database/database');
   try {
-    // Step 1: Fix engine strings in existing decoded vehicles using vin_cache
+    // Step 1: Fix engine strings — re-parse from vin_cache for ALL decoded vehicles
+    // Targets: "2.2L 170cyl" (hp not cyl), "3.5L" (missing V6), raw decimals
     const decoded = await database('yard_vehicle')
       .where('vin_decoded', true)
       .whereNotNull('vin')
@@ -280,8 +281,9 @@ app.post('/api/admin/fix-engines', async (req, res) => {
 
     let fixed = 0, cacheHits = 0;
     for (const v of decoded) {
-      // Check if engine has raw NHTSA format (contains long decimals or raw cyl count)
-      if (v.engine && (/\d{3}cyl/.test(v.engine) || /\.\d{2,}L/.test(v.engine))) {
+      // Re-format ALL engines that are missing cylinder labels or have bad ones
+      const needsFix = !v.engine || !/(V6|V8|V10|V12|4-cyl|5-cyl)/.test(v.engine) || /\d{2,3}cyl/.test(v.engine);
+      if (needsFix) {
         // Look up vin_cache for raw NHTSA data to re-parse
         try {
           const cached = await database('vin_cache').where('vin', v.vin.trim().toUpperCase()).first();
