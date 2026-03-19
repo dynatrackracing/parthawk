@@ -37,6 +37,18 @@ app.use('/yards', require('./routes/yards'));
 app.use('/attack-list', require('./routes/attack-list'));
 app.use('/cogs', require('./routes/cogs'));
 app.use('/api/parts', require('./routes/parts'));
+app.use('/api/parts-lookup', require('./routes/partsLookup'));
+
+// Build scrape queue from sales data
+app.post('/api/build-scrape-queue', async (req, res) => {
+  try {
+    const { buildQueue } = require('./scripts/buildScrapeQueue');
+    const result = await buildQueue();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.use('/part-location', require('./routes/part-location'));
 app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
