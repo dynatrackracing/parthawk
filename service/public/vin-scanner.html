@@ -197,24 +197,34 @@ function render(data){
   }else{h+='<div class="section-empty">No active listings for this vehicle</div>';}
   h+='</div>';
 
-  // Section 3: MARKET REFERENCE — split used vs rebuild
+  // Section 3: PARTS FROM DATABASE — specific items with verdicts
   const mrUsed=mr.filter(p=>!p.isRebuild);
   const mrRebuild=mr.filter(p=>p.isRebuild);
 
-  h+='<div class="card"><div class="card-title">Market Reference (Used Parts — Competitors)</div>';
+  h+='<div class="card"><div class="card-title">Parts for This Vehicle</div>';
   if(mrUsed.length>0){
-    h+='<table><tr><th>Part</th><th>Listed</th><th>Avg $</th><th>Sellers</th></tr>';
+    h+='<table><tr><th>Part Type</th><th>Verdict</th><th>Market $</th><th>Your Avg</th><th>Stock</th><th>Sold</th></tr>';
     for(const p of mrUsed){
-      const sellers=(p.sellers||[]).join(', ')||'—';
-      h+='<tr><td style="font-weight:600"><span class="b '+bc(p.avgPrice)+'">'+p.partType+'</span></td><td>'+p.count+'</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#6b7280">'+sellers+'</td></tr>';
+      const vc=p.verdict==='PULL'?'b-gr':p.verdict==='WATCH'?'b-yl':'b-gy';
+      const yourA=p.yourAvg?'$'+p.yourAvg:'—';
+      h+='<tr><td style="font-weight:600"><span class="b '+bc(p.yourAvg||p.avgPrice)+'">'+p.partType+'</span></td>';
+      h+='<td><span class="b '+vc+'">'+p.verdict+'</span></td>';
+      h+='<td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td>';
+      h+='<td style="font-weight:600">'+yourA+'</td>';
+      h+='<td>'+(p.inStock||0)+'</td>';
+      h+='<td>'+(p.yourSold||0)+'x</td></tr>';
+      // Show top items
+      if(p.topItems){for(const ti of p.topItems){
+        h+='<tr><td colspan="6" style="font-size:10px;color:#6b7280;padding:2px 8px">'+ti.seller+': '+ti.title.substring(0,60)+(ti.pn?' ['+ti.pn+']':'')+'  $'+ti.price+'</td></tr>';
+      }}
     }
     h+='</table>';
-  }else{h+='<div class="section-empty">No used part competitor data</div>';}
+  }else{h+='<div class="section-empty">No parts found in database for this vehicle</div>';}
   h+='</div>';
 
   if(mrRebuild.length>0){
-    h+='<div class="card" style="opacity:0.7"><div class="card-title">Rebuild Reference (Remanufactured — not comparable to used)</div>';
-    h+='<table><tr><th>Part</th><th>Listed</th><th>Rebuild $</th><th>Seller</th></tr>';
+    h+='<div class="card" style="opacity:0.6"><div class="card-title">Rebuild Reference (not comparable to used prices)</div>';
+    h+='<table><tr><th>Part</th><th>Count</th><th>Rebuild $</th><th>Seller</th></tr>';
     for(const p of mrRebuild){
       const sellers=(p.sellers||[]).join(', ')||'pro-rebuild';
       h+='<tr><td style="color:#9ca3af"><span class="b b-gy">[REBUILD] '+p.partType+'</span></td><td style="color:#9ca3af">'+p.count+'</td><td style="color:#9ca3af">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9ca3af">'+sellers+'</td></tr>';

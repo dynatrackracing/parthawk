@@ -384,7 +384,7 @@ router.post('/scan', async (req, res) => {
         log.warn({ err: e.message, make, model }, 'VIN scan: YourListing query failed');
       }
 
-      // 2c: Item table — competitor/reference, separated by rebuild vs used
+      // 2c: Item table — specific parts with verdicts, rebuild separated
       try {
         let items = [];
         // Try Auto join first (exact year match)
@@ -397,44 +397,75 @@ router.post('/scan', async (req, res) => {
             .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
             .where('Item.price', '>', 0)
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
+            .orderBy('Item.price', 'desc')
             .limit(200);
         }
-        // Fallback: direct title search on Item table
+        // Fallback: direct title search
         if (items.length === 0) {
           items = await database('Item')
             .where('price', '>', 0)
             .whereRaw('"title" ILIKE ?', [`%${make}%`])
             .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
             .select('title', 'price', 'seller', 'manufacturerPartNumber', 'isRepair')
+            .orderBy('price', 'desc')
             .limit(200);
         }
 
+        // Build sales lookup for verdicts: how many sold + your avg per part type
+        const salesByType = {};
+        for (const sh of salesHistory) {
+          salesByType[sh.partType] = { sold: sh.sold, avgPrice: sh.avgPrice };
+        }
+        // Stock lookup per part type
+        const stockByType = {};
+        for (const cs of currentStock) {
+          stockByType[cs.partType] = cs.inStock;
+        }
+
+        // Group items by part type, separate rebuild
         const byType = {};
         for (const item of items) {
           const pt = detectPartTypeForVin(item.title);
           const isRebuild = item.seller === 'pro-rebuild' || item.isRepair === true;
           const key = pt + (isRebuild ? '_rebuild' : '');
-          if (!byType[key]) byType[key] = { partType: pt, count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [], isRebuild };
-          byType[key].count++;
+          if (!byType[key]) byType[key] = {
+            partType: pt, isRebuild, items: [], totalPrice: 0,
+          };
+          byType[key].items.push({
+            title: item.title, price: parseFloat(item.price) || 0,
+            seller: item.seller, partNumber: item.manufacturerPartNumber,
+          });
           byType[key].totalPrice += parseFloat(item.price) || 0;
-          if (item.seller) byType[key].sellers.add(item.seller);
-          if (item.manufacturerPartNumber && byType[key].partNumbers.length < 5) {
-            byType[key].partNumbers.push(item.manufacturerPartNumber);
-          }
         }
+
         for (const [key, data] of Object.entries(byType)) {
-          const avg = data.count > 0 ? Math.round(data.totalPrice / data.count) : 0;
+          const avg = data.items.length > 0 ? Math.round(data.totalPrice / data.items.length) : 0;
+          const yourSold = salesByType[data.partType]?.sold || 0;
+          const yourAvg = salesByType[data.partType]?.avgPrice || 0;
+          const inStock = stockByType[data.partType] || 0;
+          // Verdict based on stock + sales
+          let verdict = 'SKIP';
+          if (!data.isRebuild) {
+            if (inStock === 0 && yourSold >= 2) verdict = 'PULL';
+            else if (inStock === 0 && yourSold >= 1) verdict = 'WATCH';
+            else if (inStock <= 2 && yourSold >= 3) verdict = 'WATCH';
+          }
+          // Color based on YOUR avg sold price (not competitor price)
+          const colorPrice = yourAvg > 0 ? yourAvg : avg;
+
           marketRef.push({
-            partType: data.partType, count: data.count, avgPrice: avg,
-            sellers: [...data.sellers].slice(0, 5),
-            partNumbers: [...new Set(data.partNumbers)].slice(0, 5),
+            partType: data.partType, count: data.items.length, avgPrice: avg,
+            yourSold, yourAvg, inStock, verdict,
             isRebuild: data.isRebuild,
-            color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
+            partNumbers: [...new Set(data.items.map(i => i.partNumber).filter(Boolean))].slice(0, 5),
+            sellers: [...new Set(data.items.map(i => i.seller).filter(Boolean))],
+            topItems: data.items.slice(0, 3).map(i => ({ title: i.title, price: i.price, seller: i.seller, pn: i.partNumber })),
+            color: colorPrice >= 300 ? 'green' : colorPrice >= 200 ? 'yellow' : colorPrice >= 100 ? 'orange' : 'red',
           });
         }
         marketRef.sort((a, b) => {
           if (a.isRebuild !== b.isRebuild) return a.isRebuild ? 1 : -1;
-          return b.avgPrice - a.avgPrice;
+          return (b.yourAvg || b.avgPrice) - (a.yourAvg || a.avgPrice);
         });
       } catch (e) {
         log.warn({ err: e.message, make, baseModel }, 'VIN scan: Item query failed');
