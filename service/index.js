@@ -71,7 +71,7 @@ app.post('/api/build-auto-index', async (req, res) => {
   try {
     const items = await database('Item').whereNotNull('title').select('id','ebayId','title').limit(50000);
     const autoCache = {};
-    let autosCreated = 0, linksCreated = 0, skipped = 0;
+    let autosCreated = 0, linksCreated = 0, skipped = 0, linkAttempts = 0, linkErrors = [];
     for (const item of items) {
       const title = item.title || '';
       const yearMatch = title.match(/\b((?:19|20)\d{2})\b/);
@@ -108,14 +108,16 @@ app.post('/api/build-auto-index', async (req, res) => {
         }
         autoCache[ak] = autoId;
       }
+      linkAttempts++;
       try {
         const le = await database('AutoItemCompatibility').where({autoId,itemId:item.ebayId}).first();
         if (!le) { await database('AutoItemCompatibility').insert({autoId,itemId:item.ebayId,createdAt:new Date()}); linksCreated++; }
-      } catch(e) { if (skipped < 3) console.log('Link error:', e.message?.substring(0,100), 'autoId:', autoId, 'itemId:', item.ebayId); }
+        else { /* already exists */ }
+      } catch(e) { if (linkErrors.length < 5) linkErrors.push(e.message?.substring(0,150)); }
     }
     const ac = await database('Auto').count('* as cnt').first();
     const lc = await database('AutoItemCompatibility').count('* as cnt').first();
-    res.json({success:true,itemsProcessed:items.length,autosCreated,linksCreated,skipped,totalAutos:parseInt(ac?.cnt||0),totalLinks:parseInt(lc?.cnt||0)});
+    res.json({success:true,itemsProcessed:items.length,autosCreated,linksCreated,linkAttempts,linkErrors,skipped,totalAutos:parseInt(ac?.cnt||0),totalLinks:parseInt(lc?.cnt||0)});
   } catch(err) { res.status(500).json({error:err.message}); }
 });
 
