@@ -281,20 +281,20 @@ async function decodeVins() {
         }).onConflict('vin').ignore();
       } catch (e) {}
 
-      // Update yard_vehicle
+      // Update yard_vehicle — truncate to column limits
       const upd = { vin_decoded: true, updatedAt: new Date() };
-      if (engine) upd.engine = engine;
-      if (engineType) upd.engine_type = engineType;
-      if (drivetrain) upd.drivetrain = drivetrain;
-      if (trim) upd.trim_level = trim;
-      if (bodyStyle) upd.body_style = bodyStyle;
+      if (engine) upd.engine = engine.substring(0, 50);
+      if (engineType) upd.engine_type = engineType.substring(0, 20);
+      if (drivetrain) upd.drivetrain = drivetrain.substring(0, 20);
+      if (trim) upd.trim_level = trim.substring(0, 100);
+      if (bodyStyle) upd.body_style = bodyStyle.substring(0, 50);
       await knex('yard_vehicle').where('id', v.id).update(upd);
       decoded++;
       console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — ${engine||'?'} ${engineType} ${drivetrain||'?'} ${trim||''}`);
       await sleep(200);
     } catch (err) {
       errors++;
-      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — ERROR: ${err.message.substring(0,80)}`);
+      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — ERROR: ${err.message}`);
     }
   }
   console.log(`  Done: ${decoded} decoded, ${cached} cached, ${errors} errors`);
