@@ -138,12 +138,17 @@ async function generateRestockReport() {
         make: veh.make, model: veh.model, partType,
         specificity: extractSpecificity(title),
         sold: 0, revenue: 0, partNumbers: new Set(), titles: [],
-        yearMin: null, yearMax: null,
+        yearMin: null, yearMax: null, lastSoldDate: null,
       };
     }
     groups[key].sold++;
     groups[key].revenue += parseFloat(sale.salePrice) || 0;
     if (groups[key].titles.length < 3) groups[key].titles.push(title);
+    // Track most recent sale date
+    if (sale.soldDate) {
+      const sd = new Date(sale.soldDate);
+      if (!groups[key].lastSoldDate || sd > groups[key].lastSoldDate) groups[key].lastSoldDate = sd;
+    }
 
     // Extract year range from this title
     const yearMatches = title.match(/\b((?:19|20)\d{2})\b/g);
@@ -214,17 +219,20 @@ async function generateRestockReport() {
         }
       }
     }
-    // Fallback: count listings whose title contains make AND model AND part type keyword
+    // Fallback: count listings whose title contains make AND first model word AND part type keyword
     if (stock === 0) {
       const makeLower = data.make.toLowerCase();
-      const modelLower = data.model.toLowerCase();
+      // Use first word of model only — "Grand Cherokee" → match on "Grand", "4Runner" → "4Runner"
+      const modelFirst = data.model.split(/\s+/)[0].toLowerCase();
       const ptKeywords = PART_TYPE_KEYWORDS[data.partType] || [];
       for (const l of listings) {
         const lt = (l.title || '').toLowerCase();
-        if (lt.includes(makeLower) && lt.includes(modelLower)) {
-          if (ptKeywords.length === 0 || ptKeywords.some(kw => lt.includes(kw))) {
+        // Must contain make AND model first word AND at least one part type keyword
+        if (lt.includes(makeLower) && lt.includes(modelFirst)) {
+          if (ptKeywords.length > 0 && ptKeywords.some(kw => lt.includes(kw))) {
             stock += parseInt(l.quantityAvailable) || 1;
           }
+          // If no keywords defined for this part type, don't count (too broad)
         }
       }
     }
@@ -253,6 +261,12 @@ async function generateRestockReport() {
     }
     const vehicleDisplay = `${yearStr}${data.make} ${data.model}`;
 
+    // Sold out date: if stock is 0, show when we last sold one
+    let soldOutDate = null;
+    if (stock === 0 && data.lastSoldDate) {
+      soldOutDate = data.lastSoldDate.toISOString();
+    }
+
     items.push({
       partType: data.partType,
       vehicle: vehicleDisplay,
@@ -264,6 +278,7 @@ async function generateRestockReport() {
       sold180d: data.sold, activeStock: stock, avgPrice, profit,
       revenue180d: Math.round(data.revenue),
       ratio: stock > 0 ? Math.round(data.sold / stock * 10) / 10 : data.sold,
+      soldOutDate,
       sampleTitle: data.titles[0] || null,
     });
   }

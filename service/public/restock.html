@@ -6,31 +6,31 @@
 <title>PartHawk — Weekly Restock Report</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  :root{--bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;--border:#2a2a2a;--green:#22c55e;--green-dim:#064e3b;--yellow:#eab308;--yellow-dim:#713f12;--orange:#f97316;--orange-dim:#7c2d12;--red:#ef4444;--red-dim:#7f1d1d;--gray:#6b7280;--text:#f9fafb;--text-mid:#d1d5db;--text-muted:#6b7280}
-  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
-  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em}
-  header .sub{font-size:11px;color:var(--text-muted);margin-top:1px}
-  .nav{font-size:12px;color:var(--text-muted);text-decoration:none;display:flex;gap:12px}
-  .nav a{color:var(--text-muted);text-decoration:none}.nav a:hover{color:var(--text)}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8f9fa;color:#1a1a1a;min-height:100vh}
+  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em;color:#111}
+  header .sub{font-size:11px;color:#6b7280;margin-top:1px}
+  .nav{font-size:12px;display:flex;gap:12px}
+  .nav a{color:#6b7280;text-decoration:none}.nav a:hover{color:#111}
   .summary{display:flex;gap:8px;padding:12px 20px;flex-wrap:wrap}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;min-width:80px}
-  .stat-label{font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em}
+  .stat{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;min-width:80px}
+  .stat-label{font-size:9px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em}
   .stat-value{font-size:18px;font-weight:800;margin-top:1px}
-  .sg{color:var(--green)}.sy{color:var(--yellow)}.so{color:var(--orange)}.sr{color:var(--red)}.sgr{color:var(--gray)}
+  .sg{color:#16a34a}.sy{color:#ca8a04}.so{color:#ea580c}.sr{color:#dc2626}.sgr{color:#9ca3af}
   .section{padding:0 20px 12px}
-  .section-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px;display:flex;justify-content:space-between}
-  .sh-green{color:var(--green)}.sh-yellow{color:var(--yellow)}.sh-orange{color:var(--orange)}.sh-red{color:var(--red)}.sh-grey{color:var(--gray)}
+  .section-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:8px 0;border-bottom:1px solid #e5e7eb;margin-bottom:4px;display:flex;justify-content:space-between}
+  .sh-green{color:#16a34a}.sh-yellow{color:#ca8a04}.sh-orange{color:#ea580c}.sh-red{color:#dc2626}.sh-grey{color:#9ca3af}
   table{width:100%;border-collapse:collapse;font-size:11px}
-  th{text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)}
-  td{padding:5px 6px;border-bottom:1px solid #1a1a1a;color:var(--text-mid)}
-  tr:hover td{background:var(--surface2)}
+  th{text-align:left;padding:4px 6px;color:#9ca3af;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb}
+  td{padding:5px 6px;border-bottom:1px solid #f3f4f6;color:#374151}
+  tr:hover td{background:#f9fafb}
   .badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap}
-  .b-green{background:var(--green-dim);color:var(--green)}.b-yellow{background:var(--yellow-dim);color:var(--yellow)}.b-orange{background:var(--orange-dim);color:var(--orange)}.b-red{background:var(--red-dim);color:var(--red)}.b-grey{background:#1f2937;color:var(--gray)}
+  .b-green{background:#dcfce7;color:#16a34a}.b-yellow{background:#fef9c3;color:#a16207}.b-orange{background:#ffedd5;color:#c2410c}.b-red{background:#fee2e2;color:#dc2626}.b-grey{background:#f3f4f6;color:#9ca3af}
   .mono{font-family:monospace;font-size:10px}
-  .profit-pos{color:var(--green)}.profit-neg{color:var(--red)}
-  .loading{text-align:center;padding:40px;color:var(--text-muted)}
-  .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px}
+  .profit-pos{color:#16a34a}.profit-neg{color:#dc2626}
+  .sold-out{color:#dc2626;font-size:10px;font-weight:600}
+  .loading{text-align:center;padding:40px;color:#9ca3af}
+  .spinner{width:24px;height:24px;border:2px solid #e5e7eb;border-top-color:#16a34a;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px}
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -42,6 +42,7 @@
   </div>
   <div class="nav">
     <a href="/admin/pull">Attack List</a>
+    <a href="/admin/restock">Refresh</a>
     <a href="/">Home</a>
   </div>
 </header>
@@ -55,6 +56,17 @@ const TIER_CONFIG = {
   red:    { icon: '🔴', label: 'LOW PRIORITY', badge: 'b-red',    header: 'sh-red' },
   grey:   { icon: '⚪', label: 'ON RADAR',     badge: 'b-grey',   header: 'sh-grey' },
 };
+
+function formatSoldOut(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays <= 1) return 'Today';
+  if (diffDays <= 7) return diffDays + 'd ago';
+  if (diffDays <= 30) return Math.floor(diffDays / 7) + 'w ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 async function load() {
   try {
@@ -90,15 +102,16 @@ function renderSection(tier, cfg, items) {
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
       <span>${cfg.icon} ${cfg.label} (${items.length})</span>
-      <span style="font-size:9px;color:var(--text-muted)">Score ${tier === 'green' ? '80-100' : tier === 'yellow' ? '60-79' : tier === 'orange' ? '40-59' : tier === 'red' ? '20-39' : '0-19'}</span>
+      <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80-100' : tier === 'yellow' ? '60-79' : tier === 'orange' ? '40-59' : tier === 'red' ? '20-39' : '0-19'}</span>
     </div>
     <table><tr>
       <th>Score</th><th>Part Type</th><th>Vehicle</th><th>Part #s</th><th>Spec</th>
-      <th>Sold</th><th>Stock</th><th>Avg $</th><th>Profit</th><th>Rev</th>
+      <th>Sold</th><th>Stock</th><th>Sold Out</th><th>Avg $</th><th>Profit</th><th>Total Rev</th>
     </tr>`;
   for (const i of items) {
     const profitClass = i.profit >= 0 ? 'profit-pos' : 'profit-neg';
     const pns = (i.partNumbers || []).join(', ') || '—';
+    const soldOut = i.activeStock === 0 && i.soldOutDate ? formatSoldOut(i.soldOutDate) : '';
     h += `<tr>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
       <td style="font-weight:600">${i.partType}</td>
@@ -107,6 +120,7 @@ function renderSection(tier, cfg, items) {
       <td class="mono">${i.specificity || '—'}</td>
       <td style="font-weight:600">${i.sold180d}</td>
       <td>${i.activeStock}</td>
+      <td class="sold-out">${soldOut}</td>
       <td>$${i.avgPrice}</td>
       <td class="${profitClass}">$${i.profit}</td>
       <td>$${i.revenue180d.toLocaleString()}</td>
