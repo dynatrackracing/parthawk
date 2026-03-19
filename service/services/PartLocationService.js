@@ -5,7 +5,10 @@ const { database } = require('../database/database');
 
 // Part types eligible for automated research
 const RESEARCH_PART_TYPES = [
-  'ECM', 'PCM', 'BCM', 'TIPM', 'fuse box', 'TCM', 'ABS module', 'amplifier'
+  'ECM', 'PCM', 'BCM', 'TIPM', 'fuse box', 'TCM', 'ABS module', 'amplifier',
+  'transfer case module', 'HVAC module', 'airbag module',
+  'parking sensor module', 'blind spot module', 'camera module',
+  'liftgate module', 'steering module',
 ];
 
 // Minimum vehicle year for research triggers

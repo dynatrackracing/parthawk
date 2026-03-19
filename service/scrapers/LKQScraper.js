@@ -46,7 +46,7 @@ class LKQScraper {
       { name: 'LKQ Greensboro', slug: 'greensboro-1226', storeId: '1226' },
       { name: 'LKQ East NC',    slug: 'east-nc-1227',    storeId: '1227' },
     ];
-    this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   }
 
   async scrapeAll() {
@@ -187,7 +187,7 @@ class LKQScraper {
    */
   fetchWithCurl(url) {
     const { execSync } = require('child_process');
-    const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${this.userAgent}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" "${url}"`;
+    const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${this.userAgent}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" -H "Referer: https://www.lkqpickyourpart.com/" -H "sec-ch-ua: \\"Chromium\\";v=\\"131\\", \\"Not_A Brand\\";v=\\"24\\"" -H "sec-ch-ua-mobile: ?0" -H "sec-ch-ua-platform: \\"Windows\\"" -H "Sec-Fetch-Dest: document" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Site: same-origin" "${url}"`;
     try {
       const result = execSync(cmd, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8' });
       if (result.includes('Just a moment') || result.includes('cf-challenge')) {

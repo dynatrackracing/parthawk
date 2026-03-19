@@ -33,7 +33,7 @@ const LOCATIONS = [
   { name: 'LKQ East NC',    slug: 'east-nc-1227'    },
 ];
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 // ── SCRAPE ──────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ async function scrapeYard(location) {
     try {
       // Use curl to bypass CloudFlare TLS fingerprinting (axios gets 403)
       const { execSync } = require('child_process');
-      const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${UA}" "${url}"`;
+      const cmd = `curl -s -L --max-time 30 -H "User-Agent: ${UA}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Referer: https://www.lkqpickyourpart.com/" -H "sec-ch-ua-platform: \\"Windows\\"" "${url}"`;
       const html = execSync(cmd, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf-8' });
       if (html.includes('Just a moment')) { console.log('  CloudFlare challenge — retrying...'); break; }
       const $ = cheerio.load(html);
@@ -92,7 +92,7 @@ async function scrapeYard(location) {
       if (pageCount === 0) break;
       process.stdout.write(`  Page ${page}: ${pageCount} vehicles (total: ${vehicles.length})\r`);
 
-      if (!res.data.includes('Next Page')) break;
+      if (!html.includes('Next Page')) break;
       page++;
       await sleep(500);
     } catch (err) {

@@ -220,13 +220,14 @@ async function generateRestockReport() {
       }
     }
     // Fallback: count listings by extracting make+model+partType from each listing title
-    // and checking if it matches this group exactly
+    // Must match make AND model AND part type keywords in title
     if (stock === 0) {
+      const ptKeywords = PART_TYPE_KEYWORDS[data.partType] || [];
       for (const l of listings) {
         const lVeh = extractMakeModel(l.title);
         if (!lVeh) continue;
         const lPt = detectPartType(l.title);
-        // Must match same make, same first model word, same part type
+        // Must match same make, model first word, AND part type
         if (lVeh.make === data.make && lPt === data.partType) {
           const dataModelFirst = data.model.split(/\s+/)[0].toLowerCase();
           const lModelFirst = lVeh.model.split(/\s+/)[0].toLowerCase();
@@ -235,6 +236,11 @@ async function generateRestockReport() {
           }
         }
       }
+      if (stock > 0) {
+        console.log(`[RESTOCK STOCK] ${data.make} ${data.model} ${data.partType}: stock=${stock} (title-matched)`);
+      }
+    } else {
+      console.log(`[RESTOCK STOCK] ${data.make} ${data.model} ${data.partType}: stock=${stock} (PN-matched: ${[...data.partNumbers].join(',')})`);
     }
 
     const avgPrice = data.sold > 0 ? Math.round(data.revenue / data.sold * 100) / 100 : 0;

@@ -200,7 +200,6 @@
 
 <header>
   <div class="header-left" style="display:flex;align-items:center;gap:10px;">
-    <a href="/" style="color:white;text-decoration:none;margin-right:15px;font-size:16px;">🏠 Home</a>
     <div>
       <h1>PartHawk</h1>
       <p id="headerSub">Loading...</p>
@@ -211,6 +210,16 @@
     <button class="icon-btn" id="scrapeBtn" onclick="triggerScrapeAll(this)" title="Refresh inventory from LKQ">🔄</button>
   </div>
 </header>
+<nav style="display:flex;gap:6px;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;font-size:11px;">
+  <a href="/" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Home</a>
+  <a href="/item/search" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Search</a>
+  <a href="/intelligence/price-check" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Price Check</a>
+  <a href="/intelligence/stale-inventory" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Stale Inv</a>
+  <a href="/intelligence/your-sales" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Sales</a>
+  <a href="/admin/pull" style="color:var(--red);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);font-weight:700;">Attack List</a>
+  <a href="/admin/restock" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Restock</a>
+  <a href="/admin/gate" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Gate Calc</a>
+</nav>
 
 <div class="tabs" id="tabBar">
   <div class="tab active" onclick="showTab('all')" id="tab-all">All</div>
@@ -344,7 +353,10 @@
             <span style="font-size:14px;font-weight:700;">${yd.yard.name}</span>
             <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${yd.total_vehicles} vehicles · ${lastScraped}</span>
           </div>
-          <span class="chip ${prioClass}">${priority}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="chip ${prioClass}">${priority}</span>
+            <button class="icon-btn" style="width:28px;height:28px;font-size:12px;" onclick="scrapeYard('${yd.yard.id}',this)" title="Refresh ${yd.yard.name}">🔄</button>
+          </div>
         </div>
         <div class="vehicle-list">`;
 
@@ -380,13 +392,12 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.engine ? ' ' + v.engine : ''}${v.engine_type ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
-            ${v.color ? `<span>${v.color}</span>` : ''}
-            ${v.engine ? `<span>${v.engine}</span>` : ''}
-            ${v.drivetrain ? `<span class="chip chip-age age-recent" style="font-size:9px">${v.drivetrain}</span>` : ''}
-            ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age age-old" style="font-size:9px">${v.engine_type}</span>` : ''}
+            ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
+            ${v.engine_type ? `<span class="chip chip-age ${v.engine_type === 'Gas' ? 'age-old' : v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
+            ${v.drivetrain ? `<span class="chip chip-age age-recent" style="font-size:9px;font-weight:700">${v.drivetrain}</span>` : ''}
             ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>
           <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
@@ -535,7 +546,7 @@
 
   // === Location loading ===
 
-  const RESEARCH_PARTS = ['ECM','PCM','BCM','TIPM','FUSE BOX','TCM','ABS','AMPLIFIER'];
+  const RESEARCH_PARTS = ['ECM','PCM','BCM','TIPM','FUSE BOX','TCM','ABS','AMPLIFIER','TRANSFER CASE MODULE','HVAC MODULE','AIRBAG MODULE','PARKING SENSOR MODULE','BLIND SPOT MODULE','CAMERA MODULE','LIFTGATE MODULE','STEERING MODULE'];
 
   async function loadLocation(vid) {
     let vehicle = null;
@@ -728,6 +739,16 @@
         btn.textContent = '🔄'; btn.disabled = false;
       }
     }, 5000);
+  }
+
+  async function scrapeYard(yardId, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '⏳'; btn.disabled = true;
+    try {
+      await fetch('/yards/scrape/' + yardId, { method: 'POST' });
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; loadData(); }, 60000);
+    } catch (e) { btn.textContent = '✗'; btn.disabled = false; }
   }
 
   // Load trim intelligence for a vehicle (triggered on expand)
