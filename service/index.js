@@ -43,6 +43,36 @@ app.get('/admin/restock', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
 });
 
+// Test LKQ fetch — diagnose CloudFlare block
+app.get('/api/test-lkq', async (req, res) => {
+  const axios = require('axios');
+  const url = 'https://www.pyp.com/inventory/raleigh-1168/';
+  try {
+    const r = await axios.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+      timeout: 15000,
+    });
+    const hasVehicles = r.data.includes('pypvi_resultRow');
+    const title = (r.data.match(/<title[^>]*>([^<]*)/)||[])[1] || '';
+    res.json({
+      status: r.status,
+      title,
+      hasVehicles,
+      bodyLength: r.data.length,
+      first200: r.data.substring(0, 200),
+      hasCF: r.data.includes('cf-') || r.data.includes('challenge'),
+    });
+  } catch (err) {
+    res.json({
+      error: err.message,
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      headers: err.response?.headers ? Object.fromEntries(Object.entries(err.response.headers)) : null,
+      bodyPreview: err.response?.data?.substring?.(0, 300),
+    });
+  }
+});
+
 // Decode all undecoded VINs in yard_vehicle
 app.post('/api/decode-vins', async (req, res) => {
   try {
