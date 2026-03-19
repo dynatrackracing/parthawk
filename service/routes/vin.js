@@ -292,104 +292,132 @@ router.post('/scan', async (req, res) => {
       if (!decoded.plantCountry) decoded.plantCountry = get(75);
     }
 
-    // --- Step 2: Parts Intelligence ---
-    const partsIntel = [];
+    // --- Step 2: Parts Intelligence (3 separate sections) ---
     const make = decoded.make;
     const model = decoded.model;
     const year = decoded.year;
 
-    if (make && model && year) {
-      // 2a: YourSale — what parts from this vehicle have we sold?
+    let salesHistory = [];  // YOUR SALES HISTORY
+    let currentStock = [];  // YOUR CURRENT STOCK
+    let marketRef = [];     // MARKET REFERENCE (competitors)
+
+    if (make && model) {
+      // 2a: YourSale — parts we've SOLD for this vehicle
       try {
         const sales = await database('YourSale')
           .whereNotNull('title')
-          .whereRaw('title ILIKE ?', [`%${make}%`])
-          .whereRaw('title ILIKE ?', [`%${model}%`])
-          .select('title', 'salePrice', 'soldDate');
+          .whereRaw('"title" ILIKE ?', [`%${make}%`])
+          .whereRaw('"title" ILIKE ?', [`%${model}%`])
+          .select('title', 'salePrice', 'soldDate')
+          .orderBy('soldDate', 'desc');
 
-        const partTypes = {};
+        const byType = {};
         for (const sale of sales) {
           const pt = detectPartTypeForVin(sale.title);
-          if (!partTypes[pt]) partTypes[pt] = { type: pt, sold: 0, totalPrice: 0, prices: [], source: 'YourSale' };
-          partTypes[pt].sold++;
-          const p = parseFloat(sale.salePrice) || 0;
-          partTypes[pt].totalPrice += p;
-          partTypes[pt].prices.push(p);
+          if (!byType[pt]) byType[pt] = { partType: pt, sold: 0, totalPrice: 0, lastSoldDate: null, titles: [] };
+          byType[pt].sold++;
+          byType[pt].totalPrice += parseFloat(sale.salePrice) || 0;
+          if (!byType[pt].lastSoldDate && sale.soldDate) byType[pt].lastSoldDate = sale.soldDate;
+          if (byType[pt].titles.length < 2) byType[pt].titles.push(sale.title);
         }
-        for (const [pt, data] of Object.entries(partTypes)) {
+        for (const [pt, data] of Object.entries(byType)) {
           const avg = data.sold > 0 ? Math.round(data.totalPrice / data.sold) : 0;
-          partsIntel.push({
-            partType: pt, source: 'Your Sales', sold: data.sold, avgPrice: avg,
+          salesHistory.push({
+            partType: pt, sold: data.sold, avgPrice: avg, lastSoldDate: data.lastSoldDate,
+            sampleTitle: data.titles[0] || null,
             color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
           });
         }
-      } catch (e) { /* ignore */ }
+        salesHistory.sort((a, b) => b.avgPrice - a.avgPrice);
+      } catch (e) {
+        log.warn({ err: e.message, make, model }, 'VIN scan: YourSale query failed');
+      }
 
-      // 2b: Item table — competitor/reference listings
+      // 2b: YourListing — parts we currently HAVE IN STOCK
       try {
-        const items = await database('Auto')
-          .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
-          .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
-          .where('Auto.year', year)
-          .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
-          .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + model.toUpperCase() + '%'])
-          .where('Item.price', '>', 0)
-          .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber');
+        const listings = await database('YourListing')
+          .whereNotNull('title')
+          .where('listingStatus', 'Active')
+          .whereRaw('"title" ILIKE ?', [`%${make}%`])
+          .whereRaw('"title" ILIKE ?', [`%${model}%`])
+          .select('title', 'currentPrice', 'quantityAvailable', 'sku');
+
+        const byType = {};
+        for (const l of listings) {
+          const pt = detectPartTypeForVin(l.title);
+          if (!byType[pt]) byType[pt] = { partType: pt, inStock: 0, totalPrice: 0, listings: [] };
+          byType[pt].inStock += parseInt(l.quantityAvailable) || 1;
+          byType[pt].totalPrice += parseFloat(l.currentPrice) || 0;
+          if (byType[pt].listings.length < 3) byType[pt].listings.push({
+            title: l.title, price: parseFloat(l.currentPrice) || 0, sku: l.sku,
+          });
+        }
+        for (const [pt, data] of Object.entries(byType)) {
+          const avg = data.listings.length > 0 ? Math.round(data.totalPrice / data.listings.length) : 0;
+          currentStock.push({
+            partType: pt, inStock: data.inStock, avgPrice: avg, listings: data.listings,
+            color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
+          });
+        }
+        currentStock.sort((a, b) => b.avgPrice - a.avgPrice);
+      } catch (e) {
+        log.warn({ err: e.message, make, model }, 'VIN scan: YourListing query failed');
+      }
+
+      // 2c: Item table — competitor/reference (direct ILIKE on title for broad match)
+      try {
+        let items = [];
+        // Try Auto join first (exact year match)
+        if (year) {
+          items = await database('Auto')
+            .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+            .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+            .where('Auto.year', year)
+            .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
+            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + model.toUpperCase() + '%'])
+            .where('Item.price', '>', 0)
+            .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber')
+            .limit(200);
+        }
+        // Fallback: direct title search on Item table
+        if (items.length === 0) {
+          items = await database('Item')
+            .where('price', '>', 0)
+            .whereRaw('"title" ILIKE ?', [`%${make}%`])
+            .whereRaw('"title" ILIKE ?', [`%${model}%`])
+            .select('title', 'price', 'seller', 'manufacturerPartNumber')
+            .limit(200);
+        }
 
         const byType = {};
         for (const item of items) {
           const pt = detectPartTypeForVin(item.title);
-          if (!byType[pt]) byType[pt] = { count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [] };
+          if (!byType[pt]) byType[pt] = { partType: pt, count: 0, totalPrice: 0, sellers: new Set(), partNumbers: [] };
           byType[pt].count++;
           byType[pt].totalPrice += parseFloat(item.price) || 0;
           if (item.seller) byType[pt].sellers.add(item.seller);
-          if (item.manufacturerPartNumber) byType[pt].partNumbers.push(item.manufacturerPartNumber);
+          if (item.manufacturerPartNumber && byType[pt].partNumbers.length < 5) {
+            byType[pt].partNumbers.push(item.manufacturerPartNumber);
+          }
         }
         for (const [pt, data] of Object.entries(byType)) {
-          // Don't duplicate if already in partsIntel from YourSale
-          const existing = partsIntel.find(p => p.partType === pt);
           const avg = data.count > 0 ? Math.round(data.totalPrice / data.count) : 0;
-          if (existing) {
-            existing.competitorCount = data.count;
-            existing.competitorAvg = avg;
-            existing.sellers = [...data.sellers];
-            existing.partNumbers = [...new Set(data.partNumbers)].slice(0, 5);
-          } else {
-            partsIntel.push({
-              partType: pt, source: 'Competitors', sold: 0, avgPrice: avg,
-              competitorCount: data.count, competitorAvg: avg,
-              sellers: [...data.sellers], partNumbers: [...new Set(data.partNumbers)].slice(0, 5),
-              color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
-            });
-          }
+          marketRef.push({
+            partType: pt, count: data.count, avgPrice: avg,
+            sellers: [...data.sellers].slice(0, 5),
+            partNumbers: [...new Set(data.partNumbers)].slice(0, 5),
+            color: avg >= 300 ? 'green' : avg >= 200 ? 'yellow' : avg >= 100 ? 'orange' : 'red',
+          });
         }
-      } catch (e) { /* ignore */ }
-
-      // 2c: Programming requirements from fitment_data
-      try {
-        for (const part of partsIntel) {
-          if (part.partNumbers && part.partNumbers.length > 0) {
-            for (const pn of part.partNumbers) {
-              const fd = await database('fitment_data')
-                .where('part_number', pn)
-                .first();
-              if (fd && fd.programming_required) {
-                part.programmingRequired = fd.programming_required;
-                part.programmingNote = fd.programming_note;
-                part.programmingTool = fd.programming_tool;
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) { /* ignore */ }
+        marketRef.sort((a, b) => b.avgPrice - a.avgPrice);
+      } catch (e) {
+        log.warn({ err: e.message, make, model }, 'VIN scan: Item query failed');
+      }
     }
 
-    // Sort by avgPrice descending
-    partsIntel.sort((a, b) => (b.avgPrice || 0) - (a.avgPrice || 0));
-
-    // Total estimated value
-    const totalValue = partsIntel.reduce((sum, p) => sum + (p.avgPrice || 0), 0);
+    // Total estimated value (from sales avg or competitor avg)
+    const totalValue = salesHistory.reduce((sum, p) => sum + (p.avgPrice || 0), 0)
+      || marketRef.reduce((sum, p) => sum + (p.avgPrice || 0), 0);
 
     // --- Step 3: Check if vehicle is in yard inventory ---
     let yardMatch = null;
@@ -421,7 +449,8 @@ router.post('/scan', async (req, res) => {
     } catch (e) { /* table may not exist yet */ }
 
     res.json({
-      success: true, vin, decoded, partsIntel, totalValue, yardMatch,
+      success: true, vin, decoded, totalValue, yardMatch,
+      salesHistory, currentStock, marketRef,
     });
   } catch (err) {
     log.error({ err }, 'VIN scan failed');
