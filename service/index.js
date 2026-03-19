@@ -110,8 +110,8 @@ app.post('/api/build-auto-index', async (req, res) => {
       }
       try {
         const le = await database('AutoItemCompatibility').where({autoId,itemId:item.ebayId}).first();
-        if (!le) { await database('AutoItemCompatibility').insert({autoId,itemId:item.ebayId}); linksCreated++; }
-      } catch(e) {}
+        if (!le) { await database('AutoItemCompatibility').insert({autoId,itemId:item.ebayId,createdAt:new Date()}); linksCreated++; }
+      } catch(e) { if (skipped < 3) console.log('Link error:', e.message?.substring(0,100), 'autoId:', autoId, 'itemId:', item.ebayId); }
     }
     const ac = await database('Auto').count('* as cnt').first();
     const lc = await database('AutoItemCompatibility').count('* as cnt').first();
