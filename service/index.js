@@ -43,34 +43,46 @@ app.get('/admin/restock', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
 });
 
-// Test LKQ fetch — diagnose CloudFlare block
+// Test LKQ fetch — try both axios and curl from Railway
 app.get('/api/test-lkq', async (req, res) => {
-  const axios = require('axios');
+  const { execSync } = require('child_process');
   const url = 'https://www.pyp.com/inventory/raleigh-1168/';
+  const results = {};
+
+  // Test 1: curl
   try {
-    const r = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-      timeout: 15000,
-    });
-    const hasVehicles = r.data.includes('pypvi_resultRow');
-    const title = (r.data.match(/<title[^>]*>([^<]*)/)||[])[1] || '';
-    res.json({
-      status: r.status,
-      title,
-      hasVehicles,
-      bodyLength: r.data.length,
-      first200: r.data.substring(0, 200),
-      hasCF: r.data.includes('cf-') || r.data.includes('challenge'),
-    });
-  } catch (err) {
-    res.json({
-      error: err.message,
-      status: err.response?.status,
-      statusText: err.response?.statusText,
-      headers: err.response?.headers ? Object.fromEntries(Object.entries(err.response.headers)) : null,
-      bodyPreview: err.response?.data?.substring?.(0, 300),
-    });
+    const curlResult = execSync(
+      `curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`,
+      { encoding: 'utf-8', timeout: 15000 }
+    ).trim();
+    results.curl_status = curlResult;
+  } catch (e) {
+    results.curl_error = e.message?.substring(0, 100);
   }
+
+  // Test 2: curl with body
+  try {
+    const html = execSync(
+      `curl -s -L --max-time 10 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`,
+      { maxBuffer: 5 * 1024 * 1024, encoding: 'utf-8', timeout: 15000 }
+    );
+    results.curl_body_length = html.length;
+    results.curl_has_vehicles = html.includes('pypvi_resultRow');
+    results.curl_has_cf = html.includes('Just a moment');
+    results.curl_title = (html.match(/<title[^>]*>([^<]*)/)||[])[1] || '';
+  } catch (e) {
+    results.curl_body_error = e.message?.substring(0, 100);
+  }
+
+  // Test 3: which curl
+  try {
+    results.curl_path = execSync('which curl 2>/dev/null || echo "not found"', { encoding: 'utf-8' }).trim();
+    results.curl_version = execSync('curl --version 2>/dev/null | head -1', { encoding: 'utf-8' }).trim();
+  } catch (e) {
+    results.curl_path = 'error: ' + e.message?.substring(0, 50);
+  }
+
+  res.json(results);
 });
 
 // Decode all undecoded VINs in yard_vehicle
