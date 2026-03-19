@@ -238,8 +238,11 @@
 </div>
 
 <div class="toggle-bar">
-  <button class="toggle-btn" id="toggleActive" onclick="setRetention('active')">Active Only</button>
-  <button class="toggle-btn active" id="toggle7d" onclick="setRetention('7d')">Last 7 Days</button>
+  <button class="toggle-btn" id="filt-today" onclick="setDateFilter('today')">Today</button>
+  <button class="toggle-btn" id="filt-3d" onclick="setDateFilter('3d')">3 Days</button>
+  <button class="toggle-btn active" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
+  <button class="toggle-btn" id="filt-30d" onclick="setDateFilter('30d')">30 Days</button>
+  <button class="toggle-btn" id="filt-all" onclick="setDateFilter('all')">All</button>
 </div>
 
 <div id="mainContent">
@@ -261,40 +264,51 @@
 <script>
   let allData = null;
   let currentTab = 'all';
-  let retentionMode = '7d'; // '7d' or 'active'
-  // Track active pull sessions per yard
+  let dateFilter = '7d'; // 'today', '3d', '7d', '30d', 'all'
   const activeSessions = {};
 
-  function setRetention(mode) {
-    retentionMode = mode;
-    document.getElementById('toggleActive').classList.toggle('active', mode === 'active');
-    document.getElementById('toggle7d').classList.toggle('active', mode === '7d');
-    loadData();
+  function setDateFilter(mode) {
+    dateFilter = mode;
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('filt-' + mode).classList.add('active');
+    renderData();
   }
 
-  function ageBadge(lastSeen, isActive) {
-    if (!lastSeen) return '';
-    const daysAgo = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 86400000);
-    if (daysAgo === 0) return '<span class="chip chip-age age-today">Today</span>';
-    if (daysAgo <= 2) return '<span class="chip chip-age age-recent">' + daysAgo + 'd ago</span>';
-    if (daysAgo <= 6) return '<span class="chip chip-age age-old">' + daysAgo + 'd ago</span>';
-    return '<span class="chip chip-age age-old">7d+</span>';
+  function getSetDaysAgo(v) {
+    // Use date_added (LKQ set date), NOT scraped_at
+    const d = v.date_added;
+    if (!d) return 999;
+    return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  }
+
+  function ageBadge(v) {
+    const days = getSetDaysAgo(v);
+    if (days === 0) return '<span class="chip chip-age age-today">Today</span>';
+    if (days <= 2) return '<span class="chip chip-age age-recent">' + days + 'd ago</span>';
+    if (days <= 7) return '<span class="chip chip-age age-old">' + days + 'd ago</span>';
+    if (days <= 30) return '<span class="chip chip-age age-old">' + days + 'd</span>';
+    return '<span class="chip chip-age age-old">' + days + 'd</span>';
   }
 
   function vehicleRowClass(v) {
-    if (!v.is_active) {
-      const daysAgo = v.last_seen ? Math.floor((Date.now() - new Date(v.last_seen).getTime()) / 86400000) : 99;
-      if (daysAgo > 3) return 'vehicle-stale vehicle-gone';
-      return 'vehicle-gone';
-    }
+    if (!v.is_active) return 'vehicle-stale vehicle-gone';
+    const days = getSetDaysAgo(v);
+    if (days > 30) return 'vehicle-stale';
     return '';
+  }
+
+  function filterMaxDays() {
+    if (dateFilter === 'today') return 0;
+    if (dateFilter === '3d') return 3;
+    if (dateFilter === '7d') return 7;
+    if (dateFilter === '30d') return 30;
+    return 9999;
   }
 
   async function loadData() {
     document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
-      const qs = retentionMode === 'active' ? '?activeOnly=true' : '';
-      const res = await fetch('/attack-list' + qs);
+      const res = await fetch('/attack-list');
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       allData = data;
@@ -332,9 +346,14 @@
       return;
     }
 
-    // Count totals for status bar
+    // Count totals for status bar (filtered)
+    const maxDaysGlobal = filterMaxDays();
     let totalV = 0, hotV = 0;
-    yards.forEach(y => { totalV += y.total_vehicles; hotV += y.hot_vehicles; });
+    yards.forEach(y => {
+      const fv = (y.vehicles||[]).filter(v => getSetDaysAgo(v) <= maxDaysGlobal);
+      totalV += fv.length;
+      hotV += fv.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length;
+    });
     document.getElementById('statusRight').textContent = `${totalV} vehicles · ${hotV} flagged`;
 
     let html = '';
@@ -348,11 +367,16 @@
       const prioClass = topValue >= 800 ? 'chip-green' : topValue >= 500 ? 'chip-yellow' : topValue >= 250 ? 'chip-orange' : 'chip-gray';
       const lastScraped = yd.yard.last_scraped ? timeAgo(yd.yard.last_scraped) : 'never';
 
+      // Filter vehicles by date
+      const maxDays = filterMaxDays();
+      const filtered = vehicles.filter(v => getSetDaysAgo(v) <= maxDays);
+      if (filtered.length === 0) continue;
+
       html += `<div class="yard-group">
         <div style="padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
           <div>
             <span style="font-size:14px;font-weight:700;">${yd.yard.name}</span>
-            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${yd.total_vehicles} vehicles · ${lastScraped}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${filtered.length} vehicles · ${lastScraped}</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <span class="chip ${prioClass}">${priority}</span>
@@ -361,8 +385,21 @@
         </div>
         <div class="vehicle-list">`;
 
-      for (const v of vehicles) {
-        html += renderVehicle(v);
+      // Group by date section
+      const sections = [
+        { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) === 0) },
+        { label: 'LAST 3 DAYS', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 1 && d <= 3; }) },
+        { label: 'THIS WEEK', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 4 && d <= 7; }) },
+        { label: 'OLDER', vehicles: filtered.filter(v => getSetDaysAgo(v) > 7) },
+      ];
+
+      for (const sec of sections) {
+        if (sec.vehicles.length === 0) continue;
+        html += `<div style="padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;">`
+          + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
+        for (const v of sec.vehicles) {
+          html += renderVehicle(v);
+        }
       }
       html += '</div></div>';
     }
@@ -386,7 +423,7 @@
     }).join('');
 
     const rowClass = vehicleRowClass(v);
-    const aBadge = ageBadge(v.last_seen, v.is_active);
+    const aBadge = ageBadge(v);
     const goneLabel = v.is_active === false ? '<span class="chip chip-age age-old">GONE</span>' : '';
 
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
