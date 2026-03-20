@@ -81,7 +81,7 @@ async function load() {
     const date = new Date(d.generatedAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('sub').textContent = date + ' — ' + d.summary.total + ' part groups scored';
 
-    document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates';
+    document.getElementById('sub').textContent = (d.period || 'Last 7 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || '?') + ' sales analyzed)';
     document.getElementById('summary').innerHTML =
       `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
       `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
