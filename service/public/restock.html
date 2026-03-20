@@ -108,14 +108,14 @@ function renderSection(tier, cfg, items) {
       <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
     </div>
     <table><tr>
-      <th>Score</th><th>Make</th><th>Part Type</th>
+      <th>Score</th><th>Vehicle</th><th>Part Type</th>
       <th>Sold 180d</th><th>Sold 90d</th><th>Stock</th><th>Avg $</th><th>Last Sold</th><th>Total Rev</th>
     </tr>`;
   for (const i of items) {
     const lastSold = i.daysSinceSold != null ? (i.daysSinceSold <= 1 ? 'Today' : i.daysSinceSold + 'd ago') : '—';
     h += `<tr>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
-      <td style="font-weight:600">${i.make}</td>
+      <td style="font-weight:600">${i.vehicle || i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
       <td>${i.sold180d}</td>
       <td style="font-weight:600">${i.sold90d}</td>
