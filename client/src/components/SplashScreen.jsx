@@ -5,15 +5,15 @@ const SplashScreen = ({ onComplete }) => {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    // Check if already shown this session
     if (sessionStorage.getItem("darkhawk_splash_shown")) {
       setVisible(false);
       onComplete();
       return;
     }
     sessionStorage.setItem("darkhawk_splash_shown", "1");
-    const fadeTimer = setTimeout(() => setFading(true), 2000);
-    const hideTimer = setTimeout(() => { setVisible(false); onComplete(); }, 2800);
+    // 3.5s display, then 0.5s fade
+    const fadeTimer = setTimeout(() => setFading(true), 3500);
+    const hideTimer = setTimeout(() => { setVisible(false); onComplete(); }, 4000);
     return () => { clearTimeout(fadeTimer); clearTimeout(hideTimer); };
   }, [onComplete]);
 
@@ -24,7 +24,7 @@ const SplashScreen = ({ onComplete }) => {
       style={{
         position: "fixed", inset: 0, zIndex: 9999,
         background: "#000", display: "flex", alignItems: "center", justifyContent: "center",
-        opacity: fading ? 0 : 1, transition: "opacity 0.8s ease-out",
+        opacity: fading ? 0 : 1, transition: "opacity 0.5s ease-out",
       }}
     >
       <div style={{ textAlign: "center" }}>
@@ -32,19 +32,25 @@ const SplashScreen = ({ onComplete }) => {
           src="/admin/darkhawk-splash.jpg"
           alt="DarkHawk"
           style={{
-            maxWidth: "80vw", maxHeight: "60vh", borderRadius: "12px",
-            filter: "drop-shadow(0 0 30px rgba(220,38,38,0.5))",
-            animation: "glowPulse 2s ease-in-out infinite",
+            maxWidth: "80vw", maxHeight: "55vh", borderRadius: "12px",
+            animation: "hawkPulse 0.8s ease-in-out 4",
           }}
         />
-        <div style={{ marginTop: "20px", fontSize: "28px", fontWeight: 900, letterSpacing: "6px", color: "#F0F0F0" }}>
+        <div style={{
+          marginTop: "24px", fontSize: "32px", fontWeight: 900,
+          letterSpacing: "8px", color: "#F0F0F0",
+        }}>
           DARK<span style={{ color: "#DC2626" }}>HAWK</span>
         </div>
       </div>
       <style>{`
-        @keyframes glowPulse {
-          0%, 100% { filter: drop-shadow(0 0 20px rgba(220,38,38,0.3)); }
-          50% { filter: drop-shadow(0 0 40px rgba(220,38,38,0.7)); }
+        @keyframes hawkPulse {
+          0%, 100% {
+            filter: drop-shadow(0 0 30px rgba(185, 28, 28, 0.4));
+          }
+          50% {
+            filter: drop-shadow(0 0 60px rgba(220, 38, 38, 0.8));
+          }
         }
       `}</style>
     </div>
