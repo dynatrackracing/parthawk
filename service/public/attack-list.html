@@ -238,9 +238,9 @@
 </div>
 
 <div class="toggle-bar">
-  <button class="toggle-btn active" id="filt-today" onclick="setDateFilter('today')">Today</button>
+  <button class="toggle-btn" id="filt-today" onclick="setDateFilter('today')">Today</button>
   <button class="toggle-btn" id="filt-3d" onclick="setDateFilter('3d')">3 Days</button>
-  <button class="toggle-btn" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
+  <button class="toggle-btn active" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
   <button class="toggle-btn" id="filt-30d" onclick="setDateFilter('30d')">30 Days</button>
   <button class="toggle-btn" id="filt-all" onclick="setDateFilter('all')">All</button>
 </div>
@@ -264,7 +264,7 @@
 <script>
   let allData = null;
   let currentTab = 'all';
-  let dateFilter = 'today'; // 'today', '3d', '7d', '30d', 'all'
+  let dateFilter = '7d'; // 'today', '3d', '7d', '30d', 'all'
   const activeSessions = {};
 
   function setDateFilter(mode) {
