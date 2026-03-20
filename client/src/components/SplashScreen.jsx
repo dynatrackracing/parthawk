@@ -29,7 +29,7 @@ const SplashScreen = ({ onComplete }) => {
     >
       <div style={{ textAlign: "center" }}>
         <img
-          src="/admin/darkhawk-splash.png"
+          src="/admin/darkhawk-splash.jpg"
           alt="DarkHawk"
           style={{
             maxWidth: "80vw", maxHeight: "60vh", borderRadius: "12px",
