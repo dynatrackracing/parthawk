@@ -173,7 +173,12 @@ class AttackListService {
     const scored = vehicles.map(v =>
       this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs)
     );
-    scored.sort((a, b) => b.est_value - a.est_value);
+    // Sort: highest single part value first, then total value as tiebreaker
+    scored.sort((a, b) => {
+      const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
+      if (maxDiff !== 0) return maxDiff;
+      return b.est_value - a.est_value;
+    });
 
     return {
       vehicles: scored,
@@ -844,6 +849,7 @@ class AttackListService {
       stock_number: vehicle.stock_number || null,
       score, color_code: color, vehicle_verdict,
       est_value: totalValue,
+      max_part_value: filteredParts.length > 0 ? Math.max(...filteredParts.map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,
@@ -948,10 +954,11 @@ class AttackListService {
       const scored = vehicles.map(v =>
         this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
       );
-      // Sort: active vehicles first, then by score descending
-      // Sort by total estimated value, highest first
+      // Sort: active first, then highest single part value, then total value
       scored.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+        const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
+        if (maxDiff !== 0) return maxDiff;
         return b.est_value - a.est_value;
       });
 
