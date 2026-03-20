@@ -210,18 +210,21 @@ function render(data){
     for(const p of parts){
       const price=p.avgPrice||p.marketPrice||0;
       const vd=verdict(price);
-      const lastSold=p.lastSold?timeAgo(p.lastSold)+' ago':'—';
+      const lastSoldStr=p.lastSold?timeAgo(p.lastSold)+' ago':'—';
       const pn=p.pns&&p.pns[0]?p.pns[0]:'';
       const title=p.sampleTitle||p.partType;
       totalValue+=price;
+      // Price freshness
+      let fresh='❓';
+      if(p.lastSold){const da=Math.floor((Date.now()-new Date(p.lastSold).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
 
       h+='<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">';
       h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
       h+='<div style="flex:1;min-width:0">';
-      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+'</span><span style="font-size:13px;font-weight:700;color:#111">['+p.partType+']</span><span class="'+pc(price)+'" style="font-size:13px;font-weight:700">$'+price+' avg</span></div>';
+      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#111">['+p.partType+']</span></div>';
       h+='<div style="font-size:11px;color:#374151;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title.substring(0,70)+'</div>';
       if(pn)h+='<div style="font-size:10px;color:#9ca3af;font-family:monospace;margin-top:1px">'+pn+'</div>';
-      h+='<div style="font-size:10px;color:#6b7280;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSold+'</div>';
+      h+='<div style="font-size:10px;color:#6b7280;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSoldStr+'</div>';
       h+='</div></div></div>';
     }
   }else{

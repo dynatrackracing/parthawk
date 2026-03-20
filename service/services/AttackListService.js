@@ -614,11 +614,16 @@ class AttackListService {
       // Recency-weighted avg price for this part type
       const ptWeightedAvg = weightedAvgPrice(ptData.sales);
       const verdict = ptWeightedAvg >= 250 ? 'GREAT' : ptWeightedAvg >= 150 ? 'GOOD' : ptWeightedAvg >= 100 ? 'FAIR' : 'POOR';
+      // Find most recent sale date for this part type
+      const lastSold = ptData.sales.reduce((latest, s) => {
+        if (!s.soldDate) return latest;
+        return (!latest || new Date(s.soldDate) > new Date(latest)) ? s.soldDate : latest;
+      }, null);
       parts.push({
         itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
         category: null, partNumber: null, partType,
         price: ptWeightedAvg, in_stock: ptStock,
-        sold_90d: ptData.count, verdict,
+        sold_90d: ptData.count, verdict, lastSoldDate: lastSold,
         reason: `Sold ${ptData.count}x @ $${ptWeightedAvg} avg (recency-weighted)`,
         deadWarning: null,
       });
