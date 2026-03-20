@@ -460,6 +460,16 @@ app.post('/api/admin/backfill-auto', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Check which eBay env vars are configured (names only, not values)
+app.get('/api/debug/env-check', async (req, res) => {
+  const keys = ['TRADING_API_TOKEN','TRADING_API_DEV_NAME','TRADING_API_APP_NAME','TRADING_API_CERT_NAME','FINDINGS_APP_NAME','EBAY_TOKEN','ANTHROPIC_API_KEY','DATABASE_URL'];
+  const result = {};
+  for (const k of keys) {
+    result[k] = process.env[k] ? `SET (${process.env[k].length} chars)` : 'NOT SET';
+  }
+  res.json(result);
+});
+
 // Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
   const { database } = require('./database/database');
