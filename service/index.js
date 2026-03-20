@@ -492,6 +492,26 @@ app.get('/api/debug/env-check', async (req, res) => {
   res.json(result);
 });
 
+// Seed Florida yards if they don't exist
+app.post('/api/admin/seed-florida', async (req, res) => {
+  const { database } = require('./database/database');
+  const results = [];
+  const yards = [
+    { name: 'LKQ Tampa', chain: 'LKQ', scrape_method: 'html', visit_frequency: 'road_trip', distance_from_base: 600, enabled: true, flagged: false },
+    { name: 'LKQ Largo', chain: 'LKQ', scrape_method: 'html', visit_frequency: 'road_trip', distance_from_base: 610, enabled: true, flagged: false },
+    { name: 'LKQ Clearwater', chain: 'LKQ', scrape_method: 'html', visit_frequency: 'road_trip', distance_from_base: 615, enabled: true, flagged: false },
+  ];
+  for (const yard of yards) {
+    try {
+      const exists = await database('yard').where('name', yard.name).first();
+      if (exists) { results.push({ name: yard.name, status: 'exists', id: exists.id }); continue; }
+      const inserted = await database('yard').insert({ id: database.raw('gen_random_uuid()'), ...yard, createdAt: new Date(), updatedAt: new Date() }).returning('id');
+      results.push({ name: yard.name, status: 'created', id: inserted[0]?.id || inserted[0] });
+    } catch (e) { results.push({ name: yard.name, status: 'error', error: e.message }); }
+  }
+  res.json({ success: true, results });
+});
+
 // Full raw SQL diagnostic — replaces old debug/makes
 app.get('/api/debug/makes', async (req, res) => {
   const { database } = require('./database/database');
