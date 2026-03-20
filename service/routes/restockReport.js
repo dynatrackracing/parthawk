@@ -4,11 +4,11 @@ const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { normalizePartNumber } = require('../lib/partNumberUtils');
 
-// Make detection with WORD BOUNDARIES — "Programmed" won't match "Ram"
+// Make detection — word boundaries, scans entire title
 const MAKE_PATTERNS = [
   [/\bToyota\b/i, 'Toyota'], [/\bHonda\b/i, 'Honda'], [/\bFord\b/i, 'Ford'],
   [/\bDodge\b/i, 'Dodge'], [/\bChrysler\b/i, 'Chrysler'], [/\bJeep\b/i, 'Jeep'],
-  [/\bRam\b(?!\w)/i, 'Ram'], // \b before, no word char after — won't match "Programmed" or "Ramcharger"
+  [/\bRam\b(?!\w)/i, 'Ram'],
   [/\bChevrolet\b/i, 'Chevrolet'], [/\bChevy\b/i, 'Chevrolet'],
   [/\bGMC\b/i, 'GMC'], [/\bNissan\b/i, 'Nissan'], [/\bHyundai\b/i, 'Hyundai'],
   [/\bKia\b/i, 'Kia'], [/\bMazda\b/i, 'Mazda'], [/\bSubaru\b/i, 'Subaru'],
@@ -19,11 +19,38 @@ const MAKE_PATTERNS = [
   [/\bLincoln\b/i, 'Lincoln'], [/\bMini\b/i, 'Mini'], [/\bPontiac\b/i, 'Pontiac'],
   [/\bSaturn\b/i, 'Saturn'], [/\bMercury\b/i, 'Mercury'], [/\bScion\b/i, 'Scion'],
   [/\bFiat\b/i, 'Fiat'], [/\bJaguar\b/i, 'Jaguar'], [/\bPorsche\b/i, 'Porsche'],
-  [/\bSaab\b/i, 'Saab'], [/\bLand Rover\b/i, 'Land Rover'],
+  [/\bSaab\b/i, 'Saab'], [/\bSuzuki\b/i, 'Suzuki'], [/\bIsuzu\b/i, 'Isuzu'],
+  [/\bHummer\b/i, 'Hummer'], [/\bGenesis\b/i, 'Genesis'], [/\bMaserati\b/i, 'Maserati'],
+  [/\bAlfa Romeo\b/i, 'Alfa Romeo'], [/\bSmart\b/i, 'Smart'],
+  [/\bOldsmobile\b/i, 'Oldsmobile'], [/\bPlymouth\b/i, 'Plymouth'],
+  [/\bRange Rover\b/i, 'Land Rover'], [/\bLand Rover\b/i, 'Land Rover'],
+  // Model-implies-make: Explorer=Ford, Mountaineer=Mercury, Civic=Honda etc
+  [/\bExplorer\b/i, 'Ford'], [/\bMountaineer\b/i, 'Mercury'],
+  [/\bEscalade\b/i, 'Cadillac'], [/\bYukon\b/i, 'GMC'],
 ];
 
-const COMPOUND_MODELS = new Set(['GRAND','TOWN','CROWN','MONTE','LAND','SANTA']);
-const STOP_WORDS = new Set(['ECU','ECM','PCM','BCM','TCM','ABS','TIPM','OEM','NEW','USED','REMAN','Engine','Body','Control','Module','Anti','Fuse','Power','Brake','Amplifier','Radio','Cluster','Programmed','Plug','Play','AT','MT','4WD','AWD','2WD','FWD','Integrated','Lock','Pump','Electric','Steering','Throttle','VIN','Tested','OEM','REBUILT','Genuine']);
+// Known compound models (2+ words that must stay together)
+const COMPOUND_MODELS = {
+  'GRAND': ['Cherokee','Caravan','Prix','Marquis','Vitara','Am'],
+  'SANTA': ['Fe','Cruz'],
+  'TOWN': ['Car','Country','&'],
+  'CROWN': ['Victoria'],
+  'MONTE': ['Carlo'],
+  'LAND': ['Cruiser'],
+  'PT': ['Cruiser'],
+  'RANGE': ['Rover'],
+  'COOPER': ['S','Countryman'],
+  'WRANGLER': ['JK','JL'],
+  'MUSTANG': ['GT','Mach'],
+  'CIVIC': ['Si','Type'],
+  'PARK': ['Avenue'],
+};
+
+const STOP_WORDS = new Set(['ECU','ECM','PCM','BCM','TCM','ABS','TIPM','OEM','NEW','USED','REMAN',
+  'ENGINE','BODY','CONTROL','MODULE','ANTI','FUSE','POWER','BRAKE','AMPLIFIER','RADIO','CLUSTER',
+  'PROGRAMMED','PLUG','PLAY','AT','MT','4WD','AWD','2WD','FWD','INTEGRATED','LOCK','PUMP',
+  'ELECTRIC','STEERING','THROTTLE','VIN','TESTED','GENUINE','REBUILT','V6','V8','V10',
+  'HEMI','TURBO','SUPERCHARGED','AUTOMATIC','MANUAL']);
 
 function extractMake(title) {
   for (const [re, name] of MAKE_PATTERNS) {
@@ -35,25 +62,46 @@ function extractMake(title) {
 function extractModel(title, make) {
   if (!make) return null;
   const tu = title.toUpperCase();
-  const makeUpper = make.toUpperCase();
-  // Handle aliases
-  let mi = tu.indexOf(makeUpper);
-  if (mi === -1 && make === 'Chevrolet') mi = tu.indexOf('CHEVY');
-  if (mi === -1 && make === 'Volkswagen') mi = tu.indexOf('VW');
+  // Find make position — try canonical name first, then aliases
+  const makeNames = [make.toUpperCase()];
+  if (make === 'Chevrolet') makeNames.push('CHEVY');
+  if (make === 'Volkswagen') makeNames.push('VW');
+  if (make === 'Land Rover') makeNames.push('RANGE ROVER');
+
+  let mi = -1;
+  let matchLen = 0;
+  for (const mn of makeNames) {
+    const idx = tu.indexOf(mn);
+    if (idx !== -1 && (mi === -1 || idx < mi)) { mi = idx; matchLen = mn.length; }
+  }
   if (mi === -1) return null;
 
-  const after = title.substring(mi + (make === 'Chevrolet' && tu.indexOf('CHEVY') === mi ? 5 : makeUpper.length)).trim().split(/\s+/);
+  const after = title.substring(mi + matchLen).trim().split(/\s+/);
   const mw = [];
-  for (const w of after) {
+  for (let i = 0; i < after.length; i++) {
+    const w = after[i];
     const clean = w.replace(/[^A-Za-z0-9\-]/g, '');
-    if (!clean || /^\d{4}$/.test(clean) || /^\d+\.\d+[lL]?$/.test(clean)) break;
+    if (!clean) continue;
+    if (/^\d{4}$/.test(clean) || /^\d{4}-\d{4}$/.test(clean)) {
+      if (mw.length > 0) break; else continue; // skip leading years
+    }
+    if (/^\d+\.\d+[lL]?$/.test(clean)) break;
     if (STOP_WORDS.has(clean.toUpperCase())) break;
     mw.push(clean);
-    // Compound models: Grand Cherokee, Santa Fe, Crown Victoria, Town Car, Monte Carlo, Land Cruiser
-    if (mw.length === 1 && COMPOUND_MODELS.has(clean.toUpperCase())) continue;
-    // Number suffix: Ram 1500, F-150
-    if (mw.length === 2 && /^\d/.test(clean)) break;
-    if (mw.length >= 1 && !COMPOUND_MODELS.has(mw[0].toUpperCase())) break;
+
+    // Check if this starts a compound model
+    const upper = clean.toUpperCase();
+    if (COMPOUND_MODELS[upper] && i + 1 < after.length) {
+      const next = after[i + 1]?.replace(/[^A-Za-z0-9\-&]/g, '') || '';
+      if (COMPOUND_MODELS[upper].some(c => c.toUpperCase() === next.toUpperCase())) {
+        mw.push(next);
+        break;
+      }
+    }
+
+    // Number suffix (Ram 1500, F-150)
+    if (mw.length >= 2 && /^\d/.test(clean)) break;
+    if (mw.length >= 1 && !COMPOUND_MODELS[upper]) break;
     if (mw.length >= 2) break;
   }
   return mw.length > 0 ? mw.join(' ') : null;
@@ -73,42 +121,46 @@ function extractPartType(title) {
   if (/\b(THROTTLE BODY)\b/.test(t)) return 'Throttle';
   if (/\b(MIRROR|SIDE VIEW)\b/.test(t)) return 'Mirror';
   if (/\b(ALTERNATOR)\b/.test(t)) return 'Alternator';
-  if (/\b(STARTER|STARTER MOTOR)\b/.test(t)) return 'Starter';
+  if (/\b(STARTER MOTOR|STARTER)\b/.test(t)) return 'Starter';
   if (/\b(SEAT BELT|SEATBELT)\b/.test(t)) return 'Seat Belt';
   if (/\b(WINDOW MOTOR|REGULATOR)\b/.test(t)) return 'Regulator';
   if (/\b(HEADLIGHT|HEAD LIGHT|HEAD LAMP)\b/.test(t)) return 'Headlight';
   if (/\b(TAIL LIGHT|TAILLIGHT)\b/.test(t)) return 'Tail Light';
   if (/\b(STEERING|EPS|POWER STEERING)\b/.test(t)) return 'Steering';
-  if (/\b(TRANSFER CASE|XFER)\b/.test(t)) return 'Transfer Case';
+  if (/\b(TRANSFER CASE)\b/.test(t)) return 'Transfer Case';
   if (/\b(WIPER)\b/.test(t)) return 'Wiper';
-  if (/\b(SENSOR|CAMERA|BLIND SPOT)\b/.test(t)) return 'Sensor';
-  // Fallback: grab first noun-like word after make+model+year
+  if (/\b(SENSOR|CAMERA|BLIND SPOT|PARKING)\b/.test(t)) return 'Sensor';
+  if (/\b(ACTUATOR|MULTIAIR|VVT)\b/.test(t)) return 'Actuator';
+  if (/\b(INTAKE MANIFOLD)\b/.test(t)) return 'Intake';
+  if (/\b(CLIMATE|HVAC|AC CONTROL)\b/.test(t)) return 'Climate Control';
   return null;
 }
 
 function extractPartNumbers(title) {
   const pns = [];
-  const chrysler = title.match(/\b(\d{7,10}[A-Z]{0,2})\b/g);
-  if (chrysler) pns.push(...chrysler);
-  const ford = title.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{3,7}(?:-[A-Z]{1,3})?)\b/g);
-  if (ford) pns.push(...ford);
-  const toyota = title.match(/\b(\d{5}-[A-Z0-9]{2,7}(?:-[A-Z0-9]{1,3})?)\b/g);
-  if (toyota) pns.push(...toyota);
+  const m1 = title.match(/\b(\d{7,10}[A-Z]{0,2})\b/g);
+  if (m1) pns.push(...m1);
+  const m2 = title.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{3,7}(?:-[A-Z]{1,3})?)\b/g);
+  if (m2) pns.push(...m2);
+  const m3 = title.match(/\b(\d{5}-[A-Z0-9]{2,7}(?:-[A-Z0-9]{1,3})?)\b/g);
+  if (m3) pns.push(...m3);
   return pns;
 }
 
-function extractFallbackPartName(title) {
-  // Try to grab a descriptive chunk from the title
-  // Remove year, make, model, part numbers — what's left is the part description
+function getPartLabel(title, make, model) {
+  // Remove make, model, years, PNs, engine specs → what's left is the part description
   let t = title;
-  t = t.replace(/\b\d{4}\b/g, '').replace(/\b\d{7,10}[A-Z]{0,2}\b/g, '');
+  if (make) t = t.replace(new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), '');
+  if (make === 'Chevrolet') t = t.replace(/\bChevy\b/gi, '');
+  if (model) t = t.replace(new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), '');
+  t = t.replace(/\b\d{4}(-\d{4})?\b/g, '');
+  t = t.replace(/\b\d{7,10}[A-Z]{0,2}\b/g, '');
   t = t.replace(/\b[A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{3,7}(?:-[A-Z]{1,3})?\b/g, '');
   t = t.replace(/\b\d{5}-[A-Z0-9]{2,7}\b/g, '');
   t = t.replace(/\b\d+\.\d+L\b/gi, '');
-  for (const [re] of MAKE_PATTERNS) t = t.replace(re, '');
-  t = t.replace(/\b(OEM|Programmed|Tested|REMAN|AT|MT|4WD|AWD|2WD|FWD|RWD)\b/gi, '');
-  t = t.replace(/\s+/g, ' ').trim();
-  return t.substring(0, 40) || 'Part';
+  t = t.replace(/\b(OEM|Programmed|Tested|REMAN|AT|MT|4WD|AWD|2WD|FWD|RWD|V6|V8)\b/gi, '');
+  t = t.replace(/[,\-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return t || 'Part';
 }
 
 router.get('/report', async (req, res) => {
@@ -125,13 +177,13 @@ router.get('/report', async (req, res) => {
       const make = extractMake(title);
       const model = make ? extractModel(title, make) : null;
       let pt = extractPartType(title);
-      if (!pt) pt = extractFallbackPartName(title);
+      if (!pt) pt = getPartLabel(title, make, model);
       const pns = extractPartNumbers(title);
       const basePn = pns.length > 0 ? normalizePartNumber(pns[0]) : null;
-      const key = `${make || 'Unknown'}|${model || ''}|${pt}|${basePn || title.substring(0,30)}`;
+      const key = `${make || '?'}|${model || ''}|${pt}|${basePn || title.substring(0, 30)}`;
 
       if (!groups[key]) {
-        groups[key] = { make: make || 'Unknown', model, partType: pt, basePn, allPns: new Set(), sold: 0, totalPrice: 0, lastSold: null, sampleTitle: title };
+        groups[key] = { make: make || '?', model, partType: pt, basePn, allPns: new Set(), sold: 0, totalPrice: 0, lastSold: null, sampleTitle: title };
       }
       const g = groups[key];
       g.sold++;
@@ -140,7 +192,6 @@ router.get('/report', async (req, res) => {
       if (!g.lastSold || new Date(sale.soldDate) > new Date(g.lastSold)) g.lastSold = sale.soldDate;
     }
 
-    // Stock index from listings
     const listings = await database('YourListing').where('listingStatus', 'Active').whereNotNull('title').select('title', 'quantityAvailable');
     const stockByBasePn = {};
     for (const l of listings) {
@@ -157,7 +208,7 @@ router.get('/report', async (req, res) => {
       const avgPrice = g.sold > 0 ? Math.round(g.totalPrice / g.sold * 100) / 100 : 0;
       const years = g.sampleTitle.match(/\b((?:19|20)\d{2})\b/g);
       let yearRange = null;
-      if (years) { const s = [...new Set(years.map(Number))].sort(); yearRange = s[0] === s[s.length-1] ? String(s[0]) : s[0]+'-'+s[s.length-1]; }
+      if (years) { const s = [...new Set(years.map(Number))].sort(); yearRange = s[0] === s[s.length - 1] ? String(s[0]) : s[0] + '-' + s[s.length - 1]; }
 
       let score = 0;
       score += g.sold >= 4 ? 35 : g.sold >= 3 ? 28 : g.sold >= 2 ? 20 : 10;
@@ -168,7 +219,6 @@ router.get('/report', async (req, res) => {
       score = Math.min(100, score);
       if (avgPrice >= 300 && g.sold >= 1) score = Math.max(score, 75);
 
-      // Action by stock level ONLY
       const action = stock === 0 ? 'RESTOCK NOW' : stock === 1 ? 'LOW STOCK' : 'MONITOR';
 
       items.push({
@@ -179,16 +229,15 @@ router.get('/report', async (req, res) => {
       });
     }
 
-    // Show everything where stock is 0 or 1, OR sold > stock, OR $300+
     const filtered = items.filter(i => i.activeStock <= 1 || i.sold7d > i.activeStock || i.avgPrice >= 300);
     filtered.sort((a, b) => b.revenue - a.revenue);
     const top = filtered.slice(0, 100);
 
-    // Tier by SCORE only
+    // Tier rules: green = score 75+ AND stock 0, yellow = score 60+ OR (score 75+ with stock>0), orange = rest
     const tiers = { green: [], yellow: [], orange: [] };
     for (const item of top) {
-      if (item.score >= 75) { item.tier = 'green'; tiers.green.push(item); }
-      else if (item.score >= 50) { item.tier = 'yellow'; tiers.yellow.push(item); }
+      if (item.score >= 75 && item.activeStock === 0) { item.tier = 'green'; tiers.green.push(item); }
+      else if (item.score >= 60 || (item.score >= 75 && item.activeStock > 0)) { item.tier = 'yellow'; tiers.yellow.push(item); }
       else { item.tier = 'orange'; tiers.orange.push(item); }
     }
 
