@@ -439,44 +439,74 @@ class AttackListService {
   /**
    * Find matching inventory parts for a vehicle across all compatible makes.
    */
-  findMatchedParts(make, model, year, inventoryIndex) {
+  findMatchedParts(make, model, year, inventoryIndex, vehicleEngine) {
     let matchedParts = [];
     const alsoCheck = MAKE_ALSO_CHECK[make] || [];
     const allMakes = [make, ...alsoCheck];
 
-    // Match with ±1 year range (parts often fit adjacent years)
+    // Collect candidate items from ±1 year in inventory index
+    const candidates = [];
     for (const m of allMakes) {
       for (let y = year - 1; y <= year + 1; y++) {
         const key = `${m}|${model}|${y}`;
         const match = inventoryIndex[key];
         if (match) {
           for (const item of match.items) {
-            if (!matchedParts.some(p => p.itemId === item.itemId)) {
-              matchedParts.push(item);
-            }
+            if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
           }
         }
       }
     }
 
-    // Fuzzy model match with ±1 year if still no hits
-    if (matchedParts.length === 0) {
+    // Fuzzy model match with ±1 year if no exact hits
+    if (candidates.length === 0) {
       const modelLower = model.toLowerCase();
       for (const [key, entry] of Object.entries(inventoryIndex)) {
         const [iMake, iModel, iYear] = key.split('|');
         const iYearNum = parseInt(iYear);
         if (iYearNum < year - 1 || iYearNum > year + 1) continue;
         if (!allMakes.includes(iMake)) continue;
-
         const iModelLower = iModel.toLowerCase();
         if (iModelLower.includes(modelLower) || modelLower.includes(iModelLower)) {
           for (const item of entry.items) {
-            if (!matchedParts.some(p => p.itemId === item.itemId)) {
-              matchedParts.push(item);
-            }
+            if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
           }
         }
       }
+    }
+
+    // VALIDATE each candidate: check title for year range and engine compatibility
+    for (const item of candidates) {
+      const title = (item.title || '').toUpperCase();
+
+      // Year range check from title
+      const rangeMatch = title.match(/\b((?:19|20)?\d{2})\s*[-–]\s*((?:19|20)?\d{2})\b/);
+      if (rangeMatch) {
+        let y1 = parseInt(rangeMatch[1]), y2 = parseInt(rangeMatch[2]);
+        if (y1 < 100) y1 += y1 >= 70 ? 1900 : 2000;
+        if (y2 < 100) y2 += y2 >= 70 ? 1900 : 2000;
+        if (y1 > y2) { const tmp = y1; y1 = y2; y2 = tmp; }
+        // Vehicle year must be within the part's year range (with 1 year tolerance)
+        if (year < y1 - 1 || year > y2 + 1) continue;
+      } else {
+        // Single year in title — must be within ±2 of vehicle year
+        const singleYears = title.match(/\b((?:19|20)\d{2})\b/g);
+        if (singleYears && singleYears.length >= 1) {
+          const partYears = singleYears.map(Number);
+          const closestYear = partYears.reduce((best, py) => Math.abs(py - year) < Math.abs(best - year) ? py : best, partYears[0]);
+          if (Math.abs(year - closestYear) > 2) continue;
+        }
+        // No year in title — allow (generic part)
+      }
+
+      // Engine displacement check — if both vehicle and part specify displacement, they must match
+      if (vehicleEngine) {
+        const vDispMatch = vehicleEngine.toUpperCase().match(/(\d+\.\d)/);
+        const pDispMatch = title.match(/(\d+\.\d)L/);
+        if (vDispMatch && pDispMatch && vDispMatch[1] !== pDispMatch[1]) continue;
+      }
+
+      matchedParts.push(item);
     }
 
     return matchedParts;
@@ -494,7 +524,7 @@ class AttackListService {
     // Find matching inventory parts (from Auto+Item tables — may be empty)
     let matchedParts = [];
     if (make && model && year) {
-      matchedParts = this.findMatchedParts(make, model, year, inventoryIndex);
+      matchedParts = this.findMatchedParts(make, model, year, inventoryIndex, vehicle.engine);
     }
 
     // Find matching sales from YourSale by make+model+year
