@@ -79,7 +79,9 @@ async function scrapePages(slug) {
           else if(t.includes('Stock #:')||t.includes('Stock#:'))stock=t.replace(/Stock\s*#:\s*/,'').trim();
           else if(t.includes('Available:')){const te=$(d).find('time');dateAdded=te.length?(te.attr('datetime')||te.text().trim()):t.replace('Available:','').trim();}
         });
-        all.push({year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded});
+        const vehicle = {year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded};
+        if (all.length === 0) console.log('  FIRST VEHICLE:', JSON.stringify(vehicle));
+        all.push(vehicle);
         n++;
       });
       if(n===0)break;
@@ -108,19 +110,24 @@ async function saveYard(loc, allVehicles) {
     seenYMM.add(`${v.year}|${v.make}|${v.model}`);
   }
 
-  // Filter to only vehicles added in last 24 hours
+  // Filter to only vehicles added in last 48 hours
   const newVehicles = [];
-  let oldSkipped = 0;
+  let oldSkipped = 0, nullDate = 0;
+  // Debug: show date distribution
+  const dateSamples = [];
   for (const v of allVehicles) {
     const d = parseDate(v.dateAdded);
-    if (d && daysAgo(d) <= 1) {
+    if (dateSamples.length < 5) dateSamples.push({ raw: v.dateAdded, parsed: d ? d.toISOString() : null, daysAgo: d ? daysAgo(d) : 'null' });
+    if (!d) { nullDate++; oldSkipped++; continue; }
+    if (daysAgo(d) <= 2) {
       v._date = d;
       newVehicles.push(v);
     } else {
       oldSkipped++;
     }
   }
-  console.log(`  New (last 24h): ${newVehicles.length}, Old (skipped): ${oldSkipped}`);
+  console.log(`  Date samples:`, JSON.stringify(dateSamples));
+  console.log(`  New (last 48h): ${newVehicles.length}, Old: ${oldSkipped}, Null dates: ${nullDate}`);
 
   // Mark vehicles NOT in scrape as inactive (pulled from yard)
   let deactivated = 0;
