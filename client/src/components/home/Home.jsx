@@ -4,9 +4,9 @@ import AutoSearchForm from "../AutoSearchForm/AutoSearchForm";
 import axios from "../../utils/axios";
 
 const StatCard = ({ label, value, sub }) => (
-  <div style={{ background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px 16px', flex: 1, minWidth: '120px' }}>
+  <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', flex: 1, minWidth: '120px' }}>
     <div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-    <div style={{ fontSize: '22px', fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.03em', marginTop: '2px' }}>{value}</div>
+    <div style={{ fontSize: '22px', fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.03em', marginTop: '2px' }}>{value}</div>
     {sub && <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '1px' }}>{sub}</div>}
   </div>
 );
@@ -53,7 +53,7 @@ const Home = () => {
         )}
 
         {/* Search */}
-        <div style={{ background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
             Vehicle Search
           </div>
@@ -71,9 +71,9 @@ const Home = () => {
             { label: 'VIN Scanner', href: '/admin/vin' },
           ].map(link => (
             <a key={link.href} href={link.href}
-              style={{ padding: '8px 14px', background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#9ca3af', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}
-              onMouseOver={e => e.target.style.color = '#f9fafb'}
-              onMouseOut={e => e.target.style.color = '#9ca3af'}
+              style={{ padding: '8px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#374151', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}
+              onMouseOver={e => e.target.style.color = '#111'}
+              onMouseOut={e => e.target.style.color = '#374151'}
             >
               {link.label}
             </a>
