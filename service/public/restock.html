@@ -105,28 +105,24 @@ function renderSection(tier, cfg, items) {
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
       <span>${cfg.icon} ${cfg.label} (${items.length})</span>
-      <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80-100' : tier === 'yellow' ? '60-79' : tier === 'orange' ? '40-59' : tier === 'red' ? '20-39' : '0-19'}</span>
+      <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
     </div>
     <table><tr>
-      <th>Score</th><th>Part Type</th><th>Vehicle</th><th>Part #s</th><th>Spec</th>
-      <th>Sold</th><th>Stock</th><th>Sold Out</th><th>Avg $</th><th>Profit</th><th>Total Rev</th>
+      <th>Score</th><th>Make</th><th>Part Type</th>
+      <th>Sold 180d</th><th>Sold 90d</th><th>Stock</th><th>Avg $</th><th>Last Sold</th><th>Total Rev</th>
     </tr>`;
   for (const i of items) {
-    const profitClass = i.profit >= 0 ? 'profit-pos' : 'profit-neg';
-    const pns = (i.partNumbers || []).join(', ') || '—';
-    const soldOut = i.activeStock === 0 && i.soldOutDate ? formatSoldOut(i.soldOutDate) : '';
+    const lastSold = i.daysSinceSold != null ? (i.daysSinceSold <= 1 ? 'Today' : i.daysSinceSold + 'd ago') : '—';
     h += `<tr>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
+      <td style="font-weight:600">${i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
-      <td>${i.vehicle || '—'}</td>
-      <td class="mono" style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${pns}">${pns}</td>
-      <td class="mono">${i.specificity || '—'}</td>
-      <td style="font-weight:600">${i.sold180d}</td>
+      <td>${i.sold180d}</td>
+      <td style="font-weight:600">${i.sold90d}</td>
       <td>${i.activeStock}</td>
-      <td class="sold-out">${soldOut}</td>
       <td>$${i.avgPrice}</td>
-      <td class="${profitClass}">$${i.profit}</td>
-      <td>$${i.revenue180d.toLocaleString()}</td>
+      <td>${lastSold}</td>
+      <td>$${Math.round(i.revenue180d).toLocaleString()}</td>
     </tr>`;
   }
   h += '</table></div>';
