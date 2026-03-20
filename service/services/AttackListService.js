@@ -633,17 +633,18 @@ class AttackListService {
       const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
 
       if (p.isRebuild) {
-        const rbKey = basePn || p.partType + '_' + Math.random();
-        if (!mergedByBase['_rb_' + rbKey]) {
-          mergedByBase['_rb_' + rbKey] = null; // just track we've seen it
-          rebuildParts.push({
-            itemId: p.itemId, title: p.title, category: p.category,
-            partNumber: p.partNumber, partType: p.partType,
-            price: Math.round(p.price), in_stock: 0, sold_90d: 0,
-            verdict: 'REBUILD', seller: p.seller || 'pro-rebuild',
-            reason: 'Rebuild reference — not included in pull value',
-            isRebuild: true, deadWarning: null,
-          });
+        // Group rebuild parts by partType+seller
+        const rbKey = `_rb_${p.partType}_${p.seller || 'pro-rebuild'}`;
+        if (mergedByBase[rbKey]) {
+          const rb = mergedByBase[rbKey];
+          rb._count++;
+          if (p.price < rb._minPrice) rb._minPrice = p.price;
+          if (p.price > rb._maxPrice) rb._maxPrice = p.price;
+        } else {
+          mergedByBase[rbKey] = {
+            partType: p.partType, seller: p.seller || 'pro-rebuild',
+            _count: 1, _minPrice: p.price, _maxPrice: p.price,
+          };
         }
         continue;
       }
@@ -843,7 +844,18 @@ class AttackListService {
       sales_count: salesDemand.count,
       platform_siblings: platformSiblingNames.length > 0 ? platformSiblingNames : null,
       parts: filteredParts,
-      rebuild_parts: rebuildParts.length > 0 ? rebuildParts : null,
+      rebuild_parts: (() => {
+        // Build grouped rebuild parts from mergedByBase _rb_ entries
+        for (const [k, rb] of Object.entries(mergedByBase)) {
+          if (!k.startsWith('_rb_') || !rb) continue;
+          const priceStr = rb._minPrice === rb._maxPrice ? `$${Math.round(rb._minPrice)}` : `$${Math.round(rb._minPrice)}-$${Math.round(rb._maxPrice)}`;
+          rebuildParts.push({
+            partType: rb.partType, seller: rb.seller, price: Math.round(rb._maxPrice),
+            priceRange: priceStr, count: rb._count, isRebuild: true, verdict: 'REBUILD',
+          });
+        }
+        return rebuildParts.length > 0 ? rebuildParts : null;
+      })(),
     };
   }
 
