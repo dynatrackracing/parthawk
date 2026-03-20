@@ -264,19 +264,29 @@ async function generateRestockReport() {
     const avgPrice = data.salesForWeighting.length > 0 ? weightedAvgPrice(data.salesForWeighting) : 0;
     const profit = calcProfit(avgPrice, data.partType);
 
-    let score = 0;
-    score += Math.min(40, data.sold * 4);
-    score += Math.min(30, profit > 0 ? Math.round(profit / 5) : 0);
-    score += stock === 0 ? 20 : stock === 1 ? 10 : 0;
-    score = Math.min(100, score);
-    if (avgPrice >= 300 && data.sold >= 1) score = Math.max(score, 75);
+    // Filter: only actionable restock candidates
+    // Must have sold 2+ in 180d, avg price $80+, and low/no stock
+    if (data.sold < 2) continue;
+    if (avgPrice < 80) continue;
 
-    let tier, action;
-    if (score >= 80) { tier = 'green'; action = 'RESTOCK NOW'; }
-    else if (score >= 60) { tier = 'yellow'; action = 'STRONG BUY'; }
-    else if (score >= 40) { tier = 'orange'; action = 'CONSIDER'; }
-    else if (score >= 20) { tier = 'red'; action = 'LOW PRIORITY'; }
-    else { tier = 'grey'; action = 'ON RADAR'; }
+    // Count sales in last 90 days
+    const cutoff90 = new Date(Date.now() - 90 * 86400000);
+    const sold90d = data.salesForWeighting.filter(s => s.soldDate && new Date(s.soldDate) >= cutoff90).length;
+
+    // Stock must be 0 OR less than half of 90-day sales
+    if (stock > 0 && stock >= Math.ceil(sold90d / 2)) continue;
+
+    // Tier by urgency
+    let tier, action, score;
+    if (sold90d >= 4 && stock === 0 && avgPrice >= 150) {
+      tier = 'green'; action = 'RESTOCK NOW'; score = 90 + Math.min(10, sold90d);
+    } else if (sold90d >= 2 && stock <= 1 && avgPrice >= 100) {
+      tier = 'yellow'; action = 'STRONG BUY'; score = 70 + Math.min(10, sold90d);
+    } else if (data.sold >= 2 && stock === 0) {
+      tier = 'orange'; action = 'CONSIDER'; score = 50 + Math.min(10, data.sold);
+    } else {
+      continue; // Don't show
+    }
 
     // Build vehicle string with year range
     let yearStr = '';
@@ -299,7 +309,7 @@ async function generateRestockReport() {
       specificity: data.specificity,
       partNumbers: [...data.partNumbers].slice(0, 5),
       score, tier, action,
-      sold180d: data.sold, activeStock: stock, avgPrice, profit,
+      sold180d: data.sold, sold90d, activeStock: stock, avgPrice, profit,
       revenue180d: Math.round(data.revenue),
       ratio: stock > 0 ? Math.round(data.sold / stock * 10) / 10 : data.sold,
       soldOutDate,
@@ -309,7 +319,7 @@ async function generateRestockReport() {
 
   items.sort((a, b) => b.score - a.score);
 
-  const tiers = { green: [], yellow: [], orange: [], red: [], grey: [] };
+  const tiers = { green: [], yellow: [], orange: [] };
   for (const item of items) tiers[item.tier].push(item);
 
   return {
@@ -317,7 +327,7 @@ async function generateRestockReport() {
     tiers,
     summary: {
       green: tiers.green.length, yellow: tiers.yellow.length,
-      orange: tiers.orange.length, red: tiers.red.length, grey: tiers.grey.length,
+      orange: tiers.orange.length,
       total: items.length,
     },
   };

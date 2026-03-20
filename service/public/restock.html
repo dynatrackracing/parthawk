@@ -59,8 +59,6 @@ const TIER_CONFIG = {
   green:  { icon: '🟢', label: 'RESTOCK NOW',  badge: 'b-green',  header: 'sh-green' },
   yellow: { icon: '🟡', label: 'STRONG BUY',   badge: 'b-yellow', header: 'sh-yellow' },
   orange: { icon: '🟠', label: 'CONSIDER',     badge: 'b-orange', header: 'sh-orange' },
-  red:    { icon: '🔴', label: 'LOW PRIORITY', badge: 'b-red',    header: 'sh-red' },
-  grey:   { icon: '⚪', label: 'ON RADAR',     badge: 'b-grey',   header: 'sh-grey' },
 };
 
 function formatSoldOut(dateStr) {
@@ -84,14 +82,13 @@ async function load() {
     document.getElementById('sub').textContent = date + ' — ' + d.summary.total + ' part groups scored';
 
     document.getElementById('summary').innerHTML =
-      `<div class="stat"><div class="stat-label">Green 80-100</div><div class="stat-value sg">${d.summary.green}</div></div>` +
-      `<div class="stat"><div class="stat-label">Yellow 60-79</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
-      `<div class="stat"><div class="stat-label">Orange 40-59</div><div class="stat-value so">${d.summary.orange}</div></div>` +
-      `<div class="stat"><div class="stat-label">Red 20-39</div><div class="stat-value sr">${d.summary.red}</div></div>` +
-      `<div class="stat"><div class="stat-label">Grey 0-19</div><div class="stat-value sgr">${d.summary.grey}</div></div>`;
+      `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
+      `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
+      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>` +
+      `<div class="stat"><div class="stat-label">Total</div><div class="stat-value">${d.summary.total}</div></div>`;
 
     let html = '';
-    for (const tier of ['green', 'yellow', 'orange', 'red', 'grey']) {
+    for (const tier of ['green', 'yellow', 'orange']) {
       const items = d.tiers[tier] || [];
       if (items.length === 0) continue;
       const cfg = TIER_CONFIG[tier];
