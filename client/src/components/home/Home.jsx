@@ -4,10 +4,10 @@ import AutoSearchForm from "../AutoSearchForm/AutoSearchForm";
 import axios from "../../utils/axios";
 
 const StatCard = ({ label, value, sub }) => (
-  <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '12px 16px', flex: 1, minWidth: '120px' }}>
-    <div style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-    <div style={{ fontSize: '22px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em', marginTop: '2px' }}>{value}</div>
-    {sub && <div style={{ fontSize: '10px', color: '#64748b', marginTop: '1px' }}>{sub}</div>}
+  <div style={{ background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px 16px', flex: 1, minWidth: '120px' }}>
+    <div style={{ fontSize: '10px', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+    <div style={{ fontSize: '22px', fontWeight: 800, color: '#F0F0F0', letterSpacing: '-0.03em', marginTop: '2px' }}>{value}</div>
+    {sub && <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '1px' }}>{sub}</div>}
   </div>
 );
 
@@ -53,8 +53,8 @@ const Home = () => {
         )}
 
         {/* Search */}
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        <div style={{ background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
             Vehicle Search
           </div>
           <AutoSearchForm />
@@ -71,9 +71,9 @@ const Home = () => {
             { label: 'VIN Scanner', href: '/admin/vin' },
           ].map(link => (
             <a key={link.href} href={link.href}
-              style={{ padding: '8px 14px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#94a3b8', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}
-              onMouseOver={e => e.target.style.color = '#f1f5f9'}
-              onMouseOut={e => e.target.style.color = '#94a3b8'}
+              style={{ padding: '8px 14px', background: '#141414', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#9CA3AF', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}
+              onMouseOver={e => e.target.style.color = '#DC2626'}
+              onMouseOut={e => e.target.style.color = '#9CA3AF'}
             >
               {link.label}
             </a>

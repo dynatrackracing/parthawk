@@ -1,6 +1,6 @@
 {
-  "name": "PartHawk Puller",
-  "short_name": "PartHawk",
+  "name": "darkhawk Puller",
+  "short_name": "darkhawk",
   "description": "Attack list and pull guide for junkyard parts",
   "start_url": "/puller",
   "display": "standalone",

@@ -13,6 +13,7 @@ import PrivateRoute from "./components/routing/PrivateRoute";
 import PublicRoute from "./components/routing/PublicRoute";
 import SearchItem from "./components/SearchItem";
 import Sidebar from "./components/Sidebar";
+import SplashScreen from "./components/SplashScreen";
 
 // Intelligence Pages
 import MarketDashboard from "./components/intelligence/MarketDashboard";
@@ -43,6 +44,7 @@ const App = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialPage, setInitialPage] = useState();
   const [isLoading, setIsLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -104,6 +106,8 @@ const App = () => {
   }
 
   return (
+    <>
+    {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
     <GridProvider>
       <ItemProvider>
         <ToastContainer
@@ -186,6 +190,7 @@ const App = () => {
         )}
       </ItemProvider>
     </GridProvider>
+    </>
   );
 };
 

@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>PartHawk — Gate Calculator</title>
+<title>DarkHawk — Gate Calculator</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #ffffff; --surface: #ffffff; --surface2: #f9fafb;
-    --border: #e5e7eb; --red: #dc2626; --red-dim: #fee2e2;
-    --yellow: #ca8a04; --yellow-dim: #fef9c3; --green: #16a34a;
-    --green-dim: #dcfce7; --text: #1a1a1a; --text-mid: #374151;
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a;
+    --border: #2a2a2a; --red: #DC2626; --red-dim: #7f1d1d;
+    --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
+    --green-dim: #064e3b; --text: #F0F0F0; --text-mid: #d1d5db;
     --text-muted: #6b7280;
   }
   body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
@@ -68,14 +68,14 @@
   <p>Max spend to stay under 35% COGS</p>
 </header>
 <nav style="display:flex;gap:6px;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;font-size:11px;">
-  <a href="/" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Home</a>
-  <a href="/item/search" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Search</a>
-  <a href="/intelligence/price-check" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Price Check</a>
-  <a href="/intelligence/your-sales" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Sales</a>
-  <a href="/admin/pull" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Attack List</a>
-  <a href="/admin/restock" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">Restock</a>
-  <a href="/admin/gate" style="color:var(--red);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);font-weight:700;">Gate Calc</a>
-  <a href="/admin/vin" style="color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--surface2);">VIN Scanner</a>
+  <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Home</a>
+  <a href="/item/search" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Search</a>
+  <a href="/intelligence/price-check" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Price Check</a>
+  <a href="/intelligence/your-sales" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Sales</a>
+  <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Attack List</a>
+  <a href="/admin/restock" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Restock</a>
+  <a href="/admin/gate" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;font-weight:700;">Gate Calc</a>
+  <a href="/admin/vin" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">VIN Scanner</a>
 </nav>
 
 <div class="container">

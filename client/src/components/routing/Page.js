@@ -6,7 +6,7 @@ const Page = ({ title, ...rest }) => {
   return (
     <>
       <Helmet>
-        <title>{title || "PartHawk"}</title>
+        <title>{title || "DarkHawk"}</title>
       </Helmet>
       <Route {...rest} />
     </>

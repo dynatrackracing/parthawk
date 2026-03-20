@@ -4,29 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#ffffff">
-<title>PartHawk — VIN Scanner</title>
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — VIN Scanner</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#1a1a1a;min-height:100vh}
-  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 16px}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+  header{background:#0a0a0a;border-bottom:1px solid #2a2a2a;padding:14px 16px}
   header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em}
-  header .sub{font-size:11px;color:#6b7280;margin-top:1px}
-  .nav{display:flex;gap:6px;padding:6px 14px;background:#fff;border-bottom:1px solid #e5e7eb;overflow-x:auto;scrollbar-width:none;font-size:11px}
+  header .sub{font-size:11px;color:#9CA3AF;margin-top:1px}
+  .nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px}
   .nav::-webkit-scrollbar{display:none}
-  .nav a{color:#6b7280;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#f9fafb}
+  .nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#141414}
   .nav a.active{color:#dc2626;font-weight:700;background:#fef2f2}
   .container{padding:12px;max-width:600px;margin:0 auto}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:10px}
-  .card-title{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+  .card{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+  .card-title{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
   .vin-row{display:flex;gap:8px}
-  .vin-input{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:17px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#f9fafb}
+  .vin-input{flex:1;padding:10px 12px;border:1px solid #333;border-radius:8px;font-size:17px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#141414}
   .vin-input:focus{border-color:#dc2626}
-  .vin-input::placeholder{color:#9ca3af;font-size:13px;letter-spacing:0;font-weight:400}
+  .vin-input::placeholder{color:#6B7280;font-size:13px;letter-spacing:0;font-weight:400}
   .btn{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
   .btn-red{background:#dc2626;color:#fff}
   .btn-red:disabled{opacity:.4}
-  .btn-cam{background:#f3f4f6;border:1px solid #d1d5db;font-size:18px;color:#374151}
+  .btn-cam{background:#1a1a1a;border:1px solid #333;font-size:18px;color:#d1d5db}
   .btn-row{display:flex;gap:8px;margin-top:8px}
   .spinner{width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -35,23 +35,23 @@
   .vin-str{font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-bottom:6px}
   .badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
   .b{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
-  .b-gr{background:#dcfce7;color:#16a34a}.b-yl{background:#fef9c3;color:#a16207}.b-or{background:#ffedd5;color:#c2410c}.b-rd{background:#fee2e2;color:#dc2626}.b-gy{background:#f3f4f6;color:#6b7280}.b-bl{background:#dbeafe;color:#2563eb}
-  .yard-match{background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-top:6px}
+  .b-gr{background:#064e3b;color:#16a34a}.b-yl{background:#713f12;color:#a16207}.b-or{background:#7c2d12;color:#c2410c}.b-rd{background:#7f1d1d;color:#dc2626}.b-gy{background:#1a1a1a;color:#9CA3AF}.b-bl{background:#dbeafe;color:#2563eb}
+  .yard-match{background:#064e3b;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-top:6px}
   .yard-match b{color:#16a34a}
   /* Tables */
   table{width:100%;border-collapse:collapse;font-size:12px}
-  th{text-align:left;padding:5px 6px;color:#9ca3af;font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e5e7eb}
-  td{padding:6px;border-bottom:1px solid #f3f4f6}
-  tr:hover td{background:#f9fafb}
+  th{text-align:left;padding:5px 6px;color:#6B7280;font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
+  td{padding:6px;border-bottom:1px solid #1f1f1f}
+  tr:hover td{background:#141414}
   .pg{color:#16a34a;font-weight:700}.py{color:#ca8a04;font-weight:700}.po{color:#ea580c;font-weight:700}.pr{color:#dc2626;font-weight:700}
   .total-row td{font-weight:800;font-size:13px;border-top:2px solid #e5e7eb}
-  .section-empty{color:#9ca3af;font-size:12px;padding:10px 0;text-align:center}
+  .section-empty{color:#6B7280;font-size:12px;padding:10px 0;text-align:center}
   /* History */
-  .h-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;cursor:pointer}
-  .h-row:hover{background:#f9fafb}
+  .h-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1f1f1f;cursor:pointer}
+  .h-row:hover{background:#141414}
   .h-vin{font-family:monospace;font-size:11px;font-weight:700}
-  .h-veh{font-size:10px;color:#6b7280}
-  .h-time{font-size:10px;color:#9ca3af}
+  .h-veh{font-size:10px;color:#9CA3AF}
+  .h-time{font-size:10px;color:#6B7280}
   .camera-input{display:none}
 </style>
 </head>
@@ -76,8 +76,8 @@
     <div class="btn-row">
       <button class="btn btn-red" id="decodeBtn" onclick="doScan()" style="flex:1">Decode</button>
     </div>
-    <div style="font-size:10px;color:#9ca3af;margin-top:6px;line-height:1.4">Tip: If dash VIN has glare, check the driver door jamb sticker or engine bay stamp</div>
-    <div id="vinStatus" style="font-size:11px;color:#6b7280;margin-top:4px"></div>
+    <div style="font-size:10px;color:#6B7280;margin-top:6px;line-height:1.4">Tip: If dash VIN has glare, check the driver door jamb sticker or engine bay stamp</div>
+    <div id="vinStatus" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
   </div>
   <div id="results"></div>
   <div class="card" id="historyCard">
@@ -100,7 +100,7 @@ document.getElementById('cameraBtn').onclick = function() {
     if (!file) return;
 
     document.getElementById('vinStatus').textContent = 'Reading VIN from photo...';
-    document.getElementById('results').innerHTML = '<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#9ca3af;font-size:12px">Processing photo...</div></div>';
+    document.getElementById('results').innerHTML = '<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Processing photo...</div></div>';
 
     const canvas = document.createElement('canvas');
     const img = new Image();
@@ -139,7 +139,7 @@ document.getElementById('cameraBtn').onclick = function() {
           doScan('camera');
         } else {
           document.getElementById('vinStatus').textContent = 'Could not read VIN. Try again closer to the plate.';
-          document.getElementById('results').innerHTML = '<div class="card" style="text-align:center"><div style="color:#dc2626;font-weight:600">Could not read VIN</div><div style="color:#6b7280;font-size:12px;margin-top:4px">Avoid glare, get closer, or try the door jamb sticker.</div></div>';
+          document.getElementById('results').innerHTML = '<div class="card" style="text-align:center"><div style="color:#dc2626;font-weight:600">Could not read VIN</div><div style="color:#9CA3AF;font-size:12px;margin-top:4px">Avoid glare, get closer, or try the door jamb sticker.</div></div>';
         }
       } catch(err) {
         document.getElementById('vinStatus').textContent = 'Error: ' + err.message;
@@ -156,7 +156,7 @@ async function doScan(src){
   const vin=document.getElementById('vinInput').value.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');
   if(vin.length<11){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626;font-size:13px">Enter at least 11 characters</div>';return;}
   const btn=document.getElementById('decodeBtn');btn.disabled=true;btn.innerHTML='<div class="spinner" style="margin:0 auto"></div>';
-  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#9ca3af;font-size:12px">Decoding & querying inventory...</div></div>';
+  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Decoding & querying inventory...</div></div>';
   try{
     const r=await fetch('/vin/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vin,source:src||'manual'})});
     const data=await r.json();if(!data.success)throw new Error(data.error);
@@ -177,8 +177,8 @@ function render(data){
   const headline=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
   const specs=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
   h+='<div class="card">';
-  h+='<div style="font-size:22px;font-weight:900;letter-spacing:-0.03em;color:#111">'+headline+'</div>';
-  if(specs)h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-top:2px">'+specs+'</div>';
+  h+='<div style="font-size:22px;font-weight:900;letter-spacing:-0.03em;color:#F0F0F0">'+headline+'</div>';
+  if(specs)h+='<div style="font-size:13px;font-weight:600;color:#d1d5db;margin-top:2px">'+specs+'</div>';
   h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div>';
   if(data.yardMatch)h+='<div class="yard-match"><b>In Yard:</b> '+data.yardMatch.yardName+(data.yardMatch.row?' — Row '+data.yardMatch.row:'')+(data.yardMatch.color?' — '+data.yardMatch.color:'')+'</div>';
   h+='</div>';
@@ -222,13 +222,13 @@ function render(data){
       let fresh='❓';
       if(p.lastSold){const da=Math.floor((Date.now()-new Date(p.lastSold).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
 
-      h+='<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">';
+      h+='<div style="padding:10px 0;border-bottom:1px solid #1f1f1f">';
       h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
       h+='<div style="flex:1;min-width:0">';
-      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#111">['+p.partType+']</span></div>';
-      h+='<div style="font-size:11px;color:#374151;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title.substring(0,70)+'</div>';
-      if(pn)h+='<div style="font-size:10px;color:#9ca3af;font-family:monospace;margin-top:1px">'+pn+'</div>';
-      h+='<div style="font-size:10px;color:#6b7280;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSoldStr+'</div>';
+      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#F0F0F0">['+p.partType+']</span></div>';
+      h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title.substring(0,70)+'</div>';
+      if(pn)h+='<div style="font-size:10px;color:#6B7280;font-family:monospace;margin-top:1px">'+pn+'</div>';
+      h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSoldStr+'</div>';
       h+='</div></div></div>';
     }
   }else{
@@ -237,7 +237,7 @@ function render(data){
   h+='</div>';
 
   // Total value
-  if(totalValue>0)h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Estimated Pull Value</div><div style="font-size:28px;font-weight:800;color:#16a34a;margin-top:2px">$'+totalValue+'</div></div>';
+  if(totalValue>0)h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Estimated Pull Value</div><div style="font-size:28px;font-weight:800;color:#16a34a;margin-top:2px">$'+totalValue+'</div></div>';
 
   // Rebuild reference — one line per type
   if(mrRebuild.length>0){
@@ -245,7 +245,7 @@ function render(data){
     for(const p of mrRebuild){
       const sellers=(p.sellers||[]).join(', ')||'pro-rebuild';
       const priceStr=p.priceRange||('$'+p.avgPrice);
-      h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#9ca3af">';
+      h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#6B7280">';
       h+='<span>[REBUILD] '+sellers+' — '+p.partType+'</span><span>'+priceStr+(p.count>1?' ('+p.count+')':'')+'</span></div>';
     }
     h+='</div>';
@@ -256,18 +256,18 @@ function render(data){
     h+='<div class="card" style="border-left:3px solid #8b5cf6">';
     h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
     h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#ede9fe;color:#7c3aed;text-transform:uppercase">AI Research</span>';
-    h+='<span style="font-size:10px;color:#9ca3af">Market intelligence for '+[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ')+'</span>';
+    h+='<span style="font-size:10px;color:#6B7280">Market intelligence for '+[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ')+'</span>';
     h+='</div>';
-    h+='<div style="font-size:12px;color:#374151;line-height:1.6;white-space:pre-line">'+data.aiResearch+'</div>';
+    h+='<div style="font-size:12px;color:#d1d5db;line-height:1.6;white-space:pre-line">'+data.aiResearch+'</div>';
     h+='</div>';
   }
 
   // Sales history — collapsible
   if(sh.length>0){
-    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+sh.reduce((s,p)=>s+p.sold,0)+' sold all time)</summary>';
+    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+sh.reduce((s,p)=>s+p.sold,0)+' sold all time)</summary>';
     h+='<table style="margin-top:8px"><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last</th></tr>';
     for(const p of sh){
-      h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#6b7280">'+(p.lastSoldDate?timeAgo(p.lastSoldDate):'—')+'</td></tr>';
+      h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9CA3AF">'+(p.lastSoldDate?timeAgo(p.lastSoldDate):'—')+'</td></tr>';
     }
     h+='</table></details></div>';
   }

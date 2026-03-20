@@ -158,7 +158,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
         <div className="flex items-center justify-between h-12 px-3 border-b border-slate-800">
           {/* Logo */}
           <NavLink exact to="/" className="flex items-center gap-2">
-            <img src={Logo} alt="PartHawk" className="h-8 w-auto" />
+            <img src={Logo} alt="DarkHawk" className="h-8 w-auto" />
           </NavLink>
 
           {/* Close button (mobile) */}

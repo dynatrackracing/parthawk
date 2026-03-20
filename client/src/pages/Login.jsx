@@ -97,7 +97,7 @@ const Login = () => {
           <div className="bg-white rounded-2xl shadow-2xl p-8">
             {/* Logo */}
             <div className="text-center mb-8">
-              <img src={Logo} alt="PartHawk" className="h-16 w-auto mx-auto" />
+              <img src={Logo} alt="DarkHawk" className="h-16 w-auto mx-auto" />
             </div>
 
             {/* Welcome Text */}
@@ -147,7 +147,7 @@ const Login = () => {
 
           {/* Bottom text */}
           <p className="mt-6 text-center text-sm text-white/60">
-            © 2024 PartHawk. All rights reserved.
+            © 2024 DarkHawk. All rights reserved.
           </p>
         </div>
       </FadeIn>

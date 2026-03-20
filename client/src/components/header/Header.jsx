@@ -26,7 +26,7 @@ function Header({ sidebarOpen, setSidebarOpen }) {
               </svg>
             </button>
             <Link to="/" className="flex items-center gap-2">
-              <span style={{ color: '#ef4444', fontSize: '16px', fontWeight: 800, letterSpacing: '-0.03em' }}>PartHawk</span>
+              <span style={{ color: '#ef4444', fontSize: '16px', fontWeight: 800, letterSpacing: '-0.03em' }}>DarkHawk</span>
             </Link>
           </div>
 

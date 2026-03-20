@@ -3,33 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PartHawk — Weekly Restock Report</title>
+<title>DarkHawk — Weekly Restock Report</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#ffffff;color:#1a1a1a;min-height:100vh}
-  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
-  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em;color:#111}
-  header .sub{font-size:11px;color:#6b7280;margin-top:1px}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+  header{background:#141414;border-bottom:1px solid #2a2a2a;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em;color:#F0F0F0}
+  header .sub{font-size:11px;color:#9CA3AF;margin-top:1px}
   .nav{font-size:12px;display:flex;gap:12px}
-  .nav a{color:#6b7280;text-decoration:none}.nav a:hover{color:#111}
+  .nav a{color:#9CA3AF;text-decoration:none}.nav a:hover{color:#F0F0F0}
   .summary{display:flex;gap:8px;padding:12px 20px;flex-wrap:wrap}
-  .stat{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;min-width:80px}
-  .stat-label{font-size:9px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em}
+  .stat{background:#141414;border:1px solid #2a2a2a;border-radius:6px;padding:8px 12px;min-width:80px}
+  .stat-label{font-size:9px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em}
   .stat-value{font-size:18px;font-weight:800;margin-top:1px}
-  .sg{color:#16a34a}.sy{color:#ca8a04}.so{color:#ea580c}.sr{color:#dc2626}.sgr{color:#9ca3af}
+  .sg{color:#16a34a}.sy{color:#ca8a04}.so{color:#ea580c}.sr{color:#dc2626}.sgr{color:#6B7280}
   .section{padding:0 20px 12px}
-  .section-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:8px 0;border-bottom:1px solid #e5e7eb;margin-bottom:4px;display:flex;justify-content:space-between}
-  .sh-green{color:#16a34a}.sh-yellow{color:#ca8a04}.sh-orange{color:#ea580c}.sh-red{color:#dc2626}.sh-grey{color:#9ca3af}
+  .section-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:8px 0;border-bottom:1px solid #2a2a2a;margin-bottom:4px;display:flex;justify-content:space-between}
+  .sh-green{color:#16a34a}.sh-yellow{color:#ca8a04}.sh-orange{color:#ea580c}.sh-red{color:#dc2626}.sh-grey{color:#6B7280}
   table{width:100%;border-collapse:collapse;font-size:11px}
-  th{text-align:left;padding:4px 6px;color:#9ca3af;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb}
-  td{padding:5px 6px;border-bottom:1px solid #f3f4f6;color:#374151}
-  tr:hover td{background:#f9fafb}
+  th{text-align:left;padding:4px 6px;color:#6B7280;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #2a2a2a}
+  td{padding:5px 6px;border-bottom:1px solid #1f1f1f;color:#d1d5db}
+  tr:hover td{background:#1a1a1a}
   .badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap}
-  .b-green{background:#dcfce7;color:#16a34a}.b-yellow{background:#fef9c3;color:#a16207}.b-orange{background:#ffedd5;color:#c2410c}.b-red{background:#fee2e2;color:#dc2626}.b-grey{background:#f3f4f6;color:#9ca3af}
+  .b-green{background:#064e3b;color:#16a34a}.b-yellow{background:#713f12;color:#a16207}.b-orange{background:#7c2d12;color:#c2410c}.b-red{background:#7f1d1d;color:#dc2626}.b-grey{background:#1f2937;color:#6B7280}
   .mono{font-family:monospace;font-size:10px}
   .profit-pos{color:#16a34a}.profit-neg{color:#dc2626}
   .sold-out{color:#dc2626;font-size:10px;font-weight:600}
-  .loading{text-align:center;padding:40px;color:#9ca3af}
+  .loading{text-align:center;padding:40px;color:#6B7280}
   .spinner{width:24px;height:24px;border:2px solid #e5e7eb;border-top-color:#16a34a;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px}
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -47,7 +47,7 @@
     <a href="/intelligence/stale-inventory">Stale Inv</a>
     <a href="/intelligence/your-sales">Sales</a>
     <a href="/admin/pull">Attack List</a>
-    <a href="/admin/restock" style="color:#111;font-weight:700;">Restock</a>
+    <a href="/admin/restock" style="color:#F0F0F0;font-weight:700;">Restock</a>
     <a href="/admin/gate">Gate Calc</a>
     <a href="/admin/vin">VIN Scanner</a>
   </div>
@@ -106,7 +106,7 @@ function renderSection(tier, cfg, items) {
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
       <span>${cfg.icon} ${cfg.label} (${items.length})</span>
-      <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
+      <span style="font-size:9px;color:#6B7280">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
     </div>
     <table><tr>
       <th>Score</th><th>Action</th><th>Vehicle</th><th>Part</th><th>Part #</th>
@@ -127,7 +127,7 @@ function renderSection(tier, cfg, items) {
       <td>$${Math.round(i.revenue).toLocaleString()}</td>
     </tr>`;
     if (i.sampleTitle) {
-      h += `<tr><td colspan="9" style="font-size:10px;color:#6b7280;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)}</td></tr>`;
+      h += `<tr><td colspan="9" style="font-size:10px;color:#9CA3AF;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)}</td></tr>`;
     }
   }
   h += '</table></div>';

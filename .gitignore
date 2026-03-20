@@ -5,4 +5,9 @@ secrets.js
 service/lib/logs/*
 service/data/*.db
 .vscode/*.*
-service/middleware/firebase/serviceAccountKey.json
+service/middleware/firebase/serviceAccountKey.jsondarkhawk-logo.png.png
+darkhawk-splash.jpg.jpg
+run-scrape.bat
+scrape-local-old.js.js
+scrape-log.txt
+.claude/
