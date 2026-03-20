@@ -1,24 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-/**
- * scrape-local.js — Run from Windows PC to bypass CloudFlare
- *
- * Usage:
- *   set DATABASE_URL=postgres://...
- *   node scrape-local.js
- *
- * Scrapes all pages but only saves vehicles added in last 24h.
- * Marks vehicles not seen in scrape as inactive (pulled from yard).
- * Only decodes VINs for new vehicles.
- */
-
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { v4: uuidv4 } = require('uuid');
 
 if (!process.env.DATABASE_URL) {
-  console.error('ERROR: set DATABASE_URL=postgres://...\nnode scrape-local.js');
+  console.error('set DATABASE_URL=postgres://...\nnode scrape-local.js');
   process.exit(1);
 }
 
@@ -36,19 +24,6 @@ const LOCATIONS = [
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function parseDate(str) {
-  if (!str) return null;
-  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
-  const iso = new Date(str);
-  return isNaN(iso.getTime()) ? null : iso;
-}
-
-function daysAgo(date) {
-  if (!date) return 999;
-  return Math.floor((Date.now() - date.getTime()) / 86400000);
-}
 
 // ── SCRAPE ──────────────────────────────────────────────
 
@@ -79,9 +54,7 @@ async function scrapePages(slug) {
           else if(t.includes('Stock #:')||t.includes('Stock#:'))stock=t.replace(/Stock\s*#:\s*/,'').trim();
           else if(t.includes('Available:')){const te=$(d).find('time');dateAdded=te.length?(te.attr('datetime')||te.text().trim()):t.replace('Available:','').trim();}
         });
-        const vehicle = {year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded};
-        if (all.length === 0) console.log('  FIRST VEHICLE:', JSON.stringify(vehicle));
-        all.push(vehicle);
+        all.push({year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded});
         n++;
       });
       if(n===0)break;
@@ -94,89 +67,57 @@ async function scrapePages(slug) {
   return all;
 }
 
-// ── SAVE ────────────────────────────────────────────────
+// ── SAVE (recent only) ──────────────────────────────────
 
 async function saveYard(loc, allVehicles) {
   const yard = await knex('yard').where('name', loc.name).first();
   if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB`); return {}; }
 
   const now = new Date();
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-  // Build set of all stock numbers seen in this scrape (for inactive marking)
-  const seenStocks = new Set();
-  const seenYMM = new Set();
+  // Split into recent (save) vs old (skip)
+  const recent = [];
+  let skipped = 0;
   for (const v of allVehicles) {
-    if (v.stock) seenStocks.add(v.stock);
-    seenYMM.add(`${v.year}|${v.make}|${v.model}`);
-  }
-
-  // Analyze date distribution before filtering
-  let oldest = null, newest = null, nullDate = 0;
-  const ageBuckets = { today: 0, '1d': 0, '2d': 0, '3-7d': 0, '8-30d': 0, '31d+': 0 };
-  for (const v of allVehicles) {
-    const d = parseDate(v.dateAdded);
-    if (!d) { nullDate++; continue; }
-    if (!oldest || d < oldest) oldest = d;
-    if (!newest || d > newest) newest = d;
-    const age = daysAgo(d);
-    if (age === 0) ageBuckets.today++;
-    else if (age === 1) ageBuckets['1d']++;
-    else if (age === 2) ageBuckets['2d']++;
-    else if (age <= 7) ageBuckets['3-7d']++;
-    else if (age <= 30) ageBuckets['8-30d']++;
-    else ageBuckets['31d+']++;
-  }
-  console.log(`  Date range: ${oldest ? oldest.toISOString().slice(0,10) : 'null'} to ${newest ? newest.toISOString().slice(0,10) : 'null'}`);
-  console.log(`  Distribution:`, JSON.stringify(ageBuckets), `null: ${nullDate}`);
-
-  // Filter to only vehicles added in last 48 hours
-  const newVehicles = [];
-  let oldSkipped = 0;
-  for (const v of allVehicles) {
-    const d = parseDate(v.dateAdded);
-    if (!d) { oldSkipped++; continue; }
-    if (daysAgo(d) <= 2) {
+    const d = v.dateAdded ? new Date(v.dateAdded) : null;
+    if (d && !isNaN(d.getTime()) && d >= cutoff) {
       v._date = d;
-      newVehicles.push(v);
+      recent.push(v);
     } else {
-      oldSkipped++;
+      skipped++;
     }
   }
-  console.log(`  >>> SAVING ${newVehicles.length} new vehicles, SKIPPING ${oldSkipped} old vehicles`);
+  console.log(`  Scraped ${allVehicles.length} total, ${recent.length} from last 48hrs, skipping ${skipped} old`);
 
-  // Mark vehicles NOT in scrape as inactive (pulled from yard)
-  let deactivated = 0;
-  try {
-    const active = await knex('yard_vehicle').where('yard_id', yard.id).where('active', true).select('id', 'stock_number', 'year', 'make', 'model');
-    for (const a of active) {
-      const inScrape = (a.stock_number && seenStocks.has(a.stock_number)) ||
-                       seenYMM.has(`${a.year}|${a.make}|${a.model}`);
-      if (!inScrape) {
-        await knex('yard_vehicle').where('id', a.id).update({ active: false, updatedAt: now });
-        deactivated++;
-      }
-    }
-    if (deactivated > 0) console.log(`  Deactivated ${deactivated} (not in scrape — pulled from yard)`);
-  } catch (e) { console.log(`  Deactivate error: ${e.message}`); }
+  if (recent.length === 0) {
+    // Still mark inactive vehicles not seen in full scrape
+    const allStocks = new Set(allVehicles.filter(v => v.stock).map(v => v.stock));
+    const deact = await knex('yard_vehicle')
+      .where('yard_id', yard.id).where('active', true)
+      .whereNotNull('stock_number')
+      .whereNotIn('stock_number', [...allStocks])
+      .update({ active: false, updatedAt: now });
+    if (deact > 0) console.log(`  Deactivated ${deact} (not in scrape)`);
+    await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
+    console.log(`  No new vehicles to save`);
+    return { inserted: 0, updated: 0, skipped };
+  }
 
-  // Also re-activate vehicles that ARE in scrape but were inactive
-  let reactivated = 0;
-  try {
-    const inactive = await knex('yard_vehicle').where('yard_id', yard.id).where('active', false).select('id', 'stock_number', 'year', 'make', 'model');
-    for (const a of inactive) {
-      const inScrape = (a.stock_number && seenStocks.has(a.stock_number)) ||
-                       seenYMM.has(`${a.year}|${a.make}|${a.model}`);
-      if (inScrape) {
-        await knex('yard_vehicle').where('id', a.id).update({ active: true, last_seen: now, updatedAt: now });
-        reactivated++;
-      }
-    }
-    if (reactivated > 0) console.log(`  Reactivated ${reactivated} (still on lot)`);
-  } catch (e) { console.log(`  Reactivate error: ${e.message}`); }
+  // Bulk deactivate vehicles not in full scrape (single query, not per-row)
+  const allStocks = new Set(allVehicles.filter(v => v.stock).map(v => v.stock));
+  if (allStocks.size > 0) {
+    const deact = await knex('yard_vehicle')
+      .where('yard_id', yard.id).where('active', true)
+      .whereNotNull('stock_number')
+      .whereNotIn('stock_number', [...allStocks])
+      .update({ active: false, updatedAt: now });
+    if (deact > 0) console.log(`  Deactivated ${deact} (not in scrape — pulled)`);
+  }
 
-  // INSERT/UPDATE only new (last 24h) vehicles
+  // INSERT/UPDATE only recent vehicles
   let inserted = 0, updated = 0, errors = 0, vins = 0;
-  for (const v of newVehicles) {
+  for (const v of recent) {
     const hasVin = v.vin && v.vin.length >= 11;
     if (hasVin) vins++;
     try {
@@ -187,7 +128,6 @@ async function saveYard(loc, allVehicles) {
       if (!existing) {
         existing = await knex('yard_vehicle').where('yard_id', yard.id).where('year', v.year).where('make', v.make).where('model', v.model).first();
       }
-
       if (existing) {
         await knex('yard_vehicle').where('id', existing.id).update({
           vin: hasVin ? v.vin : (existing.vin || null),
@@ -218,14 +158,14 @@ async function saveYard(loc, allVehicles) {
 
   await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
   console.log(`  SAVED: ${inserted} new, ${updated} updated, ${errors} errors, ${vins} VINs`);
-  return { inserted, updated, deactivated, reactivated, errors, vins, newCount: newVehicles.length };
+  return { inserted, updated, errors, vins, skipped };
 }
 
-// ── VIN DECODE (new vehicles only) ──────────────────────
+// ── VIN DECODE (recent only) ────────────────────────────
 
 async function decodeVins() {
-  console.log('\n━━━ VIN DECODE (new vehicles only) ━━━');
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  console.log('\n━━━ VIN DECODE ━━━');
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   let vehicles;
   try {
     vehicles = await knex('yard_vehicle')
@@ -233,15 +173,13 @@ async function decodeVins() {
       .where(function() { this.where('vin_decoded', false).orWhereNull('vin_decoded'); })
       .where('scraped_at', '>=', cutoff)
       .select('id', 'vin', 'year', 'make', 'model');
-  } catch (e) { console.log(`  Query error: ${e.message}`); return; }
+  } catch (e) { console.log(`  Error: ${e.message}`); return; }
 
   console.log(`  ${vehicles.length} VINs to decode`);
   let decoded = 0, cached = 0, errors = 0;
 
   for (const v of vehicles) {
     const vin = v.vin.trim().toUpperCase();
-
-    // Cache check
     try {
       const c = await knex('vin_cache').where('vin', vin).first();
       if (c) {
@@ -253,12 +191,10 @@ async function decodeVins() {
           vin_decoded: true, updatedAt: new Date(),
         });
         cached++;
-        console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — cached`);
         continue;
       }
     } catch (e) {}
 
-    // NHTSA
     try {
       const res = await axios.get(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`, { timeout: 10000 });
       const results = res.data?.Results || [];
@@ -266,13 +202,11 @@ async function decodeVins() {
 
       const disp = get(13); const rawCyl = get(71); let engine = null;
       if (disp) { const dn = parseFloat(disp); engine = (!isNaN(dn) ? dn.toFixed(1) : disp) + 'L'; const c = parseInt(rawCyl); if (c >= 2 && c <= 16) { const lb = c <= 4 ? '4-cyl' : c === 5 ? '5-cyl' : c === 6 ? 'V6' : c === 8 ? 'V8' : c === 10 ? 'V10' : c + '-cyl'; engine += ' ' + lb; } }
-
       const ft = (get(24)||'').toLowerCase();
       let engineType = 'Gas';
       if (ft.includes('diesel')) engineType = 'Diesel';
       else if (ft.includes('hybrid')) engineType = 'Hybrid';
       else if (ft.includes('electric') && !ft.includes('hybrid')) engineType = 'Electric';
-
       const dt = (get(15)||'').toUpperCase();
       let drivetrain = null;
       if (dt.includes('4WD')||dt.includes('4X4')||dt.includes('4-WHEEL')) drivetrain = '4WD';
@@ -281,7 +215,6 @@ async function decodeVins() {
       else if (dt.includes('RWD')||dt.includes('REAR-WHEEL')||dt.includes('REAR WHEEL')) drivetrain = 'RWD';
       const trim = get(38), bodyStyle = get(5);
 
-      // Cache
       try {
         await knex('vin_cache').insert({
           vin, year: get(29)?parseInt(get(29)):null, make: get(26), model: get(28),
@@ -291,7 +224,6 @@ async function decodeVins() {
         }).onConflict('vin').ignore();
       } catch (e) {}
 
-      // Update
       const upd = { vin_decoded: true, updatedAt: new Date() };
       if (engine) upd.engine = engine.substring(0, 50);
       if (engineType) upd.engine_type = engineType.substring(0, 20);
@@ -300,11 +232,11 @@ async function decodeVins() {
       if (bodyStyle) upd.body_style = bodyStyle.substring(0, 50);
       await knex('yard_vehicle').where('id', v.id).update(upd);
       decoded++;
-      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — ${engine||'?'} ${drivetrain||'?'}`);
+      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} ${engine||''} ${drivetrain||''}`);
       await sleep(200);
     } catch (e) {
       errors++;
-      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} — ERROR: ${e.message}`);
+      console.log(`  [${cached+decoded+errors}/${vehicles.length}] ${vin} ERROR: ${e.message.substring(0,60)}`);
     }
   }
   console.log(`  Done: ${decoded} decoded, ${cached} cached, ${errors} errors`);
@@ -312,36 +244,27 @@ async function decodeVins() {
 
 // ── MAIN ────────────────────────────────────────────────
 
+function parseFloat2(s) { const n = parseFloat(s); return isNaN(n) ? null : n; }
+
 async function main() {
   console.log('PartHawk Local Scraper');
-  console.log('DB:', process.env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
   console.log('Time:', new Date().toISOString());
-
   try { await knex.raw('SELECT 1'); console.log('DB: OK'); }
   catch (e) { console.error('DB FAILED:', e.message); process.exit(1); }
 
-  const before = await knex.raw('SELECT COUNT(*) as total, COUNT(vin) as has_vin, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active FROM yard_vehicle');
+  const before = await knex.raw('SELECT COUNT(*) as total, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active FROM yard_vehicle');
   console.log('Before:', JSON.stringify(before.rows[0]));
 
-  let totalNew = 0, totalDeactivated = 0;
   for (const loc of LOCATIONS) {
     console.log(`\n━━━ ${loc.name} ━━━`);
     const vehicles = await scrapePages(loc.slug);
-    console.log(`  Scraped: ${vehicles.length} total`);
-    if (vehicles.length > 0) {
-      const r = await saveYard(loc, vehicles);
-      totalNew += (r.inserted || 0);
-      totalDeactivated += (r.deactivated || 0);
-    }
+    if (vehicles.length > 0) await saveYard(loc, vehicles);
   }
-
-  console.log(`\n━━━ TOTALS: ${totalNew} new vehicles, ${totalDeactivated} deactivated ━━━`);
 
   await decodeVins();
 
-  const after = await knex.raw('SELECT COUNT(*) as total, COUNT(vin) as has_vin, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active, SUM(CASE WHEN vin_decoded THEN 1 ELSE 0 END) as decoded FROM yard_vehicle');
+  const after = await knex.raw('SELECT COUNT(*) as total, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active, SUM(CASE WHEN vin_decoded THEN 1 ELSE 0 END) as decoded FROM yard_vehicle');
   console.log('\nAfter:', JSON.stringify(after.rows[0]));
-
   await knex.destroy();
   console.log('Done!');
 }
