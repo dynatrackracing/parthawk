@@ -340,32 +340,19 @@ router.post('/scan', async (req, res) => {
       // 2c: Item table — specific parts with verdicts, rebuild separated
       try {
         let items = [];
-        // Try Auto join — exact year first, then any year for same make+model
+        // Auto+AIC join with ±1 year range (parts often fit adjacent years)
         if (year) {
           items = await database('Auto')
             .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
             .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
-            .where('Auto.year', year)
+            .whereRaw('"Auto"."year"::int >= ? AND "Auto"."year"::int <= ?', [year - 1, year + 1])
             .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
             .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
             .where('Item.price', '>', 0)
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
             .orderBy('Item.price', 'desc')
             .limit(200);
-          log.info({ count: items.length, year, make, baseModel }, 'VIN scan: Auto join exact year');
-        }
-        // Broaden: any year for same make+model
-        if (items.length === 0) {
-          items = await database('Auto')
-            .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
-            .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
-            .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
-            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
-            .where('Item.price', '>', 0)
-            .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
-            .orderBy('Item.price', 'desc')
-            .limit(200);
-          log.info({ count: items.length, make, baseModel }, 'VIN scan: Auto join any year');
+          log.info({ count: items.length, year, make, baseModel }, 'VIN scan: Auto join ±1 year');
         }
         // Last fallback: ILIKE title search on Item table
         if (items.length === 0) {

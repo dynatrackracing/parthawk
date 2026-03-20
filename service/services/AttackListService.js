@@ -425,25 +425,28 @@ class AttackListService {
     const alsoCheck = MAKE_ALSO_CHECK[make] || [];
     const allMakes = [make, ...alsoCheck];
 
-    // Exact match first
+    // Match with ±1 year range (parts often fit adjacent years)
     for (const m of allMakes) {
-      const key = `${m}|${model}|${year}`;
-      const match = inventoryIndex[key];
-      if (match) {
-        for (const item of match.items) {
-          if (!matchedParts.some(p => p.itemId === item.itemId)) {
-            matchedParts.push(item);
+      for (let y = year - 1; y <= year + 1; y++) {
+        const key = `${m}|${model}|${y}`;
+        const match = inventoryIndex[key];
+        if (match) {
+          for (const item of match.items) {
+            if (!matchedParts.some(p => p.itemId === item.itemId)) {
+              matchedParts.push(item);
+            }
           }
         }
       }
     }
 
-    // Fuzzy model match if no exact hits
+    // Fuzzy model match with ±1 year if still no hits
     if (matchedParts.length === 0) {
       const modelLower = model.toLowerCase();
       for (const [key, entry] of Object.entries(inventoryIndex)) {
         const [iMake, iModel, iYear] = key.split('|');
-        if (parseInt(iYear) !== year) continue;
+        const iYearNum = parseInt(iYear);
+        if (iYearNum < year - 1 || iYearNum > year + 1) continue;
         if (!allMakes.includes(iMake)) continue;
 
         const iModelLower = iModel.toLowerCase();
