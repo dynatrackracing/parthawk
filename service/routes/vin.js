@@ -336,7 +336,7 @@ router.post('/scan', async (req, res) => {
       // 2c: Item table — specific parts with verdicts, rebuild separated
       try {
         let items = [];
-        // Auto+AIC join with ±1 year range (parts often fit adjacent years)
+        // Auto+AIC join with ±1 year range
         if (year) {
           items = await database('Auto')
             .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
@@ -348,41 +348,78 @@ router.post('/scan', async (req, res) => {
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
             .orderBy('Item.price', 'desc')
             .limit(200);
-          log.info({ count: items.length, year, make, baseModel }, 'VIN scan: Auto join ±1 year');
         }
-        // Last fallback: ILIKE title search on Item table
-        if (items.length === 0) {
-          items = await database('Item')
+        // Fallback for sparse results on newer vehicles: title ILIKE with year range
+        if (items.length < 5 && year) {
+          const yearRange = [];
+          for (let y = year - 2; y <= year + 2; y++) yearRange.push(String(y));
+          const yearRegex = '(' + yearRange.join('|') + ')';
+          const fallback = await database('Item')
             .where('price', '>', 0)
             .whereRaw('"title" ILIKE ?', [`%${make}%`])
             .whereRaw('"title" ILIKE ?', [`%${baseModel}%`])
+            .whereRaw('"title" ~ ?', [yearRegex])
             .select('title', 'price', 'seller', 'manufacturerPartNumber', 'isRepair')
             .orderBy('price', 'desc')
-            .limit(200);
+            .limit(20);
+          // Merge without duplicates
+          const existingPNs = new Set(items.map(i => i.manufacturerPartNumber).filter(Boolean));
+          for (const fb of fallback) {
+            if (fb.manufacturerPartNumber && existingPNs.has(fb.manufacturerPartNumber)) continue;
+            items.push(fb);
+          }
         }
 
-        // Build sales lookup for verdicts: how many sold + your avg per part type
+        // Extract vehicle engine displacement for filtering
+        const vDispMatch = (decoded.engine || '').match(/(\d+\.\d)/);
+        const vDisp = vDispMatch ? vDispMatch[1] : null;
+
+        // Build sales/stock lookups
         const salesByType = {};
-        for (const sh of salesHistory) {
-          salesByType[sh.partType] = { sold: sh.sold, avgPrice: sh.avgPrice };
-        }
-        // Stock lookup per part type
+        for (const sh of salesHistory) salesByType[sh.partType] = { sold: sh.sold, avgPrice: sh.avgPrice };
         const stockByType = {};
-        for (const cs of currentStock) {
-          stockByType[cs.partType] = cs.inStock;
-        }
+        for (const cs of currentStock) stockByType[cs.partType] = cs.inStock;
 
-        // Group items by part type, separate rebuild
+        // Filter + group items by part type
+        const EXCLUDED_TYPES = new Set(['XFER CASE', 'STEERING', null]);
         const byType = {};
         for (const item of items) {
-          const pt = detectPartTypeForVin(item.title);
+          const title = item.title || '';
+          const titleUpper = title.toUpperCase();
+          const pt = detectPartTypeForVin(title);
+
+          // Exclude transfer case and steering
+          if (EXCLUDED_TYPES.has(pt) || titleUpper.includes('TRANSFER CASE') || titleUpper.includes('XFER CASE') ||
+              titleUpper.includes('POWER STEERING') || titleUpper.includes('STEERING PUMP') || titleUpper.includes('STEERING RACK')) continue;
+
+          // Year range check: parse years from title and check vehicle fits
+          if (year) {
+            const rangeMatch = titleUpper.match(/\b((?:19|20)?\d{2})\s*[-–]\s*((?:19|20)?\d{2})\b/);
+            if (rangeMatch) {
+              let y1 = parseInt(rangeMatch[1]), y2 = parseInt(rangeMatch[2]);
+              if (y1 < 100) y1 += y1 >= 70 ? 1900 : 2000;
+              if (y2 < 100) y2 += y2 >= 70 ? 1900 : 2000;
+              if (y1 > y2) { const tmp = y1; y1 = y2; y2 = tmp; }
+              if (year < y1 || year > y2) continue;
+            }
+            const singleYears = titleUpper.match(/\b((?:19|20)\d{2})\b/g);
+            if (singleYears && singleYears.length === 1 && !rangeMatch) {
+              const partYear = parseInt(singleYears[0]);
+              if (Math.abs(year - partYear) > 2) continue;
+            }
+          }
+
+          // Engine displacement mismatch
+          if (vDisp) {
+            const pDispMatch = titleUpper.match(/(\d+\.\d)L/);
+            if (pDispMatch && pDispMatch[1] !== vDisp) continue;
+          }
+
           const isRebuild = item.seller === 'pro-rebuild' || item.isRepair === true;
           const key = pt + (isRebuild ? '_rebuild' : '');
-          if (!byType[key]) byType[key] = {
-            partType: pt, isRebuild, items: [], totalPrice: 0,
-          };
+          if (!byType[key]) byType[key] = { partType: pt, isRebuild, items: [], totalPrice: 0 };
           byType[key].items.push({
-            title: item.title, price: parseFloat(item.price) || 0,
+            title, price: parseFloat(item.price) || 0,
             seller: item.seller, partNumber: item.manufacturerPartNumber,
           });
           byType[key].totalPrice += parseFloat(item.price) || 0;
@@ -393,20 +430,16 @@ router.post('/scan', async (req, res) => {
           const yourSold = salesByType[data.partType]?.sold || 0;
           const yourAvg = salesByType[data.partType]?.avgPrice || 0;
           const inStock = stockByType[data.partType] || 0;
-          // Verdict based on stock + sales
           let verdict = 'SKIP';
           if (!data.isRebuild) {
             if (inStock === 0 && yourSold >= 2) verdict = 'PULL';
             else if (inStock === 0 && yourSold >= 1) verdict = 'WATCH';
             else if (inStock <= 2 && yourSold >= 3) verdict = 'WATCH';
           }
-          // Color based on YOUR avg sold price (not competitor price)
           const colorPrice = yourAvg > 0 ? yourAvg : avg;
-
           marketRef.push({
             partType: data.partType, count: data.items.length, avgPrice: avg,
-            yourSold, yourAvg, inStock, verdict,
-            isRebuild: data.isRebuild,
+            yourSold, yourAvg, inStock, verdict, isRebuild: data.isRebuild,
             partNumbers: [...new Set(data.items.map(i => i.partNumber).filter(Boolean))].slice(0, 5),
             sellers: [...new Set(data.items.map(i => i.seller).filter(Boolean))],
             topItems: data.items.slice(0, 3).map(i => ({ title: i.title, price: i.price, seller: i.seller, pn: i.partNumber })),
@@ -561,8 +594,8 @@ function detectPartTypeForVin(title) {
   if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT') || t.includes('GAUGE')) return 'CLUSTER';
   if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO')) return 'RADIO';
   if (t.includes('THROTTLE')) return 'THROTTLE';
-  if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
-  if (t.includes('TRANSFER CASE')) return 'XFER CASE';
+  if (t.includes('TRANSFER CASE') || t.includes('XFER CASE')) return null; // excluded
+  if (t.includes('STEERING') || t.includes('EPS') || t.includes('POWER STEERING')) return null; // excluded
   if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
   if (t.includes('MIRROR')) return 'MIRROR';
   return 'OTHER';
