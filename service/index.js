@@ -248,10 +248,25 @@ app.post('/api/admin/dedup-sales', async (req, res) => {
     const before90 = await database.raw('SELECT COUNT(*) as count, ROUND(SUM("salePrice"::numeric),2) as revenue FROM "YourSale" WHERE "soldDate" >= NOW() - INTERVAL \'90 days\'');
 
     // Delete duplicates: keep the row with the smallest id (first inserted)
-    const deleted = await database.raw(`
+    // Round 1: same ebayItemId + same soldDate
+    await database.raw(`
       DELETE FROM "YourSale" a USING "YourSale" b
       WHERE a.id > b.id
         AND a."ebayItemId" = b."ebayItemId"
+        AND a."soldDate"::date = b."soldDate"::date
+    `);
+    // Round 2: same ebayItemId (item can only be sold once)
+    await database.raw(`
+      DELETE FROM "YourSale" a USING "YourSale" b
+      WHERE a.id > b.id
+        AND a."ebayItemId" = b."ebayItemId"
+    `);
+    // Round 3: same title + same salePrice + same soldDate (different ebayItemId but same transaction)
+    const deleted = await database.raw(`
+      DELETE FROM "YourSale" a USING "YourSale" b
+      WHERE a.id > b.id
+        AND a.title = b.title
+        AND a."salePrice" = b."salePrice"
         AND a."soldDate"::date = b."soldDate"::date
     `);
 
