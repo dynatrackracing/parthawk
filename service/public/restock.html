@@ -56,9 +56,9 @@
 <div id="content"><div class="loading"><div class="spinner"></div>Generating report...</div></div>
 <script>
 const TIER_CONFIG = {
-  green:  { icon: '🟢', label: 'RESTOCK NOW',  badge: 'b-green',  header: 'sh-green' },
-  yellow: { icon: '🟡', label: 'OUT OF STOCK',  badge: 'b-yellow', header: 'sh-yellow' },
-  orange: { icon: '🟠', label: 'LOW STOCK',    badge: 'b-orange', header: 'sh-orange' },
+  green:  { icon: '🟢', label: 'RESTOCK NOW',   badge: 'b-green',  header: 'sh-green' },
+  yellow: { icon: '🟡', label: 'STRONG BUY',    badge: 'b-yellow', header: 'sh-yellow' },
+  orange: { icon: '🟠', label: 'CONSIDER',      badge: 'b-orange', header: 'sh-orange' },
 };
 
 function formatSoldOut(dateStr) {
@@ -81,11 +81,11 @@ async function load() {
     const date = new Date(d.generatedAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('sub').textContent = date + ' — ' + d.summary.total + ' part groups scored';
 
-    document.getElementById('sub').textContent = (d.period || 'Last 7 days') + ' — ' + d.summary.total + ' restock candidates';
+    document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates';
     document.getElementById('summary').innerHTML =
       `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
-      `<div class="stat"><div class="stat-label">Out of Stock</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
-      `<div class="stat"><div class="stat-label">Low Stock</div><div class="stat-value so">${d.summary.orange}</div></div>` +
+      `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
+      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>` +
       `<div class="stat"><div class="stat-label">Total</div><div class="stat-value">${d.summary.total}</div></div>`;
 
     let html = '';
@@ -109,22 +109,25 @@ function renderSection(tier, cfg, items) {
       <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
     </div>
     <table><tr>
-      <th>Action</th><th>Make</th><th>Part Type</th><th>Years</th>
-      <th>Sold 7d</th><th>Stock</th><th>Avg $</th><th>Rev</th>
+      <th>Score</th><th>Action</th><th>Make</th><th>Part Type</th><th>Years</th>
+      <th>Sold 30d</th><th>Sold 7d</th><th>Stock</th><th>Avg $</th><th>Rev 30d</th>
     </tr>`;
   for (const i of items) {
+    const lastSold = i.daysSinceSold != null ? (i.daysSinceSold <= 1 ? 'today' : i.daysSinceSold + 'd') : '';
     h += `<tr>
-      <td><span class="badge ${cfg.badge}">${i.action}</span></td>
+      <td><span class="badge ${cfg.badge}">${i.score}</span></td>
+      <td style="font-size:10px;font-weight:600">${i.action}</td>
       <td style="font-weight:600">${i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
       <td style="font-size:10px">${i.yearRange || '—'}</td>
-      <td style="font-weight:600">${i.sold7d}</td>
+      <td style="font-weight:600">${i.sold30d}</td>
+      <td>${i.sold7d || 0}</td>
       <td>${i.activeStock}</td>
       <td>$${i.avgPrice}</td>
       <td>$${Math.round(i.revenue).toLocaleString()}</td>
     </tr>`;
     if (i.sampleTitle) {
-      h += `<tr><td colspan="8" style="font-size:10px;color:#6b7280;padding:1px 6px 4px">${i.sampleTitle.substring(0,80)}</td></tr>`;
+      h += `<tr><td colspan="10" style="font-size:10px;color:#6b7280;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)} ${lastSold ? '· last sold ' + lastSold : ''}</td></tr>`;
     }
   }
   h += '</table></div>';

@@ -33,6 +33,10 @@ WITH recent_sales AS (
       WHEN title ILIKE '%Buick%' THEN 'Buick'
       WHEN title ILIKE '%Cadillac%' THEN 'Cadillac'
       WHEN title ILIKE '%Lincoln%' THEN 'Lincoln'
+      WHEN title ILIKE '%Pontiac%' THEN 'Pontiac'
+      WHEN title ILIKE '%Saturn%' THEN 'Saturn'
+      WHEN title ILIKE '%Mercury%' THEN 'Mercury'
+      WHEN title ILIKE '%Scion%' THEN 'Scion'
       ELSE 'Other'
     END as make,
     CASE
@@ -46,38 +50,42 @@ WITH recent_sales AS (
       WHEN title ~* '\\m(radio|stereo|infotainment|head unit|receiver)\\M' THEN 'Radio'
       WHEN title ~* '\\m(cluster|speedometer|gauge|instrument)\\M' THEN 'Cluster'
       WHEN title ~* '\\m(throttle body)\\M' THEN 'Throttle'
+      WHEN title ~* '\\m(steering|EPS|power steering)\\M' THEN 'Steering'
+      WHEN title ~* '\\m(mirror|side view)\\M' THEN 'Mirror'
       ELSE 'Other'
     END as part_type,
     title,
     sku,
     "salePrice"::numeric as price,
-    "soldDate",
-    -- Extract year range from title
-    (regexp_matches(title, '\\m((?:19|20)\\d{2})\\M', 'g'))[1] as title_year
+    "soldDate"
   FROM "YourSale"
-  WHERE "soldDate" >= NOW() - INTERVAL '7 days'
+  WHERE "soldDate" >= NOW() - INTERVAL '30 days'
     AND title IS NOT NULL
+    AND "salePrice"::numeric >= 50
 ),
 grouped AS (
   SELECT
     make,
     part_type,
-    COUNT(*) as sold_7d,
+    COUNT(*) as sold_30d,
+    COUNT(*) FILTER (WHERE "soldDate" >= NOW() - INTERVAL '7 days') as sold_7d,
     ROUND(AVG(price), 2) as avg_price,
-    MAX("soldDate") as last_sold,
     ROUND(SUM(price), 2) as total_rev,
-    MIN(title_year) as year_min,
-    MAX(title_year) as year_max,
-    (array_agg(DISTINCT sku))[1:3] as skus,
-    (array_agg(DISTINCT title))[1] as sample_title
+    MAX("soldDate") as last_sold,
+    MIN((regexp_matches(title, '\\m((?:19|20)\\d{2})\\M'))[1]) as year_min,
+    MAX((regexp_matches(title, '\\m((?:19|20)\\d{2})\\M'))[1]) as year_max,
+    (array_agg(DISTINCT title ORDER BY title))[1] as sample_title,
+    (array_agg(DISTINCT sku ORDER BY sku))[1:3] as skus
   FROM recent_sales
   WHERE make != 'Other' AND part_type != 'Other'
   GROUP BY make, part_type
+  HAVING COUNT(*) >= 1
 ),
 with_stock AS (
   SELECT g.*,
     COALESCE((
-      SELECT SUM(l."quantityAvailable") FROM "YourListing" l
+      SELECT SUM(COALESCE(l."quantityAvailable", 1))
+      FROM "YourListing" l
       WHERE l."listingStatus" = 'Active'
         AND l.title ILIKE '%' || g.make || '%'
         AND l.title ~* (CASE g.part_type
@@ -91,21 +99,32 @@ with_stock AS (
           WHEN 'Radio' THEN '\\m(radio|stereo|receiver)\\M'
           WHEN 'Cluster' THEN '\\m(cluster|speedometer|gauge)\\M'
           WHEN 'Throttle' THEN '\\m(throttle body)\\M'
+          WHEN 'Steering' THEN '\\m(steering|EPS|power steering)\\M'
+          WHEN 'Mirror' THEN '\\m(mirror|side view)\\M'
           ELSE g.part_type
         END)
     ), 0) as stock
   FROM grouped g
 )
 SELECT *,
+  -- Score: demand (35) + price (25) + stock urgency (25) + recency (15)
+  LEAST(100, (
+    CASE WHEN sold_30d >= 10 THEN 35 WHEN sold_30d >= 6 THEN 28 WHEN sold_30d >= 4 THEN 22 WHEN sold_30d >= 2 THEN 15 ELSE 8 END
+    + CASE WHEN avg_price >= 300 THEN 25 WHEN avg_price >= 200 THEN 20 WHEN avg_price >= 150 THEN 15 WHEN avg_price >= 100 THEN 10 ELSE 5 END
+    + CASE WHEN stock = 0 THEN 25 WHEN stock <= 2 AND sold_30d > stock THEN 18 WHEN sold_30d > stock THEN 12 ELSE 0 END
+    + CASE WHEN last_sold >= NOW() - INTERVAL '3 days' THEN 15 WHEN last_sold >= NOW() - INTERVAL '7 days' THEN 12 WHEN last_sold >= NOW() - INTERVAL '14 days' THEN 8 ELSE 4 END
+  )) as score,
   CASE
     WHEN stock = 0 AND avg_price >= 200 THEN 'RESTOCK NOW'
     WHEN stock = 0 THEN 'OUT OF STOCK'
-    WHEN stock <= 1 AND sold_7d >= 2 THEN 'LOW STOCK'
+    WHEN stock <= 2 AND sold_30d > stock THEN 'LOW STOCK'
+    WHEN sold_30d > stock THEN 'SELLING FAST'
     ELSE 'MONITOR'
-  END as action
+  END as action,
+  EXTRACT(DAY FROM NOW() - last_sold)::int as days_since_sold
 FROM with_stock
-WHERE stock <= 1
-ORDER BY avg_price DESC, sold_7d DESC
+WHERE sold_30d > stock OR stock = 0 OR (avg_price >= 300 AND sold_30d >= 1)
+ORDER BY score DESC, total_rev DESC
 LIMIT 100;
 `;
 
@@ -116,29 +135,39 @@ router.get('/report', async (req, res) => {
 
     const tiers = { green: [], yellow: [], orange: [] };
     for (const row of rows) {
+      const score = parseInt(row.score) || 0;
       const item = {
+        score,
         make: row.make,
         partType: row.part_type,
-        yearRange: row.year_min && row.year_max ? (row.year_min === row.year_max ? row.year_min : row.year_min + '-' + row.year_max) : null,
+        yearRange: row.year_min && row.year_max
+          ? (row.year_min === row.year_max ? row.year_min : row.year_min + '-' + row.year_max)
+          : null,
+        sold30d: parseInt(row.sold_30d) || 0,
         sold7d: parseInt(row.sold_7d) || 0,
         activeStock: parseInt(row.stock) || 0,
         avgPrice: parseFloat(row.avg_price) || 0,
         lastSold: row.last_sold,
+        daysSinceSold: parseInt(row.days_since_sold) || 0,
         revenue: parseFloat(row.total_rev) || 0,
         action: row.action,
         sampleTitle: row.sample_title,
         skus: row.skus ? row.skus.filter(Boolean) : [],
       };
 
-      if (row.action === 'RESTOCK NOW') { item.tier = 'green'; tiers.green.push(item); }
-      else if (row.action === 'OUT OF STOCK') { item.tier = 'yellow'; tiers.yellow.push(item); }
+      // Floor: $300+ parts with any sales get minimum yellow
+      if (item.avgPrice >= 300 && item.sold30d >= 1 && score < 75) item.score = 75;
+
+      const s = item.score;
+      if (s >= 75) { item.tier = 'green'; tiers.green.push(item); }
+      else if (s >= 50) { item.tier = 'yellow'; tiers.yellow.push(item); }
       else { item.tier = 'orange'; tiers.orange.push(item); }
     }
 
     res.json({
       success: true,
       generatedAt: new Date().toISOString(),
-      period: 'Last 7 days',
+      period: 'Last 30 days',
       tiers,
       summary: {
         green: tiers.green.length,
