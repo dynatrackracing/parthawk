@@ -64,8 +64,6 @@ const Home = () => {
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
           {[
             { label: 'Attack List', href: '/admin/pull' },
-            { label: 'Price Check', href: '/intelligence/price-check' },
-            { label: 'Stale Inventory', href: '/intelligence/stale-inventory' },
             { label: 'Your Sales', href: '/intelligence/your-sales' },
             { label: 'Gate Calculator', href: '/admin/gate' },
             { label: 'VIN Scanner', href: '/admin/vin' },

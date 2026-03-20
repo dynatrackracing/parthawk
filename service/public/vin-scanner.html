@@ -15,12 +15,12 @@
   .nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px}
   .nav::-webkit-scrollbar{display:none}
   .nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#141414}
-  .nav a.active{color:#dc2626;font-weight:700;background:#fef2f2}
+  .nav a.active{color:#dc2626;font-weight:700;background:#2a1a1a}
   .container{padding:12px;max-width:600px;margin:0 auto}
-  .card{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+  .card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
   .card-title{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
   .vin-row{display:flex;gap:8px}
-  .vin-input{flex:1;padding:10px 12px;border:1px solid #333;border-radius:8px;font-size:17px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#141414}
+  .vin-input{flex:1;padding:10px 12px;border:1px solid #333;border-radius:8px;font-size:17px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#141414;color:#F0F0F0}
   .vin-input:focus{border-color:#dc2626}
   .vin-input::placeholder{color:#6B7280;font-size:13px;letter-spacing:0;font-weight:400}
   .btn{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
@@ -56,15 +56,20 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>VIN Scanner</h1>
-  <div class="sub">Scan or enter a VIN for instant parts intelligence</div>
+<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/"><img src="/admin/darkhawk-logo.png" style="height:55px;background:transparent;border-radius:6px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DarkHawk"></a>
+    <div><span style="font-size:18px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><div class="sub" style="font-size:11px;color:#6B7280;margin-top:1px">VIN Scanner</div></div>
+  </div>
 </header>
-<div class="nav">
-  <a href="/">Home</a><a href="/item/search">Search</a><a href="/intelligence/price-check">Price Check</a>
-  <a href="/intelligence/your-sales">Sales</a><a href="/admin/pull">Attack List</a>
-  <a href="/admin/restock">Restock</a><a href="/admin/gate">Gate Calc</a>
-  <a href="/admin/vin" class="active">VIN Scanner</a>
+<div class="nav" style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px">
+  <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Home</a>
+  <a href="/item/search" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Search</a>
+  <a href="/intelligence/your-sales" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Sales</a>
+  <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Attack List</a>
+  <a href="/admin/restock" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Restock</a>
+  <a href="/admin/gate" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">Gate Calc</a>
+  <a href="/admin/vin" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a;font-weight:700">VIN Scanner</a>
 </div>
 <div class="container">
   <div class="card">
