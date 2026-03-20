@@ -17,12 +17,11 @@ function getFirebaseAdmin() {
 }
 
 async function authMiddleware(req, res, next) {
-  // Bypass auth if DISABLE_AUTH is set (any environment)
-  if (process.env.DISABLE_AUTH === 'true') {
-    req.user = { isAdmin: true, email: 'admin@dynatrack.local' };
-    return next();
-  }
+  // Auth disabled — internal tool, all requests pass through as admin
+  req.user = { isAdmin: true, isVerified: true, canSeePrice: true, email: 'admin@darkhawk.local' };
+  return next();
 
+  // Original auth code below (disabled)
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.sendStatus(401);

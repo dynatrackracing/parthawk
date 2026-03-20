@@ -1,7 +1,7 @@
-import { auth } from "./firebase/firebase-config";
-import React, { useCallback, useEffect, useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import FadeIn from "react-fade-in";
-import { Switch, useHistory, useLocation } from "react-router-dom";
+import { Route, Switch, useLocation } from "react-router-dom";
 import { cssTransition, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AddItem from "./components/AddItem";
@@ -9,8 +9,6 @@ import EditItem from "./components/EditItem";
 import Header from "./components/header/Header";
 import Home from "./components/home/Home";
 import ItemDetail from "./components/ItemDetail";
-import PrivateRoute from "./components/routing/PrivateRoute";
-import PublicRoute from "./components/routing/PublicRoute";
 import SearchItem from "./components/SearchItem";
 import Sidebar from "./components/Sidebar";
 import SplashScreen from "./components/SplashScreen";
@@ -28,11 +26,7 @@ import SoldItemsView from "./components/intelligence/SoldItemsView";
 import DemandDashboard from "./components/intelligence/DemandDashboard";
 import { GridProvider, ItemProvider, useUserData } from "./context";
 import AdminPanel from "./pages/Admin";
-import Login from "./pages/Login";
-import Payment from "./pages/Payment";
 import "./styles/main.scss";
-import AXIOS from "./utils/axios";
-import Verification from "./pages/Verification";
 
 const Zoom = cssTransition({
   enter: "zoomIn",
@@ -55,51 +49,12 @@ const App = () => {
     state: { user: userData },
     setUser,
   } = useUserData();
-  const history = useHistory();
-
-  const fetchUserData = useCallback(async () => {
-    setIsLoading(true);
-    AXIOS.get(`/users/${auth.currentUser.email}`)
-      .then((response) => {
-        setUser(response.data);
-        if (!response.data.isVerified) {
-          history.push("/verification");
-        } else {
-          history.push(initialPage);
-        }
-      })
-      .catch(() => {
-        history.push("/login");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // No auth — internal tool, auto-set admin user
   useEffect(() => {
-    // Check for auth bypass in development/testing
-    const authDisabled = window.localStorage.getItem('DISABLE_AUTH') === 'true';
-    if (authDisabled) {
-      setIsLoading(false);
-      return;
-    }
-
-    auth.onAuthStateChanged(function (user) {
-      if (!user) {
-        history.push("/login");
-        setIsLoading(false);
-      } else {
-        if (!userData) {
-          fetchUserData();
-        }
-      }
-    });
+    setUser({ isAdmin: true, isVerified: true, canSeePrice: true, email: 'admin@darkhawk.local' });
+    setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Check if current path is a public route (login, verification)
-  const isPublicRoute = location.pathname === '/login' || location.pathname === '/verification';
 
   if (isLoading) {
     return <></>;
@@ -124,29 +79,14 @@ const App = () => {
           limit={3}
         />
 
-        {/* Public Routes - Full screen without app shell */}
-        {isPublicRoute ? (
-          <Switch>
-            <PublicRoute
-              restricted={true}
-              component={Login}
-              path="/login"
-              exact
-            />
-            <PublicRoute component={Verification} path="/verification" exact />
-          </Switch>
-        ) : (
-          /* Private Routes - With app shell (sidebar + header) */
+        {/* App shell — no auth required */}
           <div className="flex h-screen overflow-hidden">
-            {/* Sidebar */}
-            {(userData?.isVerified || window.localStorage.getItem('DISABLE_AUTH') === 'true') && (
-              <FadeIn>
-                <Sidebar
-                  sidebarOpen={sidebarOpen}
-                  setSidebarOpen={setSidebarOpen}
-                />
-              </FadeIn>
-            )}
+            <FadeIn>
+              <Sidebar
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+              />
+            </FadeIn>
             <div className="s-base__background relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
               {/*  Site header */}
               <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -154,40 +94,39 @@ const App = () => {
               <main>
                 <div className="s-base__background w-full mx-auto">
                   <Switch>
-                    <PrivateRoute exact path="/item/add" component={AddItem} />
-                    <PrivateRoute
+                    <Route exact path="/item/add" component={AddItem} />
+                    <Route
                       exact
                       path="/item/edit/:id"
                       component={EditItem}
                     />
-                    <PrivateRoute
+                    <Route
                       exact
                       path="/item/search"
                       component={SearchItem}
                     />
-                    <PrivateRoute exact path="/item/:id" component={ItemDetail} />
-                    <PrivateRoute exact path="/payment" component={Payment} />
-                    <PrivateRoute exact path="/admin" component={AdminPanel} />
+                    <Route exact path="/item/:id" component={ItemDetail} />
+                    <Route exact path="/payment" component={Payment} />
+                    <Route exact path="/admin" component={AdminPanel} />
 
                     {/* Intelligence Routes */}
-                    <PrivateRoute exact path="/intelligence" component={MarketDashboard} />
-                    <PrivateRoute exact path="/intelligence/price-check" component={PriceCheck} />
-                    <PrivateRoute exact path="/intelligence/stale-inventory" component={StaleInventory} />
-                    <PrivateRoute exact path="/intelligence/your-listings" component={YourListings} />
-                    <PrivateRoute exact path="/intelligence/your-sales" component={YourSales} />
-                    <PrivateRoute exact path="/intelligence/price-analysis/:listingId" component={PriceAnalysis} />
-                    <PrivateRoute exact path="/intelligence/pricing-insights" component={PricingInsights} />
-                    <PrivateRoute exact path="/intelligence/competitors" component={CompetitorListings} />
-                    <PrivateRoute exact path="/intelligence/sold-items" component={SoldItemsView} />
-                    <PrivateRoute exact path="/intelligence/demand" component={DemandDashboard} />
+                    <Route exact path="/intelligence" component={MarketDashboard} />
+                    <Route exact path="/intelligence/price-check" component={PriceCheck} />
+                    <Route exact path="/intelligence/stale-inventory" component={StaleInventory} />
+                    <Route exact path="/intelligence/your-listings" component={YourListings} />
+                    <Route exact path="/intelligence/your-sales" component={YourSales} />
+                    <Route exact path="/intelligence/price-analysis/:listingId" component={PriceAnalysis} />
+                    <Route exact path="/intelligence/pricing-insights" component={PricingInsights} />
+                    <Route exact path="/intelligence/competitors" component={CompetitorListings} />
+                    <Route exact path="/intelligence/sold-items" component={SoldItemsView} />
+                    <Route exact path="/intelligence/demand" component={DemandDashboard} />
 
-                    <PrivateRoute exact path="/" component={Home} />
+                    <Route exact path="/" component={Home} />
                   </Switch>
                 </div>
               </main>
             </div>
           </div>
-        )}
       </ItemProvider>
     </GridProvider>
     </>
