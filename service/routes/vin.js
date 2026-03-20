@@ -24,55 +24,51 @@ function formatEngineStr(displacement, cylinders) {
 /**
  * POST /vin/decode-photo
  * Accepts JSON body: { image: "base64-encoded-jpeg" }
- * Uses Claude API to read VIN from photo, then NHTSA to decode.
+ * Calls Claude Vision API via raw fetch (no SDK dependency).
  */
 router.post('/decode-photo', async (req, res) => {
   try {
     const imageBase64 = req.body?.image;
     if (!imageBase64 || imageBase64.length < 1000) {
-      return res.status(400).json({ error: 'No image provided or image too small' });
+      return res.status(400).json({ error: 'No image provided or image too small (' + (imageBase64?.length || 0) + ' chars)' });
     }
     log.info({ imageSize: imageBase64.length }, 'VIN photo received');
 
-    // Step 1: Send to Claude API for VIN reading
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
     }
 
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey });
-
-    const claudeRes = await client.messages.create({
+    // Call Claude Vision via raw fetch (avoids SDK dependency issues)
+    const fetchRes = await axios.post('https://api.anthropic.com/v1/messages', {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 100,
       messages: [{
         role: 'user',
         content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 },
-          },
-          {
-            type: 'text',
-            text: 'Read the Vehicle Identification Number (VIN) from this photo. The photo may have glare, be at an angle, be dirty, partially obscured, rotated, tilted, or taken through a windshield. Rules: A VIN is exactly 17 characters (letters and numbers only). VINs never contain I, O, or Q. Position 9 is always a check digit (0-9 or X). Common misreads: 0↔O↔Q↔D, 1↔I↔L, 5↔S, 8↔B, 2↔Z. If a character is unclear, use VIN rules to determine the most likely character. If reading through a windshield with glare, focus on the metal plate beneath. The photo may be sideways or upside down — read the VIN regardless of orientation. Return ONLY the 17-character VIN string. If you can read at least 14 characters, return what you can with ? for unreadable positions. If you cannot read the VIN at all, return UNREADABLE.',
-          },
-        ],
-      }],
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+          { type: 'text', text: 'Read the Vehicle Identification Number (VIN) from this photo. The photo may have glare, be at an angle, dirty, or partially obscured. A VIN is exactly 17 characters — letters and numbers only. VINs never contain I, O, or Q. If a character is unclear, use VIN rules to determine the most likely character. Common misreads: 0/O/D, 1/I/L, 5/S, 8/B. Return ONLY the 17-character VIN string. If unreadable, return UNREADABLE.' }
+        ]
+      }]
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      timeout: 30000,
     });
 
-    let vin = '';
-    for (const block of claudeRes.content) {
-      if (block.type === 'text') vin += block.text.trim();
-    }
+    const text = fetchRes.data?.content?.[0]?.text?.trim() || '';
+    log.info({ rawResponse: text }, 'Claude Vision response');
 
-    vin = vin.replace(/[^A-HJ-NPR-Z0-9?]/gi, '').toUpperCase();
+    // Extract 17-char VIN from response
+    const vinMatch = text.match(/[A-HJ-NPR-Z0-9]{17}/i);
+    let vin = vinMatch ? vinMatch[0].toUpperCase() : text.replace(/[^A-HJ-NPR-Z0-9?]/gi, '').toUpperCase();
 
     if (vin === 'UNREADABLE' || vin.length < 14) {
       return res.json({ success: true, vin: 'UNREADABLE' });
     }
-
-    // Partial VIN (has ? characters) — return for manual completion
     if (vin.includes('?')) {
       return res.json({ success: true, vin, partial: true });
     }
