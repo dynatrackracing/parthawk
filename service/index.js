@@ -516,7 +516,11 @@ app.get('/api/debug/makes', async (req, res) => {
     const envCheck = {};
     for (const k of envKeys) envCheck[k] = process.env[k] ? `SET (${process.env[k].length} chars)` : 'NOT SET';
     R.env_check = envCheck;
-    await q('latest_sale', "SELECT title, \"salePrice\", \"soldDate\" FROM \"YourSale\" WHERE \"soldDate\" IS NOT NULL ORDER BY \"soldDate\" DESC LIMIT 5");
+    await q('sale_by_store', "SELECT store, COUNT(*) as cnt FROM \"YourSale\" GROUP BY store ORDER BY cnt DESC");
+    await q('sale_null_store', "SELECT COUNT(*) as no_store FROM \"YourSale\" WHERE store IS NULL");
+    await q('sale_date_range_by_store', "SELECT store, MIN(\"soldDate\") as earliest, MAX(\"soldDate\") as latest, COUNT(*) as cnt FROM \"YourSale\" GROUP BY store ORDER BY cnt DESC");
+    await q('sale_dupes', "SELECT \"ebayItemId\", \"soldDate\"::date as sold_date, COUNT(*) as dupes FROM \"YourSale\" GROUP BY \"ebayItemId\", \"soldDate\"::date HAVING COUNT(*) > 1 LIMIT 10");
+    await q('sale_most_recent', "SELECT id, \"ebayItemId\", title, \"salePrice\", \"soldDate\", store, \"createdAt\" FROM \"YourSale\" ORDER BY \"createdAt\" DESC LIMIT 5");
     await q('honda_2000_with_items', "SELECT a.year, a.make, a.model, COUNT(aic.\"itemId\") as item_count FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON aic.\"autoId\" = a.id WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' GROUP BY a.year, a.make, a.model ORDER BY a.model");
     await q('honda_2000_auto_only', "SELECT DISTINCT a.model FROM \"Auto\" a WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' ORDER BY a.model");
     await q('honda_2000_auto_linked', "SELECT DISTINCT a.model FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON aic.\"autoId\" = a.id WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' ORDER BY a.model");
