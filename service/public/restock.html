@@ -109,25 +109,25 @@ function renderSection(tier, cfg, items) {
       <span style="font-size:9px;color:#9ca3af">Score ${tier === 'green' ? '80+' : tier === 'yellow' ? '60-79' : '40-59'}</span>
     </div>
     <table><tr>
-      <th>Score</th><th>Action</th><th>Make</th><th>Part Type</th><th>Years</th>
-      <th>Sold 30d</th><th>Sold 7d</th><th>Stock</th><th>Avg $</th><th>Rev 30d</th>
+      <th>Score</th><th>Action</th><th>Vehicle</th><th>Part</th><th>Part #</th>
+      <th>Sold 7d</th><th>Stock</th><th>Avg $</th><th>Rev</th>
     </tr>`;
   for (const i of items) {
-    const lastSold = i.daysSinceSold != null ? (i.daysSinceSold <= 1 ? 'today' : i.daysSinceSold + 'd') : '';
+    const vehicle = [i.yearRange, i.make, i.model].filter(Boolean).join(' ');
+    const pn = i.basePn || (i.variantPns && i.variantPns[0]) || '';
     h += `<tr>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
       <td style="font-size:10px;font-weight:600">${i.action}</td>
-      <td style="font-weight:600">${i.make}</td>
+      <td style="font-weight:600">${vehicle || i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
-      <td style="font-size:10px">${i.yearRange || '—'}</td>
-      <td style="font-weight:600">${i.sold30d}</td>
-      <td>${i.sold7d || 0}</td>
+      <td class="mono" style="max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${pn}">${pn}</td>
+      <td style="font-weight:600">${i.sold7d}</td>
       <td>${i.activeStock}</td>
       <td>$${i.avgPrice}</td>
       <td>$${Math.round(i.revenue).toLocaleString()}</td>
     </tr>`;
     if (i.sampleTitle) {
-      h += `<tr><td colspan="10" style="font-size:10px;color:#6b7280;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)} ${lastSold ? '· last sold ' + lastSold : ''}</td></tr>`;
+      h += `<tr><td colspan="9" style="font-size:10px;color:#6b7280;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)}</td></tr>`;
     }
   }
   h += '</table></div>';
