@@ -114,8 +114,15 @@ app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));
-// Serve static admin tools
-app.use('/admin', express.static(path.resolve(__dirname, 'public')));
+// Serve static admin tools with cache headers
+app.use('/admin', express.static(path.resolve(__dirname, 'public'), {
+  maxAge: '10m',  // Cache static files for 10 minutes
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.svg')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Images: 24h
+    }
+  }
+}));
 app.get('/admin/import', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'import.html'));
 });
