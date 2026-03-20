@@ -530,7 +530,9 @@ app.get('/api/debug/makes', async (req, res) => {
     await q('sale_like_tables', "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename ILIKE '%sale%' OR tablename ILIKE '%order%' OR tablename ILIKE '%sold%' OR tablename ILIKE '%transaction%')");
     await q('yoursale_latest_created', "SELECT MAX(\"createdAt\") as latest_created, MAX(\"soldDate\") as latest_sold FROM \"YourSale\"");
     await q('yard_vehicle_by_yard', "SELECT y.name, COUNT(yv.id) as total, SUM(CASE WHEN yv.active THEN 1 ELSE 0 END) as active, MAX(yv.scraped_at) as last_scraped FROM yard y LEFT JOIN yard_vehicle yv ON y.id = yv.yard_id WHERE y.enabled = true GROUP BY y.name ORDER BY y.name");
-    await q('yard_status', "SELECT name, enabled, last_scraped, flagged FROM yard WHERE chain = 'LKQ' ORDER BY name");
+    await q('yard_status', "SELECT id, name, enabled, last_scraped, flagged, flag_reason FROM yard WHERE chain = 'LKQ' ORDER BY name");
+    await q('yard_vehicle_by_yard_id', "SELECT yard_id, COUNT(*) as total, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active_count, MAX(scraped_at) as last_scraped FROM yard_vehicle GROUP BY yard_id ORDER BY total DESC");
+    await q('attack_list_yards', "SELECT id, name, enabled, flagged FROM yard WHERE enabled = true AND (flagged = false OR flagged IS NULL) ORDER BY name");
     await q('honda_2000_with_items', "SELECT a.year, a.make, a.model, COUNT(aic.\"itemId\") as item_count FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON aic.\"autoId\" = a.id WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' GROUP BY a.year, a.make, a.model ORDER BY a.model");
     await q('honda_2000_auto_only', "SELECT DISTINCT a.model FROM \"Auto\" a WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' ORDER BY a.model");
     await q('honda_2000_auto_linked', "SELECT DISTINCT a.model FROM \"Auto\" a JOIN \"AutoItemCompatibility\" aic ON aic.\"autoId\" = a.id WHERE a.make ILIKE '%Honda%' AND a.year::text = '2000' ORDER BY a.model");
