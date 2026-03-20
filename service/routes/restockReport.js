@@ -35,7 +35,6 @@ WITH sales_grouped AS (
       WHEN title ILIKE '%Lincoln%' THEN 'Lincoln'
       ELSE 'Other'
     END as make,
-    SUBSTRING(title FROM '(?:Toyota|Honda|Ford|Dodge|Chrysler|Jeep|Ram|Chevy|Chevrolet|GMC|Nissan|Hyundai|Kia|Mazda|BMW|Mercedes|Volkswagen|Audi|Lexus|Acura|Infiniti|Volvo|Mitsubishi|Buick|Cadillac|Lincoln|Subaru)\\s+(\\w+)') as model,
     CASE
       WHEN title ~* '\\m(TCM|TCU|transmission control)\\M' THEN 'TCM'
       WHEN title ~* '\\m(BCM|body control)\\M' THEN 'BCM'
@@ -57,7 +56,6 @@ WITH sales_grouped AS (
 aggregated AS (
   SELECT
     make,
-    model,
     part_type,
     COUNT(*) as sold_180d,
     COUNT(*) FILTER (WHERE "soldDate" >= NOW() - INTERVAL '90 days') as sold_90d,
@@ -75,8 +73,8 @@ aggregated AS (
     MAX("soldDate") as last_sold,
     ROUND(SUM(price), 2) as total_rev
   FROM sales_grouped
-  WHERE make != 'Other' AND part_type != 'Other' AND model IS NOT NULL AND LENGTH(model) >= 2
-  GROUP BY make, model, part_type
+  WHERE make != 'Other' AND part_type != 'Other'
+  GROUP BY make, part_type
 ),
 with_stock AS (
   SELECT a.*,
@@ -84,7 +82,6 @@ with_stock AS (
       SELECT COUNT(*) FROM "YourListing" l
       WHERE l."listingStatus" = 'Active'
         AND l.title ILIKE '%' || a.make || '%'
-        AND l.title ILIKE '%' || a.model || '%'
         AND l.title ~* (CASE a.part_type
           WHEN 'ECM' THEN '\\m(ECU|ECM|PCM|engine control)\\M'
           WHEN 'ABS' THEN '\\m(ABS|anti.lock|brake pump)\\M'
@@ -126,9 +123,8 @@ router.get('/report', async (req, res) => {
       const item = {
         score,
         make: row.make,
-        model: row.model,
-        vehicle: row.make + ' ' + row.model,
         partType: row.part_type,
+        vehicle: row.make,
         sold180d: parseInt(row.sold_180d) || 0,
         sold90d: parseInt(row.sold_90d) || 0,
         activeStock: parseInt(row.stock) || 0,
