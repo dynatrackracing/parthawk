@@ -41,10 +41,15 @@ class LKQScraper {
   constructor() {
     this.log = log.child({ class: 'LKQScraper' }, true);
     this.locations = [
+      // North Carolina
       { name: 'LKQ Raleigh',    slug: 'raleigh-1168',    storeId: '1168' },
       { name: 'LKQ Durham',     slug: 'durham-1142',     storeId: '1142' },
       { name: 'LKQ Greensboro', slug: 'greensboro-1226', storeId: '1226' },
       { name: 'LKQ East NC',    slug: 'east-nc-1227',    storeId: '1227' },
+      // Florida
+      { name: 'LKQ Tampa',      slug: 'tampa-1180',      storeId: '1180' },
+      { name: 'LKQ Largo',      slug: 'largo-1189',      storeId: '1189' },
+      { name: 'LKQ Clearwater', slug: 'clearwater-1190', storeId: '1190' },
     ];
     this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   }

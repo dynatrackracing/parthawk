@@ -16,10 +16,15 @@ const knex = require('knex')({
 });
 
 const LOCATIONS = [
+  // North Carolina
   { name: 'LKQ Raleigh',    slug: 'raleigh-1168'    },
   { name: 'LKQ Durham',     slug: 'durham-1142'     },
   { name: 'LKQ Greensboro', slug: 'greensboro-1226' },
   { name: 'LKQ East NC',    slug: 'east-nc-1227'    },
+  // Florida
+  { name: 'LKQ Tampa',      slug: 'tampa-1180'      },
+  { name: 'LKQ Largo',      slug: 'largo-1189'      },
+  { name: 'LKQ Clearwater', slug: 'clearwater-1190' },
 ];
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
