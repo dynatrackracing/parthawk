@@ -488,9 +488,58 @@ router.post('/scan', async (req, res) => {
       });
     } catch (e) { /* table may not exist yet */ }
 
+    // --- Step 5: AI Research for newer vehicles with sparse data ---
+    let aiResearch = null;
+    const nonRebuildParts = marketRef.filter(p => !p.isRebuild).length;
+    const minYear = new Date().getFullYear() - 8; // 2017+ for 2025
+    if (year >= minYear && nonRebuildParts < 5 && make && baseModel) {
+      try {
+        // Check cache first
+        let cached = null;
+        try {
+          cached = await database('ai_vehicle_research')
+            .where({ year, make: make.toUpperCase(), model: baseModel.toUpperCase() })
+            .first();
+        } catch (e) { /* table may not exist */ }
+
+        if (cached) {
+          aiResearch = cached.research;
+        } else {
+          const apiKey = process.env.ANTHROPIC_API_KEY;
+          if (apiKey) {
+            const engineDesc = decoded.engine || '';
+            const aiRes = await axios.post('https://api.anthropic.com/v1/messages', {
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 500,
+              messages: [{
+                role: 'user',
+                content: `What used OEM parts have the highest resale value for a ${year} ${make} ${baseModel} ${engineDesc}? List the top 10 parts that sell well on eBay as used/pulled parts from junkyards. For each part include: part name, typical eBay price range, and whether it requires programming. Focus on electronic modules, sensors, and hard-to-find components. Format as a simple list.`
+              }]
+            }, {
+              headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+              timeout: 15000,
+            });
+            aiResearch = aiRes.data?.content?.[0]?.text || null;
+
+            // Cache it
+            if (aiResearch) {
+              try {
+                await database('ai_vehicle_research').insert({
+                  year, make: make.toUpperCase(), model: baseModel.toUpperCase(),
+                  engine: engineDesc || null, research: aiResearch,
+                });
+              } catch (e) { /* cache write failure non-fatal */ }
+            }
+          }
+        }
+      } catch (e) {
+        log.warn({ err: e.message }, 'AI research failed');
+      }
+    }
+
     res.json({
       success: true, vin, decoded, baseModel, totalValue, yardMatch,
-      salesHistory, currentStock, marketRef,
+      salesHistory, currentStock, marketRef, aiResearch,
     });
   } catch (err) {
     log.error({ err }, 'VIN scan failed');

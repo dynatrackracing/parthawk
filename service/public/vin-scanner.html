@@ -244,6 +244,17 @@ function render(data){
     h+='</div>';
   }
 
+  // AI Research — for newer vehicles with sparse data
+  if(data.aiResearch){
+    h+='<div class="card" style="border-left:3px solid #8b5cf6">';
+    h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
+    h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#ede9fe;color:#7c3aed;text-transform:uppercase">AI Research</span>';
+    h+='<span style="font-size:10px;color:#9ca3af">Market intelligence for '+[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ')+'</span>';
+    h+='</div>';
+    h+='<div style="font-size:12px;color:#374151;line-height:1.6;white-space:pre-line">'+data.aiResearch+'</div>';
+    h+='</div>';
+  }
+
   // Sales history — collapsible
   if(sh.length>0){
     h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+sh.reduce((s,p)=>s+p.sold,0)+' sold all time)</summary>';
