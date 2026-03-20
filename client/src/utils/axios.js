@@ -1,5 +1,4 @@
 import axios from "axios";
-import { auth } from "../firebase/firebase-config";
 
 const AXIOS = axios.create({
   headers: {
@@ -7,25 +6,12 @@ const AXIOS = axios.create({
   },
 });
 
-// Get the token and inject it to the header before every request
-AXIOS.interceptors.request.use(async (config) => {
-  // Skip auth token if DISABLE_AUTH is set (for testing)
-  if (window.localStorage.getItem('DISABLE_AUTH') === 'true') {
-    return config;
-  }
-
-  const token = await auth.currentUser.getIdToken();
-  config.headers.Authorization = `Bearer ${token}`;
-
-  return config;
-});
-
+// No auth token injection — internal tool, all requests pass through
 AXIOS.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.log(error);
+    console.error('API error:', error?.message || error);
+    return Promise.reject(error);
   }
 );
 

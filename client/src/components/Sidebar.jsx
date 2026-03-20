@@ -1,8 +1,8 @@
-import { signOut } from "firebase/auth";
+// import { signOut } from "firebase/auth"; // Auth removed
 import React, { useEffect, useRef } from "react";
 import { NavLink, useHistory, useLocation } from "react-router-dom";
 import Logo from "../assets/images/logo.png";
-import { auth } from "../firebase/firebase-config";
+// import { auth } from "../firebase/firebase-config"; // Auth removed
 import { toast } from "react-toastify";
 import { useUserData } from "../context/user";
 
@@ -123,16 +123,9 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
   }, [location.pathname]);
 
   const logout = () => {
-    signOut(auth)
-      .then(() => {
-        toast.success("Logout Successful");
-        setSidebarOpen(false);
-        resetUser();
-        history.push("/");
-      })
-      .catch((error) => {
-        console.log(error.message);
-      });
+    // Auth removed — no logout needed for internal tool
+    toast.success("Session cleared");
+    setSidebarOpen(false);
   };
 
   return (
