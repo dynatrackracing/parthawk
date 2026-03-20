@@ -92,7 +92,12 @@ class ItemLookupService {
 
   scopeAutoStatement(statement, { year, make, model, trim, engine }) {
     if (year) {
-      statement.where('year', year);
+      const y = parseInt(year);
+      if (!isNaN(y)) {
+        statement.whereRaw('"year"::int >= ? AND "year"::int <= ?', [y - 1, y + 1]);
+      } else {
+        statement.where('year', year);
+      }
     }
     if (make) {
       statement.where('make', make);

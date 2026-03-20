@@ -101,6 +101,20 @@ function detectPartType(title) {
 }
 
 /**
+ * Clean up stored engine strings for display.
+ * "2.671000L" → "2.7L", "3.211864544L" → "3.2L", "2.2L 170cyl" → "2.2L"
+ */
+function formatEngineDisplay(engine) {
+  if (!engine) return null;
+  let e = engine.replace(/\s*\d{2,3}cyl/i, '').trim();
+  // Round raw NHTSA decimals: "2.671000L" → "2.7L"
+  e = e.replace(/(\d+\.\d+)L/i, (match, num) => {
+    return parseFloat(num).toFixed(1) + 'L';
+  });
+  return e || null;
+}
+
+/**
  * Recency weight for a sale based on how recently it sold.
  * Last 30 days = 1.0, 30-90 days = 0.75, 90-180 days = 0.5, older = 0.25
  */
@@ -745,7 +759,7 @@ class AttackListService {
       trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
       date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
       vin: vehicle.vin || null,
-      engine: (vehicle.engine || '').replace(/\s*\d{2,3}cyl/i, '').trim() || null,
+      engine: formatEngineDisplay(vehicle.engine),
       engine_type: vehicle.engine_type || null,
       drivetrain: vehicle.drivetrain || null,
       trim_level: vehicle.trim_level || null,
