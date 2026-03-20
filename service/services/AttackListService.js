@@ -94,7 +94,7 @@ function detectPartType(title) {
   if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO')) return 'RADIO';
   if (t.includes('THROTTLE')) return 'THROTTLE';
   if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
-  if (t.includes('TRANSFER CASE')) return 'XFER CASE';
+  if (t.includes('TRANSFER CASE') || t.includes('XFER CASE')) return null; // never pull these
   if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
   if (t.includes('MIRROR')) return 'MIRROR';
   return null;
@@ -712,6 +712,31 @@ class AttackListService {
 
     const filteredParts = parts.filter(p => {
       const title = (p.title || '').toUpperCase();
+      const pt = (p.partType || '').toUpperCase();
+
+      // 1. EXCLUDE transfer case — never pull these
+      if (pt.includes('XFER') || pt.includes('TRANSFER') || title.includes('TRANSFER CASE') || title.includes('XFER CASE')) return false;
+
+      // 2. YEAR RANGE CHECK — if title has a year range, vehicle must fit within it
+      if (year > 0) {
+        // Match "02-03", "2002-2003", "00-02", "1999-2001" patterns
+        const rangeMatch = title.match(/\b((?:19|20)?\d{2})\s*[-–]\s*((?:19|20)?\d{2})\b/);
+        if (rangeMatch) {
+          let y1 = parseInt(rangeMatch[1]), y2 = parseInt(rangeMatch[2]);
+          // Convert 2-digit years: 02 → 2002, 99 → 1999
+          if (y1 < 100) y1 += y1 >= 70 ? 1900 : 2000;
+          if (y2 < 100) y2 += y2 >= 70 ? 1900 : 2000;
+          if (y1 > y2) { const tmp = y1; y1 = y2; y2 = tmp; }
+          // Vehicle year must fall within the part's year range
+          if (year < y1 || year > y2) return false;
+        }
+        // Single year in title with no range — must match within ±1
+        const singleYears = title.match(/\b((?:19|20)\d{2})\b/g);
+        if (singleYears && singleYears.length === 1 && !rangeMatch) {
+          const partYear = parseInt(singleYears[0]);
+          if (Math.abs(year - partYear) > 1) return false;
+        }
+      }
 
       // Fuel type filters
       if (vEngineType === 'GAS' || vEngineType === '') {
@@ -719,7 +744,7 @@ class AttackListService {
         if (title.includes('DIESEL') || title.includes('CUMMINS') || title.includes('DURAMAX') || title.includes('POWERSTROKE')) return false;
       }
 
-      // Drivetrain filter (applies to all drivetrain-specific parts, not just ABS)
+      // Drivetrain filter
       if (vDrivetrain) {
         if (vDrivetrain === '2WD' || vDrivetrain === 'FWD' || vDrivetrain === 'RWD') {
           if (title.includes('4WD') || title.includes('4X4') || title.includes('AWD')) return false;
@@ -729,15 +754,13 @@ class AttackListService {
         }
       }
 
-      // Engine size mismatch filter — V6 parts shouldn't match V8 vehicles and vice versa
+      // Engine size mismatch filter
       if (vEngine) {
         const vIsV6 = vEngine.includes('V6') || vEngine.includes('4-CYL') || /\b(3\.[0-7]|2\.[0-9]|4\.0)L/.test(vEngine);
         const vIsV8 = vEngine.includes('V8') || /\b(4\.[6-9]|5\.[0-9]|6\.[0-9])L/.test(vEngine);
         const pHasV6 = title.includes('V6') || title.includes('3.6L') || title.includes('3.5L') || title.includes('4.0L') || title.includes('3.0L') || title.includes('2.4L') || title.includes('2.5L');
         const pHasV8 = title.includes('V8') || title.includes('5.7L') || title.includes('5.0L') || title.includes('4.6L') || title.includes('5.3L') || title.includes('6.0L') || title.includes('6.2L') || title.includes('HEMI') || title.includes(' GT ');
-        // V6 vehicle + V8 part = mismatch
         if (vIsV6 && pHasV8 && !pHasV6) return false;
-        // V8 vehicle + V6 part = mismatch
         if (vIsV8 && pHasV6 && !pHasV8) return false;
       }
 
