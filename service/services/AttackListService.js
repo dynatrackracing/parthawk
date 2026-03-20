@@ -624,41 +624,82 @@ class AttackListService {
       });
     }
 
-    // Item-based parts — only if partType not already covered
-    // Separate rebuild (pro-rebuild / isRepair) from pullable parts
-    const seenBasePNs = new Set();
+    // Item-based parts — dedup by base part number, separate rebuild
+    const mergedByBase = {};  // basePn → merged entry
     const rebuildParts = [];
-    for (const p of matchedParts) {
-      if (!p.partType || seenTypes.has(p.partType)) continue;
-      const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
-      if (basePn && seenBasePNs.has(basePn)) continue;
-      if (basePn) seenBasePNs.add(basePn);
 
-      // Stock: check by this specific part number
-      let ptStock = 0;
-      if (basePn && stockPartNumbers) ptStock = stockPartNumbers[basePn] || 0;
+    for (const p of matchedParts) {
+      if (!p.partType) continue;
+      const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
 
       if (p.isRebuild) {
-        // Rebuild reference — do NOT add to parts array or scoring
-        rebuildParts.push({
-          itemId: p.itemId, title: p.title, category: p.category,
-          partNumber: p.partNumber, partType: p.partType,
-          price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
-          verdict: 'REBUILD', seller: p.seller || 'pro-rebuild',
-          reason: 'Rebuild reference — not included in pull value',
-          isRebuild: true, deadWarning: null,
-        });
+        const rbKey = basePn || p.partType + '_' + Math.random();
+        if (!mergedByBase['_rb_' + rbKey]) {
+          mergedByBase['_rb_' + rbKey] = null; // just track we've seen it
+          rebuildParts.push({
+            itemId: p.itemId, title: p.title, category: p.category,
+            partNumber: p.partNumber, partType: p.partType,
+            price: Math.round(p.price), in_stock: 0, sold_90d: 0,
+            verdict: 'REBUILD', seller: p.seller || 'pro-rebuild',
+            reason: 'Rebuild reference — not included in pull value',
+            isRebuild: true, deadWarning: null,
+          });
+        }
+        continue;
+      }
+
+      // Skip if this partType was already covered by YourSale data
+      if (seenTypes.has(p.partType) && !basePn) continue;
+
+      const key = basePn || (p.partType + '_noPN_' + p.itemId);
+
+      if (mergedByBase[key]) {
+        // Merge: keep higher price, combine part numbers and types
+        const existing = mergedByBase[key];
+        if (p.price > existing._rawPrice) {
+          existing._rawPrice = p.price;
+          existing.price = Math.round(p.price);
+          existing.title = p.title;
+          existing.itemId = p.itemId;
+        }
+        if (p.partNumber && !existing._allPNs.includes(p.partNumber)) {
+          existing._allPNs.push(p.partNumber);
+          existing.partNumber = existing._allPNs.join(' / ');
+        }
+        if (p.partType && !existing._allTypes.includes(p.partType)) {
+          existing._allTypes.push(p.partType);
+          existing.partType = existing._allTypes.join('/');
+        }
       } else {
-        seenTypes.add(p.partType);
-        parts.push({
+        // New entry
+        let ptStock = 0;
+        if (basePn && stockPartNumbers) ptStock = stockPartNumbers[basePn] || 0;
+        mergedByBase[key] = {
           itemId: p.itemId, title: p.title, category: p.category,
           partNumber: p.partNumber, partType: p.partType,
           price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
           verdict: 'SKIP', seller: p.seller || null,
           reason: 'Competitor listed, check YourSale for demand',
           isRebuild: false, deadWarning: null,
-        });
+          _rawPrice: p.price,
+          _allPNs: p.partNumber ? [p.partNumber] : [],
+          _allTypes: p.partType ? [p.partType] : [],
+        };
       }
+    }
+
+    // Add merged parts to parts array (skip types already covered by YourSale)
+    for (const [key, entry] of Object.entries(mergedByBase)) {
+      if (!entry || key.startsWith('_rb_')) continue;
+      // Skip if ALL part types in this merged entry are already covered
+      const types = entry._allTypes || [entry.partType];
+      if (types.every(t => seenTypes.has(t))) continue;
+      for (const t of types) seenTypes.add(t);
+      // Clean internal fields
+      delete entry._rawPrice;
+      delete entry._allPNs;
+      delete entry._allTypes;
+      parts.push(entry);
       if (parts.length >= 8) break;
     }
 
