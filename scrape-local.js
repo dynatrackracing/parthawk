@@ -110,15 +110,31 @@ async function saveYard(loc, allVehicles) {
     seenYMM.add(`${v.year}|${v.make}|${v.model}`);
   }
 
-  // Filter to only vehicles added in last 48 hours
-  const newVehicles = [];
-  let oldSkipped = 0, nullDate = 0;
-  // Debug: show date distribution
-  const dateSamples = [];
+  // Analyze date distribution before filtering
+  let oldest = null, newest = null, nullDate = 0;
+  const ageBuckets = { today: 0, '1d': 0, '2d': 0, '3-7d': 0, '8-30d': 0, '31d+': 0 };
   for (const v of allVehicles) {
     const d = parseDate(v.dateAdded);
-    if (dateSamples.length < 5) dateSamples.push({ raw: v.dateAdded, parsed: d ? d.toISOString() : null, daysAgo: d ? daysAgo(d) : 'null' });
-    if (!d) { nullDate++; oldSkipped++; continue; }
+    if (!d) { nullDate++; continue; }
+    if (!oldest || d < oldest) oldest = d;
+    if (!newest || d > newest) newest = d;
+    const age = daysAgo(d);
+    if (age === 0) ageBuckets.today++;
+    else if (age === 1) ageBuckets['1d']++;
+    else if (age === 2) ageBuckets['2d']++;
+    else if (age <= 7) ageBuckets['3-7d']++;
+    else if (age <= 30) ageBuckets['8-30d']++;
+    else ageBuckets['31d+']++;
+  }
+  console.log(`  Date range: ${oldest ? oldest.toISOString().slice(0,10) : 'null'} to ${newest ? newest.toISOString().slice(0,10) : 'null'}`);
+  console.log(`  Distribution:`, JSON.stringify(ageBuckets), `null: ${nullDate}`);
+
+  // Filter to only vehicles added in last 48 hours
+  const newVehicles = [];
+  let oldSkipped = 0;
+  for (const v of allVehicles) {
+    const d = parseDate(v.dateAdded);
+    if (!d) { oldSkipped++; continue; }
     if (daysAgo(d) <= 2) {
       v._date = d;
       newVehicles.push(v);
@@ -126,8 +142,7 @@ async function saveYard(loc, allVehicles) {
       oldSkipped++;
     }
   }
-  console.log(`  Date samples:`, JSON.stringify(dateSamples));
-  console.log(`  New (last 48h): ${newVehicles.length}, Old: ${oldSkipped}, Null dates: ${nullDate}`);
+  console.log(`  >>> SAVING ${newVehicles.length} new vehicles, SKIPPING ${oldSkipped} old vehicles`);
 
   // Mark vehicles NOT in scrape as inactive (pulled from yard)
   let deactivated = 0;
