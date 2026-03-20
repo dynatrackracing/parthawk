@@ -161,96 +161,98 @@ async function doScan(src){
   btn.disabled=false;btn.textContent='Decode';
 }
 
-function pc(v){return v>=300?'pg':v>=200?'py':v>=100?'po':'pr'}
-function bc(v){return v>=300?'b-gr':v>=200?'b-yl':v>=100?'b-or':'b-rd'}
+function verdict(v){return v>=250?'GREAT':v>=150?'GOOD':v>=100?'FAIR':'POOR'}
+function vc(v){return v==='GREAT'?'b-gr':v==='GOOD'?'b-yl':v==='FAIR'?'b-or':'b-rd'}
+function pc(v){return v>=250?'pg':v>=150?'py':v>=100?'po':'pr'}
 
 function render(data){
   const d=data.decoded;const sh=data.salesHistory||[];const cs=data.currentStock||[];const mr=data.marketRef||[];
   let h='';
 
-  // Vehicle card — prominent display with all specs
-  const headline = [d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
-  const specLine = [d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
+  // Vehicle header — matches attack list style
+  const headline=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
+  const specs=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
   h+='<div class="card">';
-  h+='<div style="font-size:24px;font-weight:900;letter-spacing:-0.03em;color:#111">'+headline+'</div>';
-  if(specLine) h+='<div style="font-size:14px;font-weight:600;color:#374151;margin-top:2px">'+specLine+'</div>';
-  h+='<div class="vin-str">'+data.vin+'</div>';
-  if(data.baseModel && data.baseModel !== d.model) h+='<div style="font-size:10px;color:#9ca3af">NHTSA model: '+d.model+' · Searching: '+data.baseModel+'</div>';
-  h+='<div class="badges">';
-  if(d.engine)h+='<span class="b b-gy">'+d.engine+'</span>';
-  if(d.engineType&&d.engineType!=='Gas')h+='<span class="b '+(d.engineType==='Hybrid'?'b-yl':d.engineType==='Diesel'?'b-or':'b-bl')+'">'+d.engineType+'</span>';
-  if(d.drivetrain)h+='<span class="b b-bl">'+d.drivetrain+'</span>';
-  if(d.bodyStyle)h+='<span class="b b-gy">'+d.bodyStyle+'</span>';
-  h+='</div>';
-  if(d.plantCity||d.plantCountry)h+='<div style="font-size:11px;color:#9ca3af">'+(d.plantCity?'Plant: '+d.plantCity:'')+(d.plantCountry?' &middot; '+d.plantCountry:'')+'</div>';
+  h+='<div style="font-size:22px;font-weight:900;letter-spacing:-0.03em;color:#111">'+headline+'</div>';
+  if(specs)h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-top:2px">'+specs+'</div>';
+  h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div>';
   if(data.yardMatch)h+='<div class="yard-match"><b>In Yard:</b> '+data.yardMatch.yardName+(data.yardMatch.row?' — Row '+data.yardMatch.row:'')+(data.yardMatch.color?' — '+data.yardMatch.color:'')+'</div>';
   h+='</div>';
 
-  // Section 1: YOUR SALES HISTORY (all time, make+model match)
-  h+='<div class="card"><div class="card-title">Your Sales History (all '+[d.make,data.baseModel||d.model].filter(Boolean).join(' ')+' parts)</div>';
-  if(sh.length>0){
-    h+='<table><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last Sold</th></tr>';
-    let totalSales=0;
-    for(const p of sh){
-      totalSales+=p.avgPrice||0;
-      const ls=p.lastSoldDate?timeAgo(p.lastSoldDate):'—';
-      h+='<tr><td style="font-weight:600"><span class="b '+bc(p.avgPrice)+'">'+p.partType+'</span></td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#6b7280">'+ls+'</td></tr>';
-    }
-    h+='<tr class="total-row"><td>TOTAL</td><td>'+sh.reduce((s,p)=>s+p.sold,0)+'x</td><td class="pg">$'+totalSales+'</td><td></td></tr>';
-    h+='</table>';
-  }else{h+='<div class="section-empty">No sales found for '+[d.make,data.baseModel||d.model].filter(Boolean).join(' ')+'</div>';}
-  h+='</div>';
-
-  // Section 2: YOUR CURRENT STOCK
-  h+='<div class="card"><div class="card-title">Your Current Stock</div>';
-  if(cs.length>0){
-    h+='<table><tr><th>Part</th><th>In Stock</th><th>Price</th><th>SKU</th></tr>';
-    for(const p of cs){
-      const sku=p.listings&&p.listings[0]?p.listings[0].sku||'':'';
-      h+='<tr><td style="font-weight:600"><span class="b '+bc(p.avgPrice)+'">'+p.partType+'</span></td><td>'+p.inStock+'</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#6b7280;font-family:monospace">'+sku+'</td></tr>';
-    }
-    h+='</table>';
-  }else{h+='<div class="section-empty">No active listings for this vehicle</div>';}
-  h+='</div>';
-
-  // Section 3: PARTS FROM DATABASE — specific items with verdicts
+  // PARTS TO PULL — attack list format
+  // Merge sales data + market data into unified part list
+  const partMap={};
+  for(const s of sh){
+    partMap[s.partType]={partType:s.partType,sold:s.sold,avgPrice:s.avgPrice,lastSold:s.lastSoldDate,sampleTitle:s.sampleTitle,inStock:0,marketPrice:0,pns:[],sellers:[],isRebuild:false};
+  }
+  for(const c of cs){
+    if(partMap[c.partType])partMap[c.partType].inStock=c.inStock;
+    else partMap[c.partType]={partType:c.partType,sold:0,avgPrice:0,lastSold:null,sampleTitle:null,inStock:c.inStock,marketPrice:c.avgPrice,pns:[],sellers:[],isRebuild:false};
+  }
   const mrUsed=mr.filter(p=>!p.isRebuild);
   const mrRebuild=mr.filter(p=>p.isRebuild);
-
-  h+='<div class="card"><div class="card-title">Parts for This Vehicle</div>';
-  if(mrUsed.length>0){
-    h+='<table><tr><th>Part Type</th><th>Verdict</th><th>Market $</th><th>Your Avg</th><th>Stock</th><th>Sold</th></tr>';
-    for(const p of mrUsed){
-      const vc=p.verdict==='PULL'?'b-gr':p.verdict==='WATCH'?'b-yl':'b-gy';
-      const yourA=p.yourAvg?'$'+p.yourAvg:'—';
-      h+='<tr><td style="font-weight:600"><span class="b '+bc(p.yourAvg||p.avgPrice)+'">'+p.partType+'</span></td>';
-      h+='<td><span class="b '+vc+'">'+p.verdict+'</span></td>';
-      h+='<td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td>';
-      h+='<td style="font-weight:600">'+yourA+'</td>';
-      h+='<td>'+(p.inStock||0)+'</td>';
-      h+='<td>'+(p.yourSold||0)+'x</td></tr>';
-      // Show top items
-      if(p.topItems){for(const ti of p.topItems){
-        h+='<tr><td colspan="6" style="font-size:10px;color:#6b7280;padding:2px 8px">'+ti.seller+': '+ti.title.substring(0,60)+(ti.pn?' ['+ti.pn+']':'')+'  $'+ti.price+'</td></tr>';
-      }}
+  for(const m of mrUsed){
+    if(partMap[m.partType]){
+      partMap[m.partType].marketPrice=m.avgPrice;
+      partMap[m.partType].pns=m.partNumbers||[];
+      partMap[m.partType].sellers=m.sellers||[];
+      if(!partMap[m.partType].inStock)partMap[m.partType].inStock=m.inStock||0;
+    }else{
+      partMap[m.partType]={partType:m.partType,sold:m.yourSold||0,avgPrice:m.yourAvg||m.avgPrice,lastSold:null,sampleTitle:null,inStock:m.inStock||0,marketPrice:m.avgPrice,pns:m.partNumbers||[],sellers:m.sellers||[],isRebuild:false};
     }
-    h+='</table>';
-  }else{h+='<div class="section-empty">No parts found in database for this vehicle</div>';}
-  h+='</div>';
-
-  if(mrRebuild.length>0){
-    h+='<div class="card" style="opacity:0.6"><div class="card-title">Rebuild Reference (not comparable to used prices)</div>';
-    h+='<table><tr><th>Part</th><th>Count</th><th>Rebuild $</th><th>Seller</th></tr>';
-    for(const p of mrRebuild){
-      const sellers=(p.sellers||[]).join(', ')||'pro-rebuild';
-      h+='<tr><td style="color:#9ca3af"><span class="b b-gy">[REBUILD] '+p.partType+'</span></td><td style="color:#9ca3af">'+p.count+'</td><td style="color:#9ca3af">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9ca3af">'+sellers+'</td></tr>';
-    }
-    h+='</table></div>';
   }
 
-  // Total value summary
-  const tv=data.totalValue||0;
-  if(tv>0)h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Estimated Total Pull Value</div><div style="font-size:28px;font-weight:800;color:#16a34a;margin-top:2px">$'+tv+'</div></div>';
+  const parts=Object.values(partMap).filter(p=>!p.isRebuild).sort((a,b)=>(b.avgPrice||b.marketPrice)-(a.avgPrice||a.marketPrice));
+  let totalValue=0;
+
+  h+='<div class="card"><div class="card-title">Parts to Pull</div>';
+  if(parts.length>0){
+    for(const p of parts){
+      const price=p.avgPrice||p.marketPrice||0;
+      const vd=verdict(price);
+      const lastSold=p.lastSold?timeAgo(p.lastSold)+' ago':'—';
+      const pn=p.pns&&p.pns[0]?p.pns[0]:'';
+      const title=p.sampleTitle||p.partType;
+      totalValue+=price;
+
+      h+='<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+      h+='<div style="flex:1;min-width:0">';
+      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+'</span><span style="font-size:13px;font-weight:700;color:#111">['+p.partType+']</span><span class="'+pc(price)+'" style="font-size:13px;font-weight:700">$'+price+' avg</span></div>';
+      h+='<div style="font-size:11px;color:#374151;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title.substring(0,70)+'</div>';
+      if(pn)h+='<div style="font-size:10px;color:#9ca3af;font-family:monospace;margin-top:1px">'+pn+'</div>';
+      h+='<div style="font-size:10px;color:#6b7280;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSold+'</div>';
+      h+='</div></div></div>';
+    }
+  }else{
+    h+='<div class="section-empty">No parts data for this vehicle</div>';
+  }
+  h+='</div>';
+
+  // Total value
+  if(totalValue>0)h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Estimated Pull Value</div><div style="font-size:28px;font-weight:800;color:#16a34a;margin-top:2px">$'+totalValue+'</div></div>';
+
+  // Rebuild reference — one line per type
+  if(mrRebuild.length>0){
+    h+='<div class="card" style="opacity:0.6"><div class="card-title">Rebuild Reference</div>';
+    for(const p of mrRebuild){
+      const sellers=(p.sellers||[]).join(', ')||'pro-rebuild';
+      const priceStr=p.priceRange||('$'+p.avgPrice);
+      h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#9ca3af">';
+      h+='<span>[REBUILD] '+sellers+' — '+p.partType+'</span><span>'+priceStr+(p.count>1?' ('+p.count+')':'')+'</span></div>';
+    }
+    h+='</div>';
+  }
+
+  // Sales history — collapsible
+  if(sh.length>0){
+    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+sh.reduce((s,p)=>s+p.sold,0)+' sold all time)</summary>';
+    h+='<table style="margin-top:8px"><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last</th></tr>';
+    for(const p of sh){
+      h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#6b7280">'+(p.lastSoldDate?timeAgo(p.lastSoldDate):'—')+'</td></tr>';
+    }
+    h+='</table></details></div>';
+  }
 
   document.getElementById('results').innerHTML=h;
 }
