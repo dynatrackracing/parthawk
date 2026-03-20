@@ -754,14 +754,21 @@ class AttackListService {
         }
       }
 
-      // Engine size mismatch filter
+      // Engine displacement mismatch — if both have a specific size, they must match
       if (vEngine) {
-        const vIsV6 = vEngine.includes('V6') || vEngine.includes('4-CYL') || /\b(3\.[0-7]|2\.[0-9]|4\.0)L/.test(vEngine);
-        const vIsV8 = vEngine.includes('V8') || /\b(4\.[6-9]|5\.[0-9]|6\.[0-9])L/.test(vEngine);
-        const pHasV6 = title.includes('V6') || title.includes('3.6L') || title.includes('3.5L') || title.includes('4.0L') || title.includes('3.0L') || title.includes('2.4L') || title.includes('2.5L');
-        const pHasV8 = title.includes('V8') || title.includes('5.7L') || title.includes('5.0L') || title.includes('4.6L') || title.includes('5.3L') || title.includes('6.0L') || title.includes('6.2L') || title.includes('HEMI') || title.includes(' GT ');
-        if (vIsV6 && pHasV8 && !pHasV6) return false;
-        if (vIsV8 && pHasV6 && !pHasV8) return false;
+        // Extract displacement from vehicle: "4.6L V8" → "4.6"
+        const vDispMatch = vEngine.match(/(\d+\.\d)L/);
+        if (vDispMatch) {
+          const vDisp = vDispMatch[1]; // e.g. "4.6"
+          // Extract displacement from part title: "5.4L" → "5.4"
+          const pDispMatch = title.match(/(\d+\.\d)L/);
+          if (pDispMatch) {
+            const pDisp = pDispMatch[1]; // e.g. "5.4"
+            // Both have specific displacements and they don't match → exclude
+            if (vDisp !== pDisp) return false;
+          }
+          // No displacement in title → could fit multiple engines → include
+        }
       }
 
       return true;
