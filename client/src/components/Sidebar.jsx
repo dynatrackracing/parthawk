@@ -146,6 +146,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
         className={`fixed z-50 left-0 top-0 lg:static lg:left-auto lg:top-auto lg:translate-x-0 transform h-screen overflow-y-auto no-scrollbar w-52 lg:w-52 flex-shrink-0 transition-transform duration-200 ease-in-out flex flex-col ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ backgroundColor: '#0a0a0a' }}
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between h-12 px-3 border-b border-slate-800">
@@ -194,28 +195,6 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </nav>
           </div>
 
-          {/* Admin Section */}
-          {user?.isAdmin && (
-            <div>
-              <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Admin
-              </h3>
-              <nav className="space-y-1">
-                <NavItem to="/admin" icon={SettingsIcon} label="Admin Panel" isActive={page === "/admin"} />
-              </nav>
-            </div>
-          )}
-        </div>
-
-        {/* Logout Button */}
-        <div className="p-4 border-t border-slate-800">
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-150"
-          >
-            <LogoutIcon />
-            <span className="text-sm font-medium">Logout</span>
-          </button>
         </div>
       </div>
     </div>
