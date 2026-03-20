@@ -175,36 +175,24 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
         {/* Navigation */}
         <div className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
-          {/* Main Section */}
+          {/* Navigation */}
           <div>
             <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Main
+              Tools
             </h3>
             <nav className="space-y-1">
               <NavItem to="/" icon={HomeIcon} label="Home" isActive={page === "/"} />
-              <NavItem to="/item/search" icon={SearchIcon} label="Search Items" isActive={page === "/item/search"} />
-              {user?.isAdmin && (
-                <NavItem to="/item/add" icon={AddIcon} label="Add Item" isActive={page === "/item/add"} />
-              )}
-            </nav>
-          </div>
-
-          {/* Intelligence Section */}
-          <div>
-            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Intelligence
-            </h3>
-            <nav className="space-y-1">
-              <NavItem to="/intelligence" icon={ChartIcon} label="Dashboard" isActive={page === "/intelligence"} />
               <a href="/admin/pull" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <TargetIcon />
                 <span className="text-xs font-semibold tracking-wide">Attack List</span>
               </a>
-              {/* Price Check and Stale Inventory removed */}
-              <NavItem to="/intelligence/your-sales" icon={SalesIcon} label="Your Sales" isActive={page === "/intelligence/your-sales"} />
               <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
-                <AddIcon />
+                <ChartIcon />
                 <span className="text-xs font-semibold tracking-wide">Restock Report</span>
+              </a>
+              <a href="/admin/gate" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <DollarIcon />
+                <span className="text-xs font-semibold tracking-wide">Gate Calculator</span>
               </a>
               <a href="/admin/vin" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <SearchIcon />

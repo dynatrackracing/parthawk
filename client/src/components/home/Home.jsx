@@ -63,15 +63,15 @@ const Home = () => {
         {/* Quick links */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Attack List', href: '/admin/pull' },
-            { label: 'Your Sales', href: '/intelligence/your-sales' },
-            { label: 'Gate Calculator', href: '/admin/gate' },
-            { label: 'VIN Scanner', href: '/admin/vin' },
+            { label: '🎯 Attack List', href: '/admin/pull' },
+            { label: '📦 Restock Report', href: '/admin/restock' },
+            { label: '🧮 Gate Calculator', href: '/admin/gate' },
+            { label: '📷 VIN Scanner', href: '/admin/vin' },
           ].map(link => (
             <a key={link.href} href={link.href}
-              style={{ padding: '8px 14px', background: '#141414', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#9CA3AF', fontSize: '12px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.15s' }}
-              onMouseOver={e => e.target.style.color = '#DC2626'}
-              onMouseOut={e => e.target.style.color = '#9CA3AF'}
+              style={{ padding: '10px 16px', background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#9CA3AF', fontSize: '13px', fontWeight: 600, textDecoration: 'none', transition: 'all 0.15s', flex: '1', minWidth: '140px', textAlign: 'center' }}
+              onMouseOver={e => { e.target.style.color = '#DC2626'; e.target.style.borderColor = '#DC2626'; }}
+              onMouseOut={e => { e.target.style.color = '#9CA3AF'; e.target.style.borderColor = '#2a2a2a'; }}
             >
               {link.label}
             </a>
