@@ -613,7 +613,7 @@ class AttackListService {
 
       // Recency-weighted avg price for this part type
       const ptWeightedAvg = weightedAvgPrice(ptData.sales);
-      const verdict = ptData.count >= 3 ? 'PULL' : ptData.count >= 1 ? 'WATCH' : 'SKIP';
+      const verdict = ptWeightedAvg >= 250 ? 'GREAT' : ptWeightedAvg >= 150 ? 'GOOD' : ptWeightedAvg >= 100 ? 'FAIR' : 'POOR';
       parts.push({
         itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
         category: null, partNumber: null, partType,
@@ -748,10 +748,10 @@ class AttackListService {
 
     // Set per-part verdict based on individual part price
     for (const p of filteredParts) {
-      if (p.price >= 300) p.verdict = 'PULL';
-      else if (p.price >= 200) p.verdict = 'WATCH';
-      else if (p.price >= 100) p.verdict = 'CONSIDER';
-      else p.verdict = 'SKIP';
+      if (p.price >= 250) p.verdict = 'GREAT';
+      else if (p.price >= 150) p.verdict = 'GOOD';
+      else if (p.price >= 100) p.verdict = 'FAIR';
+      else p.verdict = 'POOR';
     }
 
     return {

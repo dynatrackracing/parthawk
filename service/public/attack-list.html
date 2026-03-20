@@ -125,10 +125,10 @@
   .pd-verdict {
     font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; margin-left: 8px;
   }
-  .verdict-pull { background: #dcfce7; color: #16a34a; }
-  .verdict-watch { background: #fef9c3; color: #a16207; }
-  .verdict-consider { background: #ffedd5; color: #c2410c; }
-  .verdict-skip { background: #fee2e2; color: #dc2626; }
+  .verdict-great { background: #dcfce7; color: #16a34a; }
+  .verdict-good { background: #fef9c3; color: #a16207; }
+  .verdict-fair { background: #ffedd5; color: #c2410c; }
+  .verdict-poor { background: #fee2e2; color: #dc2626; }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
   .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
   .pd-actions { display: none; }
@@ -471,7 +471,7 @@
     for (const p of parts) {
       if (!p) continue;
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
-      const vc = p.verdict === 'PULL' ? 'verdict-pull' : p.verdict === 'WATCH' ? 'verdict-watch' : p.verdict === 'CONSIDER' ? 'verdict-consider' : 'verdict-skip';
+      const vc = p.verdict === 'GREAT' ? 'verdict-great' : p.verdict === 'GOOD' ? 'verdict-good' : p.verdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
       const price = p.price != null ? p.price : 0;
       const inStock = p.in_stock != null ? p.in_stock : 0;
       const sold90d = p.sold_90d != null ? p.sold_90d : 0;
