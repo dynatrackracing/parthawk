@@ -16,8 +16,6 @@ import SplashScreen from "./components/SplashScreen";
 // Intelligence Pages
 import MarketDashboard from "./components/intelligence/MarketDashboard";
 import YourListings from "./components/intelligence/YourListings";
-import PriceCheck from "./components/intelligence/PriceCheck";
-import StaleInventory from "./components/intelligence/StaleInventory";
 import YourSales from "./components/intelligence/YourSales";
 import PriceAnalysis from "./components/intelligence/PriceAnalysis";
 import PricingInsights from "./components/intelligence/PricingInsights";
@@ -106,13 +104,10 @@ const App = () => {
                       component={SearchItem}
                     />
                     <Route exact path="/item/:id" component={ItemDetail} />
-                    <Route exact path="/payment" component={Payment} />
                     <Route exact path="/admin" component={AdminPanel} />
 
                     {/* Intelligence Routes */}
                     <Route exact path="/intelligence" component={MarketDashboard} />
-                    <Route exact path="/intelligence/price-check" component={PriceCheck} />
-                    <Route exact path="/intelligence/stale-inventory" component={StaleInventory} />
                     <Route exact path="/intelligence/your-listings" component={YourListings} />
                     <Route exact path="/intelligence/your-sales" component={YourSales} />
                     <Route exact path="/intelligence/price-analysis/:listingId" component={PriceAnalysis} />
