@@ -178,7 +178,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <NavItem to="/" icon={HomeIcon} label="Home" isActive={page === "/"} />
               <a href="/admin/pull" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <TargetIcon />
-                <span className="text-xs font-semibold tracking-wide">Attack List</span>
+                <span className="text-xs font-semibold tracking-wide">DADDY SEEKR</span>
               </a>
               <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <ChartIcon />

@@ -63,7 +63,7 @@ const Home = () => {
         {/* Quick links */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
           {[
-            { label: '🎯 Attack List', href: '/admin/pull' },
+            { label: '🎯 DADDY SEEKR', href: '/admin/pull' },
             { label: '📦 Restock Report', href: '/admin/restock' },
             { label: '🧮 Gate Calculator', href: '/admin/gate' },
             { label: '📷 VIN Scanner', href: '/admin/vin' },
