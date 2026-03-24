@@ -641,6 +641,38 @@ async function start() {
       cronWorker.work();
     });
 
+    // YOUR eBay data sync — orders + listings every 6 hours (offset by 1 hour from competitor cron)
+    const YourDataManager = require('./managers/YourDataManager');
+    const yourDataSyncJob = schedule.scheduleJob('0 1,7,13,19 * * *', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting scheduled eBay YourData sync (orders + listings)');
+      try {
+        const manager = new YourDataManager();
+        const results = await manager.syncAll({ daysBack: 30 });
+        log.info({ results, scheduledTime }, 'Completed scheduled eBay YourData sync');
+      } catch (err) {
+        log.error({ err }, 'Scheduled eBay YourData sync failed');
+      }
+    });
+
+    // Run an immediate sync on startup if sales data is stale (> 24 hours old)
+    (async () => {
+      try {
+        const staleCheck = await database.raw('SELECT MAX("soldDate") as latest FROM "YourSale"');
+        const latest = staleCheck.rows[0]?.latest;
+        const hoursOld = latest ? Math.floor((Date.now() - new Date(latest).getTime()) / 3600000) : 999;
+        if (hoursOld > 24) {
+          log.info({ hoursOld, latestSale: latest }, 'YourSale data is stale — triggering immediate sync');
+          const manager = new YourDataManager();
+          const results = await manager.syncAll({ daysBack: 30 });
+          log.info({ results }, 'Startup YourData sync completed');
+        } else {
+          log.info({ hoursOld }, 'YourSale data is fresh — skipping startup sync');
+        }
+      } catch (err) {
+        log.warn({ err: err.message }, 'Startup YourData stale check failed (non-fatal)');
+      }
+    })();
+
     // Price check cron - runs once a week (Sunday at 2:00 AM)
     const priceCheckJob = schedule.scheduleJob('0 2 * * 0', async function (scheduledTime) {
       log.info({ scheduledTime }, 'Starting weekly price check cron');
