@@ -560,6 +560,7 @@ app.get('/api/debug/makes', async (req, res) => {
     await q('yard_status', "SELECT id, name, enabled, last_scraped, flagged, flag_reason FROM yard WHERE chain = 'LKQ' ORDER BY name");
     await q('yard_vehicle_by_yard_id', "SELECT yard_id, COUNT(*) as total, SUM(CASE WHEN active THEN 1 ELSE 0 END) as active_count, MAX(scraped_at) as last_scraped FROM yard_vehicle GROUP BY yard_id ORDER BY total DESC");
     await q('attack_list_yards', "SELECT id, name, enabled, flagged FROM yard WHERE enabled = true AND (flagged = false OR flagged IS NULL) ORDER BY name");
+    await q('fl_vehicle_dates', "SELECT y.name, COUNT(*) as total, MIN(yv.date_added) as oldest_date, MAX(yv.date_added) as newest_date, COUNT(CASE WHEN yv.date_added >= NOW() - INTERVAL '7 days' THEN 1 END) as within_7d FROM yard y JOIN yard_vehicle yv ON y.id = yv.yard_id WHERE y.name IN ('LKQ Tampa','LKQ Largo','LKQ Clearwater') AND yv.active = true GROUP BY y.name");
     await q('restock_diag_sales_7d', "SELECT COUNT(*) as cnt FROM \"YourSale\" WHERE \"soldDate\" >= NOW() - INTERVAL '7 days'");
     await q('restock_diag_sales_30d', "SELECT COUNT(*) as cnt FROM \"YourSale\" WHERE \"soldDate\" >= NOW() - INTERVAL '30 days'");
     await q('restock_diag_recent_sales', "SELECT title, \"salePrice\", \"soldDate\", sku FROM \"YourSale\" WHERE \"soldDate\" IS NOT NULL ORDER BY \"soldDate\" DESC LIMIT 10");
