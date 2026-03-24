@@ -5,6 +5,7 @@ const router = require('express-promise-router')();
 const AttackListService = require('../services/AttackListService');
 const DeadInventoryService = require('../services/DeadInventoryService');
 const { database } = require('../database/database');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * GET /attack-list
@@ -217,5 +218,252 @@ router.get('/last-visit/:yardId', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+/**
+ * POST /attack-list/manual
+ * Parse raw text into vehicles, score them through the same engine.
+ * Body: { text: "2009 Dodge Ram 1500 Silver\n09 RAM 1500\n..." }
+ */
+router.post('/manual', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ success: false, error: 'text is required' });
+    }
+
+    const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) {
+      return res.status(400).json({ success: false, error: 'No vehicles found in input' });
+    }
+    if (lines.length > 200) {
+      return res.status(400).json({ success: false, error: 'Max 200 vehicles per manual list' });
+    }
+
+    const parsed = lines.map((line, idx) => parseVehicleLine(line, idx));
+    const valid = parsed.filter(v => v.year && v.make && v.model);
+
+    if (valid.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not parse any vehicles. Use format: "2009 Dodge Ram 1500"',
+        parsed: parsed.slice(0, 5),
+      });
+    }
+
+    // Build fake yard_vehicle objects for the scoring engine
+    const vehicles = valid.map(v => ({
+      id: 'manual-' + uuidv4().slice(0, 8),
+      year: v.year,
+      make: v.make,
+      model: v.model,
+      trim: v.trim || null,
+      color: v.color || null,
+      row_number: v.row || null,
+      vin: v.vin || null,
+      engine: v.engine || null,
+      engine_type: null,
+      drivetrain: v.drivetrain || null,
+      trim_level: null,
+      body_style: null,
+      stock_number: null,
+      date_added: new Date().toISOString(),
+      last_seen: new Date().toISOString(),
+      active: true,
+      _raw_line: v.raw,
+    }));
+
+    // VIN decode any that have VINs (batch via NHTSA)
+    const withVins = vehicles.filter(v => v.vin && v.vin.length >= 11);
+    if (withVins.length > 0) {
+      try {
+        for (const v of withVins) {
+          try {
+            const nhtsa = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${v.vin}?format=json`);
+            const data = await nhtsa.json();
+            const results = data.Results || [];
+            const get = (id) => {
+              const r = results.find(r => r.VariableId === id);
+              return r && r.Value && r.Value !== 'Not Applicable' ? r.Value : null;
+            };
+            if (!v.year && get(29)) v.year = parseInt(get(29));
+            if (get(26)) v.make = get(26);
+            if (get(28)) v.model = get(28);
+            if (get(13)) v.trim = get(13);
+            const disp = get(13) || get(71);
+            if (disp) v.engine = disp;
+          } catch (e) { /* skip individual VIN errors */ }
+        }
+      } catch (e) {
+        log.warn({ err: e.message }, 'Manual list VIN decode failed');
+      }
+    }
+
+    const service = new AttackListService();
+    const scored = await service.scoreManualVehicles(vehicles);
+
+    // Enrich with dead inventory warnings
+    const deadService = new DeadInventoryService();
+    for (const vehicle of scored) {
+      for (const part of (vehicle.parts || [])) {
+        if (part.partNumber) {
+          try {
+            const warning = await deadService.getWarning(part.partNumber);
+            if (warning) part.deadWarning = warning;
+          } catch (e) { /* ignore */ }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      generated_at: new Date().toISOString(),
+      total_lines: lines.length,
+      parsed_count: valid.length,
+      skipped_count: lines.length - valid.length,
+      vehicles: scored,
+    });
+  } catch (err) {
+    log.error({ err }, 'Error scoring manual set list');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Vehicle line parser ──────────────────────────────────
+const MAKE_MAP = {
+  'chevy': 'Chevrolet', 'chevrolet': 'Chevrolet', 'chev': 'Chevrolet',
+  'dodge': 'Dodge', 'ram': 'Ram',
+  'chrysler': 'Chrysler', 'jeep': 'Jeep',
+  'ford': 'Ford', 'gmc': 'GMC', 'gm': 'GMC',
+  'toyota': 'Toyota', 'honda': 'Honda', 'nissan': 'Nissan',
+  'bmw': 'BMW', 'mercedes': 'Mercedes-Benz', 'mercedes-benz': 'Mercedes-Benz', 'merc': 'Mercedes-Benz',
+  'mazda': 'Mazda', 'kia': 'Kia', 'hyundai': 'Hyundai',
+  'subaru': 'Subaru', 'mitsubishi': 'Mitsubishi',
+  'infiniti': 'Infiniti', 'lexus': 'Lexus', 'acura': 'Acura',
+  'cadillac': 'Cadillac', 'caddy': 'Cadillac',
+  'buick': 'Buick', 'lincoln': 'Lincoln',
+  'volvo': 'Volvo', 'audi': 'Audi',
+  'volkswagen': 'Volkswagen', 'vw': 'Volkswagen',
+  'mini': 'Mini', 'pontiac': 'Pontiac', 'saturn': 'Saturn',
+  'mercury': 'Mercury', 'scion': 'Scion',
+  'land rover': 'Land Rover', 'landrover': 'Land Rover',
+  'porsche': 'Porsche', 'jaguar': 'Jaguar',
+  'saab': 'Saab', 'fiat': 'Fiat', 'alfa': 'Alfa Romeo',
+  'alfa romeo': 'Alfa Romeo', 'tesla': 'Tesla',
+};
+
+const COLOR_WORDS = new Set([
+  'black', 'white', 'silver', 'gray', 'grey', 'red', 'blue', 'green',
+  'gold', 'tan', 'beige', 'brown', 'orange', 'yellow', 'purple', 'maroon',
+  'burgundy', 'champagne', 'bronze', 'charcoal', 'cream', 'ivory',
+]);
+
+function parseVehicleLine(line, idx) {
+  const raw = line;
+  // Clean up: remove leading bullets, numbers, dashes, tabs
+  let cleaned = line.replace(/^[\s\-•*#\d.)\]]+/, '').trim();
+  if (!cleaned) return { raw, error: 'empty' };
+
+  // Extract VIN if present (17-char alphanumeric, no I/O/Q)
+  let vin = null;
+  const vinMatch = cleaned.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+  if (vinMatch) {
+    vin = vinMatch[1].toUpperCase();
+    cleaned = cleaned.replace(vinMatch[0], ' ').trim();
+  }
+
+  // Extract row/space if present (e.g., "Row C3", "Space 12", "R-C3", "Spot 4A")
+  let row = null;
+  const rowMatch = cleaned.match(/\b(?:row|space|spot|r-?)\s*([A-Z]?\d+[A-Z]?(?:\s*[-/]\s*[A-Z]?\d+[A-Z]?)?)\b/i);
+  if (rowMatch) {
+    row = rowMatch[1].toUpperCase();
+    cleaned = cleaned.replace(rowMatch[0], ' ').trim();
+  }
+
+  // Extract engine displacement (e.g., "3.5L", "5.7", "EcoBoost", "Hemi")
+  let engine = null;
+  const engMatch = cleaned.match(/\b(\d+\.\d+)\s*[lL]?\b/);
+  if (engMatch) {
+    engine = engMatch[1] + 'L';
+    cleaned = cleaned.replace(engMatch[0], ' ').trim();
+  }
+  // Named engines
+  const namedEng = cleaned.match(/\b(ecoboost|hemi|coyote|vortec|duramax|cummins|powerstroke|ecotec|pentastar)\b/i);
+  if (namedEng) {
+    engine = (engine ? engine + ' ' : '') + namedEng[1];
+    cleaned = cleaned.replace(namedEng[0], ' ').trim();
+  }
+
+  // Extract drivetrain
+  let drivetrain = null;
+  const dtMatch = cleaned.match(/\b(4wd|4x4|awd|2wd|fwd|rwd)\b/i);
+  if (dtMatch) {
+    drivetrain = dtMatch[1].toUpperCase();
+    cleaned = cleaned.replace(dtMatch[0], ' ').trim();
+  }
+
+  // Extract color
+  let color = null;
+  const words = cleaned.toLowerCase().split(/\s+/);
+  for (const w of words) {
+    if (COLOR_WORDS.has(w)) {
+      color = w.charAt(0).toUpperCase() + w.slice(1);
+      cleaned = cleaned.replace(new RegExp('\\b' + w + '\\b', 'i'), ' ').trim();
+      break;
+    }
+  }
+
+  // Extract year — full (2009) or short (09)
+  let year = null;
+  const fullYearMatch = cleaned.match(/\b((?:19|20)\d{2})\b/);
+  if (fullYearMatch) {
+    year = parseInt(fullYearMatch[1]);
+    cleaned = cleaned.replace(fullYearMatch[0], ' ').trim();
+  } else {
+    const shortYearMatch = cleaned.match(/\b(\d{2})\b/);
+    if (shortYearMatch) {
+      let y = parseInt(shortYearMatch[1]);
+      year = y >= 70 ? 1900 + y : 2000 + y;
+      cleaned = cleaned.replace(shortYearMatch[0], ' ').trim();
+    }
+  }
+
+  // Normalize remaining tokens
+  const tokens = cleaned.split(/[\s,/]+/).filter(t => t.length > 0);
+
+  // Find make
+  let make = null;
+  let makeIdx = -1;
+  for (let i = 0; i < tokens.length; i++) {
+    const lower = tokens[i].toLowerCase();
+    // Check two-word makes first
+    if (i + 1 < tokens.length) {
+      const twoWord = lower + ' ' + tokens[i + 1].toLowerCase();
+      if (MAKE_MAP[twoWord]) {
+        make = MAKE_MAP[twoWord];
+        makeIdx = i;
+        tokens.splice(i, 2);
+        break;
+      }
+    }
+    if (MAKE_MAP[lower]) {
+      make = MAKE_MAP[lower];
+      makeIdx = i;
+      tokens.splice(i, 1);
+      break;
+    }
+  }
+
+  // Remaining tokens = model (take up to 3 words, stop at noise)
+  const modelTokens = [];
+  for (const t of tokens) {
+    if (/^(ecm|bcm|abs|tipm|radio|module|oem|used|new|reman|part|engine|control)$/i.test(t)) break;
+    if (/^\d+\.\d+$/.test(t)) break;
+    modelTokens.push(t);
+    if (modelTokens.length >= 3) break;
+  }
+  const model = modelTokens.join(' ') || null;
+
+  return { raw, year, make, model, color, row, vin, engine, drivetrain, trim: null };
+}
 
 module.exports = router;

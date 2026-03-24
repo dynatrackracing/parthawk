@@ -941,6 +941,31 @@ class AttackListService {
   }
 
   /**
+   * Score an array of manually-parsed vehicles (not from DB).
+   * Uses the same indexes and scoreVehicle() as the regular attack list.
+   */
+  async scoreManualVehicles(vehicles, options = {}) {
+    const { daysBack = 90 } = options;
+    const inventoryIndex = await this.buildInventoryIndex();
+    const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    const salesIndex = await this.buildSalesIndex(cutoff);
+    const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
+    const platformIndex = await this.buildPlatformIndex();
+
+    const scored = vehicles.map(v =>
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
+    );
+
+    scored.sort((a, b) => {
+      const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
+      if (maxDiff !== 0) return maxDiff;
+      return b.est_value - a.est_value;
+    });
+
+    return scored;
+  }
+
+  /**
    * Get attack list across all yards. Returns ALL vehicles per yard (not just top 5).
    */
   async getAllYardsAttackList(options = {}) {

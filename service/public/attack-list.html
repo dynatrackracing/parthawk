@@ -196,6 +196,31 @@
   .vin-card h3 { font-size: 16px; margin-bottom: 12px; }
   .vin-result { margin-top: 12px; font-size: 13px; color: var(--text-mid); text-align: left; }
   .vin-result .vin-str { font-family: monospace; font-size: 16px; font-weight: 700; color: var(--green); margin: 8px 0; text-align: center; }
+
+  /* Manual set list modal */
+  .manual-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; padding-top: 60px; }
+  .manual-modal.open { display: flex; }
+  .manual-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 100%; max-width: 480px; }
+  .manual-card h3 { font-size: 16px; margin-bottom: 4px; }
+  .manual-card .subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4; }
+  .manual-textarea {
+    width: 100%; min-height: 200px; max-height: 50vh; padding: 12px; font-family: monospace;
+    font-size: 13px; line-height: 1.5; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); resize: vertical; outline: none;
+  }
+  .manual-textarea:focus { border-color: var(--red); }
+  .manual-textarea::placeholder { color: var(--text-faint); }
+  .manual-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  .manual-actions button { padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+  .btn-run { background: var(--red); color: white; }
+  .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-cancel { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border) !important; }
+  .manual-banner {
+    padding: 8px 14px; background: linear-gradient(90deg, #7f1d1d, #1a1a1a); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .manual-banner span { font-size: 12px; font-weight: 700; color: #ef4444; letter-spacing: 0.05em; }
+  .manual-banner button { font-size: 11px; padding: 4px 10px; border-radius: 5px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -208,6 +233,7 @@
     </div>
   </div>
   <div class="header-actions">
+    <button class="icon-btn" onclick="openManualModal()" title="Paste Set List">📋</button>
     <button class="icon-btn" onclick="openVinScanner()" title="Scan VIN">📷</button>
     <button class="icon-btn" id="scrapeBtn" onclick="triggerScrapeAll(this)" title="Refresh inventory from LKQ">🔄</button>
   </div>
@@ -232,6 +258,7 @@
   <div class="tab" onclick="showTab('yard:LKQ Clearwater')" id="tab-yard:LKQ Clearwater">Clearwater</div>
   <div class="tab" onclick="showTab('day_trip')" id="tab-day_trip">Day Trip</div>
   <div class="tab" onclick="showTab('road_trip')" id="tab-road_trip">Road Trip</div>
+  <div class="tab" id="tab-manual" onclick="showTab('manual')" style="display:none;border-left:1px solid var(--border);margin-left:4px;padding-left:12px;color:#ef4444;font-weight:700;">MANUAL</div>
 </div>
 
 <div class="status-bar">
@@ -260,6 +287,20 @@
     <button class="btn-primary" onclick="document.getElementById('vinFileInput').click()">Open Camera</button>
     <div class="vin-result" id="vinResult"></div>
     <button class="icon-btn" style="margin-top:12px;width:100%;" onclick="closeVinScanner()">Close</button>
+  </div>
+</div>
+
+<!-- Manual Set List Modal -->
+<div class="manual-modal" id="manualModal">
+  <div class="manual-card">
+    <h3>📋 Paste Set List</h3>
+    <div class="subtitle">Paste vehicles from any junkyard — website, Facebook, text, whatever. One per line. Any format works.</div>
+    <textarea class="manual-textarea" id="manualText" placeholder="2009 Dodge Ram 1500 Silver Row C3&#10;09 RAM 1500&#10;2011 Ford F-150 3.5L EcoBoost&#10;2018 Chevy Silverado 4WD White&#10;Honda Civic 2016 Blue"></textarea>
+    <div class="manual-actions">
+      <button class="btn-cancel" onclick="closeManualModal()">Cancel</button>
+      <button class="btn-run" id="manualRunBtn" onclick="runManualList()">Run It</button>
+    </div>
+    <div id="manualError" style="margin-top:8px;font-size:11px;color:#ef4444;display:none;"></div>
   </div>
 </div>
 
@@ -330,7 +371,13 @@
     currentTab = tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
-    renderData();
+    if (tab === 'manual' && manualResults) {
+      showingManual = true;
+      renderManualResults();
+    } else {
+      showingManual = false;
+      renderData();
+    }
   }
 
   function renderData() {
@@ -538,21 +585,32 @@
     return html;
   }
 
+  function findVehicleById(id) {
+    // Search yards data
+    if (allData && allData.yards) {
+      for (const yd of allData.yards) {
+        const vList = yd.vehicles || yd.top_vehicles || [];
+        const v = vList.find(v => v.id === id);
+        if (v) return v;
+      }
+    }
+    // Search manual results
+    if (manualResults && manualResults.vehicles) {
+      const v = manualResults.vehicles.find(v => v.id === id);
+      if (v) return v;
+    }
+    return null;
+  }
+
   function toggleV(id) {
     const exp = document.getElementById('vexp-' + id);
-    if (!exp) return; // guard: element may not exist
+    if (!exp) return;
     const wasOpen = exp.classList.contains('open');
     exp.classList.toggle('open');
     if (!wasOpen && !exp.dataset.locLoaded) {
       exp.dataset.locLoaded = '1';
       loadLocation(id);
-      // Also load trim intelligence if vehicle has a trim
-      let vehicle = null;
-      for (const yd of allData.yards) {
-        const vList = yd.vehicles || yd.top_vehicles || [];
-        vehicle = vList.find(v => v.id === id);
-        if (vehicle) break;
-      }
+      const vehicle = findVehicleById(id);
       if (vehicle && vehicle.trim) loadTrimIntel(vehicle);
     }
   }
@@ -618,12 +676,7 @@
   const RESEARCH_PARTS = ['ECM','PCM','BCM','TIPM','FUSE BOX','TCM','ABS','AMPLIFIER','TRANSFER CASE MODULE','HVAC MODULE','AIRBAG MODULE','PARKING SENSOR MODULE','BLIND SPOT MODULE','CAMERA MODULE','LIFTGATE MODULE','STEERING MODULE'];
 
   async function loadLocation(vid) {
-    let vehicle = null;
-    for (const yd of allData.yards) {
-      const vList = yd.vehicles || yd.top_vehicles || [];
-      vehicle = vList.find(v => v.id === vid);
-      if (vehicle) break;
-    }
+    const vehicle = findVehicleById(vid);
     if (!vehicle) return;
 
     const locDiv = document.getElementById('loc-' + vid);
@@ -843,6 +896,122 @@
     const d = new Date(ds); const diff = Date.now() - d.getTime();
     const h = Math.floor(diff / 3600000); const dd = Math.floor(h / 24);
     if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now';
+  }
+
+  // === Manual Set List ===
+  let manualResults = null;
+  let showingManual = false;
+
+  function openManualModal() {
+    document.getElementById('manualModal').classList.add('open');
+    document.getElementById('manualText').value = '';
+    document.getElementById('manualError').style.display = 'none';
+    document.getElementById('manualRunBtn').disabled = false;
+    document.getElementById('manualRunBtn').textContent = 'Run It';
+    setTimeout(() => document.getElementById('manualText').focus(), 100);
+  }
+
+  function closeManualModal() {
+    document.getElementById('manualModal').classList.remove('open');
+  }
+
+  async function runManualList() {
+    const text = document.getElementById('manualText').value.trim();
+    if (!text) return;
+
+    const btn = document.getElementById('manualRunBtn');
+    const errEl = document.getElementById('manualError');
+    btn.disabled = true;
+    btn.textContent = 'Scoring...';
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/attack-list/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      manualResults = data;
+      showingManual = true;
+      closeManualModal();
+      renderManualResults();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Run It';
+    }
+  }
+
+  function clearManualResults() {
+    manualResults = null;
+    showingManual = false;
+    document.getElementById('tab-manual').style.display = 'none';
+    currentTab = 'all';
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-all').classList.add('active');
+    renderData();
+    if (allData) {
+      document.getElementById('headerSub').textContent = allData.yards.length + ' yards scored';
+      const ts = new Date(allData.generated_at);
+      document.getElementById('statusLeft').textContent = 'Updated ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    }
+  }
+
+  function renderManualResults() {
+    if (!manualResults) return;
+
+    // Show and activate the MANUAL tab
+    const manualTab = document.getElementById('tab-manual');
+    manualTab.style.display = '';
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    manualTab.classList.add('active');
+    currentTab = 'manual';
+
+    const vehicles = manualResults.vehicles || [];
+    document.getElementById('headerSub').textContent = 'MANUAL LIST — ' + vehicles.length + ' scored';
+    document.getElementById('statusLeft').textContent = 'Manual list · ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+    const hotV = vehicles.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length;
+    document.getElementById('statusRight').textContent = vehicles.length + ' vehicles · ' + hotV + ' flagged';
+
+    let html = '';
+
+    // Banner
+    html += `<div class="manual-banner">
+      <span>MANUAL SET LIST — ${manualResults.parsed_count} vehicles${manualResults.skipped_count > 0 ? ' (' + manualResults.skipped_count + ' skipped)' : ''}</span>
+      <button onclick="clearManualResults()">Back to Yards</button>
+    </div>`;
+
+    if (vehicles.length === 0) {
+      html += '<div class="empty-state"><h3>No scoreable vehicles</h3><p>None of the parsed vehicles matched parts in the database.</p></div>';
+      document.getElementById('mainContent').innerHTML = html;
+      return;
+    }
+
+    // Group by date section (all manual are "today" — group by score tier instead)
+    const sections = [
+      { label: 'PULL', vehicles: vehicles.filter(v => v.vehicle_verdict === 'PULL'), cls: 'chip-green' },
+      { label: 'WATCH', vehicles: vehicles.filter(v => v.vehicle_verdict === 'WATCH'), cls: 'chip-yellow' },
+      { label: 'CONSIDER', vehicles: vehicles.filter(v => v.vehicle_verdict === 'CONSIDER'), cls: 'chip-orange' },
+      { label: 'SKIP', vehicles: vehicles.filter(v => v.vehicle_verdict === 'SKIP'), cls: 'chip-gray' },
+    ];
+
+    html += '<div class="vehicle-list">';
+    for (const sec of sections) {
+      if (sec.vehicles.length === 0) continue;
+      html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;">
+        <span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
+      for (const v of sec.vehicles) {
+        html += renderVehicle(v);
+      }
+    }
+    html += '</div>';
+
+    document.getElementById('mainContent').innerHTML = html;
   }
 
   // Boot
