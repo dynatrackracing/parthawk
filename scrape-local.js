@@ -79,6 +79,7 @@ async function saveYard(loc, allVehicles) {
   if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB`); return {}; }
 
   const now = new Date();
+  let skipped = 0;
 
   // Save ALL vehicles — let the display layer filter by date
   const recent = allVehicles.map(v => {
