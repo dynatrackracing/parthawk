@@ -278,13 +278,16 @@
 
   function getSetDaysAgo(v) {
     // Use date_added (LKQ set date), NOT scraped_at
+    // Returns 0 for today, negative for future dates, positive for past
     const d = v.date_added;
     if (!d) return 999;
-    return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+    const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+    return days; // Can be negative for future-dated vehicles
   }
 
   function ageBadge(v) {
     const days = getSetDaysAgo(v);
+    if (days < 0) return '<span class="chip chip-age age-today">NEW ' + Math.abs(days) + 'd</span>';
     if (days === 0) return '<span class="chip chip-age age-today">Today</span>';
     if (days <= 2) return '<span class="chip chip-age age-recent">' + days + 'd ago</span>';
     if (days <= 7) return '<span class="chip chip-age age-old">' + days + 'd ago</span>';
@@ -391,7 +394,7 @@
 
       // Group by date section
       const sections = [
-        { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) === 0) },
+        { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) <= 0) },
         { label: 'LAST 3 DAYS', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 1 && d <= 3; }) },
         { label: 'THIS WEEK', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 4 && d <= 7; }) },
         { label: 'OLDER', vehicles: filtered.filter(v => getSetDaysAgo(v) > 7) },

@@ -72,28 +72,20 @@ async function scrapePages(slug) {
   return all;
 }
 
-// ── SAVE (recent only) ──────────────────────────────────
+// ── SAVE (all vehicles) ──────────────────────────────────
 
 async function saveYard(loc, allVehicles) {
   const yard = await knex('yard').where('name', loc.name).first();
   if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB`); return {}; }
 
   const now = new Date();
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-  // Split into recent (save) vs old (skip)
-  const recent = [];
-  let skipped = 0;
-  for (const v of allVehicles) {
-    const d = v.dateAdded ? new Date(v.dateAdded) : null;
-    if (d && !isNaN(d.getTime()) && d >= cutoff) {
-      v._date = d;
-      recent.push(v);
-    } else {
-      skipped++;
-    }
-  }
-  console.log(`  Scraped ${allVehicles.length} total, ${recent.length} from last 48hrs, skipping ${skipped} old`);
+  // Save ALL vehicles — let the display layer filter by date
+  const recent = allVehicles.map(v => {
+    v._date = v.dateAdded ? new Date(v.dateAdded) : null;
+    return v;
+  });
+  console.log(`  Saving all ${recent.length} vehicles`);
 
   if (recent.length === 0) {
     // Still mark inactive vehicles not seen in full scrape
