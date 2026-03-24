@@ -165,8 +165,11 @@ function getPartLabel(title, make, model) {
 
 router.get('/report', async (req, res) => {
   try {
+    const days = parseInt(req.query.days) || 30;
+    const clampedDays = Math.min(Math.max(days, 1), 365);
+
     const sales = await database('YourSale')
-      .where('soldDate', '>=', database.raw("NOW() - INTERVAL '7 days'"))
+      .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${clampedDays} days'`))
       .whereNotNull('title')
       .whereRaw('"salePrice"::numeric >= 50')
       .select('title', 'salePrice', 'soldDate', 'sku');
@@ -192,19 +195,57 @@ router.get('/report', async (req, res) => {
       if (!g.lastSold || new Date(sale.soldDate) > new Date(g.lastSold)) g.lastSold = sale.soldDate;
     }
 
-    const listings = await database('YourListing').where('listingStatus', 'Active').whereNotNull('title').select('title', 'quantityAvailable');
+    const listings = await database('YourListing').where('listingStatus', 'Active').whereNotNull('title').select('title', 'quantityAvailable', 'sku');
     const stockByBasePn = {};
+    const listingTitles = [];
     for (const l of listings) {
       const qty = parseInt(l.quantityAvailable) || 1;
+      listingTitles.push({ title: (l.title || '').toUpperCase(), qty });
       for (const pn of extractPartNumbers(l.title || '')) {
         const base = normalizePartNumber(pn);
         if (base) stockByBasePn[base] = (stockByBasePn[base] || 0) + qty;
       }
+      // Also index by SKU as part number
+      if (l.sku) {
+        const skuBase = normalizePartNumber(l.sku);
+        if (skuBase && skuBase.length >= 5) stockByBasePn[skuBase] = (stockByBasePn[skuBase] || 0) + qty;
+      }
+    }
+
+    // Fallback stock lookup: match by make + partType keywords in listing titles
+    function titleStockFallback(make, partType) {
+      if (!make || make === '?' || !partType) return 0;
+      const makeUp = make.toUpperCase();
+      const ptPatterns = {
+        'ECM': ['ECM','ECU','PCM','ENGINE CONTROL','ENGINE COMPUTER'],
+        'BCM': ['BCM','BODY CONTROL'],
+        'TCM': ['TCM','TCU','TRANSMISSION CONTROL'],
+        'ABS': ['ABS','ANTI LOCK','ANTI-LOCK','BRAKE MODULE'],
+        'TIPM': ['TIPM'],
+        'Fuse Box': ['FUSE BOX','JUNCTION','IPDM','RELAY BOX'],
+        'Amplifier': ['AMPLIFIER','BOSE','HARMAN','JBL'],
+        'Radio': ['RADIO','STEREO','RECEIVER','INFOTAINMENT'],
+        'Cluster': ['CLUSTER','SPEEDOMETER','INSTRUMENT','GAUGE'],
+        'Throttle': ['THROTTLE BODY'],
+      };
+      const patterns = ptPatterns[partType];
+      if (!patterns) return 0;
+      let count = 0;
+      for (const lt of listingTitles) {
+        if (lt.title.includes(makeUp) && patterns.some(p => lt.title.includes(p))) {
+          count += lt.qty;
+        }
+      }
+      return count;
     }
 
     const items = [];
     for (const [, g] of Object.entries(groups)) {
-      const stock = g.basePn ? (stockByBasePn[g.basePn] || 0) : 0;
+      let stock = g.basePn ? (stockByBasePn[g.basePn] || 0) : 0;
+      // Fallback: if no PN match, try title-based matching
+      if (stock === 0 && g.make && g.make !== '?') {
+        stock = titleStockFallback(g.make, g.partType);
+      }
       const avgPrice = g.sold > 0 ? Math.round(g.totalPrice / g.sold * 100) / 100 : 0;
       const years = g.sampleTitle.match(/\b((?:19|20)\d{2})\b/g);
       let yearRange = null;
@@ -241,8 +282,17 @@ router.get('/report', async (req, res) => {
       else { item.tier = 'orange'; tiers.orange.push(item); }
     }
 
-    res.json({ success: true, generatedAt: new Date().toISOString(), period: 'Last 7 days', tiers,
-      summary: { green: tiers.green.length, yellow: tiers.yellow.length, orange: tiers.orange.length, total: top.length, salesAnalyzed: sales.length },
+    // Get listing count for diagnostics
+    let activeListingCount = 0;
+    try {
+      const lc = await database('YourListing').where('listingStatus', 'Active').count('* as cnt').first();
+      activeListingCount = parseInt(lc?.cnt || 0);
+    } catch (e) { /* ignore */ }
+
+    res.json({ success: true, generatedAt: new Date().toISOString(), days: clampedDays,
+      period: clampedDays === 1 ? 'Last 24 hours' : `Last ${clampedDays} days`, tiers,
+      summary: { green: tiers.green.length, yellow: tiers.yellow.length, orange: tiers.orange.length,
+        total: top.length, salesAnalyzed: sales.length, activeListings: activeListingCount },
     });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });

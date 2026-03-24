@@ -55,6 +55,17 @@
   <a href="/admin/gate" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">Gate Calc</a>
   <a href="/admin/vin" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">VIN Scanner</a>
 </nav>
+<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;font-size:12px;color:#6B7280;">
+  <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Period:</span>
+  <button class="toggle-btn" onclick="setPeriod(7)" id="pd-7">7d</button>
+  <button class="toggle-btn active" onclick="setPeriod(30)" id="pd-30">30d</button>
+  <button class="toggle-btn" onclick="setPeriod(60)" id="pd-60">60d</button>
+  <button class="toggle-btn" onclick="setPeriod(90)" id="pd-90">90d</button>
+</div>
+<style>
+  .toggle-btn{padding:5px 12px;border-radius:6px;border:1px solid #2a2a2a;background:#1a1a1a;color:#6B7280;font-size:11px;font-weight:600;cursor:pointer}
+  .toggle-btn.active{background:#064e3b;color:#16a34a;border-color:#bbf7d0}
+</style>
 <div class="summary" id="summary"></div>
 <div id="content"><div class="loading"><div class="spinner"></div>Generating report...</div></div>
 <script>
@@ -64,32 +75,31 @@ const TIER_CONFIG = {
   orange: { icon: '🟠', label: 'CONSIDER',      badge: 'b-orange', header: 'sh-orange' },
 };
 
-function formatSoldOut(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / 86400000);
-  if (diffDays <= 1) return 'Today';
-  if (diffDays <= 7) return diffDays + 'd ago';
-  if (diffDays <= 30) return Math.floor(diffDays / 7) + 'w ago';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+let currentDays = 30;
+
+function setPeriod(days) {
+  currentDays = days;
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pd-' + days).classList.add('active');
+  load();
 }
 
 async function load() {
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Generating report...</div>';
   try {
-    const res = await fetch('/restock/report');
+    const res = await fetch('/restock/report?days=' + currentDays);
     const d = await res.json();
     if (!d.success) throw new Error(d.error);
 
-    const date = new Date(d.generatedAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    document.getElementById('sub').textContent = date + ' — ' + d.summary.total + ' part groups scored';
+    const listingsNote = d.summary.activeListings != null ? ' | ' + d.summary.activeListings + ' active listings' : '';
+    document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || 0) + ' sales analyzed' + listingsNote + ')';
 
-    document.getElementById('sub').textContent = (d.period || 'Last 7 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || '?') + ' sales analyzed)';
     document.getElementById('summary').innerHTML =
       `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
       `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
       `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>` +
-      `<div class="stat"><div class="stat-label">Total</div><div class="stat-value">${d.summary.total}</div></div>`;
+      `<div class="stat"><div class="stat-label">Sales</div><div class="stat-value">${d.summary.salesAnalyzed || 0}</div></div>` +
+      `<div class="stat"><div class="stat-label">Listings</div><div class="stat-value">${d.summary.activeListings || 0}</div></div>`;
 
     let html = '';
     for (const tier of ['green', 'yellow', 'orange']) {
@@ -98,7 +108,17 @@ async function load() {
       const cfg = TIER_CONFIG[tier];
       html += renderSection(tier, cfg, items);
     }
-    if (!html) html = '<div class="loading">No restock flags found.</div>';
+    if (!html) {
+      html = '<div class="loading" style="padding:30px;">';
+      if ((d.summary.salesAnalyzed || 0) === 0) {
+        html += '<div style="font-size:14px;font-weight:600;color:#F0F0F0;margin-bottom:8px;">No sales found in the last ' + currentDays + ' days</div>';
+        html += '<div style="font-size:12px;color:#9CA3AF;line-height:1.6;">Try a wider window, or sync your eBay data:<br>Settings > Sync > Your Data</div>';
+        if (currentDays < 90) html += '<button class="toggle-btn" style="margin-top:12px;padding:8px 16px;" onclick="setPeriod(90)">Try Last 90 Days</button>';
+      } else {
+        html += 'All sold parts are well-stocked. No restock flags.';
+      }
+      html += '</div>';
+    }
     document.getElementById('content').innerHTML = html;
   } catch (e) {
     document.getElementById('content').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
@@ -106,6 +126,7 @@ async function load() {
 }
 
 function renderSection(tier, cfg, items) {
+  const soldLabel = 'Sold ' + currentDays + 'd';
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
       <span>${cfg.icon} ${cfg.label} (${items.length})</span>
@@ -113,7 +134,7 @@ function renderSection(tier, cfg, items) {
     </div>
     <table><tr>
       <th>Score</th><th>Action</th><th>Vehicle</th><th>Part</th><th>Part #</th>
-      <th>Sold 7d</th><th>Stock</th><th>Avg $</th><th>Rev</th>
+      <th>${soldLabel}</th><th>Stock</th><th>Avg $</th><th>Rev</th>
     </tr>`;
   for (const i of items) {
     const vehicle = [i.yearRange, i.make, i.model].filter(Boolean).join(' ');
