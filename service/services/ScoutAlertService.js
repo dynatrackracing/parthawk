@@ -191,7 +191,7 @@ function scoreMatch(part, vehicle) {
   const vModel = (vehicle.model || '').toLowerCase();
   const vYear = parseInt(vehicle.year) || 0;
 
-  // Check make match
+  // Check make match — required for all confidence levels
   const makeMatch = part.make && vMake.includes(part.make.toLowerCase());
   if (!makeMatch) return {};
 
@@ -205,59 +205,59 @@ function scoreMatch(part, vehicle) {
       }
     }
   }
+
+  // No model match and part specifies models — reject entirely
   if (!modelMatch && part.models.length > 0) return {};
 
-  // Check year range
+  // Check year range — strict
   let yearMatch = 'none';
-  if (part.yearStart && part.yearEnd) {
+  if (part.yearStart && part.yearEnd && vYear > 0) {
     if (vYear >= part.yearStart && vYear <= part.yearEnd) {
       yearMatch = 'exact';
     } else if (vYear >= part.yearStart - 2 && vYear <= part.yearEnd + 2) {
       yearMatch = 'close';
     } else {
-      return {};
+      return {}; // Year too far off — no alert
     }
-  } else if (!part.yearStart) {
+  } else if (!part.yearStart && vYear > 0) {
     yearMatch = 'unknown';
   }
 
-  // Build confidence
+  // Build confidence — STRICT rules
   let confidence;
   const notes = [];
+  const titleLower = (part.title || '').toLowerCase();
+  const needsEngineVerify = /v8|5\.7|hemi|v6|3\.5|3\.8|2\.3|2\.7|4\.7/.test(titleLower);
+  const needsDriveVerify = /4x4|awd|4wd|fwd/.test(titleLower);
+  const needsTrimVerify = /type.?s|sport|limited|touring|ss\b/i.test(titleLower);
 
   if (modelMatch && yearMatch === 'exact') {
-    confidence = 'high';
+    // HIGH only if we don't need to verify engine/drivetrain/trim
+    if (needsEngineVerify && !vehicle.engine) {
+      confidence = 'medium';
+      notes.push('Verify engine spec at yard');
+    } else if (needsDriveVerify && !vehicle.drivetrain) {
+      confidence = 'medium';
+      notes.push('Verify drivetrain at yard');
+    } else if (needsTrimVerify && !vehicle.trim_level) {
+      confidence = 'medium';
+      notes.push('Verify trim at yard');
+    } else {
+      confidence = 'high';
+    }
   } else if (modelMatch && yearMatch === 'close') {
     confidence = 'medium';
-    notes.push('Year is close but outside listed range');
+    notes.push('Year ' + vYear + ' is close but outside ' + part.yearStart + '-' + part.yearEnd + ' range');
   } else if (modelMatch && yearMatch === 'unknown') {
     confidence = 'medium';
-    notes.push('Year range not specified in part title');
+    notes.push('Year range not specified — verify fitment');
   } else if (!modelMatch && part.models.length === 0) {
-    // Make-only match (no model specified in part)
-    if (yearMatch === 'exact') confidence = 'medium';
-    else if (yearMatch === 'close') confidence = 'low';
-    else confidence = 'low';
+    // Make-only match — always LOW (no model to confirm)
+    confidence = 'low';
     notes.push('No specific model in part title — verify model at yard');
   } else {
     confidence = 'low';
   }
-
-  // Engine/trim notes
-  const titleLower = (part.title || '').toLowerCase();
-  if (/v8|5\.7|hemi/.test(titleLower) && !vehicle.engine) {
-    notes.push('Verify V8/HEMI engine at yard');
-  }
-  if (/v6|3\.5|3\.8/.test(titleLower) && !vehicle.engine) {
-    notes.push('Verify V6 engine at yard');
-  }
-  if (/4x4|awd|4wd/.test(titleLower) && !vehicle.drivetrain) {
-    notes.push('Verify 4x4/AWD drivetrain at yard');
-  }
-  if (/type.?s|sport|limited|touring/i.test(titleLower) && !vehicle.trim_level) {
-    notes.push('Verify trim level at yard');
-  }
-
   return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };
 }
 

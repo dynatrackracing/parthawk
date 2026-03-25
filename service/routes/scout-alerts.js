@@ -9,8 +9,18 @@ router.get('/list', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const perPage = 50;
 
+  // Sort: BONE HIGH > BONE MED > PERCH HIGH > PERCH MED > LOW, then by value
   const alerts = await database('scout_alerts')
-    .orderByRaw("CASE confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 END")
+    .orderByRaw(`
+      CASE
+        WHEN source = 'bone_pile' AND confidence = 'high' THEN 0
+        WHEN source = 'bone_pile' AND confidence = 'medium' THEN 1
+        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 2
+        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 3
+        WHEN confidence = 'low' AND source = 'bone_pile' THEN 4
+        ELSE 5
+      END
+    `)
     .orderBy('part_value', 'desc')
     .offset((page - 1) * perPage)
     .limit(perPage);
@@ -37,10 +47,20 @@ router.get('/list', async (req, res) => {
     .groupBy('yard_name')
     .orderBy('count', 'desc');
 
+  // Get source counts
+  const sourceCounts = await database('scout_alerts')
+    .select('source')
+    .count('* as count')
+    .groupBy('source');
+  const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
+  const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
+
   res.json({
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
+    boneCount,
+    perchCount,
     total,
     page,
     totalPages: Math.ceil(total / perPage),
