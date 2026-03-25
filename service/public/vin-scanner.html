@@ -2,317 +2,214 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="preload" href="/admin/darkhawk-logo.png" as="image">
-<link rel="prefetch" href="/admin/pull"><link rel="prefetch" href="/admin/restock"><link rel="prefetch" href="/admin/gate"><link rel="prefetch" href="/admin/vin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a">
 <title>DarkHawk — VIN SCANNER</title>
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
-  header{background:#0a0a0a;border-bottom:1px solid #2a2a2a;padding:14px 16px}
-  header h1{font-size:18px;font-weight:700;letter-spacing:-0.03em}
-  header .sub{font-size:11px;color:#9CA3AF;margin-top:1px}
-  .nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px}
-  .nav::-webkit-scrollbar{display:none}
-  .nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#141414}
-  .nav a.active{color:#dc2626;font-weight:700;background:#2a1a1a}
-  .container{padding:12px;max-width:600px;margin:0 auto}
-  .card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
-  .card-title{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
-  .vin-row{display:flex;gap:8px}
-  .vin-input{flex:1;padding:10px 12px;border:1px solid #333;border-radius:8px;font-size:17px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#141414;color:#F0F0F0}
-  .vin-input:focus{border-color:#dc2626}
-  .vin-input::placeholder{color:#6B7280;font-size:13px;letter-spacing:0;font-weight:400}
-  .btn{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
-  .btn-red{background:#dc2626;color:#fff}
-  .btn-red:disabled{opacity:.4}
-  .btn-cam{background:#1a1a1a;border:1px solid #333;font-size:18px;color:#d1d5db}
-  .btn-row{display:flex;gap:8px;margin-top:8px}
-  .spinner{width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  /* Vehicle */
-  .vh{font-size:18px;font-weight:800;letter-spacing:-0.02em;margin-bottom:2px}
-  .vin-str{font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-bottom:6px}
-  .badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
-  .b{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
-  .b-gr{background:#064e3b;color:#16a34a}.b-yl{background:#713f12;color:#a16207}.b-or{background:#7c2d12;color:#c2410c}.b-rd{background:#7f1d1d;color:#dc2626}.b-gy{background:#1a1a1a;color:#9CA3AF}.b-bl{background:#dbeafe;color:#2563eb}
-  .yard-match{background:#064e3b;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-top:6px}
-  .yard-match b{color:#16a34a}
-  /* Tables */
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{text-align:left;padding:5px 6px;color:#6B7280;font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
-  td{padding:6px;border-bottom:1px solid #1f1f1f}
-  tr:hover td{background:#141414}
-  .pg{color:#16a34a;font-weight:700}.py{color:#ca8a04;font-weight:700}.po{color:#ea580c;font-weight:700}.pr{color:#dc2626;font-weight:700}
-  .total-row td{font-weight:800;font-size:13px;border-top:2px solid #e5e7eb}
-  .section-empty{color:#6B7280;font-size:12px;padding:10px 0;text-align:center}
-  /* History */
-  .h-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1f1f1f;cursor:pointer}
-  .h-row:hover{background:#141414}
-  .h-vin{font-family:monospace;font-size:11px;font-weight:700}
-  .h-veh{font-size:10px;color:#9CA3AF}
-  .h-time{font-size:10px;color:#6B7280}
-  .camera-input{display:none}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:600px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.card-title{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+.vin-input{width:100%;padding:12px;border:1px solid #333;border-radius:8px;font-size:18px;font-family:monospace;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;outline:none;background:#141414;color:#F0F0F0}
+.vin-input:focus{border-color:#dc2626}
+.vin-input::placeholder{color:#6B7280;font-size:13px;letter-spacing:0;font-weight:400}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn{padding:12px 16px;border-radius:8px;border:none;font-size:14px;font-weight:700;cursor:pointer}
+.btn-red{background:#dc2626;color:#fff;flex:1}
+.btn-red:disabled{opacity:.4}
+.btn-cam{background:#1a1a1a;border:1px solid #333;font-size:20px;color:#d1d5db;padding:12px 16px}
+.spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.b{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
+.b-gr{background:#064e3b;color:#16a34a}.b-yl{background:#713f12;color:#a16207}.b-or{background:#7c2d12;color:#c2410c}.b-rd{background:#7f1d1d;color:#dc2626}.b-gy{background:#1a1a1a;color:#9CA3AF}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:5px 6px;color:#6B7280;font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
+td{padding:6px;border-bottom:1px solid #1f1f1f}
+.pg{color:#16a34a;font-weight:700}.py{color:#ca8a04;font-weight:700}.po{color:#ea580c;font-weight:700}.pr{color:#dc2626;font-weight:700}
+.section-empty{color:#6B7280;font-size:12px;padding:10px 0;text-align:center}
+.hist-link{display:block;text-align:center;padding:10px;font-size:11px;color:#6B7280;cursor:pointer;text-decoration:underline}
+.h-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1f1f1f;cursor:pointer}
+.h-vin{font-family:monospace;font-size:11px;font-weight:700}
+.h-veh{font-size:10px;color:#9CA3AF}
+.h-time{font-size:10px;color:#6B7280}
 </style>
 </head>
 <body>
-<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:10px">
-    <a href="/"><img src="/admin/darkhawk-logo.png" style="height:55px;background:none !important;border-radius:6px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DarkHawk"></a>
-    <div><span style="font-size:18px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><div class="sub" style="font-size:11px;color:#6B7280;margin-top:1px">VIN SCANNER</div></div>
-  </div>
+<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;gap:10px">
+  <a href="/"><img src="/admin/darkhawk-logo.png" style="height:45px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
+  <div><span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><div style="font-size:10px;color:#6B7280;margin-top:1px">VIN SCANNER</div></div>
 </header>
-<div class="nav" style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px">
+<nav style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px">
   <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">HOME</a>
   <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">DADDY SEEKR</a>
   <a href="/admin/restock" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">PREY LIST</a>
   <a href="/admin/gate" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">GATE KEEPER</a>
   <a href="/admin/vin" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a;font-weight:700">VIN SCANNER</a>
-</div>
+</nav>
 <div class="container">
   <div class="card">
     <div class="card-title">Enter or Scan VIN</div>
-    <div class="vin-row">
-      <input type="text" class="vin-input" id="vinInput" maxlength="17" placeholder="17-character VIN" autocomplete="off" spellcheck="false">
-      <button class="btn btn-cam" id="cameraBtn" title="Camera">📷</button>
-    </div>
+    <input type="text" class="vin-input" id="vinInput" maxlength="17" placeholder="17-character VIN" autocomplete="off" spellcheck="false">
     <div class="btn-row">
-      <button class="btn btn-red" id="decodeBtn" onclick="doScan()" style="flex:1">Decode</button>
+      <button class="btn btn-cam" id="camBtn">📷</button>
+      <button class="btn btn-red" id="decBtn" onclick="doScan()">Decode</button>
     </div>
-    <div style="font-size:10px;color:#6B7280;margin-top:6px;line-height:1.4">Tip: If dash VIN has glare, check the driver door jamb sticker or engine bay stamp</div>
-    <div id="vinStatus" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
+    <div style="font-size:10px;color:#6B7280;margin-top:6px">Tip: check door jamb sticker if dash has glare</div>
+    <div id="status" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
   </div>
   <div id="results"></div>
-  <div class="card" id="historyCard">
-    <div class="card-title">Recent Scans</div>
-    <div id="historyList"><div class="section-empty">Loading...</div></div>
-  </div>
+  <div id="histArea"><span class="hist-link" onclick="loadHistory(this)">Show Recent Scans</span></div>
 </div>
 <script>
-document.getElementById('vinInput').focus();
-document.getElementById('vinInput').addEventListener('keydown',e=>{if(e.key==='Enter')doScan()});
+var V=document.getElementById('vinInput');
+V.focus();
+V.addEventListener('keydown',function(e){if(e.key==='Enter')doScan()});
 
-// Camera: dynamic file input, resize+grayscale+contrast, send base64
-document.getElementById('cameraBtn').onclick = function() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment';
-  input.onchange = async function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    document.getElementById('vinStatus').textContent = 'Reading VIN from photo...';
-    document.getElementById('results').innerHTML = '<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Processing photo...</div></div>';
-
-    const canvas = document.createElement('canvas');
-    const img = new Image();
-    img.onload = async function() {
-      const maxW = 640; // Reduced from 1024 to prevent low-memory on mobile
-      const scale = Math.min(1, maxW / img.width);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // Grayscale + contrast for junkyard conditions
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = imageData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-        const adj = Math.min(255, Math.max(0, ((gray-128)*1.4)+128));
-        d[i] = d[i+1] = d[i+2] = adj;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-      // Free canvas memory immediately
-      canvas.width = 1; canvas.height = 1;
-
-      try {
-        const res = await fetch('/vin/decode-photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 })
-        });
-        const result = await res.json();
-
-        if (result.vin && result.vin !== 'UNREADABLE' && result.vin.length >= 11 && !result.vin.includes(' ')) {
-          document.getElementById('vinInput').value = result.vin;
-          document.getElementById('vinStatus').textContent = 'VIN read: ' + result.vin;
-          doScan('camera');
-        } else {
-          document.getElementById('vinStatus').textContent = 'Could not read VIN. Try again closer to the plate.';
-          document.getElementById('results').innerHTML = '<div class="card" style="text-align:center"><div style="color:#dc2626;font-weight:600">Could not read VIN</div><div style="color:#9CA3AF;font-size:12px;margin-top:4px">Avoid glare, get closer, or try the door jamb sticker.</div></div>';
-        }
-      } catch(err) {
-        document.getElementById('vinStatus').textContent = 'Error: ' + err.message;
-        document.getElementById('results').innerHTML = '<div class="card" style="color:#dc2626">Error: ' + err.message + '</div>';
-      }
+// Camera — all processing deferred to tap
+document.getElementById('camBtn').onclick=function(){
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';inp.capture='environment';
+  inp.onchange=function(e){
+    var file=e.target.files[0];if(!file)return;
+    document.getElementById('status').textContent='Reading VIN from photo...';
+    document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Processing...</div></div>';
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement('canvas');
+      var s=Math.min(1,480/img.width);
+      c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+      var x=c.getContext('2d');x.drawImage(img,0,0,c.width,c.height);
+      // Grayscale+contrast for junkyard conditions
+      var id=x.getImageData(0,0,c.width,c.height),d=id.data;
+      for(var i=0;i<d.length;i+=4){var g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];var a=Math.min(255,Math.max(0,((g-128)*1.4)+128));d[i]=d[i+1]=d[i+2]=a;}
+      x.putImageData(id,0,0);
+      var b64=c.toDataURL('image/jpeg',0.6).split(',')[1];
+      c.width=1;c.height=1; // free memory
       URL.revokeObjectURL(img.src);
+      fetch('/vin/decode-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})})
+      .then(function(r){return r.json()})
+      .then(function(r){
+        if(r.vin&&r.vin!=='UNREADABLE'&&r.vin.length>=11){
+          V.value=r.vin;document.getElementById('status').textContent='VIN read: '+r.vin;doScan('camera');
+        }else{
+          document.getElementById('status').textContent='Could not read VIN. Try closer.';
+          document.getElementById('results').innerHTML='<div class="card" style="text-align:center;color:#dc2626;font-weight:600">Could not read VIN<div style="color:#9CA3AF;font-size:12px;font-weight:400;margin-top:4px">Avoid glare, get closer, or try door jamb sticker.</div></div>';
+        }
+      }).catch(function(err){
+        document.getElementById('status').textContent='Error: '+err.message;
+        document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';
+      });
     };
-    img.src = URL.createObjectURL(file);
+    img.src=URL.createObjectURL(file);
   };
-  input.click();
+  inp.click();
 };
 
-async function doScan(src){
-  const vin=document.getElementById('vinInput').value.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');
+function doScan(src){
+  var vin=V.value.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');
   if(vin.length<11){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626;font-size:13px">Enter at least 11 characters</div>';return;}
-  const btn=document.getElementById('decodeBtn');btn.disabled=true;btn.innerHTML='<div class="spinner" style="margin:0 auto"></div>';
-  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Decoding & querying inventory...</div></div>';
-  try{
-    const r=await fetch('/vin/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vin,source:src||'manual'})});
-    const data=await r.json();if(!data.success)throw new Error(data.error);
-    render(data);loadHistory();
-  }catch(err){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';}
-  btn.disabled=false;btn.textContent='Decode';
+  var btn=document.getElementById('decBtn');btn.disabled=true;btn.innerHTML='<div class="spinner" style="margin:0 auto"></div>';
+  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Decoding...</div></div>';
+  fetch('/vin/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vin:vin,source:src||'manual'})})
+  .then(function(r){return r.json()})
+  .then(function(data){if(!data.success)throw new Error(data.error);render(data);})
+  .catch(function(err){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';})
+  .finally(function(){btn.disabled=false;btn.textContent='Decode';});
 }
 
-function verdict(v){return v>=250?'GREAT':v>=150?'GOOD':v>=100?'FAIR':'POOR'}
+function vd(v){return v>=250?'GREAT':v>=150?'GOOD':v>=100?'FAIR':'POOR'}
 function vc(v){return v==='GREAT'?'b-gr':v==='GOOD'?'b-yl':v==='FAIR'?'b-or':'b-rd'}
 function pc(v){return v>=250?'pg':v>=150?'py':v>=100?'po':'pr'}
+function ta(ds){if(!ds)return'-';var m=Math.floor((Date.now()-new Date(ds).getTime())/60000);if(m<1)return'now';if(m<60)return m+'m';var h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d'}
 
 function render(data){
-  const d=data.decoded;const sh=data.salesHistory||[];const cs=data.currentStock||[];const mr=data.marketRef||[];
-  let h='';
-
+  var d=data.decoded||{},sh=data.salesHistory||[],cs=data.currentStock||[],mr=data.marketRef||[];
+  var h='';
   // Vehicle header
-  const headline=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
-  const specs=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
-  h+='<div class="card">';
-  h+='<div style="font-size:22px;font-weight:900;letter-spacing:-0.03em;color:#F0F0F0">'+headline+'</div>';
-  if(specs)h+='<div style="font-size:13px;font-weight:600;color:#d1d5db;margin-top:2px">'+specs+'</div>';
-  h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div>';
-  h+='</div>';
+  var hl=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
+  var sp=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
+  h+='<div class="card"><div style="font-size:20px;font-weight:900;letter-spacing:-0.03em">'+hl+'</div>';
+  if(sp)h+='<div style="font-size:12px;font-weight:600;color:#d1d5db;margin-top:2px">'+sp+'</div>';
+  h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div></div>';
 
-  // PARTS INTELLIGENCE — merge sales + stock + market into unified list
-  const partMap={};
-  for(const s of sh){
-    if(!s.partType) continue;
-    partMap[s.partType]={partType:s.partType,sold:s.sold,avgPrice:s.avgPrice,lastSold:s.lastSoldDate,sampleTitle:s.sampleTitle,inStock:0,marketPrice:0,pns:[],sellers:[],isRebuild:false};
-  }
-  for(const c of cs){
-    if(!c.partType) continue;
-    if(partMap[c.partType])partMap[c.partType].inStock=c.inStock;
-    else partMap[c.partType]={partType:c.partType,sold:0,avgPrice:0,lastSold:null,sampleTitle:null,inStock:c.inStock,marketPrice:c.avgPrice,pns:[],sellers:[],isRebuild:false};
-  }
-  const mrUsed=mr.filter(p=>!p.isRebuild&&p.partType);
-  const mrRebuild=mr.filter(p=>p.isRebuild&&p.partType);
-  for(const m of mrUsed){
-    if(partMap[m.partType]){
-      partMap[m.partType].marketPrice=m.avgPrice;
-      partMap[m.partType].pns=m.partNumbers||[];
-      partMap[m.partType].sellers=m.sellers||[];
-      if(!partMap[m.partType].inStock)partMap[m.partType].inStock=m.inStock||0;
-    }else{
-      partMap[m.partType]={partType:m.partType,sold:m.yourSold||0,avgPrice:m.yourAvg||m.avgPrice,lastSold:null,sampleTitle:null,inStock:m.inStock||0,marketPrice:m.avgPrice,pns:m.partNumbers||[],sellers:m.sellers||[],isRebuild:false};
-    }
-  }
+  // Build unified parts list
+  var pm={};
+  sh.forEach(function(s){if(s.partType)pm[s.partType]={pt:s.partType,sold:s.sold,avg:s.avgPrice,last:s.lastSoldDate,title:s.sampleTitle,stk:0,mprice:0};});
+  cs.forEach(function(c){if(!c.partType)return;if(pm[c.partType])pm[c.partType].stk=c.inStock;else pm[c.partType]={pt:c.partType,sold:0,avg:0,last:null,title:null,stk:c.inStock,mprice:c.avgPrice};});
+  mr.filter(function(m){return!m.isRebuild&&m.partType}).forEach(function(m){
+    if(pm[m.partType]){pm[m.partType].mprice=m.avgPrice;if(!pm[m.partType].stk)pm[m.partType].stk=m.inStock||0;}
+    else pm[m.partType]={pt:m.partType,sold:m.yourSold||0,avg:m.yourAvg||m.avgPrice,last:null,title:null,stk:m.inStock||0,mprice:m.avgPrice};
+  });
 
-  // Filter: must have a partType, skip null/OTHER, skip zero-value with no sales
-  const parts=Object.values(partMap).filter(p=>!p.isRebuild&&p.partType&&p.partType!=='OTHER'&&p.partType!=='null'&&(p.avgPrice>0||p.marketPrice>0||p.sold>0)).sort((a,b)=>(b.avgPrice||b.marketPrice)-(a.avgPrice||a.marketPrice));
-  let totalValue=0;
+  var parts=[];
+  for(var k in pm){var p=pm[k];if(p.pt&&p.pt!=='OTHER'&&p.pt!=='null'&&(p.avg>0||p.mprice>0||p.sold>0))parts.push(p);}
+  parts.sort(function(a,b){return(b.avg||b.mprice)-(a.avg||a.mprice)});
+  var tot=0;
 
   h+='<div class="card"><div class="card-title">Parts Intelligence</div>';
   if(parts.length>0){
-    for(const p of parts){
-      const price=p.avgPrice||p.marketPrice||0;
-      const vd=verdict(price);
-      const lastSoldStr=p.lastSold?timeAgo(p.lastSold)+' ago':'—';
-      const pn=p.pns&&p.pns[0]?p.pns[0]:'';
-      const title=p.sampleTitle||p.partType;
-      totalValue+=price;
-      let fresh='';
-      if(p.lastSold){const da=Math.floor((Date.now()-new Date(p.lastSold).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
-
-      // Badge: PULL THIS / NEED / X stk
-      let badge='';
-      if(p.inStock===0&&p.sold>=2) badge='<span class="b b-gr" style="font-size:9px">PULL THIS</span> ';
-      else if(p.inStock===0&&p.sold>=1) badge='<span class="b b-yl" style="font-size:9px">NEED</span> ';
-      else if(p.inStock>0) badge='<span class="b b-gy" style="font-size:9px">'+p.inStock+' stk</span> ';
-
-      h+='<div style="padding:10px 0;border-bottom:1px solid #1f1f1f">';
-      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
-      h+='<div style="flex:1;min-width:0">';
-      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+badge+'<span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#F0F0F0">['+p.partType+']</span></div>';
-      h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(title||'').substring(0,70)+'</div>';
-      if(pn)h+='<div style="font-size:10px;color:#6B7280;font-family:monospace;margin-top:1px">'+pn+'</div>';
-      h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSoldStr+'</div>';
-      h+='</div></div></div>';
-    }
-  }else{
-    h+='<div class="section-empty">No parts data for this vehicle yet</div>';
-  }
+    parts.forEach(function(p){
+      var price=p.avg||p.mprice||0;var v=vd(price);tot+=price;
+      var badge='';
+      if(p.stk===0&&p.sold>=2)badge='<span class="b b-gr" style="font-size:9px">PULL THIS</span> ';
+      else if(p.stk===0&&p.sold>=1)badge='<span class="b b-yl" style="font-size:9px">NEED</span> ';
+      else if(p.stk>0)badge='<span class="b b-gy" style="font-size:9px">'+p.stk+' stk</span> ';
+      var fresh='';if(p.last){var da=Math.floor((Date.now()-new Date(p.last).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
+      h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
+      h+='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+badge+'<span class="b '+vc(v)+'">'+v+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700">['+p.pt+']</span></div>';
+      if(p.title)h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.title||'').substring(0,65)+'</div>';
+      h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.stk+' in stock · '+p.sold+'x sold · Last '+ta(p.last)+'</div>';
+      h+='</div>';
+    });
+  }else{h+='<div class="section-empty">No parts data for this vehicle yet</div>';}
   h+='</div>';
 
   // Est. Haul Value
-  if(totalValue>0){
-    const vc2=totalValue>=800?'#16a34a':totalValue>=500?'#ca8a04':totalValue>=250?'#ea580c':'#dc2626';
-    h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Est. Haul Value</div><div style="font-size:28px;font-weight:800;color:'+vc2+';margin-top:2px">$'+totalValue+'</div>';
-    const pullCount=parts.filter(p=>p.inStock===0&&p.sold>=2).length;
-    if(pullCount>0)h+='<div style="font-size:11px;color:#16a34a;margin-top:2px">'+pullCount+' part'+(pullCount>1?'s':'')+' we need (0 stock + sold before)</div>';
+  if(tot>0){
+    var vc2=tot>=800?'#16a34a':tot>=500?'#ca8a04':tot>=250?'#ea580c':'#dc2626';
+    h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Est. Haul Value</div><div style="font-size:28px;font-weight:800;color:'+vc2+';margin-top:2px">$'+tot+'</div>';
+    var pc2=parts.filter(function(p){return p.stk===0&&p.sold>=2}).length;
+    if(pc2>0)h+='<div style="font-size:11px;color:#16a34a;margin-top:2px">'+pc2+' part'+(pc2>1?'s':'')+' we need</div>';
     h+='</div>';
   }
 
   // Rebuild reference
-  if(mrRebuild.length>0){
-    h+='<div class="card" style="opacity:0.6"><div class="card-title">Rebuild Reference</div>';
-    for(const p of mrRebuild){
-      const sellers=(p.sellers||[]).join(', ')||'pro-rebuild';
-      const priceStr=p.priceRange||('$'+p.avgPrice);
-      h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#6B7280">';
-      h+='<span>[REBUILD] '+sellers+' — '+p.partType+'</span><span>'+priceStr+(p.count>1?' ('+p.count+')':'')+'</span></div>';
-    }
+  var rb=mr.filter(function(m){return m.isRebuild&&m.partType});
+  if(rb.length>0){
+    h+='<div class="card" style="opacity:0.5"><div class="card-title">Rebuild Reference</div>';
+    rb.forEach(function(p){h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#6B7280"><span>[REBUILD] '+(p.sellers||[]).join(', ')+' — '+p.partType+'</span><span>'+(p.priceRange||'$'+p.avgPrice)+'</span></div>';});
     h+='</div>';
   }
 
-  // AI Research
-  if(data.aiResearch){
-    h+='<div class="card" style="border-left:3px solid #8b5cf6">';
-    h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
-    h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#ede9fe;color:#7c3aed;text-transform:uppercase">AI Research</span>';
-    h+='<span style="font-size:10px;color:#6B7280">Market intelligence for '+[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ')+'</span>';
-    h+='</div>';
-    h+='<div style="font-size:12px;color:#d1d5db;line-height:1.6;white-space:pre-line">'+data.aiResearch+'</div>';
-    h+='</div>';
-  }
-
-  // Sales history — collapsible
-  const validSh=sh.filter(p=>p.partType&&p.partType!=='OTHER');
-  if(validSh.length>0){
-    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+validSh.reduce((s,p)=>s+p.sold,0)+' sold)</summary>';
+  // Sales history — collapsed
+  var vsh=sh.filter(function(p){return p.partType&&p.partType!=='OTHER'});
+  if(vsh.length>0){
+    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+vsh.reduce(function(s,p){return s+p.sold},0)+' sold)</summary>';
     h+='<table style="margin-top:8px"><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last</th></tr>';
-    for(const p of validSh){
-      h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9CA3AF">'+(p.lastSoldDate?timeAgo(p.lastSoldDate):'—')+'</td></tr>';
-    }
+    vsh.forEach(function(p){h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9CA3AF">'+ta(p.lastSoldDate)+'</td></tr>';});
     h+='</table></details></div>';
   }
 
-  // Scan Another button
-  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="document.getElementById(\'vinInput\').value=\'\';document.getElementById(\'vinInput\').focus();">Scan Another</button></div>';
-
+  // Scan Another
+  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';">Scan Another</button></div>';
   document.getElementById('results').innerHTML=h;
 }
 
-async function loadHistory(){
-  try{
-    const r=await fetch('/vin/history?limit=10');const d=await r.json();
-    if(!d.success||!d.scans||!d.scans.length){document.getElementById('historyList').innerHTML='<div class="section-empty">No scans yet</div>';return;}
-    let h='';
-    for(const s of d.scans){
-      const v=[s.year,s.make,s.model].filter(Boolean).join(' ');
-      h+='<div class="h-row" onclick="document.getElementById(\'vinInput\').value=\''+s.vin+'\';doScan()"><div><div class="h-vin">'+s.vin+'</div><div class="h-veh">'+(v||'Unknown')+'</div></div><div style="text-align:right"><div class="h-time">'+timeAgo(s.scanned_at)+'</div></div></div>';
-    }
-    document.getElementById('historyList').innerHTML=h;
-  }catch(e){document.getElementById('historyList').innerHTML='<div class="section-empty">Could not load</div>';}
+function loadHistory(el){
+  if(el)el.textContent='Loading...';
+  fetch('/vin/history?limit=10').then(function(r){return r.json()}).then(function(d){
+    if(!d.success||!d.scans||!d.scans.length){document.getElementById('histArea').innerHTML='<div class="section-empty">No scans yet</div>';return;}
+    var h='<div class="card"><div class="card-title">Recent Scans</div>';
+    d.scans.forEach(function(s){
+      var v=[s.year,s.make,s.model].filter(Boolean).join(' ');
+      h+='<div class="h-row" onclick="V.value=\''+s.vin+'\';doScan()"><div><div class="h-vin">'+s.vin+'</div><div class="h-veh">'+(v||'Unknown')+'</div></div><div><div class="h-time">'+ta(s.scanned_at)+'</div></div></div>';
+    });
+    h+='</div>';
+    document.getElementById('histArea').innerHTML=h;
+  }).catch(function(){document.getElementById('histArea').innerHTML='<div class="section-empty">Could not load history</div>';});
 }
-
-function timeAgo(ds){if(!ds)return'—';const d=new Date(ds),m=Math.floor((Date.now()-d.getTime())/60000);if(m<1)return'now';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d';}
-
-loadHistory();
 </script>
 </body>
 </html>
