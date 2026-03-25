@@ -66,7 +66,8 @@ router.get('/just-sold', async (req, res) => {
     .select('title', 'salePrice', 'soldDate')
     .orderBy('soldDate', 'desc');
 
-  const results = [];
+  // Group sales by want list item (dedup)
+  const grouped = new Map(); // wantTitle -> { sales[], yardMatches[] }
   for (const sale of recentSales) {
     const saleTitle = (sale.title || '').toLowerCase();
     for (const item of wantList) {
@@ -75,22 +76,31 @@ router.get('/just-sold', async (req, res) => {
         .split(/\s+/).filter(w => w.length >= 3);
       const matches = words.filter(w => saleTitle.includes(w));
       if (matches.length >= 3) {
-        const yardVehicles = await matchPartToYardVehicles(item.title);
         const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
-        results.push({
-          wantTitle: item.title,
-          saleTitle: sale.title,
-          salePrice: Math.round(parseFloat(sale.salePrice) || 0),
+        if (!grouped.has(item.title)) {
+          grouped.set(item.title, { wantTitle: item.title, sales: [], yardMatches: null });
+        }
+        grouped.get(item.title).sales.push({
+          price: Math.round(parseFloat(sale.salePrice) || 0),
           soldAgo: daysAgo <= 0 ? 'today' : daysAgo + 'd ago',
-          soldDate: sale.soldDate,
-          yardMatches: yardVehicles.slice(0, 5).map(v => ({
-            desc: [v.year, v.make, v.model].filter(Boolean).join(' '),
-            yard: v.yard, row: v.row
-          }))
         });
         break;
       }
     }
+  }
+
+  // Fetch yard matches once per grouped item
+  const results = [];
+  for (const [, group] of grouped) {
+    const yardVehicles = await matchPartToYardVehicles(group.wantTitle);
+    results.push({
+      wantTitle: group.wantTitle,
+      sales: group.sales,
+      yardMatches: yardVehicles.slice(0, 5).map(v => ({
+        desc: [v.year, v.make, v.model].filter(Boolean).join(' '),
+        yard: v.yard, row: v.row
+      }))
+    });
   }
 
   res.json({ success: true, items: results });
