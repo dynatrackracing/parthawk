@@ -2,73 +2,7 @@
 
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
-
-const MAKES_LIST = [
-  'ford','toyota','honda','acura','bmw','volvo','infiniti','mazda','lincoln',
-  'land rover','saturn','dodge','chrysler','jeep','nissan','buick','pontiac',
-  'hyundai','kia','jaguar','lexus','cadillac','mitsubishi','suzuki','geo',
-  'chevrolet','chevy','mercedes','ram',
-];
-
-const MODELS = [
-  'f150','f250','f350','vue','tsx','ridgeline','xc90','xc70','coupe','m35',
-  'sequoia','mazda6','town car','p38','dakota','durango','fusion','corolla',
-  'gs300','charger','accord','srx','ranger','econoline','cr-v','crv','endeavor',
-  'titan','pathfinder','qx4','grand vitara','tundra','lacrosse','lucerne',
-  'grand prix','c70','s70','v70','miata','montero','xterra','santa fe',
-  'xg350','xj6','xk8','explorer','transit','transit connect','fx35','ilx',
-  'tl','escalade','grand cherokee','jetta','trailblazer','rav4','nv200',
-  'nv2500','nv3500','pilot','flex','c230','prius','s550','rdx',
-  'five hundred','solstice','tacoma','4runner','mdx','promaster','t100',
-  'metro','sidekick','tracker','odyssey','caravan','dart','sienna',
-  'pacifica','voyager','camaro','300','l100','q60','q40','ram',
-];
-
-function parseVehicleFromTitle(title) {
-  const titleLower = title.toLowerCase();
-  let yearStart = null, yearEnd = null;
-
-  const rangeMatch = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
-  if (rangeMatch) {
-    yearStart = parseInt(rangeMatch[1] + rangeMatch[2]);
-    const endDigits = rangeMatch[4];
-    yearEnd = rangeMatch[3]
-      ? parseInt(rangeMatch[3] + endDigits)
-      : (endDigits.length === 2 ? parseInt(rangeMatch[1] + endDigits) : parseInt(endDigits));
-  } else {
-    const singleYear = title.match(/\b(19|20)\d{2}\b/);
-    if (singleYear) { yearStart = parseInt(singleYear[0]); yearEnd = yearStart; }
-    const shortRange = title.match(/\b(\d{2})\s*[-–]\s*(\d{2})\b/);
-    if (shortRange && !rangeMatch) {
-      const s = parseInt(shortRange[1]), e = parseInt(shortRange[2]);
-      if (s >= 89 && s <= 99) yearStart = 1900 + s;
-      else if (s >= 0 && s <= 30) yearStart = 2000 + s;
-      if (e >= 89 && e <= 99) yearEnd = 1900 + e;
-      else if (e >= 0 && e <= 30) yearEnd = 2000 + e;
-    }
-  }
-
-  const plusMatch = title.match(/\b(19|20)(\d{2})\+/);
-  if (plusMatch && !yearStart) {
-    yearStart = parseInt(plusMatch[1] + plusMatch[2]);
-    yearEnd = new Date().getFullYear();
-  }
-
-  let foundMake = null;
-  for (const make of MAKES_LIST) {
-    const re = new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-    if (re.test(titleLower)) { foundMake = make; break; }
-  }
-
-  const foundModels = [];
-  for (const model of MODELS) {
-    const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-    if (re.test(titleLower)) foundModels.push(model);
-  }
-
-  if (!foundMake && foundModels.length === 0) return null;
-  return { make: foundMake, models: foundModels, yearStart, yearEnd };
-}
+const { parseTitle, matchPartToSales } = require('../utils/partMatcher');
 
 async function generateAlerts() {
   const startTime = Date.now();
@@ -98,23 +32,17 @@ async function generateAlerts() {
   // HUNTERS PERCH — manual want list
   const wantList = await database('restock_want_list').where({ active: true });
   for (const item of wantList) {
-    const parsed = parseVehicleFromTitle(item.title);
-    if (parsed) {
-      // Get avg price from YourSale for this item
-      let avgPrice = null;
-      try {
-        const sale = await database('YourSale')
-          .where('title', 'ilike', `%${(parsed.models[0] || parsed.make || '').substring(0, 15)}%`)
-          .select(database.raw('AVG("salePrice") as avg'))
-          .first();
-        if (sale && sale.avg) avgPrice = Math.round(parseFloat(sale.avg));
-      } catch (e) { /* ignore */ }
-
+    const parsed = parseTitle(item.title);
+    if (parsed && (parsed.make || parsed.models.length > 0)) {
+      const sales = await matchPartToSales(item.title);
       partsToMatch.push({
         source: 'hunters_perch',
         title: item.title,
-        value: avgPrice,
-        ...parsed
+        value: sales.avgPrice,
+        make: parsed.make,
+        models: parsed.models,
+        yearStart: parsed.yearStart,
+        yearEnd: parsed.yearEnd,
       });
     }
   }
@@ -127,18 +55,20 @@ async function generateAlerts() {
       .whereRaw('"salePrice"::numeric >= 50')
       .select('title', 'salePrice');
 
-    // Group by approximate title
     const seen = new Map();
     for (const sale of bonePileSales) {
-      const parsed = parseVehicleFromTitle(sale.title);
-      if (!parsed) continue;
+      const parsed = parseTitle(sale.title);
+      if (!parsed || (!parsed.make && parsed.models.length === 0)) continue;
       const key = (parsed.make || '') + '|' + (parsed.models[0] || '') + '|' + sale.title.substring(0, 40);
       if (!seen.has(key)) {
         seen.set(key, {
           source: 'bone_pile',
           title: sale.title,
           value: Math.round(parseFloat(sale.salePrice) || 0),
-          ...parsed
+          make: parsed.make,
+          models: parsed.models,
+          yearStart: parsed.yearStart,
+          yearEnd: parsed.yearEnd,
         });
       }
     }
@@ -173,8 +103,6 @@ async function generateAlerts() {
 
   // 4. Wipe old alerts and insert new ones
   await database('scout_alerts').truncate();
-
-  // Insert in batches of 50
   for (let i = 0; i < alerts.length; i += 50) {
     await database('scout_alerts').insert(alerts.slice(i, i + 50));
   }
@@ -191,11 +119,9 @@ function scoreMatch(part, vehicle) {
   const vModel = (vehicle.model || '').toLowerCase();
   const vYear = parseInt(vehicle.year) || 0;
 
-  // Check make match — required for all confidence levels
   const makeMatch = part.make && vMake.includes(part.make.toLowerCase());
   if (!makeMatch) return {};
 
-  // Check model match
   let modelMatch = false;
   if (part.models.length > 0) {
     for (const m of part.models) {
@@ -205,25 +131,17 @@ function scoreMatch(part, vehicle) {
       }
     }
   }
-
-  // No model match and part specifies models — reject entirely
   if (!modelMatch && part.models.length > 0) return {};
 
-  // Check year range — strict
   let yearMatch = 'none';
   if (part.yearStart && part.yearEnd && vYear > 0) {
-    if (vYear >= part.yearStart && vYear <= part.yearEnd) {
-      yearMatch = 'exact';
-    } else if (vYear >= part.yearStart - 2 && vYear <= part.yearEnd + 2) {
-      yearMatch = 'close';
-    } else {
-      return {}; // Year too far off — no alert
-    }
+    if (vYear >= part.yearStart && vYear <= part.yearEnd) yearMatch = 'exact';
+    else if (vYear >= part.yearStart - 2 && vYear <= part.yearEnd + 2) yearMatch = 'close';
+    else return {};
   } else if (!part.yearStart && vYear > 0) {
     yearMatch = 'unknown';
   }
 
-  // Build confidence — STRICT rules
   let confidence;
   const notes = [];
   const titleLower = (part.title || '').toLowerCase();
@@ -232,16 +150,12 @@ function scoreMatch(part, vehicle) {
   const needsTrimVerify = /type.?s|sport|limited|touring|ss\b/i.test(titleLower);
 
   if (modelMatch && yearMatch === 'exact') {
-    // HIGH only if we don't need to verify engine/drivetrain/trim
     if (needsEngineVerify && !vehicle.engine) {
-      confidence = 'medium';
-      notes.push('Verify engine spec at yard');
+      confidence = 'medium'; notes.push('Verify engine spec at yard');
     } else if (needsDriveVerify && !vehicle.drivetrain) {
-      confidence = 'medium';
-      notes.push('Verify drivetrain at yard');
+      confidence = 'medium'; notes.push('Verify drivetrain at yard');
     } else if (needsTrimVerify && !vehicle.trim_level) {
-      confidence = 'medium';
-      notes.push('Verify trim at yard');
+      confidence = 'medium'; notes.push('Verify trim at yard');
     } else {
       confidence = 'high';
     }
@@ -252,12 +166,12 @@ function scoreMatch(part, vehicle) {
     confidence = 'medium';
     notes.push('Year range not specified — verify fitment');
   } else if (!modelMatch && part.models.length === 0) {
-    // Make-only match — always LOW (no model to confirm)
     confidence = 'low';
     notes.push('No specific model in part title — verify model at yard');
   } else {
     confidence = 'low';
   }
+
   return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };
 }
 
@@ -267,7 +181,6 @@ async function saveMeta() {
     await database('scout_alerts_meta').insert({ key: 'last_generated', value: now })
       .onConflict('key').merge();
   } catch (e) {
-    // Fallback for databases without onConflict
     await database('scout_alerts_meta').where('key', 'last_generated').del();
     await database('scout_alerts_meta').insert({ key: 'last_generated', value: now });
   }
