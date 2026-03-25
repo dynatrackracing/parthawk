@@ -4,13 +4,71 @@ const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { generateAlerts } = require('../services/ScoutAlertService');
 
-// Get all alerts (paginated, grouped by yard)
+// Hard age ceilings
+const BONE_MAX_DAYS = 90;
+const PERCH_MAX_DAYS = 60;
+
+// Get alerts with yard + time filters
 router.get('/list', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const perPage = 50;
+  const yard = req.query.yard || 'all';
+  const days = parseInt(req.query.days) || 0; // 0 = all (within hard ceilings)
 
-  // Sort: ALL BONE first (by confidence then value), then ALL PERCH
-  const alerts = await database('scout_alerts')
+  const knex = database;
+
+  // Base query with hard age ceilings applied always
+  let baseQuery = knex('scout_alerts').where(function() {
+    this.where(function() {
+      this.where('source', 'bone_pile')
+        .andWhere('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${BONE_MAX_DAYS} days'`));
+    }).orWhere(function() {
+      this.where('source', 'hunters_perch')
+        .andWhere('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${PERCH_MAX_DAYS} days'`));
+    });
+  });
+
+  // Time filter (days pill)
+  if (days > 0) {
+    const effectiveBoneDays = Math.min(days, BONE_MAX_DAYS);
+    const effectivePerchDays = Math.min(days, PERCH_MAX_DAYS);
+    baseQuery = knex('scout_alerts').where(function() {
+      this.where(function() {
+        this.where('source', 'bone_pile')
+          .andWhere('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${effectiveBoneDays} days'`));
+      }).orWhere(function() {
+        this.where('source', 'hunters_perch')
+          .andWhere('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${effectivePerchDays} days'`));
+      });
+    });
+  }
+
+  // Also include alerts with NULL vehicle_set_date (can't filter what we can't date)
+  // Actually, re-do: build the where as a function we can reuse
+  function applyFilters(q) {
+    q = q.where(function() {
+      this.where(function() {
+        this.where('source', 'bone_pile').andWhere(function() {
+          this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days > 0 ? Math.min(days, BONE_MAX_DAYS) : BONE_MAX_DAYS} days'`))
+            .orWhereNull('vehicle_set_date');
+        });
+      }).orWhere(function() {
+        this.where('source', 'hunters_perch').andWhere(function() {
+          this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days > 0 ? Math.min(days, PERCH_MAX_DAYS) : PERCH_MAX_DAYS} days'`))
+            .orWhereNull('vehicle_set_date');
+        });
+      });
+    });
+    if (yard && yard !== 'all') {
+      q = q.andWhere('yard_name', 'ilike', `%${yard}%`);
+    }
+    return q;
+  }
+
+  // Get paginated alerts
+  let alertQuery = knex('scout_alerts');
+  alertQuery = applyFilters(alertQuery);
+  const alerts = await alertQuery
     .orderByRaw(`
       CASE
         WHEN source = 'bone_pile' AND confidence = 'high' THEN 0
@@ -26,48 +84,46 @@ router.get('/list', async (req, res) => {
     .offset((page - 1) * perPage)
     .limit(perPage);
 
-  const [{ count }] = await database('scout_alerts').count('* as count');
+  // Get total count with same filters
+  let countQuery = knex('scout_alerts');
+  countQuery = applyFilters(countQuery);
+  const [{ count }] = await countQuery.count('* as count');
   const total = parseInt(count) || 0;
 
   // Get last generated timestamp
-  const meta = await database('scout_alerts_meta').where('key', 'last_generated').first();
+  const meta = await knex('scout_alerts_meta').where('key', 'last_generated').first();
   const lastGenerated = meta ? meta.value : null;
 
   // Group by yard
   const byYard = {};
   for (const a of alerts) {
-    const yard = a.yard_name || 'Unknown';
-    if (!byYard[yard]) byYard[yard] = [];
-    byYard[yard].push(a);
+    const y = a.yard_name || 'Unknown';
+    if (!byYard[y]) byYard[y] = [];
+    byYard[y].push(a);
   }
 
-  // Get yard counts for all alerts (not just this page)
-  const yardCounts = await database('scout_alerts')
-    .select('yard_name')
-    .count('* as count')
-    .groupBy('yard_name')
-    .orderBy('count', 'desc');
+  // Yard counts with same filters
+  let yardCountQuery = knex('scout_alerts');
+  yardCountQuery = applyFilters(yardCountQuery);
+  const yardCounts = await yardCountQuery
+    .select('yard_name').count('* as count').groupBy('yard_name').orderBy('count', 'desc');
 
-  // Get source counts
-  const sourceCounts = await database('scout_alerts')
-    .select('source')
-    .count('* as count')
-    .groupBy('source');
+  // Source counts with same filters
+  let srcQuery = knex('scout_alerts');
+  srcQuery = applyFilters(srcQuery);
+  const sourceCounts = await srcQuery.select('source').count('* as count').groupBy('source');
   const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
   const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
 
-  // Check which perch alerts had recent sales (last 3 days)
+  // Tag perch alerts with recent sales
   let justSoldCount = 0;
   try {
-    const recentSales = await database('YourSale')
-      .where('soldDate', '>=', database.raw("NOW() - INTERVAL '3 days'"))
-      .whereNotNull('title')
-      .select('title', 'soldDate');
+    const recentSales = await knex('YourSale')
+      .where('soldDate', '>=', knex.raw("NOW() - INTERVAL '3 days'"))
+      .whereNotNull('title').select('title', 'soldDate');
     const saleTitles = recentSales.map(s => ({ lower: (s.title || '').toLowerCase(), soldDate: s.soldDate }));
-
-    // Tag alerts that match recent sales
-    for (const yard in byYard) {
-      for (const alert of byYard[yard]) {
+    for (const yardName in byYard) {
+      for (const alert of byYard[yardName]) {
         if (alert.source !== 'hunters_perch') continue;
         const alertWords = (alert.source_title || '').toLowerCase()
           .replace(/\([^)]*\)/g, '').replace(/\b\d+\b/g, '').replace(/[^a-z\s]/g, ' ')
@@ -89,12 +145,8 @@ router.get('/list', async (req, res) => {
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
-    boneCount,
-    perchCount,
-    justSoldCount,
-    total,
-    page,
-    totalPages: Math.ceil(total / perPage),
+    boneCount, perchCount, justSoldCount,
+    total, page, totalPages: Math.ceil(total / perPage),
     lastGenerated
   });
 });

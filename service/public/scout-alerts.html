@@ -14,6 +14,14 @@ nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px s
 nav::-webkit-scrollbar{display:none}
 nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a}
 nav a.active{color:#DC2626;font-weight:700}
+.tabs{display:flex;background:#141414;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:11px 16px;font-size:12px;font-weight:600;color:#9CA3AF;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0}
+.tab.active{color:#F0F0F0;border-bottom-color:#DC2626}
+.pill-bar{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;font-size:11px;overflow-x:auto;scrollbar-width:none}
+.pill-bar::-webkit-scrollbar{display:none}
+.pill{padding:4px 10px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.pill.active{background:#dc2626;color:#fff;border-color:#dc2626}
 .container{padding:12px;max-width:700px;margin:0 auto}
 .card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
 .badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
@@ -42,7 +50,7 @@ nav a.active{color:#DC2626;font-weight:700}
 .pg-btn{padding:8px 16px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:12px;font-weight:600;cursor:pointer}
 .pg-btn.active{background:#dc2626;color:#fff;border-color:#dc2626}
 .summary-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.summary-card{flex:1;min-width:80px;background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:8px 10px;text-align:center}
+.summary-card{flex:1;min-width:70px;background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:8px 10px;text-align:center}
 .summary-num{font-size:20px;font-weight:800;color:#F0F0F0}
 .summary-label{font-size:9px;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;margin-top:1px}
 </style>
@@ -70,6 +78,28 @@ nav a.active{color:#DC2626;font-weight:700}
   <a href="/admin/restock-list">HUNTERS PERCH</a>
   <a href="/admin/scout-alerts" class="active">SCOUT ALERTS</a>
 </nav>
+<!-- Yard Tabs -->
+<div class="tabs" id="yardTabs">
+  <div class="tab active" onclick="setYard('all',this)">All</div>
+  <div class="tab" onclick="setYard('Raleigh',this)">Raleigh</div>
+  <div class="tab" onclick="setYard('Durham',this)">Durham</div>
+  <div class="tab" onclick="setYard('Greensboro',this)">Greensboro</div>
+  <div class="tab" onclick="setYard('East NC',this)">East NC</div>
+  <div class="tab" onclick="setYard('Tampa',this)">Tampa</div>
+  <div class="tab" onclick="setYard('Largo',this)">Largo</div>
+  <div class="tab" onclick="setYard('Clearwater',this)">Clearwater</div>
+</div>
+<!-- Time Filter Pills -->
+<div class="pill-bar">
+  <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#6B7280">Set:</span>
+  <button class="pill" onclick="setDays(0,this)">Today</button>
+  <button class="pill" onclick="setDays(3,this)">3d</button>
+  <button class="pill active" onclick="setDays(7,this)">7d</button>
+  <button class="pill" onclick="setDays(30,this)">30d</button>
+  <button class="pill" onclick="setDays(60,this)">60d</button>
+  <button class="pill" onclick="setDays(90,this)">90d</button>
+  <button class="pill" onclick="setDays(-1,this)">All</button>
+</div>
 <div class="container">
   <div id="loading" style="text-align:center;padding:40px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading alerts...</div></div>
   <div id="summary"></div>
@@ -78,16 +108,38 @@ nav a.active{color:#DC2626;font-weight:700}
 </div>
 <script>
 var currentPage = 1;
+var currentYard = 'all';
+var currentDays = 7;
+
+function setYard(yard, el) {
+  currentYard = yard;
+  document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+  load(1);
+}
+
+function setDays(days, el) {
+  currentDays = days === -1 ? 0 : (days === 0 ? 1 : days); // 0=today(1d), -1=all(0)
+  if (days === -1) currentDays = 0;
+  else if (days === 0) currentDays = 1;
+  else currentDays = days;
+  document.querySelectorAll('.pill-bar .pill').forEach(function(p) { p.classList.remove('active'); });
+  el.classList.add('active');
+  load(1);
+}
 
 function load(page) {
   currentPage = page || 1;
-  fetch('/scout-alerts/list?page=' + currentPage)
+  var url = '/scout-alerts/list?page=' + currentPage;
+  if (currentYard !== 'all') url += '&yard=' + encodeURIComponent(currentYard);
+  if (currentDays > 0) url += '&days=' + currentDays;
+
+  fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(d) {
       document.getElementById('loading').style.display = 'none';
       if (!d.success) { document.getElementById('list').innerHTML = '<div class="empty">Error loading alerts</div>'; return; }
 
-      // Update header
       document.getElementById('alertCount').textContent = d.total > 0 ? '(' + d.total + ')' : '';
       if (d.lastGenerated) {
         var mins = Math.floor((Date.now() - new Date(d.lastGenerated).getTime()) / 60000);
@@ -95,26 +147,22 @@ function load(page) {
         document.getElementById('lastUpdated').textContent = 'Updated ' + ts;
       }
 
-      // Summary cards
-      if (d.total > 0) {
-        var sh = '<div class="summary-bar">';
-        sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">BONE</div></div>';
-        sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
-        sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
-        sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
-        sh += '</div>';
-        document.getElementById('summary').innerHTML = sh;
-      }
+      // Summary cards — filtered counts
+      var sh = '<div class="summary-bar">';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">BONE</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
+      sh += '</div>';
+      document.getElementById('summary').innerHTML = d.total > 0 ? sh : '';
 
-      // Alerts grouped by yard
       if (d.total === 0) {
-        document.getElementById('list').innerHTML = '<div class="empty">No scout alerts yet.<br><br>Alerts are generated after each yard scrape by cross-referencing BONE PILE + HUNTERS PERCH against yard vehicle inventories.<br><br>Tap Refresh to generate now.</div>';
+        document.getElementById('list').innerHTML = '<div class="empty">No alerts for this filter.<br>Try a wider time range or different yard.</div>';
         document.getElementById('pagination').innerHTML = '';
         return;
       }
 
       var h = '';
-      // Sort yards by alert count desc
       var yardOrder = d.yardCounts.map(function(y) { return y.yard; });
       yardOrder.forEach(function(yardName) {
         var alerts = d.alerts[yardName];
@@ -156,7 +204,6 @@ function load(page) {
 
       document.getElementById('list').innerHTML = h;
 
-      // Pagination
       if (d.totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
       var ph = '';
       for (var i = 1; i <= d.totalPages; i++) {
@@ -180,7 +227,7 @@ function refreshAlerts() {
     .then(function(d) {
       btn.disabled = false; btn.textContent = 'Refresh';
       if (d.success) load(1);
-      else { document.getElementById('list').innerHTML = '<div class="empty">Error: ' + (d.error || 'Unknown') + '</div>'; }
+      else document.getElementById('list').innerHTML = '<div class="empty">Error: ' + (d.error || 'Unknown') + '</div>';
     })
     .catch(function(err) {
       btn.disabled = false; btn.textContent = 'Refresh';
