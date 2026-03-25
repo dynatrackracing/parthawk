@@ -179,28 +179,28 @@ function render(data){
   const d=data.decoded;const sh=data.salesHistory||[];const cs=data.currentStock||[];const mr=data.marketRef||[];
   let h='';
 
-  // Vehicle header — matches attack list style
+  // Vehicle header
   const headline=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
   const specs=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
   h+='<div class="card">';
   h+='<div style="font-size:22px;font-weight:900;letter-spacing:-0.03em;color:#F0F0F0">'+headline+'</div>';
   if(specs)h+='<div style="font-size:13px;font-weight:600;color:#d1d5db;margin-top:2px">'+specs+'</div>';
   h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div>';
-  if(data.yardMatch)h+='<div class="yard-match"><b>In Yard:</b> '+data.yardMatch.yardName+(data.yardMatch.row?' — Row '+data.yardMatch.row:'')+(data.yardMatch.color?' — '+data.yardMatch.color:'')+'</div>';
   h+='</div>';
 
-  // PARTS TO PULL — attack list format
-  // Merge sales data + market data into unified part list
+  // PARTS INTELLIGENCE — merge sales + stock + market into unified list
   const partMap={};
   for(const s of sh){
+    if(!s.partType) continue;
     partMap[s.partType]={partType:s.partType,sold:s.sold,avgPrice:s.avgPrice,lastSold:s.lastSoldDate,sampleTitle:s.sampleTitle,inStock:0,marketPrice:0,pns:[],sellers:[],isRebuild:false};
   }
   for(const c of cs){
+    if(!c.partType) continue;
     if(partMap[c.partType])partMap[c.partType].inStock=c.inStock;
     else partMap[c.partType]={partType:c.partType,sold:0,avgPrice:0,lastSold:null,sampleTitle:null,inStock:c.inStock,marketPrice:c.avgPrice,pns:[],sellers:[],isRebuild:false};
   }
-  const mrUsed=mr.filter(p=>!p.isRebuild);
-  const mrRebuild=mr.filter(p=>p.isRebuild);
+  const mrUsed=mr.filter(p=>!p.isRebuild&&p.partType);
+  const mrRebuild=mr.filter(p=>p.isRebuild&&p.partType);
   for(const m of mrUsed){
     if(partMap[m.partType]){
       partMap[m.partType].marketPrice=m.avgPrice;
@@ -212,10 +212,11 @@ function render(data){
     }
   }
 
-  const parts=Object.values(partMap).filter(p=>!p.isRebuild).sort((a,b)=>(b.avgPrice||b.marketPrice)-(a.avgPrice||a.marketPrice));
+  // Filter: must have a partType, skip null/OTHER, skip zero-value with no sales
+  const parts=Object.values(partMap).filter(p=>!p.isRebuild&&p.partType&&p.partType!=='OTHER'&&p.partType!=='null'&&(p.avgPrice>0||p.marketPrice>0||p.sold>0)).sort((a,b)=>(b.avgPrice||b.marketPrice)-(a.avgPrice||a.marketPrice));
   let totalValue=0;
 
-  h+='<div class="card"><div class="card-title">Parts to Pull</div>';
+  h+='<div class="card"><div class="card-title">Parts Intelligence</div>';
   if(parts.length>0){
     for(const p of parts){
       const price=p.avgPrice||p.marketPrice||0;
@@ -224,28 +225,39 @@ function render(data){
       const pn=p.pns&&p.pns[0]?p.pns[0]:'';
       const title=p.sampleTitle||p.partType;
       totalValue+=price;
-      // Price freshness
-      let fresh='❓';
+      let fresh='';
       if(p.lastSold){const da=Math.floor((Date.now()-new Date(p.lastSold).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
+
+      // Badge: PULL THIS / NEED / X stk
+      let badge='';
+      if(p.inStock===0&&p.sold>=2) badge='<span class="b b-gr" style="font-size:9px">PULL THIS</span> ';
+      else if(p.inStock===0&&p.sold>=1) badge='<span class="b b-yl" style="font-size:9px">NEED</span> ';
+      else if(p.inStock>0) badge='<span class="b b-gy" style="font-size:9px">'+p.inStock+' stk</span> ';
 
       h+='<div style="padding:10px 0;border-bottom:1px solid #1f1f1f">';
       h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
       h+='<div style="flex:1;min-width:0">';
-      h+='<div style="display:flex;align-items:center;gap:6px"><span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#F0F0F0">['+p.partType+']</span></div>';
-      h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title.substring(0,70)+'</div>';
+      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+badge+'<span class="b '+vc(vd)+'">'+vd+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700;color:#F0F0F0">['+p.partType+']</span></div>';
+      h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(title||'').substring(0,70)+'</div>';
       if(pn)h+='<div style="font-size:10px;color:#6B7280;font-family:monospace;margin-top:1px">'+pn+'</div>';
       h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.inStock+' in stock · '+p.sold+'x sold · Last sold '+lastSoldStr+'</div>';
       h+='</div></div></div>';
     }
   }else{
-    h+='<div class="section-empty">No parts data for this vehicle</div>';
+    h+='<div class="section-empty">No parts data for this vehicle yet</div>';
   }
   h+='</div>';
 
-  // Total value
-  if(totalValue>0)h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Estimated Pull Value</div><div style="font-size:28px;font-weight:800;color:#16a34a;margin-top:2px">$'+totalValue+'</div></div>';
+  // Est. Haul Value
+  if(totalValue>0){
+    const vc2=totalValue>=800?'#16a34a':totalValue>=500?'#ca8a04':totalValue>=250?'#ea580c':'#dc2626';
+    h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Est. Haul Value</div><div style="font-size:28px;font-weight:800;color:'+vc2+';margin-top:2px">$'+totalValue+'</div>';
+    const pullCount=parts.filter(p=>p.inStock===0&&p.sold>=2).length;
+    if(pullCount>0)h+='<div style="font-size:11px;color:#16a34a;margin-top:2px">'+pullCount+' part'+(pullCount>1?'s':'')+' we need (0 stock + sold before)</div>';
+    h+='</div>';
+  }
 
-  // Rebuild reference — one line per type
+  // Rebuild reference
   if(mrRebuild.length>0){
     h+='<div class="card" style="opacity:0.6"><div class="card-title">Rebuild Reference</div>';
     for(const p of mrRebuild){
@@ -257,7 +269,7 @@ function render(data){
     h+='</div>';
   }
 
-  // AI Research — for newer vehicles with sparse data
+  // AI Research
   if(data.aiResearch){
     h+='<div class="card" style="border-left:3px solid #8b5cf6">';
     h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
@@ -269,14 +281,18 @@ function render(data){
   }
 
   // Sales history — collapsible
-  if(sh.length>0){
-    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+sh.reduce((s,p)=>s+p.sold,0)+' sold all time)</summary>';
+  const validSh=sh.filter(p=>p.partType&&p.partType!=='OTHER');
+  if(validSh.length>0){
+    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+validSh.reduce((s,p)=>s+p.sold,0)+' sold)</summary>';
     h+='<table style="margin-top:8px"><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last</th></tr>';
-    for(const p of sh){
+    for(const p of validSh){
       h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9CA3AF">'+(p.lastSoldDate?timeAgo(p.lastSoldDate):'—')+'</td></tr>';
     }
     h+='</table></details></div>';
   }
+
+  // Scan Another button
+  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="document.getElementById(\'vinInput\').value=\'\';document.getElementById(\'vinInput\').focus();">Scan Another</button></div>';
 
   document.getElementById('results').innerHTML=h;
 }

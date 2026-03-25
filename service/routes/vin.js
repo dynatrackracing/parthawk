@@ -459,25 +459,7 @@ router.post('/scan', async (req, res) => {
     const totalValue = salesHistory.reduce((sum, p) => sum + (p.avgPrice || 0), 0)
       || marketRef.reduce((sum, p) => sum + (p.avgPrice || 0), 0);
 
-    // --- Step 3: Check if vehicle is in yard inventory ---
-    let yardMatch = null;
-    try {
-      const match = await database('yard_vehicle')
-        .where('active', true)
-        .where('year', String(year))
-        .whereRaw('UPPER(make) = ?', [(make || '').toUpperCase()])
-        .whereRaw('UPPER(model) LIKE ?', ['%' + (baseModel || '').toUpperCase() + '%'])
-        .first();
-      if (match) {
-        const yard = await database('yard').where('id', match.yard_id).first();
-        yardMatch = {
-          vehicleId: match.id, yardName: yard?.name || 'Unknown',
-          row: match.row_number, color: match.color,
-        };
-      }
-    } catch (e) { /* ignore */ }
-
-    // --- Step 4: Log the scan ---
+    // --- Step 3: Log the scan ---
     try {
       await database('vin_scan_log').insert({
         vin, year: decoded.year, make: decoded.make, model: decoded.model,
@@ -539,7 +521,7 @@ router.post('/scan', async (req, res) => {
 
     // Limit response size to prevent mobile memory issues
     res.json({
-      success: true, vin, decoded, baseModel, totalValue, yardMatch,
+      success: true, vin, decoded, baseModel, totalValue,
       salesHistory: salesHistory.slice(0, 15),
       currentStock: currentStock.slice(0, 15),
       marketRef: marketRef.slice(0, 20),

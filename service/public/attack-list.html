@@ -189,26 +189,7 @@
   .empty-state p { font-size: 12px; line-height: 1.5; }
   .btn-primary { margin-top: 12px; padding: 10px 20px; background: var(--red); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-  /* VIN scanner modal */
-  .vin-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: flex-start; justify-content: center; padding: 12px; padding-top: 40px; overflow-y: auto; }
-  .vin-modal.open { display: flex; }
-  .vin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: 100%; max-width: 480px; text-align: center; }
-  .vin-card h3 { font-size: 16px; margin-bottom: 12px; }
-  .vin-result { margin-top: 12px; font-size: 13px; color: var(--text-mid); text-align: left; }
-  .vin-result .vin-str { font-family: monospace; font-size: 16px; font-weight: 700; color: var(--green); margin: 8px 0; text-align: center; }
-  .vin-section { margin-top: 12px; padding: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; text-align: left; }
-  .vin-section-hdr { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .vin-part-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-  .vin-part-row:last-child { border-bottom: none; }
-  .vin-part-left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-  .vin-part-right { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
-  .vin-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
-  .vin-badge-pull { background: #064e3b; color: #22c55e; }
-  .vin-badge-watch { background: #713f12; color: #eab308; }
-  .vin-badge-stock { background: #1f2937; color: #6B7280; }
-  .vin-total { margin-top: 12px; padding: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; text-align: center; }
-  .vin-total-val { font-size: 22px; font-weight: 800; color: var(--green); }
-  .vin-total-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  /* VIN scanner styles removed — unified to /admin/vin page */
 
   /* Manual set list modal */
   .manual-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; padding-top: 60px; }
@@ -247,7 +228,7 @@
   </div>
   <div class="header-actions">
     <button class="icon-btn" onclick="openManualModal()" title="Paste Set List">📋</button>
-    <button class="icon-btn" onclick="openVinScanner()" title="Scan VIN">📷</button>
+    <a class="icon-btn" href="/admin/vin" title="Scan VIN" style="text-decoration:none;">📷</a>
     <button class="icon-btn" id="scrapeBtn" onclick="triggerScrapeAll(this)" title="Refresh inventory from LKQ">🔄</button>
   </div>
 </header>
@@ -289,18 +270,6 @@
 
 <div id="mainContent">
   <div class="loading"><div class="spinner"></div><div>Building attack list...</div></div>
-</div>
-
-<!-- VIN Scanner Modal -->
-<div class="vin-modal" id="vinModal">
-  <div class="vin-card">
-    <h3>📷 Scan VIN</h3>
-    <p style="font-size:12px;color:#9CA3AF;margin-bottom:12px;">Take a photo of the VIN plate</p>
-    <input type="file" accept="image/*" capture="environment" id="vinFileInput" style="display:none;" onchange="handleVinPhoto(event)">
-    <button class="btn-primary" onclick="document.getElementById('vinFileInput').click()">Open Camera</button>
-    <div class="vin-result" id="vinResult"></div>
-    <button class="icon-btn" style="margin-top:12px;width:100%;" onclick="closeVinScanner()">Close</button>
-  </div>
 </div>
 
 <!-- Manual Set List Modal -->
@@ -809,185 +778,6 @@
 
   async function confirmLoc(id) { fetch('/part-location/confirm', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) }).catch(()=>{}); }
   async function flagLoc(id) { fetch('/part-location/flag-wrong', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) }).catch(()=>{}); }
-
-  // === VIN Scanner ===
-  function openVinScanner() { document.getElementById('vinModal').classList.add('open'); document.getElementById('vinResult').innerHTML = ''; }
-  function closeVinScanner() { document.getElementById('vinModal').classList.remove('open'); }
-
-  // Resize image to max 1024px to prevent mobile low-memory crash
-  function resizeImage(file, maxWidth) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          if (blob) resolve(blob);
-          else reject(new Error('Resize failed'));
-        }, 'image/jpeg', 0.8);
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
-      img.src = url;
-    });
-  }
-
-  async function handleVinPhoto(evt) {
-    const file = evt.target.files[0];
-    if (!file) return;
-    const resultDiv = document.getElementById('vinResult');
-    resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><div>Reading VIN...</div></div>';
-
-    try {
-      // Step 1: Read VIN from photo
-      const resized = await resizeImage(file, 1024);
-      const reader = new FileReader();
-      const b64 = await new Promise((ok,no) => { reader.onload = () => ok(reader.result.split(',')[1]); reader.onerror = no; reader.readAsDataURL(resized); });
-
-      const photoRes = await fetch('/vin/decode-photo', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({image: b64}) });
-      const photoData = await photoRes.json();
-
-      if (!photoData.success) throw new Error(photoData.error || 'Failed');
-      if (photoData.vin === 'UNREADABLE') {
-        resultDiv.innerHTML = '<p style="color:#DC2626;margin-top:12px;">Could not read VIN. Retake photo.</p><button class="btn-primary" onclick="document.getElementById(\'vinFileInput\').click()">Retake</button>';
-        return;
-      }
-
-      // Step 2: Full scan with parts intelligence
-      resultDiv.innerHTML = '<div class="vin-str">' + photoData.vin + '</div><div class="loading"><div class="spinner"></div><div>Scoring parts...</div></div>';
-
-      const scanRes = await fetch('/vin/scan', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ vin: photoData.vin, source: 'camera' }) });
-      const scan = await scanRes.json();
-      if (!scan.success) throw new Error(scan.error || 'Scan failed');
-
-      resultDiv.innerHTML = renderVinIntel(scan);
-    } catch (err) {
-      resultDiv.innerHTML = '<p style="color:#DC2626;">Error: ' + err.message + '</p>';
-    }
-    evt.target.value = '';
-  }
-
-  function renderVinIntel(scan) {
-    const d = scan.decoded || {};
-    const vin = scan.vin;
-    let html = '';
-
-    // VIN + decoded vehicle info
-    html += '<div class="vin-str">' + vin + '</div>';
-    html += '<div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:2px;">';
-    html += [d.year, d.make, d.model].filter(Boolean).join(' ');
-    html += '</div>';
-    const details = [d.trim, d.engine, d.engineType && d.engineType !== 'Gas' ? d.engineType : null, d.drivetrain].filter(Boolean);
-    if (details.length) html += '<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px;">' + details.join(' | ') + '</div>';
-
-    // Yard status
-    html += '<div class="vin-section">';
-    html += '<div class="vin-section-hdr">Yard Status</div>';
-    if (scan.yardMatch) {
-      const ym = scan.yardMatch;
-      html += '<div style="font-size:13px;color:var(--green);font-weight:600;">On set list — ' + ym.yardName;
-      if (ym.row) html += ' Row ' + ym.row;
-      html += '</div>';
-      if (ym.color) html += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + ym.color + '</div>';
-      html += '<button class="btn-primary" style="margin-top:8px;width:100%;font-size:12px;padding:8px;" onclick="closeVinScanner();scrollToVehicle(\'' + ym.vehicleId + '\')">Jump to Vehicle</button>';
-    } else {
-      html += '<div style="font-size:12px;color:var(--text-muted);">Not on today\'s set list</div>';
-    }
-    html += '</div>';
-
-    // Parts intelligence — merge sales history + stock into a unified view
-    const salesByType = {};
-    for (const s of (scan.salesHistory || [])) salesByType[s.partType] = s;
-    const stockByType = {};
-    for (const s of (scan.currentStock || [])) stockByType[s.partType] = s;
-
-    // Build unified parts list from all sources
-    const allTypes = new Set();
-    (scan.salesHistory || []).forEach(s => allTypes.add(s.partType));
-    (scan.currentStock || []).forEach(s => allTypes.add(s.partType));
-    (scan.marketRef || []).filter(m => !m.isRebuild).forEach(m => allTypes.add(m.partType));
-
-    const partRows = [];
-    for (const pt of allTypes) {
-      if (!pt || pt === 'OTHER') continue;
-      const sale = salesByType[pt];
-      const stock = stockByType[pt];
-      const market = (scan.marketRef || []).find(m => m.partType === pt && !m.isRebuild);
-      const avgPrice = sale ? sale.avgPrice : (market ? market.avgPrice : (stock ? stock.avgPrice : 0));
-      const soldCount = sale ? sale.sold : 0;
-      const inStock = stock ? stock.inStock : (market ? market.inStock : 0);
-      const lastSold = sale ? sale.lastSoldDate : null;
-
-      let badge = '';
-      if (inStock === 0 && soldCount >= 2) badge = 'pull';
-      else if (inStock === 0 && soldCount >= 1) badge = 'watch';
-      else if (inStock > 0) badge = 'stock';
-
-      partRows.push({ pt, avgPrice, soldCount, inStock, badge, lastSold });
-    }
-    partRows.sort((a, b) => {
-      // PULL first, then WATCH, then by price
-      const badgeOrder = { pull: 0, watch: 1, stock: 2, '': 3 };
-      const bo = (badgeOrder[a.badge] || 3) - (badgeOrder[b.badge] || 3);
-      if (bo !== 0) return bo;
-      return b.avgPrice - a.avgPrice;
-    });
-
-    if (partRows.length > 0) {
-      html += '<div class="vin-section">';
-      html += '<div class="vin-section-hdr">Parts Intelligence</div>';
-      for (const p of partRows) {
-        const priceColor = p.avgPrice >= 300 ? 'var(--green)' : p.avgPrice >= 200 ? '#eab308' : p.avgPrice >= 100 ? '#f97316' : '#ef4444';
-        html += '<div class="vin-part-row">';
-        html += '<div class="vin-part-left">';
-        if (p.badge === 'pull') html += '<span class="vin-badge vin-badge-pull">PULL THIS</span>';
-        else if (p.badge === 'watch') html += '<span class="vin-badge vin-badge-watch">NEED</span>';
-        else if (p.badge === 'stock') html += '<span class="vin-badge vin-badge-stock">' + p.inStock + ' stk</span>';
-        html += '<span style="font-weight:600;">' + p.pt + '</span>';
-        html += '</div>';
-        html += '<div class="vin-part-right">';
-        if (p.soldCount > 0) html += '<span style="font-size:10px;color:var(--text-muted);">' + p.soldCount + ' sold</span>';
-        html += '<span style="font-weight:700;color:' + priceColor + ';">$' + p.avgPrice + '</span>';
-        html += '</div>';
-        html += '</div>';
-      }
-      html += '</div>';
-
-      // Total estimated haul value
-      const totalValue = partRows.reduce((sum, p) => sum + (p.avgPrice || 0), 0);
-      if (totalValue > 0) {
-        const valColor = totalValue >= 800 ? 'var(--green)' : totalValue >= 500 ? '#eab308' : totalValue >= 250 ? '#f97316' : '#ef4444';
-        html += '<div class="vin-total">';
-        html += '<div class="vin-total-label">Est. Haul Value</div>';
-        html += '<div class="vin-total-val" style="color:' + valColor + ';">$' + totalValue + '</div>';
-        const pullCount = partRows.filter(p => p.badge === 'pull').length;
-        if (pullCount > 0) html += '<div style="font-size:11px;color:var(--green);margin-top:2px;">' + pullCount + ' part' + (pullCount > 1 ? 's' : '') + ' we need (0 stock + sold before)</div>';
-        html += '</div>';
-      }
-    } else {
-      html += '<div class="vin-section"><div class="vin-section-hdr">Parts Intelligence</div>';
-      html += '<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No sales history or inventory data for this vehicle yet.</div></div>';
-    }
-
-    // Retake button
-    html += '<button class="btn-primary" style="margin-top:12px;width:100%;font-size:12px;padding:8px;" onclick="document.getElementById(\'vinFileInput\').click()">Scan Another</button>';
-
-    return html;
-  }
-
-  function scrollToVehicle(vid) {
-    const el = document.getElementById('vrow-' + vid);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.style.outline = '2px solid var(--red)';
-      setTimeout(() => { el.style.outline = ''; }, 3000);
-      toggleV(vid);
-    }
-  }
 
   // === Utility ===
   async function triggerScrape(btn) {
