@@ -129,14 +129,30 @@ function renderPage() {
 
   var h = '<div class="card">';
   visible.forEach(function(item, idx) {
-    var badge, bc;
-    var approx = (item.confidence === 'low') ? '~' : '';
-    if (item.pulled) { badge = 'PULLED'; bc = 'b-pulled'; }
-    else if (item.confidence === 'none') { badge = '? VERIFY'; bc = 'b-out'; }
-    else if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
-    else if (item.confidence === 'low') { badge = approx + item.stock + ' LOW?'; bc = 'b-low'; }
-    else if (item.stock <= 2) { badge = item.stock + ' LOW'; bc = 'b-low'; }
-    else { badge = item.stock + ' STOCKED'; bc = 'b-ok'; }
+    // Determine badge based on match method + stock
+    var badge, bc, tierLabel;
+    if (item.pulled) {
+      badge = 'PULLED'; bc = 'b-pulled'; tierLabel = '';
+    } else if (item.confidence === 'none') {
+      badge = '? VERIFY'; bc = 'b-out'; tierLabel = '';
+    } else if (item.matchMethod === 'part_number') {
+      // Tier 1: PN match
+      tierLabel = 'EXACT';
+      if (item.stock === 0) { badge = '0 EXACT'; bc = 'b-out'; }
+      else if (item.stock <= 2) { badge = item.stock + ' EXACT'; bc = 'b-low'; }
+      else { badge = item.stock + ' EXACT'; bc = 'b-ok'; }
+    } else if (item.matchMethod === 'model_phrase' || item.matchMethod === 'make_phrase') {
+      // Tier 3: keyword match
+      tierLabel = 'KEYWORD';
+      if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
+      else if (item.stock <= 2) { badge = item.stock + ' LOW'; bc = 'b-low'; }
+      else { badge = item.stock + ' STOCKED'; bc = 'b-ok'; }
+    } else {
+      tierLabel = item.matchMethod === 'model_words' ? 'KEYWORD' : '';
+      if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
+      else if (item.stock <= 2) { badge = '~' + item.stock + ' LOW?'; bc = 'b-low'; }
+      else { badge = '~' + item.stock + ' STOCKED?'; bc = 'b-ok'; }
+    }
 
     var priceStr = item.avgPrice ? '$' + item.avgPrice : '-';
     var soldStr = '-';
@@ -161,7 +177,23 @@ function renderPage() {
     h += '<div class="part-info">';
     h += '<div class="part-title"' + (item.pulled ? ' style="opacity:0.6"' : '') + '>' + esc(item.title) + '</div>';
     if (item.notes) h += '<div class="part-notes">' + esc(item.notes) + '</div>';
-    h += '<div class="part-meta"><span class="badge ' + bc + '">' + badge + pulledInfo + '</span><span>Avg ' + priceStr + '</span><span>Last sold ' + soldStr + '</span></div>';
+    h += '<div class="part-meta"><span class="badge ' + bc + '">' + badge + pulledInfo + '</span>';
+    if (tierLabel) h += '<span style="font-size:8px;padding:1px 5px;border-radius:3px;background:#1a1a1a;color:' + (tierLabel === 'EXACT' ? '#22c55e' : tierLabel === 'SIMILAR' ? '#eab308' : '#6B7280') + ';font-weight:700">' + tierLabel + '</span>';
+    h += '<span>Avg ' + priceStr + '</span><span>Last sold ' + soldStr + '</span></div>';
+
+    // Similar PN line (Tier 2)
+    if (item.similar && item.similar.length > 0) {
+      item.similar.forEach(function(sim) {
+        h += '<div style="margin-top:3px;padding:3px 6px;background:#1a1a1a;border-radius:4px;border:1px solid #333;font-size:10px">';
+        h += '<span style="color:#eab308;font-weight:700">SIMILAR:</span> ';
+        h += '<span style="color:#d1d5db;font-family:monospace">' + esc(sim.similarPN) + '</span>';
+        h += ' <span style="color:#9CA3AF">(' + sim.stockCount + ' in stock';
+        if (sim.soldCount > 0) h += ', sold ' + sim.soldCount + 'x';
+        if (sim.avgPrice) h += ' @ $' + sim.avgPrice + ' avg';
+        h += ')</span></div>';
+      });
+    }
+
     // Match debug
     if (item.matchDebug) {
       h += '<details style="margin-top:3px"><summary style="font-size:9px;color:#6B7280;cursor:pointer">Match: ' + esc(item.matchDebug) + '</summary>';

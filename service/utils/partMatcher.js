@@ -258,6 +258,79 @@ function parseTitle(title) {
 }
 
 // ============================================================
+// SIMILAR PART NUMBER DETECTION
+// ============================================================
+
+/**
+ * Find listings/sales with part numbers that differ by only the last character.
+ * Returns { listings: [{ title, pn }], sales: { count, avgPrice }, similarPN }
+ */
+async function findSimilarPartNumbers(partNumbers) {
+  if (!partNumbers || partNumbers.length === 0) return null;
+
+  const knex = database;
+  const realPNs = partNumbers.filter(pn => /[A-Z]/i.test(pn.raw));
+  if (realPNs.length === 0) return null;
+
+  // For each PN, strip last char to get stem, search for stem + any single char
+  const results = [];
+  for (const pn of realPNs) {
+    const raw = pn.raw;
+    if (raw.length < 3) continue;
+    const stem = raw.slice(0, -1); // everything except last char
+
+    // Search listings with stem prefix
+    const listings = await knex('YourListing')
+      .where('listingStatus', 'Active')
+      .andWhere('title', 'ilike', `%${stem}%`)
+      .andWhereNot('title', 'ilike', `%${raw}%`) // exclude exact matches
+      .select('title')
+      .limit(10);
+
+    // Filter: only keep if the actual matched PN differs by exactly the last char
+    const similar = [];
+    for (const l of listings) {
+      // Find the PN in the listing title that starts with our stem
+      const titleUpper = l.title.toUpperCase();
+      const stemIdx = titleUpper.indexOf(stem);
+      if (stemIdx === -1) continue;
+      // Extract the character after the stem
+      const nextChar = titleUpper[stemIdx + stem.length];
+      if (!nextChar || /\s/.test(nextChar)) continue; // stem is at end, no difference
+      // Verify it's just one char different (the PN ends right after)
+      const afterPN = titleUpper[stemIdx + stem.length + 1];
+      if (afterPN && /[A-Z0-9]/i.test(afterPN)) continue; // more than 1 char different
+      const foundPN = stem + nextChar;
+      if (foundPN !== raw) {
+        similar.push({ title: l.title, similarPN: foundPN });
+      }
+    }
+
+    if (similar.length === 0) continue;
+
+    // Get sales data for the similar PN
+    const similarPN = similar[0].similarPN;
+    const salesData = await knex('YourSale')
+      .where('title', 'ilike', `%${similarPN}%`)
+      .select(
+        knex.raw('COUNT(*) as count'),
+        knex.raw('AVG("salePrice") as avg_price')
+      ).first();
+
+    results.push({
+      originalPN: raw,
+      similarPN,
+      stockCount: similar.length,
+      stockTitles: similar.slice(0, 3).map(s => s.title),
+      soldCount: parseInt(salesData?.count) || 0,
+      avgPrice: salesData?.avg_price ? Math.round(parseFloat(salesData.avg_price)) : null,
+    });
+  }
+
+  return results.length > 0 ? results : null;
+}
+
+// ============================================================
 // MATCHING FUNCTIONS
 // ============================================================
 
@@ -317,12 +390,17 @@ async function matchPartToListings(partTitle) {
     });
     const listings = await q.select('title').limit(20);
     const pnDebug = `PN: ${realPNs.map(p => p.raw).join(', ')}`;
+
+    // Find similar PNs (last char differs)
+    const similar = await findSimilarPartNumbers(parsed.partNumbers);
+
     // PN match is definitive — return result even if 0
     return {
       stock: listings.length,
       matchedTitles: listings.map(l => l.title),
       method: 'part_number',
-      debug: `${pnDebug} (${listings.length} found)`
+      debug: `${pnDebug} (${listings.length} found)`,
+      similar, // array of { originalPN, similarPN, stockCount, soldCount, avgPrice } or null
     };
   }
 
@@ -494,6 +572,7 @@ module.exports = {
   extractYearsFromTitle,
   normalizePartNumber,
   parseTitle,
+  findSimilarPartNumbers,
   matchPartToListings,
   matchPartToSales,
   matchPartToYardVehicles,

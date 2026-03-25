@@ -35,6 +35,8 @@ router.get('/items', async (req, res) => {
       avgPrice: sales.avgPrice,
       lastSold: sales.lastSold,
       matchedTitles: listings.matchedTitles,
+      matchMethod: listings.method,
+      similar: listings.similar || null,
       confidence: listings.method === 'none' ? 'none' : (listings.method === 'model_phrase' || listings.method === 'part_number') ? 'high' : 'low',
       matchDebug: listings.debug,
       created_at: item.created_at
