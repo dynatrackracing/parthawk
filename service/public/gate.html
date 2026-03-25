@@ -133,7 +133,7 @@
     yards = data.yards || [];
     const sel = document.getElementById('yardSelect');
     sel.innerHTML = '<option value="">Select a yard...</option>' +
-      yards.map(y => `<option value="${y.id}">${y.name} (${y.distance_from_base}mi — $${y.entry_fee} gate)</option>`).join('');
+      yards.map(y => `<option value="${y.id}">${y.name} (${y.distance_from_base}mi from ${y.region === 'fl' ? 'Tampa' : 'NC'} — $${y.entry_fee} gate)</option>`).join('');
   }
 
   function addPart(type = 'ECM', value = 180) {

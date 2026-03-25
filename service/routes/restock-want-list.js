@@ -58,6 +58,7 @@ router.get('/items', async (req, res) => {
 });
 
 // "Just Sold" — perch items that sold in the last 3 days
+// Uses shared parseTitle for strict model+part matching (no loose keyword overlap)
 router.get('/just-sold', async (req, res) => {
   const wantList = await database('restock_want_list').where({ active: true });
   const recentSales = await database('YourSale')
@@ -66,26 +67,56 @@ router.get('/just-sold', async (req, res) => {
     .select('title', 'salePrice', 'soldDate')
     .orderBy('soldDate', 'desc');
 
-  // Group sales by want list item (dedup)
-  const grouped = new Map(); // wantTitle -> { sales[], yardMatches[] }
+  // Pre-parse each want list item
+  const parsedWantList = wantList.map(item => ({
+    title: item.title,
+    parsed: parseTitle(item.title)
+  })).filter(w => w.parsed);
+
+  // Group sales by want list item — strict matching: model + part phrase/words
+  const grouped = new Map();
   for (const sale of recentSales) {
-    const saleTitle = (sale.title || '').toLowerCase();
-    for (const item of wantList) {
-      const words = item.title.toLowerCase()
-        .replace(/\([^)]*\)/g, '').replace(/\b\d+\b/g, '').replace(/[^a-z\s]/g, ' ')
-        .split(/\s+/).filter(w => w.length >= 3);
-      const matches = words.filter(w => saleTitle.includes(w));
-      if (matches.length >= 3) {
-        const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
-        if (!grouped.has(item.title)) {
-          grouped.set(item.title, { wantTitle: item.title, sales: [], yardMatches: null });
-        }
-        grouped.get(item.title).sales.push({
-          price: Math.round(parseFloat(sale.salePrice) || 0),
-          soldAgo: daysAgo <= 0 ? 'today' : daysAgo + 'd ago',
-        });
-        break;
+    const saleLower = (sale.title || '').toLowerCase();
+
+    for (const want of parsedWantList) {
+      const p = want.parsed;
+
+      // Must match at least one model (or make if no model)
+      let vehicleMatch = false;
+      if (p.models.length > 0) {
+        vehicleMatch = p.models.some(m => saleLower.includes(m.toLowerCase()));
+      } else if (p.make) {
+        vehicleMatch = saleLower.includes(p.make.toLowerCase());
       }
+      if (!vehicleMatch) continue;
+
+      // Must match part phrase or at least 2 part words
+      let partMatch = false;
+      if (p.partPhrase) {
+        partMatch = saleLower.includes(p.partPhrase);
+      } else if (p.partWords.length >= 2) {
+        const wordHits = p.partWords.filter(w => saleLower.includes(w));
+        partMatch = wordHits.length >= 2;
+      }
+      if (!partMatch) continue;
+
+      // Also check part numbers if available
+      let pnMatch = false;
+      if (p.partNumbers.length > 0) {
+        pnMatch = p.partNumbers.some(pn => saleLower.includes(pn.raw.toLowerCase()) || saleLower.includes(pn.base.toLowerCase()));
+      }
+
+      const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
+      if (!grouped.has(want.title)) {
+        grouped.set(want.title, { wantTitle: want.title, sales: [], matchedSaleTitles: [] });
+      }
+      const g = grouped.get(want.title);
+      g.sales.push({
+        price: Math.round(parseFloat(sale.salePrice) || 0),
+        soldAgo: daysAgo <= 0 ? 'today' : daysAgo + 'd ago',
+      });
+      if (g.matchedSaleTitles.length < 5) g.matchedSaleTitles.push(sale.title);
+      break; // one want match per sale
     }
   }
 
@@ -96,6 +127,7 @@ router.get('/just-sold', async (req, res) => {
     results.push({
       wantTitle: group.wantTitle,
       sales: group.sales,
+      matchedSaleTitles: group.matchedSaleTitles,
       yardMatches: yardVehicles.slice(0, 5).map(v => ({
         desc: [v.year, v.make, v.model].filter(Boolean).join(' '),
         yard: v.yard, row: v.row

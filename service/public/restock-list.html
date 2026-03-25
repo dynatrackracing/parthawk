@@ -297,13 +297,24 @@ function loadJustSold() {
           ? s.sales.length + 'x sold ' + s.sales[0].soldAgo
           : 'sold ' + s.sales[0].soldAgo;
         h += '<div style="font-size:11px;margin-top:2px"><span style="color:#22c55e;font-weight:700">' + prices + '</span> <span style="color:#9CA3AF">' + soldLabel + '</span></div>';
-        // Collapsible yard list
-        if (s.yardMatches && s.yardMatches.length > 0) {
-          h += '<details style="margin-top:4px"><summary style="font-size:10px;color:#22c55e;cursor:pointer;user-select:none">' + s.yardMatches.length + ' yard' + (s.yardMatches.length > 1 ? 's' : '') + ' nearby &#9654;</summary>';
+        // Collapsible details: matched sale titles + yard locations
+        var hasYards = s.yardMatches && s.yardMatches.length > 0;
+        var hasSaleTitles = s.matchedSaleTitles && s.matchedSaleTitles.length > 0;
+        if (hasYards || hasSaleTitles) {
+          var label = hasYards ? s.yardMatches.length + ' yard' + (s.yardMatches.length > 1 ? 's' : '') + ' nearby' : 'View details';
+          h += '<details style="margin-top:4px"><summary style="font-size:10px;color:#22c55e;cursor:pointer;user-select:none">' + label + ' &#9654;</summary>';
           h += '<div style="margin-top:4px;padding:4px 8px;background:#0a0a0a;border-radius:4px;border:1px solid #2a2a2a">';
-          s.yardMatches.forEach(function(v) {
-            h += '<div style="font-size:10px;color:#d1d5db;padding:2px 0"><span style="font-weight:600">' + esc(v.desc) + '</span> — <span style="color:#22c55e">' + esc(v.yard) + '</span> Row ' + esc(v.row) + '</div>';
-          });
+          if (hasYards) {
+            s.yardMatches.forEach(function(v) {
+              h += '<div style="font-size:10px;color:#d1d5db;padding:2px 0"><span style="font-weight:600">' + esc(v.desc) + '</span> — <span style="color:#22c55e">' + esc(v.yard) + '</span> Row ' + esc(v.row) + '</div>';
+            });
+          }
+          if (hasSaleTitles) {
+            h += '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #2a2a2a;font-size:9px;color:#6B7280">Matched sales:</div>';
+            s.matchedSaleTitles.forEach(function(t) {
+              h += '<div style="font-size:9px;color:#9CA3AF;padding:1px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t) + '</div>';
+            });
+          }
           h += '</div></details>';
         } else {
           h += '<div style="font-size:10px;color:#6B7280;margin-top:2px">No matching vehicles in yards right now</div>';

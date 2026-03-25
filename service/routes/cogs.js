@@ -77,8 +77,15 @@ router.get('/yards', async (req, res) => {
       .select('id', 'name', 'chain', 'distance_from_base', 'entry_fee', 'tax_rate', 'visit_frequency')
       .orderBy('distance_from_base', 'asc');
 
+    const BASE_ADDRESSES = {
+      nc: 'Hillsborough, NC',
+      fl: '7413 S O\'Brien St, Tampa, FL 33616',
+    };
+
     const yardsWithCalc = yards.map(y => ({
       ...y,
+      region: y.region || 'nc',
+      base_address: BASE_ADDRESSES[y.region || 'nc'] || BASE_ADDRESSES.nc,
       mileage_cost: Math.round(parseFloat(y.distance_from_base || 0) * 2 * 0.67 * 100) / 100,
       fixed_overhead: Math.round((parseFloat(y.entry_fee || 0) + parseFloat(y.distance_from_base || 0) * 2 * 0.67) * 100) / 100,
     }));
