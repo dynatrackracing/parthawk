@@ -322,44 +322,37 @@ const MODELS = new Set([
   'pacifica','voyager','camaro','300','l100','q60','q40','ram',
 ]);
 
-// Part phrases — matched as CONTIGUOUS strings, not split into words
+// Part phrases — matched as CONTIGUOUS strings against listing titles
+// Longer phrases checked first (sorted by length desc at runtime)
 const PART_PHRASES = [
-  'yaw rate sensor', 'yaw rate', 'fuse box', 'ignition switch lock',
-  'ignition switch', 'ignition lock', 'body control module', 'brake booster',
-  'brake accumulator', 'brake pump', 'abs pump', 'abs brake pump',
-  'throttle body', 'oil cooler housing', 'oil cooler', 'intake manifold',
-  'center console lid', 'center console', 'door control module', 'door module',
-  'steering angle sensor', 'power steering pump', 'turn signal',
-  'wiper switch', 'combo switch', 'spare tire donut', 'spare tire',
-  'gear shifter', 'gear selector', 'floor shifter', 'rear window motor',
-  'fan solenoid', 'camshaft set', 'control module', 'transfer case',
-  'rear door hinge', 'fuse relay box', 'fuse junction', 'fuse relay',
-];
+  // Multi-word specific
+  'yaw rate sensor', 'yaw rate', 'ignition switch lock', 'ignition switch',
+  'ignition lock', 'body control module', 'brake booster', 'brake accumulator',
+  'abs pump', 'abs brake pump', 'throttle body', 'oil cooler housing',
+  'oil cooler', 'intake manifold', 'center console lid', 'center console',
+  'door control module', 'door module', 'steering angle sensor',
+  'power steering pump', 'turn signal', 'wiper switch', 'combo switch',
+  'spare tire donut', 'spare tire', 'gear shifter', 'gear selector',
+  'floor shifter', 'rear window motor', 'window motor', 'fan solenoid',
+  'camshaft set', 'transfer case control', 'transfer case', 'rear door hinge',
+  'fuse relay box', 'fuse junction', 'fuse relay', 'fuse box',
+  'bose amp', 'amplifier',
+  // Single keyword part types — still need model to be useful
+  'haldex', 'tccm', 'ipdm', 'bcm', 'ecu', 'ecm', 'pcm', 'tcm', 'tcu',
+  'abs', 'throttle', 'ignition', 'accumulator',
+].sort((a, b) => b.length - a.length); // longest first so "yaw rate sensor" matches before "yaw rate"
 
 function buildMatch(title) {
   const titleLower = title.toLowerCase();
 
-  // 1. Extract OEM part numbers (highest confidence)
-  const pnMatches = title.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)*\b/gi) || [];
-  const numPns = title.match(/\b\d{5,}\b/g) || [];
-  const partNumbers = [...pnMatches, ...numPns]
-    .filter(pn => pn.length >= 5 && !/^\d{4}$/.test(pn) && !/^(19|20)\d{2}$/.test(pn));
-
-  if (partNumbers.length > 0) {
-    return {
-      type: 'pn', partNumbers, confidence: 'high',
-      debug: `PN: ${partNumbers.join(', ')}`
-    };
-  }
-
-  // 2. Extract model names
+  // 1. Extract model names — ALWAYS do this first
   const foundModels = [];
   for (const model of MODELS) {
     const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) foundModels.push(model);
   }
 
-  // 3. Extract part phrase — match as CONTIGUOUS string (the key fix)
+  // 2. Extract part phrase — ALWAYS do this
   let foundPartPhrase = null;
   for (const phrase of PART_PHRASES) {
     if (titleLower.includes(phrase)) {
@@ -369,19 +362,33 @@ function buildMatch(title) {
     }
   }
 
-  // 4. Find make
+  // 3. Find make
   let foundMake = null;
   for (const make of MAKES_LIST) {
     const re = new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) { foundMake = make; break; }
   }
 
+  // 4. Extract OEM part numbers — but ONLY real PNs, not year ranges
+  // Real PNs have letters mixed in (F75B-14B194-BC) or are 5+ digit numbers
+  const pnMatches = title.match(/\b[A-Z][A-Z0-9]{1,}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)*\b/g) || [];
+  const numPns = title.match(/\b\d{5,}\b/g) || [];
+  const partNumbers = [...pnMatches, ...numPns]
+    .filter(pn => {
+      // Reject year ranges (1995-2002, 2001-2007, etc.)
+      if (/^\d{4}-\d{2,4}$/.test(pn)) return false;
+      if (/^\d{2}-\d{2,4}$/.test(pn)) return false;
+      // Must be at least 5 chars and contain at least one letter for dash-PNs
+      if (pn.includes('-') && !/[A-Za-z]/.test(pn)) return false;
+      return pn.length >= 5;
+    });
+
   // 5. Fallback: extract individual part words (only if no phrase found)
   let fallbackWords = [];
   if (!foundPartPhrase) {
     const cleaned = title
       .replace(/\([^)]*\)/g, '')
-      .replace(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)*\b/g, '')
+      .replace(/\b[A-Z][A-Z0-9]+-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/g, '')
       .replace(/\b\d+\b/g, '')
       .replace(/[^a-zA-Z\s]/g, ' ');
     const makesSet = new Set(MAKES_LIST);
@@ -391,39 +398,48 @@ function buildMatch(title) {
     fallbackWords = [...new Set(fallbackWords)].slice(0, 3);
   }
 
-  // Strategy A: Model + contiguous part phrase (HIGH confidence)
+  // Strategy A: Model + part phrase (HIGH) — best match
   if (foundModels.length > 0 && foundPartPhrase) {
     return {
-      type: 'phrase', models: foundModels, phrase: foundPartPhrase,
+      type: 'phrase', models: foundModels, phrase: foundPartPhrase, partNumbers,
       confidence: 'high',
-      debug: `Models: [${foundModels.join(', ')}] + Phrase: "${foundPartPhrase}"`
+      debug: `${foundModels.join('/')} + "${foundPartPhrase}"` + (partNumbers.length ? ` + PN:${partNumbers[0]}` : '')
     };
   }
 
-  // Strategy B: Make + contiguous part phrase (MEDIUM confidence)
+  // Strategy B: Make + part phrase (MEDIUM)
   if (foundMake && foundPartPhrase) {
     return {
-      type: 'phrase', models: [], make: foundMake, phrase: foundPartPhrase,
+      type: 'phrase', models: [], make: foundMake, phrase: foundPartPhrase, partNumbers,
       confidence: 'medium',
-      debug: `Make: ${foundMake} + Phrase: "${foundPartPhrase}"`
+      debug: `${foundMake} + "${foundPartPhrase}"` + (partNumbers.length ? ` + PN:${partNumbers[0]}` : '')
     };
   }
 
-  // Strategy C: Model + fallback words (LOW confidence — show as approximate)
+  // Strategy C: Model + fallback words (LOW)
   if (foundModels.length > 0 && fallbackWords.length >= 2) {
     return {
-      type: 'keywords', models: foundModels, partTerms: fallbackWords,
+      type: 'keywords', models: foundModels, partTerms: fallbackWords, partNumbers,
       confidence: 'low',
-      debug: `Models: [${foundModels.join(', ')}] + Words: [${fallbackWords.join(', ')}] (approx)`
+      debug: `${foundModels.join('/')} + [${fallbackWords.join(', ')}] (approx)`
     };
   }
 
-  // Strategy D: Make + fallback words (LOW confidence)
+  // Strategy D: PN-only match — only if we have a real part number with letters
+  if (partNumbers.length > 0 && partNumbers.some(pn => /[A-Za-z]/.test(pn))) {
+    return {
+      type: 'pn', partNumbers: partNumbers.filter(pn => /[A-Za-z]/.test(pn)),
+      confidence: 'medium',
+      debug: `PN only: ${partNumbers.filter(pn => /[A-Za-z]/.test(pn)).join(', ')}`
+    };
+  }
+
+  // Strategy E: Make + fallback words (LOW)
   if (foundMake && fallbackWords.length >= 2) {
     return {
       type: 'keywords', models: [], make: foundMake, partTerms: fallbackWords,
       confidence: 'low',
-      debug: `Make: ${foundMake} + Words: [${fallbackWords.join(', ')}] (approx)`
+      debug: `${foundMake} + [${fallbackWords.join(', ')}] (approx)`
     };
   }
 
@@ -442,7 +458,7 @@ const STOP_WORDS = new Set([
 
 function applyMatch(query, match, col) {
   if (match.type === 'pn') {
-    // Match ANY part number (OR)
+    // Match ANY real part number (OR) — only PNs with letters
     query = query.where(function() {
       for (const pn of match.partNumbers) {
         this.orWhere(col, 'ilike', `%${pn}%`);
@@ -452,7 +468,7 @@ function applyMatch(query, match, col) {
   }
 
   if (match.type === 'phrase') {
-    // Model/make filter
+    // Model/make filter — REQUIRED
     if (match.models && match.models.length > 0) {
       query = query.where(function() {
         for (const model of match.models) {
@@ -462,7 +478,7 @@ function applyMatch(query, match, col) {
     } else if (match.make) {
       query = query.where(col, 'ilike', `%${match.make}%`);
     }
-    // Match the ENTIRE part phrase as a contiguous string
+    // Match the ENTIRE part phrase as a contiguous string — REQUIRED
     query = query.andWhere(col, 'ilike', `%${match.phrase}%`);
     return query;
   }
