@@ -43,8 +43,12 @@ app.use('/api/parts', require('./routes/partsLookup'));
 app.use('/api/parts', require('./routes/parts'));
 app.use('/api/parts-lookup', require('./routes/partsLookup'));
 app.use('/restock', require('./routes/restockReport'));
+app.use('/restock-want-list', require('./routes/restock-want-list'));
 app.get('/admin/restock', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
+});
+app.get('/admin/restock-list', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'restock-list.html'));
 });
 
 // Test LKQ fetch — try both axios and curl from Railway
