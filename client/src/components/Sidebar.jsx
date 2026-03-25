@@ -182,15 +182,15 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               </a>
               <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <ChartIcon />
-                <span className="text-xs font-semibold tracking-wide">Restock Report</span>
+                <span className="text-xs font-semibold tracking-wide">PREY LIST</span>
               </a>
               <a href="/admin/gate" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <DollarIcon />
-                <span className="text-xs font-semibold tracking-wide">Gate Calculator</span>
+                <span className="text-xs font-semibold tracking-wide">GATE KEEPER</span>
               </a>
               <a href="/admin/vin" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <SearchIcon />
-                <span className="text-xs font-semibold tracking-wide">VIN Scanner</span>
+                <span className="text-xs font-semibold tracking-wide">VIN SCANNER</span>
               </a>
             </nav>
           </div>
