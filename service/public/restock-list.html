@@ -161,7 +161,9 @@ function renderPage() {
       soldStr = days <= 0 ? 'today' : days + 'd ago';
     }
     var pulledInfo = '';
-    if (item.pulled && item.pulled_date) {
+    if (item.pulled && item.pulled_from) {
+      pulledInfo = ' (from ' + esc(item.pulled_from) + ')';
+    } else if (item.pulled && item.pulled_date) {
       var pd = Math.floor((Date.now() - new Date(item.pulled_date).getTime()) / 86400000);
       pulledInfo = ' (pulled ' + (pd <= 0 ? 'today' : pd + 'd ago') + ')';
     }

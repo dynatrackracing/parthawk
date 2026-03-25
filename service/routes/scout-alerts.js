@@ -14,6 +14,7 @@ router.get('/list', async (req, res) => {
   const perPage = 50;
   const yard = req.query.yard || 'all';
   const days = parseInt(req.query.days) || 0; // 0 = all (within hard ceilings)
+  const hideClaimed = req.query.hideClaimed === '1';
 
   const knex = database;
 
@@ -62,6 +63,9 @@ router.get('/list', async (req, res) => {
     if (yard && yard !== 'all') {
       q = q.andWhere('yard_name', 'ilike', `%${yard}%`);
     }
+    if (hideClaimed) {
+      q = q.andWhere(function() { this.where('claimed', false).orWhereNull('claimed'); });
+    }
     return q;
   }
 
@@ -69,6 +73,7 @@ router.get('/list', async (req, res) => {
   let alertQuery = knex('scout_alerts');
   alertQuery = applyFilters(alertQuery);
   const alerts = await alertQuery
+    .orderByRaw(`CASE WHEN claimed = true THEN 1 ELSE 0 END`)
     .orderByRaw(`
       CASE
         WHEN source = 'bone_pile' AND confidence = 'high' THEN 0
@@ -149,6 +154,41 @@ router.get('/list', async (req, res) => {
     total, page, totalPages: Math.ceil(total / perPage),
     lastGenerated
   });
+});
+
+// Claim / unclaim an alert (GOT ONE)
+router.post('/claim', async (req, res) => {
+  const { id, claimed } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID required' });
+
+  const knex = database;
+  const alert = await knex('scout_alerts').where({ id }).first();
+  if (!alert) return res.status(404).json({ error: 'Alert not found' });
+
+  // Update scout_alerts
+  await knex('scout_alerts').where({ id }).update({
+    claimed: !!claimed,
+    claimed_by: claimed ? (alert.yard_name || 'unknown') : null,
+    claimed_at: claimed ? new Date().toISOString() : null,
+  });
+
+  // If PERCH alert, sync with restock_want_list
+  if (alert.source === 'hunters_perch') {
+    // Find the matching want list item by title
+    const wantItem = await knex('restock_want_list')
+      .where({ active: true })
+      .where('title', alert.source_title)
+      .first();
+    if (wantItem) {
+      await knex('restock_want_list').where({ id: wantItem.id }).update({
+        pulled: !!claimed,
+        pulled_date: claimed ? new Date().toISOString() : null,
+        pulled_from: claimed ? (alert.yard_name || null) : null,
+      });
+    }
+  }
+
+  res.json({ success: true });
 });
 
 // Manual refresh

@@ -31,6 +31,7 @@ router.get('/items', async (req, res) => {
       notes: item.notes,
       pulled: item.pulled || false,
       pulled_date: item.pulled_date,
+      pulled_from: item.pulled_from || null,
       stock: listings.stock,
       avgPrice: sales.avgPrice,
       lastSold: sales.lastSold,
@@ -140,15 +141,29 @@ router.get('/just-sold', async (req, res) => {
   res.json({ success: true, items: results });
 });
 
-// Toggle pulled status
+// Toggle pulled status — syncs with scout_alerts
 router.post('/pull', async (req, res) => {
   const { id, pulled } = req.body;
   if (!id) return res.status(400).json({ error: 'ID required' });
 
+  const item = await database('restock_want_list').where({ id }).first();
   await database('restock_want_list').where({ id }).update({
     pulled: !!pulled,
-    pulled_date: pulled ? new Date().toISOString() : null
+    pulled_date: pulled ? new Date().toISOString() : null,
+    pulled_from: pulled ? null : null, // no yard context when pulled from PERCH page
   });
+
+  // Sync: mark matching scout_alerts as claimed/unclaimed
+  if (item) {
+    await database('scout_alerts')
+      .where('source', 'hunters_perch')
+      .where('source_title', item.title)
+      .update({
+        claimed: !!pulled,
+        claimed_at: pulled ? new Date().toISOString() : null,
+      });
+  }
+
   res.json({ success: true });
 });
 
