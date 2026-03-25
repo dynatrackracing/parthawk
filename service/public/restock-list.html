@@ -16,7 +16,7 @@ nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white
 nav a.active{color:#DC2626;font-weight:700}
 .container{padding:12px;max-width:700px;margin:0 auto}
 .card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
-.add-row{display:flex;gap:8px;margin-bottom:12px}
+.add-row{display:flex;gap:8px}
 .add-input{flex:1;padding:12px;border:1px solid #333;border-radius:8px;font-size:14px;background:#141414;color:#F0F0F0;outline:none}
 .add-input:focus{border-color:#dc2626}
 .add-input::placeholder{color:#6B7280}
@@ -26,14 +26,29 @@ nav a.active{color:#DC2626;font-weight:700}
 .b-out{background:#7f1d1d;color:#dc2626}
 .b-low{background:#713f12;color:#eab308}
 .b-ok{background:#064e3b;color:#22c55e}
-.part-row{padding:10px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:10px}
+.b-pulled{background:#064e3b;color:#22c55e}
+.part-row{padding:10px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px}
 .part-row:last-child{border-bottom:none}
 .part-info{flex:1;min-width:0}
 .part-title{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .part-meta{font-size:10px;color:#9CA3AF;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .part-notes{font-size:10px;color:#eab308;margin-top:2px;font-style:italic}
-.del-btn{width:32px;height:32px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#dc2626;font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.part-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.del-btn{width:32px;height:32px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#dc2626;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .del-btn:active{opacity:.5}
+.find-btn{width:32px;height:32px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.find-btn:active{opacity:.5}
+.find-btn.has-results{color:#22c55e;border-color:#064e3b}
+.pull-check{width:36px;height:36px;border-radius:8px;border:2px solid #333;background:#1a1a1a;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:all 0.15s}
+.pull-check:active{transform:scale(0.9)}
+.pull-check.checked{background:#064e3b;border-color:#22c55e}
+.pull-check svg{width:20px;height:20px}
+.yard-results{margin-top:6px;padding:8px;background:#0a0a0a;border-radius:6px;border:1px solid #2a2a2a;font-size:11px}
+.yard-row{padding:4px 0;border-bottom:1px solid #1a1a1a;color:#d1d5db}
+.yard-row:last-child{border-bottom:none}
+.yard-name{color:#22c55e;font-weight:600}
+.yard-loc{color:#9CA3AF}
+.yard-age{color:#6B7280;font-size:10px}
 .spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty{text-align:center;color:#6B7280;padding:30px 10px;font-size:13px}
@@ -111,9 +126,10 @@ function renderPage() {
   }
 
   var h = '<div class="card">';
-  visible.forEach(function(item) {
+  visible.forEach(function(item, idx) {
     var badge, bc;
-    if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
+    if (item.pulled) { badge = 'PULLED'; bc = 'b-pulled'; }
+    else if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
     else if (item.stock <= 2) { badge = item.stock + ' LOW'; bc = 'b-low'; }
     else { badge = item.stock + ' STOCKED'; bc = 'b-ok'; }
 
@@ -123,13 +139,25 @@ function renderPage() {
       var days = Math.floor((Date.now() - new Date(item.lastSold).getTime()) / 86400000);
       soldStr = days <= 0 ? 'today' : days + 'd ago';
     }
+    var pulledInfo = '';
+    if (item.pulled && item.pulled_date) {
+      var pd = Math.floor((Date.now() - new Date(item.pulled_date).getTime()) / 86400000);
+      pulledInfo = ' (pulled ' + (pd <= 0 ? 'today' : pd + 'd ago') + ')';
+    }
+
+    var checkSvg = item.pulled
+      ? '<svg viewBox="0 0 24 24" fill="#22c55e" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
 
     h += '<div class="part-row">';
+    // Checkbox on left
+    h += '<div class="pull-check' + (item.pulled ? ' checked' : '') + '" onclick="togglePull(' + item.id + ',' + !item.pulled + ')" title="' + (item.pulled ? 'Unmark as pulled' : 'Mark as pulled') + '">' + checkSvg + '</div>';
+    // Info
     h += '<div class="part-info">';
-    h += '<div class="part-title">' + esc(item.title) + '</div>';
+    h += '<div class="part-title"' + (item.pulled ? ' style="opacity:0.6"' : '') + '>' + esc(item.title) + '</div>';
     if (item.notes) h += '<div class="part-notes">' + esc(item.notes) + '</div>';
-    h += '<div class="part-meta"><span class="badge ' + bc + '">' + badge + '</span><span>Avg ' + priceStr + '</span><span>Last sold ' + soldStr + '</span></div>';
-    // Match debug — expandable
+    h += '<div class="part-meta"><span class="badge ' + bc + '">' + badge + pulledInfo + '</span><span>Avg ' + priceStr + '</span><span>Last sold ' + soldStr + '</span></div>';
+    // Match debug
     if (item.matchDebug) {
       h += '<details style="margin-top:3px"><summary style="font-size:9px;color:#6B7280;cursor:pointer">Match: ' + esc(item.matchDebug) + '</summary>';
       if (item.matchedTitles && item.matchedTitles.length > 0) {
@@ -141,8 +169,14 @@ function renderPage() {
       }
       h += '</details>';
     }
+    // Yard results container
+    h += '<div id="yard-' + item.id + '"></div>';
     h += '</div>';
-    h += '<button class="del-btn" onclick="delPart(' + item.id + ',this)" title="Remove">&#x1f5d1;</button>';
+    // Right side buttons
+    h += '<div class="part-actions">';
+    h += '<button class="find-btn" onclick="findInYard(' + item.id + ',this)" title="Find in yard"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></button>';
+    h += '<button class="del-btn" onclick="delPart(' + item.id + ',this)" title="Remove"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>';
+    h += '</div>';
     h += '</div>';
   });
   h += '</div>';
@@ -158,6 +192,58 @@ function renderPage() {
 }
 
 function goPage(p) { page = p; renderPage(); window.scrollTo(0, 0); }
+
+function togglePull(id, pulled) {
+  // Optimistic update
+  for (var i = 0; i < allItems.length; i++) {
+    if (allItems[i].id === id) {
+      allItems[i].pulled = pulled;
+      allItems[i].pulled_date = pulled ? new Date().toISOString() : null;
+      break;
+    }
+  }
+  renderPage();
+  fetch('/restock-want-list/pull', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, pulled: pulled }) })
+    .catch(function(err) { alert('Error saving: ' + err.message); load(); });
+}
+
+function findInYard(id, btn) {
+  var item = null;
+  for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === id) { item = allItems[i]; break; } }
+  if (!item) return;
+
+  var el = document.getElementById('yard-' + id);
+  // Toggle off if already showing
+  if (el.innerHTML) { el.innerHTML = ''; btn.classList.remove('has-results'); return; }
+
+  el.innerHTML = '<div style="padding:4px 0;font-size:10px;color:#6B7280"><div class="spinner" style="width:14px;height:14px"></div> Searching yards...</div>';
+
+  fetch('/restock-want-list/find-in-yard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: item.title }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.vehicles || d.vehicles.length === 0) {
+        el.innerHTML = '<div class="yard-results"><div style="color:#6B7280;text-align:center">No matching vehicles on current set lists</div></div>';
+        return;
+      }
+      btn.classList.add('has-results');
+      var h = '<div class="yard-results">';
+      h += '<div style="font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:4px">' + d.vehicles.length + ' vehicle' + (d.vehicles.length > 1 ? 's' : '') + ' found in yards</div>';
+      d.vehicles.forEach(function(v) {
+        h += '<div class="yard-row">';
+        h += '<span style="font-weight:600">' + esc(v.year + ' ' + v.make + ' ' + v.model) + '</span>';
+        if (v.color) h += ' <span style="color:#6B7280">(' + esc(v.color) + ')</span>';
+        h += ' — <span class="yard-name">' + esc(v.yard) + '</span>';
+        h += ' <span class="yard-loc">Row ' + esc(v.row) + '</span>';
+        h += ' <span class="yard-age">set ' + v.daysAgo + '</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+      el.innerHTML = h;
+    })
+    .catch(function(err) {
+      el.innerHTML = '<div class="yard-results" style="color:#dc2626">Error: ' + err.message + '</div>';
+    });
+}
 
 function addPart() {
   var inp = document.getElementById('addInput');
@@ -184,7 +270,7 @@ function delPart(id, btn) {
     .catch(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.style.opacity = '1'; });
 }
 
-function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 load();
 </script>
