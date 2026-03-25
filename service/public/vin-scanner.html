@@ -67,42 +67,35 @@ var V=document.getElementById('vinInput');
 V.focus();
 V.addEventListener('keydown',function(e){if(e.key==='Enter')doScan()});
 
-// Camera — all processing deferred to tap
+// Camera — native file input, minimal memory
 document.getElementById('camBtn').onclick=function(){
   var inp=document.createElement('input');
   inp.type='file';inp.accept='image/*';inp.capture='environment';
-  inp.onchange=function(e){
+  inp.onchange=async function(e){
     var file=e.target.files[0];if(!file)return;
     document.getElementById('status').textContent='Reading VIN from photo...';
     document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Processing...</div></div>';
-    var img=new Image();
-    img.onload=function(){
+    try{
+      // Resize at decode time — never loads full-res image into memory
+      var bmp=await createImageBitmap(file,{resizeWidth:640,resizeQuality:'medium'});
       var c=document.createElement('canvas');
-      var s=Math.min(1,480/img.width);
-      c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
-      var x=c.getContext('2d');x.drawImage(img,0,0,c.width,c.height);
-      // Grayscale+contrast for junkyard conditions
-      var id=x.getImageData(0,0,c.width,c.height),d=id.data;
-      for(var i=0;i<d.length;i+=4){var g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];var a=Math.min(255,Math.max(0,((g-128)*1.4)+128));d[i]=d[i+1]=d[i+2]=a;}
-      x.putImageData(id,0,0);
-      var b64=c.toDataURL('image/jpeg',0.6).split(',')[1];
-      c.width=1;c.height=1; // free memory
-      URL.revokeObjectURL(img.src);
-      fetch('/vin/decode-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})})
-      .then(function(r){return r.json()})
-      .then(function(r){
-        if(r.vin&&r.vin!=='UNREADABLE'&&r.vin.length>=11){
-          V.value=r.vin;document.getElementById('status').textContent='VIN read: '+r.vin;doScan('camera');
-        }else{
-          document.getElementById('status').textContent='Could not read VIN. Try closer.';
-          document.getElementById('results').innerHTML='<div class="card" style="text-align:center;color:#dc2626;font-weight:600">Could not read VIN<div style="color:#9CA3AF;font-size:12px;font-weight:400;margin-top:4px">Avoid glare, get closer, or try door jamb sticker.</div></div>';
-        }
-      }).catch(function(err){
-        document.getElementById('status').textContent='Error: '+err.message;
-        document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';
-      });
-    };
-    img.src=URL.createObjectURL(file);
+      c.width=bmp.width;c.height=bmp.height;
+      var x=c.getContext('2d');x.drawImage(bmp,0,0);
+      bmp.close(); // free bitmap memory immediately
+      var b64=c.toDataURL('image/jpeg',0.5).split(',')[1];
+      c.width=1;c.height=1; // free canvas memory
+      var r=await fetch('/vin/decode-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})}).then(function(r){return r.json()});
+      b64=null; // free string
+      if(r.vin&&r.vin!=='UNREADABLE'&&r.vin.length>=11){
+        V.value=r.vin;document.getElementById('status').textContent='VIN read: '+r.vin;doScan('camera');
+      }else{
+        document.getElementById('status').textContent='Could not read VIN. Try closer.';
+        document.getElementById('results').innerHTML='<div class="card" style="text-align:center;color:#dc2626;font-weight:600">Could not read VIN<div style="color:#9CA3AF;font-size:12px;font-weight:400;margin-top:4px">Avoid glare, get closer, or try door jamb sticker.</div></div>';
+      }
+    }catch(err){
+      document.getElementById('status').textContent='Error: '+err.message;
+      document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';
+    }
   };
   inp.click();
 };
