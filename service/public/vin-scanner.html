@@ -110,7 +110,7 @@ document.getElementById('cameraBtn').onclick = function() {
     const canvas = document.createElement('canvas');
     const img = new Image();
     img.onload = async function() {
-      const maxW = 1024;
+      const maxW = 640; // Reduced from 1024 to prevent low-memory on mobile
       const scale = Math.min(1, maxW / img.width);
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
@@ -127,8 +127,9 @@ document.getElementById('cameraBtn').onclick = function() {
       }
       ctx.putImageData(imageData, 0, 0);
 
-      const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-      console.log('VIN photo: ' + canvas.width + 'x' + canvas.height + ', base64: ' + base64.length + ' chars');
+      const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      // Free canvas memory immediately
+      canvas.width = 1; canvas.height = 1;
 
       try {
         const res = await fetch('/vin/decode-photo', {
@@ -282,7 +283,7 @@ function render(data){
 
 async function loadHistory(){
   try{
-    const r=await fetch('/vin/history?limit=20');const d=await r.json();
+    const r=await fetch('/vin/history?limit=10');const d=await r.json();
     if(!d.success||!d.scans||!d.scans.length){document.getElementById('historyList').innerHTML='<div class="section-empty">No scans yet</div>';return;}
     let h='';
     for(const s of d.scans){

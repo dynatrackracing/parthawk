@@ -537,9 +537,13 @@ router.post('/scan', async (req, res) => {
       }
     }
 
+    // Limit response size to prevent mobile memory issues
     res.json({
       success: true, vin, decoded, baseModel, totalValue, yardMatch,
-      salesHistory, currentStock, marketRef, aiResearch,
+      salesHistory: salesHistory.slice(0, 15),
+      currentStock: currentStock.slice(0, 15),
+      marketRef: marketRef.slice(0, 20),
+      aiResearch,
     });
   } catch (err) {
     log.error({ err }, 'VIN scan failed');
