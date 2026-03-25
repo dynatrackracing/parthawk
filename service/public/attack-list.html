@@ -189,7 +189,14 @@
   .empty-state p { font-size: 12px; line-height: 1.5; }
   .btn-primary { margin-top: 12px; padding: 10px 20px; background: var(--red); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-  /* VIN scanner styles removed — unified to /admin/vin page */
+  /* VIN scanner modal — lightweight inline */
+  .vin-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:200; overflow-y:auto; }
+  .vin-modal.open { display:block; }
+  .vin-inner { max-width:480px; margin:0 auto; padding:16px; padding-top:50px; }
+  .vin-close { position:fixed; top:12px; right:16px; z-index:201; background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); font-size:14px; width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .vin-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
+  .vin-input { width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; font-size:18px; font-family:monospace; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; outline:none; background:var(--surface2); color:var(--text); }
+  .vin-input:focus { border-color:var(--red); }
 
   /* Manual set list modal */
   .manual-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: flex-start; justify-content: center; padding: 20px; padding-top: 60px; }
@@ -228,7 +235,7 @@
   </div>
   <div class="header-actions">
     <button class="icon-btn" onclick="openManualModal()" title="Paste Set List">📋</button>
-    <a class="icon-btn" href="/admin/vin" title="Scan VIN" style="text-decoration:none;">📷</a>
+    <button class="icon-btn" onclick="openVinModal()" title="Scan VIN">📷</button>
     <button class="icon-btn" id="scrapeBtn" onclick="triggerScrapeAll(this)" title="Refresh inventory from LKQ">🔄</button>
   </div>
 </header>
@@ -283,6 +290,23 @@
       <button class="btn-run" id="manualRunBtn" onclick="runManualList()">Run It</button>
     </div>
     <div id="manualError" style="margin-top:8px;font-size:11px;color:#ef4444;display:none;"></div>
+  </div>
+</div>
+
+<!-- VIN Scanner Modal — inline, no page navigation -->
+<div class="vin-modal" id="vinModal">
+  <button class="vin-close" onclick="closeVinModal()">X</button>
+  <div class="vin-inner">
+    <div class="vin-card">
+      <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Scan or Enter VIN</div>
+      <input type="text" class="vin-input" id="vinInput" maxlength="17" placeholder="17-character VIN" autocomplete="off" spellcheck="false">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="icon-btn" style="font-size:20px;width:48px;height:44px;" id="vinCamBtn">📷</button>
+        <button class="btn-primary" style="flex:1;padding:12px;font-size:14px;" id="vinDecBtn" onclick="vinDecode()">Decode</button>
+      </div>
+      <div id="vinStatus" style="font-size:11px;color:var(--text-muted);margin-top:6px"></div>
+    </div>
+    <div id="vinResults"></div>
   </div>
 </div>
 
@@ -977,6 +1001,139 @@
 
     document.getElementById('mainContent').innerHTML = html;
   }
+
+  // === Inline VIN Scanner (no page navigation = no memory crash) ===
+  function openVinModal() {
+    document.getElementById('vinModal').classList.add('open');
+    document.getElementById('vinResults').innerHTML = '';
+    document.getElementById('vinStatus').textContent = '';
+    var vi = document.getElementById('vinInput');
+    vi.value = '';
+    setTimeout(function(){ vi.focus(); }, 100);
+  }
+  function closeVinModal() {
+    document.getElementById('vinModal').classList.remove('open');
+  }
+
+  // Camera — all processing on tap only
+  document.getElementById('vinCamBtn').onclick = function() {
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+    inp.onchange = function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      document.getElementById('vinStatus').textContent = 'Reading VIN from photo...';
+      document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="text-align:center"><div class="spinner"></div><div style="margin-top:6px;color:var(--text-muted);font-size:12px">Processing...</div></div>';
+      var img = new Image();
+      img.onload = function() {
+        var c = document.createElement('canvas');
+        var s = Math.min(1, 480 / img.width);
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        var x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height);
+        var id = x.getImageData(0, 0, c.width, c.height), d = id.data;
+        for (var i = 0; i < d.length; i += 4) { var g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; var a = Math.min(255, Math.max(0, ((g-128)*1.4)+128)); d[i]=d[i+1]=d[i+2]=a; }
+        x.putImageData(id, 0, 0);
+        var b64 = c.toDataURL('image/jpeg', 0.6).split(',')[1];
+        c.width = 1; c.height = 1;
+        URL.revokeObjectURL(img.src);
+        fetch('/vin/decode-photo', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({image:b64}) })
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+          if (r.vin && r.vin !== 'UNREADABLE' && r.vin.length >= 11) {
+            document.getElementById('vinInput').value = r.vin;
+            document.getElementById('vinStatus').textContent = 'VIN read: ' + r.vin;
+            vinDecode('camera');
+          } else {
+            document.getElementById('vinStatus').textContent = 'Could not read VIN. Try closer.';
+            document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="text-align:center;color:var(--red);font-weight:600">Could not read VIN<div style="color:var(--text-muted);font-size:12px;font-weight:400;margin-top:4px">Avoid glare, try door jamb sticker.</div></div>';
+          }
+        }).catch(function(err) {
+          document.getElementById('vinStatus').textContent = 'Error: ' + err.message;
+          document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="color:var(--red)">Error: ' + err.message + '</div>';
+        });
+      };
+      img.src = URL.createObjectURL(file);
+    };
+    inp.click();
+  };
+
+  function vinDecode(src) {
+    var vin = document.getElementById('vinInput').value.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+    if (vin.length < 11) { document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="color:var(--red);font-size:13px">Enter at least 11 characters</div>'; return; }
+    var btn = document.getElementById('vinDecBtn');
+    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="margin:0 auto"></div>';
+    document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="text-align:center"><div class="spinner"></div><div style="margin-top:6px;color:var(--text-muted);font-size:12px">Decoding...</div></div>';
+    fetch('/vin/scan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({vin:vin, source:src||'manual'}) })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.success) throw new Error(data.error);
+      vinRender(data);
+    })
+    .catch(function(err) {
+      document.getElementById('vinResults').innerHTML = '<div class="vin-card" style="color:var(--red)">Error: ' + err.message + '</div>';
+    })
+    .finally(function() { btn.disabled = false; btn.textContent = 'Decode'; });
+  }
+
+  function vinRender(data) {
+    var d = data.decoded || {}, sh = data.salesHistory || [], cs = data.currentStock || [], mr = data.marketRef || [];
+    var h = '';
+    // Vehicle header
+    var hl = [d.year, d.make, data.baseModel || d.model].filter(Boolean).join(' ');
+    var sp = [d.engine, d.engineType && d.engineType !== 'Gas' ? d.engineType : null, d.drivetrain, d.trim].filter(Boolean).join(' · ');
+    h += '<div class="vin-card"><div style="font-size:20px;font-weight:900;letter-spacing:-0.03em">' + hl + '</div>';
+    if (sp) h += '<div style="font-size:12px;font-weight:600;color:var(--text-mid);margin-top:2px">' + sp + '</div>';
+    h += '<div style="font-family:monospace;font-size:13px;color:var(--green);font-weight:700;margin-top:4px">' + data.vin + '</div></div>';
+
+    // Build unified parts
+    var pm = {};
+    sh.forEach(function(s) { if (s.partType) pm[s.partType] = { pt:s.partType, sold:s.sold, avg:s.avgPrice, last:s.lastSoldDate, title:s.sampleTitle, stk:0, mp:0 }; });
+    cs.forEach(function(c) { if (!c.partType) return; if (pm[c.partType]) pm[c.partType].stk = c.inStock; else pm[c.partType] = { pt:c.partType, sold:0, avg:0, last:null, title:null, stk:c.inStock, mp:c.avgPrice }; });
+    mr.filter(function(m) { return !m.isRebuild && m.partType; }).forEach(function(m) {
+      if (pm[m.partType]) { pm[m.partType].mp = m.avgPrice; if (!pm[m.partType].stk) pm[m.partType].stk = m.inStock || 0; }
+      else pm[m.partType] = { pt:m.partType, sold:m.yourSold||0, avg:m.yourAvg||m.avgPrice, last:null, title:null, stk:m.inStock||0, mp:m.avgPrice };
+    });
+    var parts = [];
+    for (var k in pm) { var p = pm[k]; if (p.pt && p.pt !== 'OTHER' && p.pt !== 'null' && (p.avg > 0 || p.mp > 0 || p.sold > 0)) parts.push(p); }
+    parts.sort(function(a, b) { return (b.avg || b.mp) - (a.avg || a.mp); });
+    var tot = 0;
+
+    h += '<div class="vin-card"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Parts Intelligence</div>';
+    if (parts.length > 0) {
+      parts.forEach(function(p) {
+        var price = p.avg || p.mp || 0; tot += price;
+        var vd = price >= 250 ? 'GREAT' : price >= 150 ? 'GOOD' : price >= 100 ? 'FAIR' : 'POOR';
+        var cls = vd === 'GREAT' ? 'chip-green' : vd === 'GOOD' ? 'chip-yellow' : vd === 'FAIR' ? 'chip-orange' : 'chip-red';
+        var badge = '';
+        if (p.stk === 0 && p.sold >= 2) badge = '<span class="chip chip-green" style="font-size:9px">PULL THIS</span> ';
+        else if (p.stk === 0 && p.sold >= 1) badge = '<span class="chip chip-yellow" style="font-size:9px">NEED</span> ';
+        else if (p.stk > 0) badge = '<span class="chip chip-gray" style="font-size:9px">' + p.stk + ' stk</span> ';
+        h += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">';
+        h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">' + badge + '<span class="chip ' + cls + '">' + vd + ' $' + price + '</span> <span style="font-size:13px;font-weight:700">[' + p.pt + ']</span></div>';
+        if (p.title) h += '<div style="font-size:11px;color:var(--text-mid);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.title || '').substring(0, 60) + '</div>';
+        h += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">' + p.stk + ' in stock · ' + p.sold + 'x sold</div>';
+        h += '</div>';
+      });
+    } else {
+      h += '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:8px 0">No parts data for this vehicle yet</div>';
+    }
+    h += '</div>';
+
+    // Est. Haul Value
+    if (tot > 0) {
+      var vc = tot >= 800 ? 'var(--green)' : tot >= 500 ? '#eab308' : tot >= 250 ? '#f97316' : '#ef4444';
+      h += '<div class="vin-card" style="text-align:center"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Est. Haul Value</div>';
+      h += '<div style="font-size:28px;font-weight:800;color:' + vc + ';margin-top:2px">$' + tot + '</div>';
+      var pc = parts.filter(function(p) { return p.stk === 0 && p.sold >= 2; }).length;
+      if (pc > 0) h += '<div style="font-size:11px;color:var(--green);margin-top:2px">' + pc + ' part' + (pc > 1 ? 's' : '') + ' we need</div>';
+      h += '</div>';
+    }
+
+    // Scan Another
+    h += '<div style="padding:4px 0"><button class="btn-primary" style="width:100%;padding:12px;font-size:14px;" onclick="document.getElementById(\'vinInput\').value=\'\';document.getElementById(\'vinInput\').focus();document.getElementById(\'vinResults\').innerHTML=\'\';">Scan Another</button></div>';
+    document.getElementById('vinResults').innerHTML = h;
+  }
+
+  document.getElementById('vinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') vinDecode(); });
 
   // Boot
   loadData();
