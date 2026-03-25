@@ -9,17 +9,55 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
-header{background:#141414;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;gap:10px}
+header{background:#141414;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
 nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px}
 nav::-webkit-scrollbar{display:none}
 nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a}
 nav a.active{color:#DC2626;font-weight:700}
+.container{padding:12px;max-width:700px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
+.b-high{background:#064e3b;color:#22c55e}
+.b-med{background:#713f12;color:#eab308}
+.b-low{background:#7c2d12;color:#ea580c}
+.b-src{background:#1e1b4b;color:#818cf8;font-size:8px}
+.yard-header{padding:10px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #dc2626;margin-bottom:8px}
+.yard-name{font-size:15px;font-weight:800;color:#F0F0F0}
+.yard-count{font-size:11px;color:#9CA3AF}
+.alert-row{padding:10px 0;border-bottom:1px solid #1f1f1f}
+.alert-row:last-child{border-bottom:none}
+.alert-part{font-size:13px;font-weight:600;line-height:1.3}
+.alert-vehicle{font-size:12px;color:#22c55e;font-weight:600;margin-top:3px}
+.alert-meta{font-size:10px;color:#9CA3AF;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.alert-notes{font-size:10px;color:#eab308;margin-top:2px;font-style:italic}
+.btn-refresh{padding:8px 14px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:11px;font-weight:600;cursor:pointer}
+.btn-refresh:active{opacity:.5}
+.btn-refresh:disabled{opacity:.3}
+.spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:30px 10px;font-size:13px}
+.pg-row{display:flex;justify-content:center;gap:8px;padding:12px 0}
+.pg-btn{padding:8px 16px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:12px;font-weight:600;cursor:pointer}
+.pg-btn.active{background:#dc2626;color:#fff;border-color:#dc2626}
+.summary-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.summary-card{flex:1;min-width:80px;background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:8px 10px;text-align:center}
+.summary-num{font-size:20px;font-weight:800;color:#F0F0F0}
+.summary-label{font-size:9px;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;margin-top:1px}
 </style>
 </head>
 <body>
 <header>
-  <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:45px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
-  <div><span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><div style="font-size:10px;color:#6B7280;margin-top:1px">SCOUT ALERTS</div></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
+    <div>
+      <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
+      <div style="font-size:10px;color:#6B7280;margin-top:1px">SCOUT ALERTS <span id="alertCount" style="color:#dc2626;font-weight:700"></span></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div id="lastUpdated" style="font-size:9px;color:#6B7280;text-align:right"></div>
+    <button class="btn-refresh" id="refreshBtn" onclick="refreshAlerts()">Refresh</button>
+  </div>
 </header>
 <nav>
   <a href="/">THE NEST</a>
@@ -30,13 +68,132 @@ nav a.active{color:#DC2626;font-weight:700}
   <a href="/admin/restock-list">HUNTERS PERCH</a>
   <a href="/admin/scout-alerts" class="active">SCOUT ALERTS</a>
 </nav>
-<div style="padding:60px 20px;text-align:center;max-width:500px;margin:0 auto">
-  <div style="font-size:48px;margin-bottom:16px">🦅</div>
-  <div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#F0F0F0">SCOUT ALERTS</div>
-  <div style="font-size:14px;color:#6B7280;margin-top:8px">Coming Soon</div>
-  <div style="margin-top:24px;padding:16px;background:#141414;border:1px solid #2a2a2a;border-radius:10px;font-size:12px;color:#9CA3AF;line-height:1.6">
-    Automated alerts when high-value parts matching your want list appear on junkyard set lists. Get notified before anyone else.
-  </div>
+<div class="container">
+  <div id="loading" style="text-align:center;padding:40px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading alerts...</div></div>
+  <div id="summary"></div>
+  <div id="list"></div>
+  <div id="pagination" class="pg-row"></div>
 </div>
+<script>
+var currentPage = 1;
+
+function load(page) {
+  currentPage = page || 1;
+  fetch('/scout-alerts/list?page=' + currentPage)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('loading').style.display = 'none';
+      if (!d.success) { document.getElementById('list').innerHTML = '<div class="empty">Error loading alerts</div>'; return; }
+
+      // Update header
+      document.getElementById('alertCount').textContent = d.total > 0 ? '(' + d.total + ')' : '';
+      if (d.lastGenerated) {
+        var mins = Math.floor((Date.now() - new Date(d.lastGenerated).getTime()) / 60000);
+        var ts = mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : Math.floor(mins / 60) + 'h ago';
+        document.getElementById('lastUpdated').textContent = 'Updated ' + ts;
+      }
+
+      // Summary cards
+      if (d.total > 0 && d.yardCounts) {
+        var highCount = 0, medCount = 0, lowCount = 0;
+        for (var yard in d.alerts) {
+          d.alerts[yard].forEach(function(a) {
+            if (a.confidence === 'high') highCount++;
+            else if (a.confidence === 'medium') medCount++;
+            else lowCount++;
+          });
+        }
+        var sh = '<div class="summary-bar">';
+        sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + highCount + '</div><div class="summary-label">HIGH</div></div>';
+        sh += '<div class="summary-card"><div class="summary-num" style="color:#eab308">' + medCount + '</div><div class="summary-label">MEDIUM</div></div>';
+        sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + lowCount + '</div><div class="summary-label">LOW</div></div>';
+        sh += '<div class="summary-card"><div class="summary-num">' + d.yardCounts.length + '</div><div class="summary-label">YARDS</div></div>';
+        sh += '</div>';
+        document.getElementById('summary').innerHTML = sh;
+      }
+
+      // Alerts grouped by yard
+      if (d.total === 0) {
+        document.getElementById('list').innerHTML = '<div class="empty">No scout alerts yet.<br><br>Alerts are generated after each yard scrape by cross-referencing BONE PILE + HUNTERS PERCH against yard vehicle inventories.<br><br>Tap Refresh to generate now.</div>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      var h = '';
+      // Sort yards by alert count desc
+      var yardOrder = d.yardCounts.map(function(y) { return y.yard; });
+      yardOrder.forEach(function(yardName) {
+        var alerts = d.alerts[yardName];
+        if (!alerts || alerts.length === 0) return;
+
+        h += '<div class="card">';
+        h += '<div class="yard-header"><span class="yard-name">' + esc(yardName) + '</span><span class="yard-count">' + alerts.length + ' alert' + (alerts.length > 1 ? 's' : '') + '</span></div>';
+
+        alerts.forEach(function(a) {
+          var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
+          var srcLabel = a.source === 'hunters_perch' ? 'PERCH' : 'BONE';
+          var priceStr = a.part_value ? '$' + a.part_value : '';
+          var setStr = '';
+          if (a.vehicle_set_date) {
+            var days = Math.floor((Date.now() - new Date(a.vehicle_set_date).getTime()) / 86400000);
+            setStr = 'set ' + (days <= 0 ? 'today' : days + 'd ago');
+          }
+
+          h += '<div class="alert-row">';
+          h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
+          h += '<div class="alert-vehicle">' + esc([a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' '));
+          if (a.vehicle_color) h += ' <span style="color:#6B7280;font-weight:400">(' + esc(a.vehicle_color) + ')</span>';
+          h += '</div>';
+          h += '<div class="alert-meta">';
+          h += '<span class="badge ' + bc + '">' + a.confidence.toUpperCase() + '</span>';
+          h += '<span class="badge b-src">' + srcLabel + '</span>';
+          if (priceStr) h += '<span style="font-weight:700;color:#22c55e">' + priceStr + '</span>';
+          if (a.row) h += '<span>Row ' + esc(a.row) + '</span>';
+          if (setStr) h += '<span>' + setStr + '</span>';
+          h += '</div>';
+          if (a.notes) h += '<div class="alert-notes">' + esc(a.notes) + '</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      });
+
+      document.getElementById('list').innerHTML = h;
+
+      // Pagination
+      if (d.totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+      var ph = '';
+      for (var i = 1; i <= d.totalPages; i++) {
+        ph += '<button class="pg-btn' + (i === currentPage ? ' active' : '') + '" onclick="load(' + i + ')">' + i + '</button>';
+      }
+      document.getElementById('pagination').innerHTML = ph;
+    })
+    .catch(function(err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('list').innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
+    });
+}
+
+function refreshAlerts() {
+  var btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  document.getElementById('list').innerHTML = '<div style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Matching parts against yard vehicles...</div></div>';
+
+  fetch('/scout-alerts/refresh', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = 'Refresh';
+      if (d.success) load(1);
+      else { document.getElementById('list').innerHTML = '<div class="empty">Error: ' + (d.error || 'Unknown') + '</div>'; }
+    })
+    .catch(function(err) {
+      btn.disabled = false; btn.textContent = 'Refresh';
+      document.getElementById('list').innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
+    });
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+load(1);
+</script>
 </body>
 </html>

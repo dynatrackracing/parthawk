@@ -67,6 +67,15 @@ class LKQScraper {
       }
     }
     this.log.info({ results }, 'LKQ scrape complete');
+
+    // Auto-regenerate scout alerts after scrape
+    try {
+      const { generateAlerts } = require('../services/ScoutAlertService');
+      generateAlerts().catch(err => {
+        this.log.warn({ err: err.message }, 'Scout alert generation failed after scrape');
+      });
+    } catch (e) { /* ignore if table doesn't exist yet */ }
+
     return results;
   }
 
