@@ -21,7 +21,8 @@ nav a.active{color:#DC2626;font-weight:700}
 .b-med{background:#713f12;color:#eab308}
 .b-low{background:#7c2d12;color:#ea580c}
 .b-bone{background:#dc2626;color:#fff;font-size:8px;letter-spacing:0.05em}
-.b-perch{background:#7c3aed;color:#fff;font-size:8px;letter-spacing:0.05em}
+.b-perch{background:#ea580c;color:#fff;font-size:8px;letter-spacing:0.05em}
+.b-sold{background:#16a34a;color:#fff;font-size:8px;letter-spacing:0.05em}
 .yard-header{padding:10px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #dc2626;margin-bottom:8px}
 .yard-name{font-size:15px;font-weight:800;color:#F0F0F0}
 .yard-count{font-size:11px;color:#9CA3AF}
@@ -94,11 +95,12 @@ function load(page) {
         document.getElementById('lastUpdated').textContent = 'Updated ' + ts;
       }
 
-      // Summary cards — BONE vs PERCH vs YARDS
+      // Summary cards
       if (d.total > 0) {
         var sh = '<div class="summary-bar">';
         sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">BONE</div></div>';
-        sh += '<div class="summary-card"><div class="summary-num" style="color:#7c3aed">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
+        sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
+        sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
         sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
         sh += '</div>';
         document.getElementById('summary').innerHTML = sh;
@@ -125,6 +127,7 @@ function load(page) {
           var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
           var srcClass = a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
           var srcLabel = a.source === 'bone_pile' ? 'BONE' : 'PERCH';
+          var soldTag = a.justSold ? '<span class="badge b-sold">SOLD ' + a.justSold.toUpperCase() + '</span>' : '';
           var priceStr = a.part_value ? '$' + a.part_value : '';
           var setStr = '';
           if (a.vehicle_set_date) {
@@ -140,6 +143,7 @@ function load(page) {
           h += '<div class="alert-meta">';
           h += '<span class="badge ' + srcClass + '">' + srcLabel + '</span>';
           h += '<span class="badge ' + bc + '">' + a.confidence.toUpperCase() + '</span>';
+          if (soldTag) h += soldTag;
           if (priceStr) h += '<span style="font-weight:700;color:#22c55e">' + priceStr + '</span>';
           if (a.row) h += '<span>Row ' + esc(a.row) + '</span>';
           if (setStr) h += '<span>' + setStr + '</span>';

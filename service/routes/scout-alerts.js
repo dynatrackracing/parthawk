@@ -9,16 +9,17 @@ router.get('/list', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const perPage = 50;
 
-  // Sort: BONE HIGH > BONE MED > PERCH HIGH > PERCH MED > LOW, then by value
+  // Sort: ALL BONE first (by confidence then value), then ALL PERCH
   const alerts = await database('scout_alerts')
     .orderByRaw(`
       CASE
         WHEN source = 'bone_pile' AND confidence = 'high' THEN 0
         WHEN source = 'bone_pile' AND confidence = 'medium' THEN 1
-        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 2
-        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 3
-        WHEN confidence = 'low' AND source = 'bone_pile' THEN 4
-        ELSE 5
+        WHEN source = 'bone_pile' AND confidence = 'low' THEN 2
+        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 3
+        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 4
+        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 5
+        ELSE 6
       END
     `)
     .orderBy('part_value', 'desc')
@@ -55,12 +56,42 @@ router.get('/list', async (req, res) => {
   const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
   const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
 
+  // Check which perch alerts had recent sales (last 3 days)
+  let justSoldCount = 0;
+  try {
+    const recentSales = await database('YourSale')
+      .where('soldDate', '>=', database.raw("NOW() - INTERVAL '3 days'"))
+      .whereNotNull('title')
+      .select('title', 'soldDate');
+    const saleTitles = recentSales.map(s => ({ lower: (s.title || '').toLowerCase(), soldDate: s.soldDate }));
+
+    // Tag alerts that match recent sales
+    for (const yard in byYard) {
+      for (const alert of byYard[yard]) {
+        if (alert.source !== 'hunters_perch') continue;
+        const alertWords = (alert.source_title || '').toLowerCase()
+          .replace(/\([^)]*\)/g, '').replace(/\b\d+\b/g, '').replace(/[^a-z\s]/g, ' ')
+          .split(/\s+/).filter(w => w.length >= 3);
+        for (const sale of saleTitles) {
+          const matches = alertWords.filter(w => sale.lower.includes(w));
+          if (matches.length >= 3) {
+            const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
+            alert.justSold = daysAgo <= 0 ? 'today' : daysAgo + 'd ago';
+            justSoldCount++;
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
+
   res.json({
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
     boneCount,
     perchCount,
+    justSoldCount,
     total,
     page,
     totalPages: Math.ceil(total / perPage),

@@ -81,6 +81,7 @@ nav a.active{color:#DC2626;font-weight:700}
   <a href="/admin/scout-alerts">SCOUT ALERTS</a>
 </nav>
 <div class="container">
+  <div id="justSold"></div>
   <div class="card">
     <div class="add-row">
       <input type="text" class="add-input" id="addInput" placeholder="Add part (e.g. 2010-2015 Toyota Prius ABS Pump)" autocomplete="off">
@@ -276,7 +277,39 @@ function delPart(id, btn) {
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function loadJustSold() {
+  fetch('/restock-want-list/just-sold')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.items || d.items.length === 0) {
+        document.getElementById('justSold').innerHTML = '';
+        return;
+      }
+      var h = '<div class="card" style="border-color:#16a34a;border-width:2px">';
+      h += '<div style="font-size:11px;font-weight:800;color:#22c55e;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">JUST SOLD — RESTOCK NOW (' + d.items.length + ')</div>';
+      d.items.forEach(function(s) {
+        h += '<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
+        h += '<div style="font-size:13px;font-weight:600">' + esc(s.wantTitle) + '</div>';
+        h += '<div style="font-size:11px;margin-top:2px"><span style="color:#22c55e;font-weight:700">$' + s.salePrice + '</span> <span style="color:#9CA3AF">sold ' + s.soldAgo + '</span></div>';
+        if (s.yardMatches && s.yardMatches.length > 0) {
+          h += '<div style="margin-top:4px;padding:4px 8px;background:#0a0a0a;border-radius:4px;border:1px solid #2a2a2a">';
+          s.yardMatches.forEach(function(v) {
+            h += '<div style="font-size:10px;color:#d1d5db;padding:2px 0"><span style="font-weight:600">' + esc(v.desc) + '</span> — <span style="color:#22c55e">' + esc(v.yard) + '</span> Row ' + esc(v.row) + '</div>';
+          });
+          h += '</div>';
+        } else {
+          h += '<div style="font-size:10px;color:#6B7280;margin-top:2px">No matching vehicles in yards right now</div>';
+        }
+        h += '</div>';
+      });
+      h += '</div>';
+      document.getElementById('justSold').innerHTML = h;
+    })
+    .catch(function() { /* ignore */ });
+}
+
 load();
+loadJustSold();
 </script>
 </body>
 </html>

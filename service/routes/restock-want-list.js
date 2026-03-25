@@ -107,6 +107,63 @@ router.get('/items', async (req, res) => {
   res.json({ success: true, items: results, total: results.length });
 });
 
+// "Just Sold" — perch items that sold in the last 3 days
+router.get('/just-sold', async (req, res) => {
+  const knex = database;
+  const wantList = await knex('restock_want_list').where({ active: true });
+  const recentSales = await knex('YourSale')
+    .where('soldDate', '>=', knex.raw("NOW() - INTERVAL '3 days'"))
+    .whereNotNull('title')
+    .select('title', 'salePrice', 'soldDate')
+    .orderBy('soldDate', 'desc');
+
+  const results = [];
+  for (const sale of recentSales) {
+    const saleTitle = (sale.title || '').toLowerCase();
+    // Find matching want list item by checking if 2+ keywords overlap
+    for (const item of wantList) {
+      const words = item.title.toLowerCase()
+        .replace(/\([^)]*\)/g, '').replace(/\b\d+\b/g, '').replace(/[^a-z\s]/g, ' ')
+        .split(/\s+/).filter(w => w.length >= 3);
+      const matches = words.filter(w => saleTitle.includes(w));
+      if (matches.length >= 3) {
+        // Find yard vehicles for this part
+        const parsed = parseVehicleFromTitle(item.title);
+        let yardMatches = [];
+        if (parsed) {
+          let q = knex('yard_vehicle').join('yard', 'yard.id', 'yard_vehicle.yard_id')
+            .where('yard_vehicle.active', true).where('yard.enabled', true);
+          if (parsed.make) q = q.where('yard_vehicle.make', 'ilike', `%${parsed.make}%`);
+          if (parsed.models.length > 0) {
+            q = q.where(function() { for (const m of parsed.models) this.orWhere('yard_vehicle.model', 'ilike', `%${m}%`); });
+          }
+          if (parsed.yearStart) q = q.where('yard_vehicle.year', '>=', String(parsed.yearStart));
+          if (parsed.yearEnd) q = q.where('yard_vehicle.year', '<=', String(parsed.yearEnd));
+          yardMatches = await q.select('yard_vehicle.year', 'yard_vehicle.make', 'yard_vehicle.model',
+            'yard_vehicle.row_number', 'yard.name as yard_name').limit(5);
+        }
+
+        const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
+        results.push({
+          wantTitle: item.title,
+          saleTitle: sale.title,
+          salePrice: Math.round(parseFloat(sale.salePrice) || 0),
+          soldAgo: daysAgo <= 0 ? 'today' : daysAgo + 'd ago',
+          soldDate: sale.soldDate,
+          yardMatches: yardMatches.map(v => ({
+            desc: [v.year, v.make, v.model].filter(Boolean).join(' '),
+            yard: v.yard_name,
+            row: v.row_number || '?'
+          }))
+        });
+        break; // one match per sale
+      }
+    }
+  }
+
+  res.json({ success: true, items: results });
+});
+
 // Toggle pulled status
 router.post('/pull', async (req, res) => {
   const { id, pulled } = req.body;
