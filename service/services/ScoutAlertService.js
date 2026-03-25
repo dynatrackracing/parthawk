@@ -119,57 +119,55 @@ function scoreMatch(part, vehicle) {
   const vModel = (vehicle.model || '').toLowerCase();
   const vYear = parseInt(vehicle.year) || 0;
 
+  // RULE 1: Make must match
   const makeMatch = part.make && vMake.includes(part.make.toLowerCase());
   if (!makeMatch) return {};
 
+  // RULE 2: Model MUST match. No "no specific model" alerts.
+  // If we can't find a model in the part title, don't generate an alert.
+  if (part.models.length === 0) return {};
+
   let modelMatch = false;
-  if (part.models.length > 0) {
-    for (const m of part.models) {
-      if (vModel.includes(m.toLowerCase()) || m.toLowerCase().includes(vModel)) {
-        modelMatch = true;
-        break;
-      }
+  for (const m of part.models) {
+    if (vModel.includes(m.toLowerCase()) || m.toLowerCase().includes(vModel)) {
+      modelMatch = true;
+      break;
     }
   }
-  if (!modelMatch && part.models.length > 0) return {};
+  if (!modelMatch) return {};
 
-  let yearMatch = 'none';
+  // RULE 3: Year must be WITHIN range. No fuzzy/close matching.
+  // Wrong year = wrong part. A 2006 is NOT a 2007.
   if (part.yearStart && part.yearEnd && vYear > 0) {
-    if (vYear >= part.yearStart && vYear <= part.yearEnd) yearMatch = 'exact';
-    else if (vYear >= part.yearStart - 2 && vYear <= part.yearEnd + 2) yearMatch = 'close';
-    else return {};
-  } else if (!part.yearStart && vYear > 0) {
-    yearMatch = 'unknown';
+    if (vYear < part.yearStart || vYear > part.yearEnd) return {};
   }
+  // If part has no year range, allow match but note it
+  const hasYearRange = part.yearStart && part.yearEnd;
+  const yearVerified = hasYearRange && vYear >= part.yearStart && vYear <= part.yearEnd;
 
+  // RULE 4: Confidence based on what we can confirm
   let confidence;
   const notes = [];
   const titleLower = (part.title || '').toLowerCase();
   const needsEngineVerify = /v8|5\.7|hemi|v6|3\.5|3\.8|2\.3|2\.7|4\.7/.test(titleLower);
   const needsDriveVerify = /4x4|awd|4wd|fwd/.test(titleLower);
-  const needsTrimVerify = /type.?s|sport|limited|touring|ss\b/i.test(titleLower);
+  const needsTrimVerify = /type.?s|sport|limited|touring|ss\b|hybrid/i.test(titleLower);
 
-  if (modelMatch && yearMatch === 'exact') {
+  if (yearVerified || !hasYearRange) {
+    // Model + year confirmed (or no year to check)
     if (needsEngineVerify && !vehicle.engine) {
-      confidence = 'medium'; notes.push('Verify engine spec at yard');
+      confidence = 'medium'; notes.push('Verify engine at yard');
     } else if (needsDriveVerify && !vehicle.drivetrain) {
       confidence = 'medium'; notes.push('Verify drivetrain at yard');
     } else if (needsTrimVerify && !vehicle.trim_level) {
-      confidence = 'medium'; notes.push('Verify trim at yard');
+      confidence = 'medium'; notes.push('Verify trim/hybrid at yard');
     } else {
       confidence = 'high';
     }
-  } else if (modelMatch && yearMatch === 'close') {
-    confidence = 'medium';
-    notes.push('Year ' + vYear + ' is close but outside ' + part.yearStart + '-' + part.yearEnd + ' range');
-  } else if (modelMatch && yearMatch === 'unknown') {
-    confidence = 'medium';
-    notes.push('Year range not specified — verify fitment');
-  } else if (!modelMatch && part.models.length === 0) {
-    confidence = 'low';
-    notes.push('No specific model in part title — verify model at yard');
+    if (!hasYearRange) notes.push('No year range specified — verify fitment');
   } else {
-    confidence = 'low';
+    // Shouldn't reach here due to early return above, but safety net
+    return {};
   }
 
   return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };

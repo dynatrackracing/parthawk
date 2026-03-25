@@ -133,21 +133,68 @@ const MAKES = [
 ];
 
 const MODELS = [
-  'f150','f250','f350','vue','tsx','ridgeline','xc90','xc70','coupe','m35',
-  'sequoia','mazda6','town car','p38','dakota','durango','fusion','corolla',
-  'gs300','charger','accord','srx','ranger','econoline','cr-v','crv','endeavor',
-  'titan','pathfinder','qx4','grand vitara','tundra','lacrosse','lucerne',
-  'grand prix','c70','s70','v70','miata','montero','xterra','santa fe',
-  'xg350','xj6','xk8','explorer','transit','transit connect','fx35','ilx',
-  'tl','escalade','grand cherokee','jetta','trailblazer','rav4','nv200',
-  'nv2500','nv3500','pilot','flex','c230','prius','s550','rdx',
-  'five hundred','solstice','tacoma','4runner','mdx','promaster','t100',
-  'metro','sidekick','tracker','odyssey','caravan','dart','sienna',
-  'pacifica','voyager','camaro','300','l100','q60','q40','ram',
-  'civic','camry','highlander','rav4','sentra','altima','rogue','murano',
-  'forester','outback','impreza','wrx','wrangler','compass','patriot',
-  'equinox','traverse','malibu','impala','silverado','tahoe','suburban',
-  'yukon','sierra','terrain','envoy','cobalt','cruze','sonic','spark',
+  // Ford
+  'f150','f250','f350','f450','ranger','explorer','expedition','escape','edge',
+  'fusion','focus','taurus','mustang','bronco','econoline','e-series','e series',
+  'five hundred','flex','transit','transit connect','excursion','freestyle',
+  'windstar','contour','crown victoria','thunderbird',
+  // Toyota
+  'camry','corolla','tacoma','tundra','sequoia','highlander','rav4','4runner',
+  'prius','sienna','avalon','celica','matrix','yaris','venza','supra','fj cruiser',
+  'land cruiser','t100',
+  // Honda
+  'accord','civic','cr-v','crv','pilot','odyssey','ridgeline','fit','hr-v',
+  'element','insight','passport','prelude',
+  // Acura
+  'tsx','tl','mdx','rdx','ilx','rl','rsx','integra','cl','legend',
+  // Nissan
+  'pathfinder','titan','altima','sentra','rogue','murano','frontier','xterra',
+  'maxima','versa','quest','armada','nv200','nv2500','nv3500','juke','leaf',
+  // Infiniti
+  'm35','m45','fx35','fx45','q60','q50','q40','qx4','qx56','qx60','g35','g37',
+  // Dodge/Chrysler/Jeep/Ram
+  'charger','challenger','durango','dakota','caravan','grand caravan','dart',
+  'magnum','neon','stratus','avenger','journey','nitro',
+  'grand cherokee','wrangler','compass','patriot','liberty','cherokee','renegade',
+  'ram','ram 1500','ram 2500','ram 3500','promaster',
+  'pacifica','voyager','town country','town & country','pt cruiser','sebring',
+  '200','300',
+  // GM
+  'silverado','tahoe','suburban','equinox','traverse','malibu','impala',
+  'camaro','corvette','cobalt','cruze','sonic','spark','trax','blazer','colorado',
+  'yukon','sierra','terrain','envoy','acadia','canyon','savana','denali',
+  'lacrosse','lucerne','enclave','encore','regal','verano','rendezvous',
+  'solstice','g6','grand prix','grand am',
+  // Kia/Hyundai
+  'optima','forte','soul','sportage','sorento','sedona','rio','telluride',
+  'santa fe','tucson','elantra','sonata','accent','veloster','genesis','xg350',
+  'palisade','kona','venue','santa cruz',
+  // Subaru
+  'forester','outback','impreza','wrx','legacy','crosstrek','ascent','brz',
+  // VW/Audi
+  'jetta','passat','golf','tiguan','atlas','beetle','cc','touareg',
+  'a4','a6','q5','q7','a3','a5','s4','tt',
+  // BMW
+  'x3','x5','x1','328i','335i','528i','530i','325i',
+  // Mercedes
+  's550','c230','c300','e350','ml350','gl450','cls','slk',
+  // Volvo
+  'xc90','xc70','xc60','s60','s80','v70','c70','s70','c30','v50',
+  // Mazda
+  'mazda3','mazda6','cx-5','cx-9','miata','rx-8','tribute','mpv',
+  // Jaguar
+  'xj6','xk8','xf','s-type','x-type',
+  // Lexus
+  'gs300','gs350','is300','is250','rx350','rx330','es350','es300','ls430','gx470',
+  // Other
+  'vue','l100','l200','l300','ion','aura','sky', // Saturn
+  'sidekick','tracker','grand vitara','vitara','xl-7', // Suzuki/Geo
+  'metro','prizm','storm', // Geo
+  'town car','navigator','mkz','mkx','continental', // Lincoln
+  'mountaineer','mariner','sable','villager','grand marquis','milan', // Mercury
+  'p38','range rover','discovery','lr3','lr4','freelander', // Land Rover
+  'montero','endeavor','outlander','eclipse','galant','lancer', // Mitsubishi
+  'coupe','m35', // generic
 ];
 
 // Part phrases — longest first for greedy matching
