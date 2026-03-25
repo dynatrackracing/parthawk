@@ -251,16 +251,25 @@ router.get('/report', async (req, res) => {
       let yearRange = null;
       if (years) { const s = [...new Set(years.map(Number))].sort(); yearRange = s[0] === s[s.length - 1] ? String(s[0]) : s[0] + '-' + s[s.length - 1]; }
 
+      // === SCORING: price is king ===
       let score = 0;
-      score += g.sold >= 4 ? 35 : g.sold >= 3 ? 28 : g.sold >= 2 ? 20 : 10;
-      score += avgPrice >= 300 ? 25 : avgPrice >= 200 ? 20 : avgPrice >= 150 ? 15 : avgPrice >= 100 ? 10 : 5;
-      score += stock === 0 ? 25 : stock === 1 ? 15 : 0;
+      // Price (dominant factor, max 35)
+      score += avgPrice >= 500 ? 35 : avgPrice >= 300 ? 28 : avgPrice >= 200 ? 22 : avgPrice >= 150 ? 15 : avgPrice >= 100 ? 10 : 5;
+      // Stock urgency (max 30)
+      score += stock === 0 ? 30 : stock === 1 ? 20 : (g.sold > stock ? 10 : 0);
+      // Demand volume (max 20)
+      score += g.sold >= 4 ? 20 : g.sold >= 3 ? 15 : g.sold >= 2 ? 10 : 5;
+      // Recency (max 15)
       const daysSince = g.lastSold ? Math.floor((Date.now() - new Date(g.lastSold).getTime()) / 86400000) : 99;
-      score += daysSince <= 3 ? 15 : daysSince <= 5 ? 10 : 5;
+      score += daysSince <= 3 ? 15 : daysSince <= 7 ? 12 : daysSince <= 14 ? 8 : 4;
       score = Math.min(100, score);
-      if (avgPrice >= 300 && g.sold >= 1) score = Math.max(score, 75);
 
-      const action = stock === 0 ? 'RESTOCK NOW' : stock === 1 ? 'LOW STOCK' : 'MONITOR';
+      // Floor rules: high-value parts always surface
+      if (avgPrice >= 500 && g.sold >= 1 && stock <= 1) score = Math.max(score, 85);
+      if (avgPrice >= 300 && g.sold >= 1 && stock <= 1) score = Math.max(score, 75);
+      if (avgPrice >= 200 && g.sold >= 2 && stock === 0) score = Math.max(score, 75);
+
+      const action = stock === 0 ? 'RESTOCK NOW' : stock === 1 ? 'LOW STOCK' : (g.sold > stock ? 'SELLING FAST' : 'MONITOR');
 
       items.push({
         score, action, make: g.make, model: g.model, partType: g.partType,
@@ -271,14 +280,14 @@ router.get('/report', async (req, res) => {
     }
 
     const filtered = items.filter(i => i.activeStock <= 1 || i.sold7d > i.activeStock || i.avgPrice >= 300);
-    filtered.sort((a, b) => b.revenue - a.revenue);
+    filtered.sort((a, b) => b.score - a.score || b.revenue - a.revenue);
     const top = filtered.slice(0, 100);
 
-    // Tier rules: green = score 75+ AND stock 0, yellow = score 60+ OR (score 75+ with stock>0), orange = rest
+    // Tier rules: price-aware — high value parts with low stock are always green
     const tiers = { green: [], yellow: [], orange: [] };
     for (const item of top) {
-      if (item.score >= 75 && item.activeStock === 0) { item.tier = 'green'; tiers.green.push(item); }
-      else if (item.score >= 60 || (item.score >= 75 && item.activeStock > 0)) { item.tier = 'yellow'; tiers.yellow.push(item); }
+      if (item.score >= 75) { item.tier = 'green'; tiers.green.push(item); }
+      else if (item.score >= 60) { item.tier = 'yellow'; tiers.yellow.push(item); }
       else { item.tier = 'orange'; tiers.orange.push(item); }
     }
 
