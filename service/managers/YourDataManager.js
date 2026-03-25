@@ -144,10 +144,28 @@ class YourDataManager {
         }
       });
 
-      // Optionally: Mark listings that are no longer active
-      // This could be done by setting listingStatus = 'Ended' for items not in the current sync
+      // Mark listings not in this sync as Ended (they're no longer active on eBay)
+      const syncedIds = listings.map(l => l.itemId).filter(Boolean);
+      let deactivated = 0;
+      if (syncedIds.length > 0) {
+        try {
+          const { database } = require('../database/database');
+          const now = new Date();
+          const result = await database('YourListing')
+            .where('listingStatus', 'Active')
+            .where('syncedAt', '<', new Date(now.getTime() - 60000)) // not synced in last minute
+            .whereNotIn('ebayItemId', syncedIds)
+            .update({ listingStatus: 'Ended', updatedAt: now });
+          deactivated = result;
+          if (deactivated > 0) {
+            this.log.info({ deactivated }, 'Marked stale listings as Ended');
+          }
+        } catch (err) {
+          this.log.warn({ err: err.message }, 'Failed to deactivate stale listings (non-fatal)');
+        }
+      }
 
-      this.log.info({ synced, errors }, 'Completed syncing listings');
+      this.log.info({ synced, errors, deactivated }, 'Completed syncing listings');
     } catch (err) {
       this.log.error({ err }, 'Error fetching listings from eBay');
       throw err;
