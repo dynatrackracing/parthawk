@@ -262,7 +262,38 @@ function parseTitle(title) {
 // ============================================================
 
 /**
+ * Extract year(s) from a listing title for year-range filtering.
+ * Returns { start, end } or null.
+ */
+function extractYearsFromTitle(title) {
+  const range = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
+  if (range) {
+    const start = parseInt(range[1] + range[2]);
+    const end = range[3] ? parseInt(range[3] + range[4]) : parseInt(range[1] + range[4]);
+    return { start, end };
+  }
+  const single = title.match(/\b((?:19|20)\d{2})\b/);
+  if (single) { const y = parseInt(single[1]); return { start: y, end: y }; }
+  return null;
+}
+
+/**
+ * Filter listing results by year overlap with want list year range.
+ * A listing matches if its year range overlaps the want list year range.
+ */
+function filterByYear(listings, wantYearStart, wantYearEnd) {
+  if (!wantYearStart || !wantYearEnd) return listings; // no year to filter on
+  return listings.filter(l => {
+    const ly = extractYearsFromTitle(l.title || '');
+    if (!ly) return true; // can't determine listing year — keep it (conservative)
+    // Check overlap: listing range overlaps want range
+    return ly.start <= wantYearEnd && ly.end >= wantYearStart;
+  });
+}
+
+/**
  * Match a part title against YourListing (active listings).
+ * Priority: 1) Part number  2) Year + Model + Part type
  * Returns { stock, matchedTitles[], method, debug }
  */
 async function matchPartToListings(partTitle) {
@@ -270,99 +301,84 @@ async function matchPartToListings(partTitle) {
   if (!parsed) return { stock: 0, matchedTitles: [], method: 'none', debug: 'Could not parse title' };
 
   const knex = database;
+  const yearLabel = (parsed.yearStart && parsed.yearEnd)
+    ? (parsed.yearStart === parsed.yearEnd ? String(parsed.yearStart) : parsed.yearStart + '-' + parsed.yearEnd)
+    : null;
 
-  // Strategy 1: Part number match (most accurate)
-  if (parsed.partNumbers.length > 0) {
-    const realPNs = parsed.partNumbers.filter(pn => /[A-Z]/i.test(pn.raw));
-    if (realPNs.length > 0) {
-      let q = knex('YourListing').where('listingStatus', 'Active');
-      q = q.where(function() {
-        for (const pn of realPNs) {
-          this.orWhere('title', 'ilike', `%${pn.raw}%`);
-          if (pn.base !== pn.raw) this.orWhere('title', 'ilike', `%${pn.base}%`);
-        }
-      });
-      const listings = await q.select('title').limit(10);
-      if (listings.length > 0) {
-        return {
-          stock: listings.length >= 10 ? await countQuery(knex, realPNs) : listings.length,
-          matchedTitles: listings.map(l => l.title),
-          method: 'part_number',
-          debug: `PN: ${realPNs.map(p => p.raw).join(', ')}`
-        };
+  // Strategy 1: Part number match (highest confidence — don't fall back)
+  const realPNs = (parsed.partNumbers || []).filter(pn => /[A-Z]/i.test(pn.raw));
+  if (realPNs.length > 0) {
+    let q = knex('YourListing').where('listingStatus', 'Active');
+    q = q.where(function() {
+      for (const pn of realPNs) {
+        this.orWhere('title', 'ilike', `%${pn.raw}%`);
+        if (pn.base !== pn.raw) this.orWhere('title', 'ilike', `%${pn.base}%`);
       }
-    }
+    });
+    const listings = await q.select('title').limit(20);
+    const pnDebug = `PN: ${realPNs.map(p => p.raw).join(', ')}`;
+    // PN match is definitive — return result even if 0
+    return {
+      stock: listings.length,
+      matchedTitles: listings.map(l => l.title),
+      method: 'part_number',
+      debug: `${pnDebug} (${listings.length} found)`
+    };
   }
 
-  // Strategy 2: Model + part phrase (best keyword match)
+  // Strategy 2: Year + Model + Part phrase (requires all three)
   if (parsed.models.length > 0 && parsed.partPhrase) {
     let q = knex('YourListing').where('listingStatus', 'Active');
     q = q.where(function() {
       for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
     });
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
-    const listings = await q.select('title').limit(10);
+    const allListings = await q.select('title').limit(50);
+    const filtered = filterByYear(allListings, parsed.yearStart, parsed.yearEnd);
+    const debug = [yearLabel, parsed.models.join('/'), '"' + parsed.partPhrase + '"'].filter(Boolean).join(' + ');
     return {
-      stock: listings.length >= 10 ? await countFull(knex, parsed) : listings.length,
-      matchedTitles: listings.map(l => l.title),
+      stock: filtered.length,
+      matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'model_phrase',
-      debug: `${parsed.models.join('/')} + "${parsed.partPhrase}"`
+      debug: `${debug} (${filtered.length} found)`
     };
   }
 
-  // Strategy 3: Make + part phrase
+  // Strategy 3: Year + Make + Part phrase
   if (parsed.make && parsed.partPhrase) {
     let q = knex('YourListing').where('listingStatus', 'Active');
     q = q.andWhere('title', 'ilike', `%${parsed.make}%`);
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
-    const listings = await q.select('title').limit(10);
+    const allListings = await q.select('title').limit(50);
+    const filtered = filterByYear(allListings, parsed.yearStart, parsed.yearEnd);
+    const debug = [yearLabel, parsed.make, '"' + parsed.partPhrase + '"'].filter(Boolean).join(' + ');
     return {
-      stock: listings.length,
-      matchedTitles: listings.map(l => l.title),
+      stock: filtered.length,
+      matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'make_phrase',
-      debug: `${parsed.make} + "${parsed.partPhrase}"`
+      debug: `${debug} (${filtered.length} found)`
     };
   }
 
-  // Strategy 4: Model + fallback words
+  // Strategy 4: Year + Model + fallback words
   if (parsed.models.length > 0 && parsed.partWords.length >= 2) {
     let q = knex('YourListing').where('listingStatus', 'Active');
     q = q.where(function() {
       for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
     });
     for (const w of parsed.partWords) q = q.andWhere('title', 'ilike', `%${w}%`);
-    const listings = await q.select('title').limit(10);
+    const allListings = await q.select('title').limit(50);
+    const filtered = filterByYear(allListings, parsed.yearStart, parsed.yearEnd);
+    const debug = [yearLabel, parsed.models.join('/'), '[' + parsed.partWords.join(', ') + ']'].filter(Boolean).join(' + ');
     return {
-      stock: listings.length,
-      matchedTitles: listings.map(l => l.title),
+      stock: filtered.length,
+      matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'model_words',
-      debug: `${parsed.models.join('/')} + [${parsed.partWords.join(', ')}] (approx)`
+      debug: `${debug} (${filtered.length} found, approx)`
     };
   }
 
   return { stock: 0, matchedTitles: [], method: 'none', debug: 'No match criteria (need model + part type)' };
-}
-
-async function countQuery(knex, realPNs) {
-  let q = knex('YourListing').where('listingStatus', 'Active');
-  q = q.where(function() {
-    for (const pn of realPNs) {
-      this.orWhere('title', 'ilike', `%${pn.raw}%`);
-      if (pn.base !== pn.raw) this.orWhere('title', 'ilike', `%${pn.base}%`);
-    }
-  });
-  const [{ count }] = await q.count('* as count');
-  return parseInt(count) || 0;
-}
-
-async function countFull(knex, parsed) {
-  let q = knex('YourListing').where('listingStatus', 'Active');
-  q = q.where(function() {
-    for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
-  });
-  q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
-  const [{ count }] = await q.count('* as count');
-  return parseInt(count) || 0;
 }
 
 /**
@@ -475,6 +491,7 @@ async function matchPartToYardVehicles(partTitle) {
 
 module.exports = {
   extractPartNumbers,
+  extractYearsFromTitle,
   normalizePartNumber,
   parseTitle,
   matchPartToListings,
