@@ -561,7 +561,7 @@
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
         </div>
         <div class="pd-reason">${p.reason || ''}</div>
-        ${p.deadWarning ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">DEAD: ${p.deadWarning.failureReason || 'unknown'}</div>` : ''}
+        ${p.deadWarning && p.deadWarning.failureReason && p.deadWarning.failureReason !== 'unknown' ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">${p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold — was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold — low demand for this part' : p.deadWarning.failureReason}</div>` : ''}
       </div>`;
     }
 

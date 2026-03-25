@@ -276,7 +276,7 @@ class AttackListService {
         const partType = detectPartType(title);
         const yearRange = this.extractYearRange(title);
 
-        const key = `${make}|${model}`;
+        const key = `${make}|${model.toUpperCase()}`;
         if (!index[key]) {
           index[key] = { make, model, sales: [] };
         }
