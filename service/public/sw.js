@@ -1,15 +1,6 @@
-const CACHE_NAME = 'darkhawk-v2';
+const CACHE_NAME = 'darkhawk-v3';
 const PRECACHE_URLS = [
-  '/admin/pull',
-  '/admin/restock',
-  '/admin/gate',
-  '/admin/vin',
-  '/admin/darkhawk-logo.png',
-  '/admin/darkhawk-splash.jpg',
-  '/admin/attack-list.html',
-  '/admin/restock.html',
-  '/admin/gate.html',
-  '/admin/vin-scanner.html',
+  '/admin/darkhawk-logo-sm.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -21,6 +12,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Delete ALL old caches (including the ones with the 5.3MB logo)
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
@@ -30,30 +22,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
 
-  // API routes: network-first
-  if (url.pathname.startsWith('/attack-list') || url.pathname.startsWith('/restock/') ||
-      url.pathname.startsWith('/vin/') || url.pathname.startsWith('/api/')) {
+  // Only cache static images — NOT API responses, NOT HTML pages
+  if (url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.svg')) {
     event.respondWith(
-      fetch(event.request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+        if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
         return response;
-      }).catch(() => caches.match(event.request))
+      }))
     );
     return;
   }
 
-  // Static pages + assets: stale-while-revalidate (show cached instantly, update in background)
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      const fetchPromise = fetch(event.request).then(response => {
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
-        return response;
-      });
-      return cached || fetchPromise;
-    })
-  );
+  // Everything else: network only (no caching HTML/API in service worker)
 });

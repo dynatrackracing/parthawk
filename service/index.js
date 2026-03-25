@@ -141,6 +141,9 @@ app.get('/admin/gate', (req, res) => {
 app.get('/admin/vin', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'vin-scanner.html'));
 });
+app.get('/admin/test', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'test.html'));
+});
 // private routes for admin only
 app.use('/private', require('./routes/private'));
 app.get('/test', (req, res) => {
