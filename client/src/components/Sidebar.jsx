@@ -175,26 +175,30 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               Tools
             </h3>
             <nav className="space-y-1">
-              <NavItem to="/" icon={HomeIcon} label="Home" isActive={page === "/"} />
+              <NavItem to="/" icon={HomeIcon} label="THE NEST" isActive={page === "/"} />
               <a href="/admin/pull" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <TargetIcon />
-                <span className="text-xs font-semibold tracking-wide">DADDY SEEKR</span>
-              </a>
-              <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
-                <ChartIcon />
-                <span className="text-xs font-semibold tracking-wide">PREY LIST</span>
-              </a>
-              <a href="/admin/restock-list" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
-                <ClockIcon />
-                <span className="text-xs font-semibold tracking-wide">RESTOCK</span>
-              </a>
-              <a href="/admin/gate" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
-                <DollarIcon />
-                <span className="text-xs font-semibold tracking-wide">GATE KEEPER</span>
+                <span className="text-xs font-semibold tracking-wide">DAILY FEED</span>
               </a>
               <a href="/admin/vin" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <SearchIcon />
-                <span className="text-xs font-semibold tracking-wide">VIN SCANNER</span>
+                <span className="text-xs font-semibold tracking-wide">HAWK EYE</span>
+              </a>
+              <a href="/admin/gate" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <DollarIcon />
+                <span className="text-xs font-semibold tracking-wide">NEST PROTECTOR</span>
+              </a>
+              <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <ChartIcon />
+                <span className="text-xs font-semibold tracking-wide">BONE PILE</span>
+              </a>
+              <a href="/admin/restock-list" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <ClockIcon />
+                <span className="text-xs font-semibold tracking-wide">HUNTERS PERCH</span>
+              </a>
+              <a href="/admin/scout-alerts" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <SettingsIcon />
+                <span className="text-xs font-semibold tracking-wide">SCOUT ALERTS</span>
               </a>
             </nav>
           </div>

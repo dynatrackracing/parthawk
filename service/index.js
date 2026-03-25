@@ -145,6 +145,9 @@ app.get('/admin/gate', (req, res) => {
 app.get('/admin/vin', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'vin-scanner.html'));
 });
+app.get('/admin/scout-alerts', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
+});
 app.get('/admin/test', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'test.html'));
 });

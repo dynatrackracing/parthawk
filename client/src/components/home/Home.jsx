@@ -63,11 +63,12 @@ const Home = () => {
         {/* Quick links */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
           {[
-            { label: '🎯 DADDY SEEKR', href: '/admin/pull' },
-            { label: '📦 PREY LIST', href: '/admin/restock' },
-            { label: '🔄 RESTOCK', href: '/admin/restock-list' },
-            { label: '🧮 GATE KEEPER', href: '/admin/gate' },
-            { label: '📷 VIN SCANNER', href: '/admin/vin' },
+            { label: '🎯 DAILY FEED', href: '/admin/pull' },
+            { label: '🦅 HAWK EYE', href: '/admin/vin' },
+            { label: '🛡️ NEST PROTECTOR', href: '/admin/gate' },
+            { label: '🦴 BONE PILE', href: '/admin/restock' },
+            { label: '🪹 HUNTERS PERCH', href: '/admin/restock-list' },
+            { label: '📡 SCOUT ALERTS', href: '/admin/scout-alerts' },
           ].map(link => (
             <a key={link.href} href={link.href}
               style={{ padding: '10px 16px', background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#9CA3AF', fontSize: '13px', fontWeight: 600, textDecoration: 'none', transition: 'all 0.15s', flex: '1', minWidth: '140px', textAlign: 'center' }}
