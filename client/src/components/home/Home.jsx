@@ -65,6 +65,7 @@ const Home = () => {
           {[
             { label: '🎯 DADDY SEEKR', href: '/admin/pull' },
             { label: '📦 PREY LIST', href: '/admin/restock' },
+            { label: '🔄 RESTOCK', href: '/admin/restock-list' },
             { label: '🧮 GATE KEEPER', href: '/admin/gate' },
             { label: '📷 VIN SCANNER', href: '/admin/vin' },
           ].map(link => (

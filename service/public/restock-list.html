@@ -129,6 +129,18 @@ function renderPage() {
     h += '<div class="part-title">' + esc(item.title) + '</div>';
     if (item.notes) h += '<div class="part-notes">' + esc(item.notes) + '</div>';
     h += '<div class="part-meta"><span class="badge ' + bc + '">' + badge + '</span><span>Avg ' + priceStr + '</span><span>Last sold ' + soldStr + '</span></div>';
+    // Match debug — expandable
+    if (item.matchDebug) {
+      h += '<details style="margin-top:3px"><summary style="font-size:9px;color:#6B7280;cursor:pointer">Match: ' + esc(item.matchDebug) + '</summary>';
+      if (item.matchedTitles && item.matchedTitles.length > 0) {
+        h += '<div style="font-size:10px;color:#9CA3AF;margin-top:3px;padding-left:8px;border-left:2px solid #2a2a2a">';
+        item.matchedTitles.forEach(function(t) { h += '<div style="padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t) + '</div>'; });
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:10px;color:#6B7280;margin-top:2px;padding-left:8px">No matching listings found</div>';
+      }
+      h += '</details>';
+    }
     h += '</div>';
     h += '<button class="del-btn" onclick="delPart(' + item.id + ',this)" title="Remove">&#x1f5d1;</button>';
     h += '</div>';
