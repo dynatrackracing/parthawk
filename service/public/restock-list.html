@@ -128,8 +128,11 @@ function renderPage() {
   var h = '<div class="card">';
   visible.forEach(function(item, idx) {
     var badge, bc;
+    var approx = (item.confidence === 'low') ? '~' : '';
     if (item.pulled) { badge = 'PULLED'; bc = 'b-pulled'; }
+    else if (item.confidence === 'none') { badge = '? VERIFY'; bc = 'b-out'; }
     else if (item.stock === 0) { badge = 'OUT OF STOCK'; bc = 'b-out'; }
+    else if (item.confidence === 'low') { badge = approx + item.stock + ' LOW?'; bc = 'b-low'; }
     else if (item.stock <= 2) { badge = item.stock + ' LOW'; bc = 'b-low'; }
     else { badge = item.stock + ' STOCKED'; bc = 'b-ok'; }
 

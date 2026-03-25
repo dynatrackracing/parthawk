@@ -3,6 +3,32 @@
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
 
+// Diagnostic endpoint — shows exactly what matched and why
+router.get('/debug/:id', async (req, res) => {
+  const knex = database;
+  const item = await knex('restock_want_list').where({ id: req.params.id }).first();
+  if (!item) return res.status(404).json({ error: 'Not found' });
+
+  const match = buildMatch(item.title);
+  if (!match) return res.json({ title: item.title, match: null, message: 'No match criteria could be extracted' });
+
+  // Build the raw SQL for debugging
+  let listingQuery = knex('YourListing').where('listingStatus', 'Active');
+  listingQuery = applyMatch(listingQuery, match, 'title');
+  const listings = await listingQuery.select('title', 'sku', 'listingStatus', 'startTime').limit(20);
+
+  let saleQuery = knex('YourSale');
+  saleQuery = applyMatch(saleQuery, match, 'title');
+  const sales = await saleQuery.select('title', 'salePrice', 'soldDate').orderBy('soldDate', 'desc').limit(10);
+
+  res.json({
+    wantTitle: item.title,
+    matchStrategy: match,
+    activeListings: listings,
+    recentSales: sales
+  });
+});
+
 // Get all active want list items with stock counts and sale data
 router.get('/items', async (req, res) => {
   const knex = database;
@@ -15,6 +41,7 @@ router.get('/items', async (req, res) => {
     let avgPrice = null;
     let lastSold = null;
     let matchedTitles = [];
+    let confidence = 'none';
 
     if (match) {
       // Count active listings
@@ -24,7 +51,6 @@ router.get('/items', async (req, res) => {
       stock = listings.length;
       matchedTitles = listings.map(l => l.title);
 
-      // If we got 10 results, do a proper count (there may be more)
       if (stock === 10) {
         let countQuery = knex('YourListing').where('listingStatus', 'Active');
         countQuery = applyMatch(countQuery, match, 'title');
@@ -45,6 +71,8 @@ router.get('/items', async (req, res) => {
         avgPrice = Math.round(parseFloat(sales.avg_price) || 0);
         lastSold = sales.last_sold;
       }
+
+      confidence = match.confidence || 'medium';
     }
 
     results.push({
@@ -57,6 +85,7 @@ router.get('/items', async (req, res) => {
       avgPrice,
       lastSold,
       matchedTitles,
+      confidence,
       matchDebug: match ? match.debug : 'no match criteria',
       created_at: item.created_at
     });
@@ -65,10 +94,10 @@ router.get('/items', async (req, res) => {
   // Sort: OUT OF STOCK (0, not pulled) → PULLED → LOW (1-2) → STOCKED (3+)
   results.sort((a, b) => {
     const rank = (item) => {
-      if (item.stock === 0 && !item.pulled) return 0; // OUT OF STOCK — top
-      if (item.pulled) return 1;                        // PULLED
-      if (item.stock <= 2) return 2;                    // LOW
-      return 3;                                          // STOCKED
+      if (item.stock === 0 && !item.pulled) return 0;
+      if (item.pulled) return 1;
+      if (item.stock <= 2) return 2;
+      return 3;
     };
     const ra = rank(a), rb = rank(b);
     if (ra !== rb) return ra - rb;
@@ -104,12 +133,9 @@ router.post('/find-in-yard', async (req, res) => {
     .where('yard_vehicle.active', true)
     .where('yard.enabled', true);
 
-  // Match make
   if (parsed.make) {
     query = query.where('yard_vehicle.make', 'ilike', `%${parsed.make}%`);
   }
-
-  // Match model(s) — OR across multiple models
   if (parsed.models.length > 0) {
     query = query.where(function() {
       for (const model of parsed.models) {
@@ -117,8 +143,6 @@ router.post('/find-in-yard', async (req, res) => {
       }
     });
   }
-
-  // Year range filter
   if (parsed.yearStart) {
     query = query.where('yard_vehicle.year', '>=', String(parsed.yearStart));
   }
@@ -140,12 +164,8 @@ router.post('/find-in-yard', async (req, res) => {
       ? Math.floor((Date.now() - new Date(v.date_added).getTime()) / 86400000)
       : null;
     return {
-      year: v.year,
-      make: v.make,
-      model: v.model,
-      color: v.color,
-      row: v.row_number || '?',
-      yard: v.yard_name,
+      year: v.year, make: v.make, model: v.model, color: v.color,
+      row: v.row_number || '?', yard: v.yard_name,
       daysAgo: daysAgo !== null ? (daysAgo <= 0 ? 'today' : daysAgo + 'd ago') : '?'
     };
   });
@@ -174,12 +194,14 @@ router.post('/delete', async (req, res) => {
   res.json({ success: true });
 });
 
-// Parse make, model(s), and year range from a want list title
+// ============================================================
+// MATCHING LOGIC
+// ============================================================
+
 function parseVehicleFromTitle(title) {
   const titleLower = title.toLowerCase();
-
-  // Extract year range
   let yearStart = null, yearEnd = null;
+
   const rangeMatch = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
   if (rangeMatch) {
     yearStart = parseInt(rangeMatch[1] + rangeMatch[2]);
@@ -189,11 +211,7 @@ function parseVehicleFromTitle(title) {
       : (endDigits.length === 2 ? parseInt(rangeMatch[1] + endDigits) : parseInt(endDigits));
   } else {
     const singleYear = title.match(/\b(19|20)\d{2}\b/);
-    if (singleYear) {
-      yearStart = parseInt(singleYear[0]);
-      yearEnd = yearStart;
-    }
-    // Handle short years like "11-19" or "06-08"
+    if (singleYear) { yearStart = parseInt(singleYear[0]); yearEnd = yearStart; }
     const shortRange = title.match(/\b(\d{2})\s*[-–]\s*(\d{2})\b/);
     if (shortRange && !rangeMatch) {
       const s = parseInt(shortRange[1]), e = parseInt(shortRange[2]);
@@ -204,21 +222,18 @@ function parseVehicleFromTitle(title) {
     }
   }
 
-  // Handle "2011+" style
   const plusMatch = title.match(/\b(19|20)(\d{2})\+/);
   if (plusMatch && !yearStart) {
     yearStart = parseInt(plusMatch[1] + plusMatch[2]);
     yearEnd = new Date().getFullYear();
   }
 
-  // Find make
   let foundMake = null;
   for (const make of MAKES_LIST) {
     const re = new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) { foundMake = make; break; }
   }
 
-  // Find models
   const foundModels = [];
   for (const model of MODELS) {
     const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
@@ -226,7 +241,6 @@ function parseVehicleFromTitle(title) {
   }
 
   if (!foundMake && foundModels.length === 0) return null;
-
   return { make: foundMake, models: foundModels, yearStart, yearEnd };
 }
 
@@ -237,7 +251,6 @@ const MAKES_LIST = [
   'chevrolet','chevy','mercedes','ram',
 ];
 
-// Known vehicle models
 const MODELS = new Set([
   'f150','f250','f350','vue','tsx','ridgeline','xc90','xc70','coupe','m35',
   'sequoia','mazda6','town car','p38','dakota','durango','fusion','corolla',
@@ -252,96 +265,127 @@ const MODELS = new Set([
   'pacifica','voyager','camaro','300','l100','q60','q40','ram',
 ]);
 
-// Known part types
+// Part phrases — matched as CONTIGUOUS strings, not split into words
 const PART_PHRASES = [
-  'yaw rate sensor', 'yaw rate', 'fuse box', 'ignition switch', 'ignition lock',
-  'body control module', 'brake booster', 'brake accumulator', 'brake pump',
-  'throttle body', 'oil cooler', 'intake manifold', 'center console lid',
-  'center console', 'door module', 'door control module', 'steering angle sensor',
-  'power steering pump', 'turn signal', 'wiper switch', 'combo switch',
-  'spare tire', 'spare tire donut', 'gear shifter', 'floor shifter',
-  'rear window motor', 'fan solenoid', 'fan complete', 'camshaft set',
-  'control module', 'transfer case', 'rear door hinge',
+  'yaw rate sensor', 'yaw rate', 'fuse box', 'ignition switch lock',
+  'ignition switch', 'ignition lock', 'body control module', 'brake booster',
+  'brake accumulator', 'brake pump', 'abs pump', 'abs brake pump',
+  'throttle body', 'oil cooler housing', 'oil cooler', 'intake manifold',
+  'center console lid', 'center console', 'door control module', 'door module',
+  'steering angle sensor', 'power steering pump', 'turn signal',
+  'wiper switch', 'combo switch', 'spare tire donut', 'spare tire',
+  'gear shifter', 'gear selector', 'floor shifter', 'rear window motor',
+  'fan solenoid', 'camshaft set', 'control module', 'transfer case',
+  'rear door hinge', 'fuse relay box', 'fuse junction', 'fuse relay',
 ];
 
 function buildMatch(title) {
-  // 1. Extract OEM part numbers
+  const titleLower = title.toLowerCase();
+
+  // 1. Extract OEM part numbers (highest confidence)
   const pnMatches = title.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)*\b/gi) || [];
   const numPns = title.match(/\b\d{5,}\b/g) || [];
   const partNumbers = [...pnMatches, ...numPns]
     .filter(pn => pn.length >= 5 && !/^\d{4}$/.test(pn) && !/^(19|20)\d{2}$/.test(pn));
 
+  if (partNumbers.length > 0) {
+    return {
+      type: 'pn', partNumbers, confidence: 'high',
+      debug: `PN: ${partNumbers.join(', ')}`
+    };
+  }
+
   // 2. Extract model names
-  const titleLower = title.toLowerCase();
   const foundModels = [];
   for (const model of MODELS) {
     const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) foundModels.push(model);
   }
 
-  // 3. Extract part type phrase
+  // 3. Extract part phrase — match as CONTIGUOUS string (the key fix)
   let foundPartPhrase = null;
   for (const phrase of PART_PHRASES) {
     if (titleLower.includes(phrase)) {
-      if (!foundPartPhrase || phrase.length > foundPartPhrase.length) foundPartPhrase = phrase;
+      if (!foundPartPhrase || phrase.length > foundPartPhrase.length) {
+        foundPartPhrase = phrase;
+      }
     }
   }
 
-  // 4. Fallback part words
-  const partStopWords = new Set([
-    'oem','the','and','for','with','only','new','used','genuine','w','a','an',
-    'in','on','of','to','or','set','left','right','upper','lower','rear','front',
-    'driver','passenger','automatic','manual','electric','non-turbo','turbo',
-    'plastic','dark','gray','black','blue','yellow','discount','prices','check',
-    'get','plugs','good','shape','not','complete','combo','assembly','unused',
-    'tire','needs','show','whiskers','wear','bolt','housing','block','unit',
-    'smaller','sedan','coupe','dr','4dr',
-  ]);
+  // 4. Find make
+  let foundMake = null;
+  for (const make of MAKES_LIST) {
+    const re = new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (re.test(titleLower)) { foundMake = make; break; }
+  }
 
-  let partWords = [];
+  // 5. Fallback: extract individual part words (only if no phrase found)
+  let fallbackWords = [];
   if (!foundPartPhrase) {
     const cleaned = title
       .replace(/\([^)]*\)/g, '')
       .replace(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)*\b/g, '')
       .replace(/\b\d+\b/g, '')
       .replace(/[^a-zA-Z\s]/g, ' ');
-    partWords = cleaned.split(/\s+/)
+    const makesSet = new Set(MAKES_LIST);
+    fallbackWords = cleaned.split(/\s+/)
       .map(w => w.toLowerCase().trim())
-      .filter(w => w.length >= 3 && !partStopWords.has(w) && !new Set(MAKES_LIST).has(w) && !MODELS.has(w));
-    partWords = [...new Set(partWords)].slice(0, 2);
+      .filter(w => w.length >= 3 && !STOP_WORDS.has(w) && !makesSet.has(w) && !MODELS.has(w));
+    fallbackWords = [...new Set(fallbackWords)].slice(0, 3);
   }
 
-  // Strategy 1: Part number match
-  if (partNumbers.length > 0) {
-    return { type: 'pn', partNumbers, models: foundModels, debug: `PN: ${partNumbers.join(', ')}` };
+  // Strategy A: Model + contiguous part phrase (HIGH confidence)
+  if (foundModels.length > 0 && foundPartPhrase) {
+    return {
+      type: 'phrase', models: foundModels, phrase: foundPartPhrase,
+      confidence: 'high',
+      debug: `Models: [${foundModels.join(', ')}] + Phrase: "${foundPartPhrase}"`
+    };
   }
 
-  // Strategy 2: Model + part phrase/words
-  if (foundModels.length > 0 && (foundPartPhrase || partWords.length > 0)) {
-    const partTerms = foundPartPhrase
-      ? foundPartPhrase.split(' ').filter(w => w.length >= 3)
-      : partWords;
-    return { type: 'keywords', models: foundModels, partTerms, debug: `Models: [${foundModels.join(', ')}] + Parts: [${partTerms.join(', ')}]` };
+  // Strategy B: Make + contiguous part phrase (MEDIUM confidence)
+  if (foundMake && foundPartPhrase) {
+    return {
+      type: 'phrase', models: [], make: foundMake, phrase: foundPartPhrase,
+      confidence: 'medium',
+      debug: `Make: ${foundMake} + Phrase: "${foundPartPhrase}"`
+    };
   }
 
-  // Strategy 3: Make + part phrase
-  if (foundPartPhrase) {
-    const partTerms = foundPartPhrase.split(' ').filter(w => w.length >= 3);
-    let foundMake = null;
-    for (const make of MAKES_LIST) {
-      const re = new RegExp('\\b' + make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-      if (re.test(titleLower)) { foundMake = make; break; }
-    }
-    if (foundMake) {
-      return { type: 'keywords', models: [], make: foundMake, partTerms, debug: `Make: ${foundMake} + Parts: [${partTerms.join(', ')}]` };
-    }
+  // Strategy C: Model + fallback words (LOW confidence — show as approximate)
+  if (foundModels.length > 0 && fallbackWords.length >= 2) {
+    return {
+      type: 'keywords', models: foundModels, partTerms: fallbackWords,
+      confidence: 'low',
+      debug: `Models: [${foundModels.join(', ')}] + Words: [${fallbackWords.join(', ')}] (approx)`
+    };
+  }
+
+  // Strategy D: Make + fallback words (LOW confidence)
+  if (foundMake && fallbackWords.length >= 2) {
+    return {
+      type: 'keywords', models: [], make: foundMake, partTerms: fallbackWords,
+      confidence: 'low',
+      debug: `Make: ${foundMake} + Words: [${fallbackWords.join(', ')}] (approx)`
+    };
   }
 
   return null;
 }
 
+const STOP_WORDS = new Set([
+  'oem','the','and','for','with','only','new','used','genuine','w','a','an',
+  'in','on','of','to','or','set','left','right','upper','lower','rear','front',
+  'driver','passenger','automatic','manual','electric','non-turbo','turbo',
+  'plastic','dark','gray','black','blue','yellow','discount','prices','check',
+  'get','plugs','good','shape','not','complete','combo','assembly','unused',
+  'tire','needs','show','whiskers','wear','bolt','housing','block','unit',
+  'smaller','sedan','coupe','dr','4dr','hybrid','lock','key','keys',
+]);
+
 function applyMatch(query, match, col) {
   if (match.type === 'pn') {
+    // Match ANY part number (OR)
     query = query.where(function() {
       for (const pn of match.partNumbers) {
         this.orWhere(col, 'ilike', `%${pn}%`);
@@ -350,8 +394,9 @@ function applyMatch(query, match, col) {
     return query;
   }
 
-  if (match.type === 'keywords') {
-    if (match.models.length > 0) {
+  if (match.type === 'phrase') {
+    // Model/make filter
+    if (match.models && match.models.length > 0) {
       query = query.where(function() {
         for (const model of match.models) {
           this.orWhere(col, 'ilike', `%${model}%`);
@@ -360,7 +405,23 @@ function applyMatch(query, match, col) {
     } else if (match.make) {
       query = query.where(col, 'ilike', `%${match.make}%`);
     }
+    // Match the ENTIRE part phrase as a contiguous string
+    query = query.andWhere(col, 'ilike', `%${match.phrase}%`);
+    return query;
+  }
 
+  if (match.type === 'keywords') {
+    // Model/make filter
+    if (match.models && match.models.length > 0) {
+      query = query.where(function() {
+        for (const model of match.models) {
+          this.orWhere(col, 'ilike', `%${model}%`);
+        }
+      });
+    } else if (match.make) {
+      query = query.where(col, 'ilike', `%${match.make}%`);
+    }
+    // Each word individually (this is the fallback — lower confidence)
     for (const term of match.partTerms) {
       query = query.andWhere(col, 'ilike', `%${term}%`);
     }
