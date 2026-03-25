@@ -9,27 +9,45 @@ const { v4: uuidv4 } = require('uuid');
 
 /**
  * GET /attack-list
- * Get attack list across all yards — sorted by opportunity
+ * Get attack list across all yards — sorted by opportunity.
+ * By default returns SLIM vehicles (no parts/rebuild_parts) to keep payload under 200KB.
+ * Parts are loaded on-demand via GET /attack-list/vehicle/:id/parts.
+ * Pass ?full=true to get the old behavior (large payload with all parts).
  */
 router.get('/', async (req, res) => {
   try {
-    const { days = 90, activeOnly } = req.query;
+    const { days = 90, activeOnly, full } = req.query;
     const service = new AttackListService();
     const results = await service.getAllYardsAttackList({
       daysBack: parseInt(days),
       activeOnly: activeOnly === 'true',
     });
 
-    // Enrich with dead inventory warnings (best effort, non-blocking)
-    const deadService = new DeadInventoryService();
-    for (const yard of results) {
-      for (const vehicle of (yard.vehicles || [])) {
-        for (const part of (vehicle.parts || [])) {
-          if (part.partNumber) {
-            try {
-              const warning = await deadService.getWarning(part.partNumber);
-              if (warning) part.deadWarning = warning;
-            } catch (e) { /* ignore */ }
+    // Strip parts arrays for slim mode (default) — huge memory savings on mobile
+    if (full !== 'true') {
+      for (const yard of results) {
+        for (const vehicle of (yard.vehicles || [])) {
+          // Keep only chip-display data: part type + price for each part
+          vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
+            partType: p.partType, price: p.price, verdict: p.verdict,
+          }));
+          delete vehicle.parts;
+          delete vehicle.rebuild_parts;
+          delete vehicle.platform_siblings;
+        }
+      }
+    } else {
+      // Full mode: enrich with dead inventory warnings
+      const deadService = new DeadInventoryService();
+      for (const yard of results) {
+        for (const vehicle of (yard.vehicles || [])) {
+          for (const part of (vehicle.parts || [])) {
+            if (part.partNumber) {
+              try {
+                const warning = await deadService.getWarning(part.partNumber);
+                if (warning) part.deadWarning = warning;
+              } catch (e) { /* ignore */ }
+            }
           }
         }
       }
@@ -42,6 +60,52 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     log.error({ err }, 'Error generating attack list');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /attack-list/vehicle/:id/parts
+ * Load parts for a single vehicle on-demand (when user taps to expand).
+ */
+router.get('/vehicle/:id/parts', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const service = new AttackListService();
+
+    // Find the vehicle in the DB
+    const vehicle = await database('yard_vehicle').where('id', id).first();
+    if (!vehicle) return res.status(404).json({ success: false, error: 'Vehicle not found' });
+
+    // Build indexes and score just this one vehicle
+    const inventoryIndex = await service.buildInventoryIndex();
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const salesIndex = await service.buildSalesIndex(cutoff);
+    const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await service.buildStockIndex();
+    const platformIndex = await service.buildPlatformIndex();
+
+    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
+
+    // Enrich with dead inventory warnings
+    const deadService = new DeadInventoryService();
+    for (const part of (scored.parts || [])) {
+      if (part.partNumber) {
+        try {
+          const warning = await deadService.getWarning(part.partNumber);
+          if (warning) part.deadWarning = warning;
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    res.json({
+      success: true,
+      id,
+      parts: scored.parts || [],
+      rebuild_parts: scored.rebuild_parts || null,
+      platform_siblings: scored.platform_siblings || null,
+    });
+  } catch (err) {
+    log.error({ err }, 'Error loading vehicle parts');
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -16,7 +16,9 @@ const { authMiddleware } = require('./middleware/Middleware');
 
 const app = express();
 const cors = require('cors')
+const compression = require('compression');
 const PORT = process.env.PORT || 9000;
+app.use(compression()); // gzip all responses — critical for mobile
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors());
@@ -600,7 +602,15 @@ app.get('/api/debug/makes', async (req, res) => {
 
 
   // Have Node serve the files for our built React app
-  app.use(express.static(path.resolve(__dirname, '../client/build')));
+  app.use(express.static(path.resolve(__dirname, '../client/build'), {
+    maxAge: '1h',
+    setHeaders: (res, filePath) => {
+      // Hash-named chunks can be cached long-term
+      if (filePath.includes('/static/js/') || filePath.includes('/static/css/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
   // All other GET requests not handled before will return our React app
   app.get('/*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));

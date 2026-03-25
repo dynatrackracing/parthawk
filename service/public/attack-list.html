@@ -395,6 +395,8 @@
 
   function renderData() {
     if (!allData) return;
+    pendingLazy = []; // Reset lazy sections
+    if (lazyObserver) lazyObserver.disconnect();
     let yards = allData.yards;
 
     if (currentTab.startsWith('yard:')) {
@@ -464,34 +466,78 @@
         if (sec.vehicles.length === 0) continue;
         html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
-        for (const v of sec.vehicles) {
-          html += renderVehicle(v);
+        // Render first BATCH_SIZE immediately, rest via lazy loading
+        const BATCH = 30;
+        for (let i = 0; i < Math.min(BATCH, sec.vehicles.length); i++) {
+          html += renderVehicle(sec.vehicles[i]);
+        }
+        if (sec.vehicles.length > BATCH) {
+          const sectionId = 'lazy-' + yd.yard.id + '-' + sec.label.replace(/\s+/g, '');
+          pendingLazy.push({ id: sectionId, vehicles: sec.vehicles.slice(BATCH) });
+          html += `<div id="${sectionId}" style="padding:12px 14px;text-align:center;color:#6B7280;font-size:11px;cursor:pointer;" onclick="loadLazySection('${sectionId}')">Show ${sec.vehicles.length - BATCH} more...</div>`;
         }
       }
       html += '</div></div>';
     }
     document.getElementById('mainContent').innerHTML = html;
+    // Auto-load lazy sections as user scrolls near them
+    setupLazyObserver();
+  }
+
+  let pendingLazy = [];
+  let lazyObserver = null;
+
+  function setupLazyObserver() {
+    if (lazyObserver) lazyObserver.disconnect();
+    if (pendingLazy.length === 0) return;
+    lazyObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          loadLazySection(entry.target.id);
+          lazyObserver.unobserve(entry.target);
+        }
+      }
+    }, { rootMargin: '200px' });
+    for (const p of pendingLazy) {
+      const el = document.getElementById(p.id);
+      if (el) lazyObserver.observe(el);
+    }
+  }
+
+  function loadLazySection(sectionId) {
+    const idx = pendingLazy.findIndex(p => p.id === sectionId);
+    if (idx === -1) return;
+    const section = pendingLazy[idx];
+    pendingLazy.splice(idx, 1);
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    let html = '';
+    for (const v of section.vehicles) html += renderVehicle(v);
+    el.outerHTML = html;
   }
 
   function renderVehicle(v) {
     const sc = v.color_code;
-    const parts = v.parts || [];
-    // Deduplicate chips by partType, color by individual part price
+    // Use part_chips (slim mode) or parts (full/manual mode) for chip display
+    const chipSource = v.part_chips || (v.parts || []).slice(0, 4).map(p => ({ partType: p.partType || p.category, price: p.price }));
     const chipTypes = new Set();
-    const chips = parts.filter(p => {
-      const t = p.partType || p.category || '?';
+    const chips = chipSource.filter(p => {
+      const t = p.partType || '?';
       if (chipTypes.has(t)) return false;
       chipTypes.add(t);
       return true;
     }).slice(0, 4).map(p => {
       const price = p.price || 0;
       const cc = price >= 300 ? 'chip-green' : price >= 200 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : 'chip-red';
-      return `<span class="chip ${cc}">${p.partType || p.category || '?'}</span>`;
+      return `<span class="chip ${cc}">${p.partType || '?'}</span>`;
     }).join('');
 
     const rowClass = vehicleRowClass(v);
     const aBadge = ageBadge(v);
     const goneLabel = v.is_active === false ? '<span class="chip chip-age age-old">GONE</span>' : '';
+
+    // Don't pre-render expanded parts — load on demand when tapped
+    const hasPartsPreloaded = v.parts && v.parts.length > 0;
 
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
@@ -513,7 +559,7 @@
         </div>
       </div>
       <div class="v-expanded" id="vexp-${v.id}">
-        ${renderExpandedParts(v)}
+        ${hasPartsPreloaded ? renderExpandedParts(v) : '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;">Tap to load parts...</div>'}
       </div>
     </div>`;
   }
@@ -615,15 +661,31 @@
     return null;
   }
 
-  function toggleV(id) {
+  async function toggleV(id) {
     const exp = document.getElementById('vexp-' + id);
     if (!exp) return;
     const wasOpen = exp.classList.contains('open');
     exp.classList.toggle('open');
-    if (!wasOpen && !exp.dataset.locLoaded) {
-      exp.dataset.locLoaded = '1';
-      loadLocation(id);
+    if (!wasOpen && !exp.dataset.loaded) {
+      exp.dataset.loaded = '1';
       const vehicle = findVehicleById(id);
+
+      // Load parts on-demand if not already present (slim mode)
+      if (vehicle && !vehicle.parts) {
+        exp.innerHTML = '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;text-align:center;"><div class="spinner" style="display:inline-block;"></div> Loading parts...</div>';
+        try {
+          const res = await fetch('/attack-list/vehicle/' + id + '/parts');
+          const data = await res.json();
+          if (data.success) {
+            vehicle.parts = data.parts || [];
+            vehicle.rebuild_parts = data.rebuild_parts || null;
+            vehicle.platform_siblings = data.platform_siblings || null;
+          }
+        } catch (e) { /* use empty parts */ }
+        exp.innerHTML = renderExpandedParts(vehicle || { parts: [] });
+      }
+
+      loadLocation(id);
       if (vehicle && vehicle.trim) loadTrimIntel(vehicle);
     }
   }
