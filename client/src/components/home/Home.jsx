@@ -13,8 +13,13 @@ const StatCard = ({ label, value, sub }) => (
 
 const Home = () => {
   const [stats, setStats] = useState(null);
+  const [marketStatus, setMarketStatus] = useState(null);
+  const [pricingRunning, setPricingRunning] = useState(false);
 
   useEffect(() => {
+    // Fetch market pricing status
+    axios.get("/api/market-price/status").then(res => setMarketStatus(res.data)).catch(() => {});
+
     const fetchStats = async () => {
       try {
         const [salesRes, yardRes] = await Promise.all([
@@ -78,6 +83,31 @@ const Home = () => {
               {link.label}
             </a>
           ))}
+        </div>
+
+        {/* Market Pricing Controls */}
+        <div style={{ marginTop: '12px', background: '#141414', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Market Pricing</div>
+            <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
+              {marketStatus?.lastRun
+                ? `${marketStatus.cachedParts} parts cached · Updated ${new Date(marketStatus.lastRun).toLocaleDateString()}`
+                : 'No market data yet'}
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              setPricingRunning(true);
+              try {
+                await axios.post('/api/market-price/run-batch');
+                setTimeout(() => { setPricingRunning(false); axios.get("/api/market-price/status").then(res => setMarketStatus(res.data)).catch(() => {}); }, 5000);
+              } catch (e) { setPricingRunning(false); }
+            }}
+            disabled={pricingRunning}
+            style={{ padding: '8px 16px', background: pricingRunning ? '#1a1a1a' : '#dc2626', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: pricingRunning ? 'default' : 'pointer', opacity: pricingRunning ? 0.5 : 1 }}
+          >
+            {pricingRunning ? 'Running...' : 'Refresh Market Prices'}
+          </button>
         </div>
       </div>
     </FadeIn>

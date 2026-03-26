@@ -641,20 +641,39 @@ app.get('/api/debug/makes', async (req, res) => {
 });
 
 
-  // Have Node serve the files for our built React app
-  app.use(express.static(path.resolve(__dirname, '../client/build'), {
-    maxAge: '1h',
-    setHeaders: (res, filePath) => {
-      // Hash-named chunks can be cached long-term
-      if (filePath.includes('/static/js/') || filePath.includes('/static/css/')) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      }
+// Market pricing cache status
+app.get('/api/market-price/status', async (req, res) => {
+  try {
+    const result = await database.raw(`
+      SELECT COUNT(*) as cached_parts, MAX(last_updated) as last_run
+      FROM market_demand_cache
+      WHERE last_updated > NOW() - INTERVAL '24 hours'
+    `);
+    const row = result.rows[0];
+    res.json({
+      cachedParts: parseInt(row.cached_parts) || 0,
+      lastRun: row.last_run || null,
+      stale: parseInt(row.cached_parts) === 0,
+    });
+  } catch (err) {
+    res.json({ cachedParts: 0, lastRun: null, stale: true });
+  }
+});
+
+// ═══ SPA CATCH-ALL — MUST BE LAST ═══
+// All API routes are registered above this point.
+// Static files + SPA fallback below catches everything else.
+app.use(express.static(path.resolve(__dirname, '../client/build'), {
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.includes('/static/js/') || filePath.includes('/static/css/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
-  }));
-  // All other GET requests not handled before will return our React app
-  app.get('/*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
-  });
+  }
+}));
+app.get('/*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
+});
 
 
 async function start() {
