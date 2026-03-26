@@ -51,12 +51,12 @@ app.get('/api/debug/market-cache', async (req, res) => {
       results.directLookup = await getCachedPrice(key);
     }
 
-    // Sample from cache
-    const sample = await database.raw('SELECT part_number_base, market_avg_price, market_sold_count, last_updated FROM market_demand_cache ORDER BY last_updated DESC LIMIT 10');
+    // Sample from cache (correct column names)
+    const sample = await database.raw('SELECT part_number_base, ebay_avg_price, ebay_sold_90d, last_updated FROM market_demand_cache ORDER BY last_updated DESC LIMIT 10');
     results.cacheSample = sample.rows;
 
     // Total counts
-    const counts = await database.raw('SELECT COUNT(*) as total, COUNT(CASE WHEN market_avg_price > 0 THEN 1 END) as with_price FROM market_demand_cache');
+    const counts = await database.raw('SELECT COUNT(*) as total, COUNT(CASE WHEN ebay_avg_price > 0 THEN 1 END) as with_price FROM market_demand_cache');
     results.cacheStats = counts.rows[0];
 
     res.json(results);
