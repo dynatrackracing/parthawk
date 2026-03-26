@@ -3,193 +3,179 @@
 const router = require('express-promise-router')();
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
-const axios = require('axios');
+const priceCheckService = require('../services/PriceCheckService');
 
-const SEARCH_PHASES = [
-  { label: 'Powertrain', terms: 'ECM PCM ECU engine control module, ABS anti-lock brake pump module, TCM TCU transmission control module' },
-  { label: 'Body/Electrical', terms: 'BCM body control module, TIPM fuse box junction relay box, amplifier Bose Harman, radio head unit infotainment, instrument cluster speedometer gauges' },
-  { label: 'Sensors/Other', terms: 'throttle body, parking sensor module, camera module, blind spot module, HVAC module, airbag module, liftgate module, steering module, transfer case control module' },
-];
+const ENGINE_SPECIFIC = new Set(['ECM', 'PCM', 'ECU', 'TCM', 'THROTTLE']);
+const STANDARD_TYPES = ['ECM', 'ABS', 'BCM', 'TCM', 'TIPM', 'AMPLIFIER', 'RADIO', 'CLUSTER', 'THROTTLE'];
 
-const COGS = {
-  ECM: 40, ABS: 75, BCM: 28, TCM: 50, TIPM: 35,
-  AMP: 20, RADIO: 28, CLUSTER: 32, THROTTLE: 36,
-  CAMERA: 25, SENSOR: 20, DEFAULT: 30,
+const COGS = { ECM: 40, ABS: 75, BCM: 28, TCM: 50, TIPM: 35, AMPLIFIER: 20, RADIO: 28, CLUSTER: 32, THROTTLE: 36, DEFAULT: 30 };
+const TYPE_RE = {
+  ECM: /\b(ecm|pcm|ecu|engine\s*control|engine\s*computer)\b/i,
+  ABS: /\b(abs|anti.?lock|brake\s*pump|brake\s*module)\b/i,
+  BCM: /\b(bcm|body\s*control)\b/i,
+  TCM: /\b(tcm|tcu|transmission\s*control)\b/i,
+  TIPM: /\b(tipm|fuse\s*box|junction|fuse\s*relay|ipdm)\b/i,
+  AMPLIFIER: /\b(amp|amplifier|bose|harman)\b/i,
+  RADIO: /\b(radio|head\s*unit|infotainment|receiver)\b/i,
+  CLUSTER: /\b(cluster|speedometer|gauge|instrument)\b/i,
+  THROTTLE: /\b(throttle\s*body)\b/i,
 };
 
-function getVerdict(avgPrice, soldCount) {
-  if ((avgPrice >= 200 && soldCount >= 3) || (avgPrice >= 150 && soldCount >= 2)) return { icon: '✅', label: 'PULL' };
-  if (avgPrice >= 100 && soldCount >= 3) return { icon: '⚠️', label: 'MAYBE' };
-  if (avgPrice >= 200 && soldCount === 1) return { icon: '💎', label: 'RARE' };
+function parseVehicle(str) {
+  if (!str) return null;
+  const m = str.match(/^(\d{4})\s+(\S+)\s+(\S+)(?:\s+(.+))?$/);
+  if (!m) return null;
+  return { year: parseInt(m[1]), make: m[2], model: m[3], engine: m[4] || null };
+}
+
+function getBadge(p) { return p >= 250 ? 'GREAT' : p >= 150 ? 'GOOD' : p >= 100 ? 'FAIR' : 'LOW'; }
+function getVerdict(avg, sold) {
+  if ((avg >= 200 && sold >= 3) || (avg >= 150 && sold >= 2)) return { icon: '✅', label: 'PULL' };
+  if (avg >= 100 && sold >= 3) return { icon: '⚠️', label: 'MAYBE' };
+  if (avg >= 200 && sold === 1) return { icon: '💎', label: 'RARE' };
   return { icon: '❌', label: 'SKIP' };
 }
 
-function getBadge(avgPrice) {
-  if (avgPrice >= 250) return 'GREAT';
-  if (avgPrice >= 150) return 'GOOD';
-  if (avgPrice >= 100) return 'FAIR';
-  return 'LOW';
-}
-
-async function searchPhase(vehicle, terms) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-
-  const prompt = `Search eBay for recently SOLD used OEM parts from a ${vehicle}. Focus on: ${terms}
-
-Search eBay sold listings for each part type. For each with real results, return JSON:
-[{"partType":"ECM","avgPrice":175,"soldCount":8,"priceRange":[120,250],"partNumbers":["if visible"],"velocity":"medium"}]
-
-Rules: Only real sold data. Skip under $50. velocity: fast=10+/mo, medium=3-9/mo, slow=1-2/mo.`;
-
-  const res = await axios.post('https://api.anthropic.com/v1/messages', {
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-    messages: [{ role: 'user', content: prompt }],
-  }, {
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    timeout: 60000,
-  });
-
-  const data = res.data;
-  if (data.error) {
-    log.error({ error: data.error }, '[InstantResearch] API error');
-    throw new Error(data.error.message || JSON.stringify(data.error));
-  }
-
-  // Log the response structure for debugging
-  const blockTypes = (data.content || []).map(b => b.type);
-  log.info({ vehicle, stopReason: data.stop_reason, blockTypes, blockCount: blockTypes.length }, '[InstantResearch] API response');
-
-  // Extract ALL text from the response (may include text blocks between tool results)
-  const textBlocks = (data.content || []).filter(b => b.type === 'text');
-  const fullText = textBlocks.map(b => b.text).join('\n');
-
-  if (!fullText) {
-    log.warn({ vehicle, blockTypes }, '[InstantResearch] No text blocks in response');
+async function getVehicleParts(year, make, model) {
+  try {
+    const rows = await database('Auto')
+      .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+      .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+      .where('Auto.year', year)
+      .whereRaw('UPPER("Auto"."make") = UPPER(?)', [make])
+      .whereRaw('UPPER(REPLACE(REPLACE("Auto"."model", \'-\', \'\'), \' \', \'\')) = UPPER(REPLACE(REPLACE(?, \'-\', \'\'), \' \', \'\'))', [model])
+      .where('Item.price', '>', 0)
+      .select('Item.title', 'Item.manufacturerPartNumber', 'Item.id', 'Auto.engine')
+      .limit(200);
+    return rows;
+  } catch (e) {
+    log.warn({ err: e.message }, '[InstantResearch] Auto lookup failed');
     return [];
   }
-
-  // Parse JSON — try multiple extraction methods
-  const cleaned = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-  // Method 1: find a JSON array
-  const arrayMatch = cleaned.match(/\[[\s\S]*?\]/);
-  if (arrayMatch) {
-    try {
-      const parts = JSON.parse(arrayMatch[0]);
-      if (Array.isArray(parts) && parts.length > 0) return parts;
-    } catch (e) { /* try next method */ }
-  }
-
-  // Method 2: find individual JSON objects and collect them
-  const objMatches = [...cleaned.matchAll(/\{[^{}]*"partType"[^{}]*\}/g)];
-  if (objMatches.length > 0) {
-    const parts = [];
-    for (const m of objMatches) {
-      try { parts.push(JSON.parse(m[0])); } catch (e) { /* skip bad ones */ }
-    }
-    if (parts.length > 0) return parts;
-  }
-
-  log.warn({ vehicle, textLength: fullText.length, textSample: fullText.substring(0, 300) }, '[InstantResearch] Could not parse JSON');
-  return [];
 }
 
-function processResults(allParts) {
-  // Deduplicate by partType
-  const byType = {};
-  for (const p of allParts) {
-    if (!p.partType) continue;
-    const key = p.partType.toUpperCase().replace(/\s+/g, '_');
-    if (!byType[key] || (p.avgPrice || 0) > (byType[key].avgPrice || 0)) {
-      byType[key] = p;
+function groupByType(parts) {
+  const groups = {};
+  for (const p of parts) {
+    const title = p.title || '';
+    for (const [type, re] of Object.entries(TYPE_RE)) {
+      if (re.test(title)) {
+        if (!groups[type] || p.manufacturerPartNumber) {
+          groups[type] = { pn: p.manufacturerPartNumber || groups[type]?.pn || null, title, engine: p.engine };
+        }
+        break;
+      }
     }
   }
+  // Add standard types not in DB
+  for (const t of STANDARD_TYPES) {
+    if (!groups[t]) groups[t] = { pn: null, title: null, engine: null };
+  }
+  return groups;
+}
 
-  // Filter, enrich, sort
-  return Object.values(byType)
-    .filter(p => {
-      const avg = p.avgPrice || 0;
-      const sold = p.soldCount || 0;
-      return (avg >= 100 && sold >= 2) || (avg >= 200 && sold >= 1);
-    })
-    .map(p => {
-      const avg = p.avgPrice || 0;
-      const sold = p.soldCount || 0;
-      const typeKey = p.partType.toUpperCase().replace(/[^A-Z]/g, '');
-      const cogs = COGS[typeKey] || COGS.DEFAULT;
-      const profit = avg - cogs;
-      const verdict = getVerdict(avg, sold);
-      return {
-        ...p,
-        badge: getBadge(avg),
-        cogs,
-        estProfit: Math.round(profit),
-        revenue: Math.round(avg * sold),
-        verdict: verdict.label,
-        verdictIcon: verdict.icon,
-      };
-    })
-    .sort((a, b) => b.revenue - a.revenue);
+async function searchComps(pn, vehicle, partType) {
+  // TIER 1: Part number search
+  if (pn) {
+    try {
+      const items = await priceCheckService.scrapeSoldItems(pn);
+      if (items && items.length >= 3) return items;
+    } catch (e) { /* fall through */ }
+  }
+  // TIER 2: Keyword search with engine for powertrain parts
+  const { year, make, model, engine } = vehicle;
+  const eng = (ENGINE_SPECIFIC.has(partType) && engine) ? ' ' + engine : '';
+  const query = `${year} ${make} ${model}${eng} ${partType} OEM`;
+  try {
+    return await priceCheckService.scrapeSoldItems(query);
+  } catch (e) {
+    log.warn({ err: e.message, query }, '[InstantResearch] Scrape failed');
+    return [];
+  }
 }
 
 /**
- * GET /api/instant-research?vehicle=2011+Toyota+Sequoia
+ * GET /api/instant-research?vehicle=2011+Toyota+Sequoia+5.7L
  */
 router.get('/', async (req, res) => {
   const vehicle = req.query.vehicle;
-  if (!vehicle) return res.status(400).json({ error: 'Vehicle required. Use ?vehicle=2011+Toyota+Sequoia' });
+  if (!vehicle) return res.status(400).json({ error: 'Use ?vehicle=2011+Toyota+Sequoia' });
 
-  const cacheKey = vehicle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const parsed = parseVehicle(vehicle);
+  if (!parsed) return res.status(400).json({ error: 'Format: YEAR MAKE MODEL [ENGINE]' });
 
-  // Check cache (24h TTL)
+  const cacheKey = `${parsed.year}-${parsed.make}-${parsed.model}-${parsed.engine || 'all'}`.toLowerCase();
+
+  // Check cache (24h)
   try {
     const cached = await database('instant_research_cache')
       .where('vehicle_key', cacheKey)
       .whereRaw("last_updated > NOW() - INTERVAL '24 hours'")
       .first();
     if (cached && cached.results) {
-      const results = typeof cached.results === 'string' ? JSON.parse(cached.results) : cached.results;
-      return res.json({ vehicle, parts: results, cached: true, cachedAt: cached.last_updated });
+      const r = typeof cached.results === 'string' ? JSON.parse(cached.results) : cached.results;
+      return res.json({ vehicle, parts: r, cached: true });
     }
-  } catch (e) { /* cache miss or table doesn't exist yet */ }
+  } catch (e) { /* cache miss */ }
 
-  // Run 3-phase search
-  log.info({ vehicle }, '[InstantResearch] Starting research');
-  const allParts = [];
+  log.info({ vehicle, parsed }, '[InstantResearch] Starting');
 
-  for (const phase of SEARCH_PHASES) {
+  // Step 1: Get known parts from Auto+AIC
+  const knownParts = await getVehicleParts(parsed.year, parsed.make, parsed.model);
+  const partGroups = groupByType(knownParts);
+
+  log.info({ vehicle, knownParts: knownParts.length, groups: Object.keys(partGroups).length }, '[InstantResearch] Parts found');
+
+  // Step 2: Search eBay sold comps for each part type via Playwright scraper
+  const results = [];
+  for (const [type, info] of Object.entries(partGroups)) {
     try {
-      log.info({ vehicle, phase: phase.label }, '[InstantResearch] Phase starting');
-      const parts = await searchPhase(vehicle, phase.terms);
-      allParts.push(...parts);
-      log.info({ vehicle, phase: phase.label, found: parts.length }, '[InstantResearch] Phase complete');
+      const comps = await searchComps(info.pn, parsed, type);
+      if (!comps || comps.length === 0) continue;
+
+      const prices = comps.map(c => c.price || c.soldPrice).filter(p => p > 0);
+      if (prices.length === 0) continue;
+
+      const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+      if (avg < 50) continue;
+
+      const sold = prices.length;
+      const cogs = COGS[type] || COGS.DEFAULT;
+      const verdict = getVerdict(avg, sold);
+
+      results.push({
+        partType: type, avgPrice: avg, soldCount: sold,
+        priceRange: [Math.min(...prices), Math.max(...prices)],
+        partNumbers: info.pn ? [info.pn] : [],
+        velocity: sold >= 30 ? 'fast' : sold >= 9 ? 'medium' : 'slow',
+        badge: getBadge(avg), cogs, estProfit: avg - cogs,
+        revenue: avg * sold, verdict: verdict.label, verdictIcon: verdict.icon,
+      });
+
+      // Rate limit between scrapes
+      await new Promise(r => setTimeout(r, 1500));
     } catch (e) {
-      log.warn({ err: e.message, phase: phase.label }, '[InstantResearch] Phase failed');
+      log.warn({ err: e.message, type }, '[InstantResearch] Part search failed');
     }
   }
 
-  const results = processResults(allParts);
-  log.info({ vehicle, totalParts: allParts.length, filtered: results.length }, '[InstantResearch] Complete');
+  // Filter and sort
+  const filtered = results
+    .filter(p => (p.soldCount >= 2 && p.avgPrice >= 100) || p.avgPrice >= 200)
+    .sort((a, b) => b.revenue - a.revenue);
 
-  // Cache results
+  log.info({ vehicle, total: results.length, filtered: filtered.length }, '[InstantResearch] Complete');
+
+  // Cache
   try {
     await database.raw(`
       INSERT INTO instant_research_cache (vehicle_key, vehicle_display, results, last_updated)
       VALUES (?, ?, ?::jsonb, NOW())
       ON CONFLICT (vehicle_key) DO UPDATE SET results = EXCLUDED.results, last_updated = NOW()
-    `, [cacheKey, vehicle, JSON.stringify(results)]);
-  } catch (e) {
-    log.warn({ err: e.message }, '[InstantResearch] Cache write failed');
-  }
+    `, [cacheKey, vehicle, JSON.stringify(filtered)]);
+  } catch (e) { /* cache write optional */ }
 
-  res.json({ vehicle, parts: results, cached: false });
+  res.json({ vehicle, parts: filtered, cached: false });
 });
 
 module.exports = router;
