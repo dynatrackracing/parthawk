@@ -6,14 +6,22 @@
  * Takes matched parts, deduplicates by PN, checks cache, scrapes
  * eBay sold comps for uncached parts, stores in market_demand_cache.
  *
- * Uses PriceCheckService's scraper (persistent Playwright page) and
- * metrics calculator — no new scraping infrastructure.
+ * Primary scraper: PriceCheckServiceV2 (axios+cheerio, no Chromium).
+ * Fallback: PriceCheckService V1 (Playwright) if V2 returns 0 results.
  */
 
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { extractPartNumbers } = require('../utils/partIntelligence');
-const priceCheckService = require('./PriceCheckService');
+const priceCheckV2 = require('./PriceCheckServiceV2');
+
+// V1 Playwright fallback — may not be available on all environments
+let priceCheckV1 = null;
+try {
+  priceCheckV1 = require('./PriceCheckService');
+} catch (e) {
+  log.info('[MarketPricing] PriceCheckService V1 (Playwright) not available, V2-only mode');
+}
 
 const CACHE_TTL_HOURS = 72; // 3 days — market data doesn't change that fast
 
@@ -108,18 +116,41 @@ async function cachePrice(cacheKey, part, result) {
 
 /**
  * Scrape sold comps for a single search query.
- * Uses PriceCheckService's persistent Playwright page.
+ * Primary: V2 (axios+cheerio). Fallback: V1 (Playwright) if V2 gets 0 results.
  * Returns { count, avg, median, min, max, salesPerWeek }.
  */
 async function scrapeComps(searchQuery) {
-  // PriceCheckService.scrapeSoldItems returns [{ title, price, soldDate }]
-  const items = await priceCheckService.scrapeSoldItems(searchQuery);
-  if (!items || items.length === 0) return null;
+  // Try V2 first (lightweight, no Chromium)
+  try {
+    const v2Result = await priceCheckV2.check(searchQuery, 0);
+    if (v2Result && v2Result.metrics && v2Result.metrics.count > 0) {
+      return {
+        count: v2Result.metrics.count,
+        avg: v2Result.metrics.avg,
+        median: v2Result.metrics.median,
+        min: v2Result.metrics.min,
+        max: v2Result.metrics.max,
+        salesPerWeek: v2Result.metrics.salesPerWeek,
+      };
+    }
+  } catch (err) {
+    log.debug({ err: err.message, query: searchQuery }, '[MarketPricing] V2 scrape failed');
+  }
 
-  // Use PriceCheckService's metrics calculator
-  // Pass 0 as yourPrice since we don't need the verdict here
-  const metrics = priceCheckService.calculateMetrics(items, 0);
-  return metrics;
+  // Fallback to V1 (Playwright) if available and V2 returned nothing
+  if (priceCheckV1) {
+    try {
+      const items = await priceCheckV1.scrapeSoldItems(searchQuery);
+      if (items && items.length > 0) {
+        const metrics = priceCheckV1.calculateMetrics(items, 0);
+        return metrics;
+      }
+    } catch (err) {
+      log.debug({ err: err.message, query: searchQuery }, '[MarketPricing] V1 fallback failed');
+    }
+  }
+
+  return null;
 }
 
 /**
