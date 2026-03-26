@@ -1,3 +1,5 @@
+// DEPRECATED: Use partIntelligence.js instead. This file kept for backward compatibility.
+// All new code should require('../utils/partIntelligence').
 // File: utils/partNumberExtractor.js
 
 /**

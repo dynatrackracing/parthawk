@@ -3,6 +3,7 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
+const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches } = require('../utils/partIntelligence');
 
 /**
  * AttackListService - Scores yard vehicles by pull value
@@ -422,13 +423,12 @@ class AttackListService {
           const base = normalizePartNumber(listing.sku);
           if (base && base.length >= 5) byPartNumber[base] = (byPartNumber[base] || 0) + qty;
         }
-        // Extract PNs from title
-        const chrysler = title.match(/\b(\d{8})[A-Z]{2}\b/);
-        if (chrysler) byPartNumber[chrysler[1]] = (byPartNumber[chrysler[1]] || 0) + qty;
-        const toyota = title.match(/\b(\d{5}-[A-Z0-9]{3,5})/);
-        if (toyota) byPartNumber[toyota[1]] = (byPartNumber[toyota[1]] || 0) + qty;
-        const ford = title.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{4,6})/);
-        if (ford) byPartNumber[ford[1]] = (byPartNumber[ford[1]] || 0) + qty;
+        // Extract PNs from title using shared partIntelligence
+        const pns = piExtractPNs(title);
+        for (const pn of pns) {
+          byPartNumber[pn.normalized] = (byPartNumber[pn.normalized] || 0) + qty;
+          if (pn.base !== pn.normalized) byPartNumber[pn.base] = (byPartNumber[pn.base] || 0) + qty;
+        }
       }
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildStockIndex: YourListing table not ready');
@@ -460,6 +460,7 @@ class AttackListService {
 
     // Word-boundary model match with ±1 year if no exact hits
     // "Grand Cherokee" must NOT match "Cherokee" — require exact word boundary
+    // TODO: migrate to partIntelligence.modelMatches() for consistency
     if (candidates.length === 0) {
       const modelNorm = model.toUpperCase().replace(/[-]/g, ' ').trim();
       const modelRe = new RegExp('\\b' + modelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');

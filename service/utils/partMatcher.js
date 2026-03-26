@@ -1,5 +1,8 @@
 'use strict';
 
+// DEPRECATED: Use partIntelligence.js instead. This file kept for backward compatibility.
+// All new code should require('../utils/partIntelligence').
+
 /**
  * Shared Part Number Recognition & Matching Utility
  *

@@ -2,7 +2,8 @@
 
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
-const { normalizePartNumber, extractPartNumbers: sharedExtractPNs } = require('../utils/partMatcher');
+const { normalizePartNumber } = require('../lib/partNumberUtils');
+const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart } = require('../utils/partIntelligence');
 
 // Make detection — word boundaries, scans entire title
 const MAKE_PATTERNS = [
@@ -181,7 +182,7 @@ router.get('/report', async (req, res) => {
       const model = make ? extractModel(title, make) : null;
       let pt = extractPartType(title);
       if (!pt) pt = getPartLabel(title, make, model);
-      const pns = sharedExtractPNs(title);
+      const pns = piExtractPNs(title);
       const basePn = pns.length > 0 ? pns[0].base : null;
       const key = `${make || '?'}|${model || ''}|${pt}|${basePn || title.substring(0, 30)}`;
 
@@ -202,7 +203,7 @@ router.get('/report', async (req, res) => {
       const qty = parseInt(l.quantityAvailable) || 1;
       listingTitles.push({ title: (l.title || '').toUpperCase(), qty });
       // Use shared part number extractor (handles all OEM formats)
-      const pns = sharedExtractPNs(l.title || '');
+      const pns = piExtractPNs(l.title || '');
       for (const pn of pns) {
         if (pn.base) stockByBasePn[pn.base] = (stockByBasePn[pn.base] || 0) + qty;
         if (pn.raw && pn.raw !== pn.base) stockByBasePn[pn.raw] = (stockByBasePn[pn.raw] || 0) + qty;
@@ -215,7 +216,8 @@ router.get('/report', async (req, res) => {
     }
 
     // Fallback stock lookup: match by make + partType keywords in listing titles
-    function titleStockFallback(make, partType) {
+    // Now with year filtering to prevent cross-year false positives
+    function titleStockFallback(make, partType, yearStart) {
       if (!make || make === '?' || !partType) return 0;
       const makeUp = make.toUpperCase();
       const ptPatterns = {
@@ -234,9 +236,14 @@ router.get('/report', async (req, res) => {
       if (!patterns) return 0;
       let count = 0;
       for (const lt of listingTitles) {
-        if (lt.title.includes(makeUp) && patterns.some(p => lt.title.includes(p))) {
-          count += lt.qty;
+        if (!lt.title.includes(makeUp)) continue;
+        if (!patterns.some(p => lt.title.includes(p))) continue;
+        // Year filter: if listing has a year and we have a year, check match
+        if (yearStart) {
+          const yearCheck = vehicleYearMatchesPart(yearStart, lt.title);
+          if (yearCheck.confirmed && !yearCheck.matches) continue;
         }
+        count += lt.qty;
       }
       return count;
     }
@@ -246,7 +253,8 @@ router.get('/report', async (req, res) => {
       let stock = g.basePn ? (stockByBasePn[g.basePn] || 0) : 0;
       // Fallback: if no PN match, try title-based matching
       if (stock === 0 && g.make && g.make !== '?') {
-        stock = titleStockFallback(g.make, g.partType);
+        const yr = g.sampleTitle ? g.sampleTitle.match(/\b((?:19|20)\d{2})\b/) : null;
+        stock = titleStockFallback(g.make, g.partType, yr ? parseInt(yr[1]) : null);
       }
       const avgPrice = g.sold > 0 ? Math.round(g.totalPrice / g.sold * 100) / 100 : 0;
       const years = g.sampleTitle.match(/\b((?:19|20)\d{2})\b/g);

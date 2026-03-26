@@ -3,6 +3,7 @@
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
 const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
+const { modelMatches: piModelMatches, parseYearRange: piParseYear } = require('../utils/partIntelligence');
 
 async function generateAlerts() {
   const startTime = Date.now();

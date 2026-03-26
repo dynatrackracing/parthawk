@@ -5,6 +5,7 @@ const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch } = require('../utils/partIntelligence');
 
 function formatEngineStr(displacement, cylinders) {
   if (!displacement) return null;
@@ -306,6 +307,7 @@ router.post('/scan', async (req, res) => {
       }
 
       // 2b: YourListing — parts we currently HAVE IN STOCK
+      // TODO: Use partIntelligence.countStock() instead of ILIKE for PN-first matching
       try {
         const listings = await database('YourListing')
           .whereNotNull('title')
@@ -346,7 +348,7 @@ router.post('/scan', async (req, res) => {
             .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
             .whereRaw('"Auto"."year"::int >= ? AND "Auto"."year"::int <= ?', [year - 1, year + 1])
             .whereRaw('UPPER("Auto"."make") = ?', [make.toUpperCase()])
-            .whereRaw('UPPER("Auto"."model") LIKE ?', ['%' + baseModel.toUpperCase() + '%'])
+            .whereRaw('UPPER(REPLACE(REPLACE("Auto"."model", \'-\', \'\'), \' \', \'\')) = UPPER(REPLACE(REPLACE(?, \'-\', \'\'), \' \', \'\'))', [baseModel])
             .where('Item.price', '>', 0)
             .select('Item.title', 'Item.price', 'Item.seller', 'Item.manufacturerPartNumber', 'Item.isRepair')
             .orderBy('Item.price', 'desc')

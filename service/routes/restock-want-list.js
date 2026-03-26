@@ -3,7 +3,7 @@
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
-const { extractPartNumbers } = require('../utils/partNumberExtractor');
+const { extractPartNumbers } = require('../utils/partIntelligence');
 
 /**
  * Count stocked items for a HUNTERS PERCH entry.
