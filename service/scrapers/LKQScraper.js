@@ -76,6 +76,36 @@ class LKQScraper {
       });
     } catch (e) { /* ignore if table doesn't exist yet */ }
 
+    // Background market pricing pass — scrape eBay sold comps for matched parts
+    // Runs after scout alerts, non-blocking
+    try {
+      const AttackListService = require('../services/AttackListService');
+      const { batchPriceCheck } = require('../services/MarketPricingService');
+      const service = new AttackListService();
+      // Run in background — don't block scrape completion
+      (async () => {
+        try {
+          const allResults = await service.getAllYardsAttackList({ daysBack: 90 });
+          const parts = [];
+          for (const yard of allResults) {
+            for (const v of (yard.vehicles || [])) {
+              for (const p of (v.parts || [])) {
+                if (p.partType && p.price > 50) {
+                  parts.push({ title: p.title, make: v.make, model: v.model, year: parseInt(v.year), partType: p.partType });
+                }
+              }
+            }
+          }
+          if (parts.length > 0) {
+            this.log.info({ partCount: parts.length }, 'Starting post-scrape market pricing');
+            await batchPriceCheck(parts);
+          }
+        } catch (err) {
+          this.log.warn({ err: err.message }, 'Post-scrape market pricing failed');
+        }
+      })();
+    } catch (e) { /* ignore */ }
+
     return results;
   }
 

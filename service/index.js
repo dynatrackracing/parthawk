@@ -158,6 +158,19 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
+// Market pricing test route — scrapes eBay sold comps for a single query
+app.get('/api/market-price', async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'Provide ?q=searchquery or ?q=68163904AC' });
+  try {
+    const { singlePriceCheck } = require('./services/MarketPricingService');
+    const result = await singlePriceCheck(q);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Build Auto + AutoItemCompatibility from uploaded JSON with clean _year/_make/_model
 // Body: { records: [{ id, ebayId, _year, _make, _model }], clearFirst: true }
 app.post('/api/build-auto-index', async (req, res) => {

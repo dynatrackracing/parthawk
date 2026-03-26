@@ -600,6 +600,12 @@
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
         </div>
         <div class="pd-reason">${p.reason || ''}</div>
+        ${p.marketMedian > 0 ? `<div style="font-size:11px;margin-top:2px;display:flex;gap:8px;align-items:center">
+          <span style="color:#9CA3AF">Market</span>
+          <span style="color:${Math.abs(price - p.marketMedian) / p.marketMedian > 0.2 ? (price > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981'};font-weight:600">$${p.marketMedian} med</span>
+          <span style="color:#6B7280">${p.marketCount || 0} sold</span>
+          ${p.marketVelocity ? `<span style="color:#6B7280">${p.marketVelocity.toFixed(1)}/wk</span>` : ''}
+        </div>` : ''}
         ${p.deadWarning && p.deadWarning.failureReason && p.deadWarning.failureReason !== 'unknown' ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">${p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold — was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold — low demand for this part' : p.deadWarning.failureReason}</div>` : ''}
       </div>`;
     }
