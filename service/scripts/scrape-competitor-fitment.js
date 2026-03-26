@@ -32,7 +32,7 @@ const {
   storeFitmentProfile,
 } = require('../services/FitmentIntelligenceService');
 
-const TARGET_SELLERS = ['importaparts', 'prorebuild'];
+const TARGET_SELLERS = ['importapart', 'pro-rebuild'];
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -70,25 +70,25 @@ async function closeBrowser() {
 
 /**
  * Search eBay for a seller's listings matching a keyword.
+ * Uses /sch/SELLER/m.html format which works reliably.
  * Returns array of item IDs.
  */
 async function searchSellerListings(seller, keywords, maxResults = 5) {
   if (!_page) return [];
 
-  const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(keywords)}&_sacat=6030&_ssn=${seller}&_ipg=60`;
+  // /sch/SELLER/m.html format works; _ssn= does not. No category filter — sellers list in various categories
+  const url = `https://www.ebay.com/sch/${seller}/m.html?_nkw=${encodeURIComponent(keywords)}&_ipg=60`;
 
   try {
     await _page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await _page.waitForTimeout(2000);
+    await _page.waitForTimeout(3000);
 
     const itemIds = await _page.evaluate((max) => {
       const ids = [];
-      // Extract item IDs from listing links
-      document.querySelectorAll('ul.srp-results a.s-item__link, ul.srp-results a[href*="/itm/"]').forEach(a => {
-        const href = a.href || '';
-        const match = href.match(/\/itm\/(\d{12,13})/);
-        if (match && !ids.includes(match[1])) {
-          ids.push(match[1]);
+      document.querySelectorAll('a').forEach(a => {
+        const m = (a.href || '').match(/\/itm\/(\d{10,14})/);
+        if (m && !ids.includes(m[1])) {
+          ids.push(m[1]);
           if (ids.length >= max) return;
         }
       });
@@ -96,6 +96,87 @@ async function searchSellerListings(seller, keywords, maxResults = 5) {
     }, maxResults);
 
     return itemIds;
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Scrape compatibility table from an eBay listing page.
+ * Clicks "See compatible vehicles", reads the modal table, scrolls for more rows.
+ * Returns [{ year, make, model, trim, engine }]
+ */
+async function scrapeCompatibilityFromListing(itemId) {
+  if (!_page) return [];
+
+  try {
+    await _page.goto('https://www.ebay.com/itm/' + itemId, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await _page.waitForTimeout(4000);
+
+    // Scroll down to load lazy sections
+    for (let i = 0; i < 5; i++) {
+      await _page.evaluate((y) => window.scrollTo(0, y), i * 1500);
+      await _page.waitForTimeout(400);
+    }
+
+    // Click "See compatible vehicles" link/button
+    const clicked = await _page.evaluate(() => {
+      const elements = document.querySelectorAll('a, button, span, div');
+      for (const el of elements) {
+        const text = (el.textContent || '').trim();
+        if (text.includes('See compatible') || text === 'compatible vehicles' || text.includes('See all compatible')) {
+          el.click();
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (!clicked) return [];
+
+    // Wait for modal/overlay to load
+    await _page.waitForTimeout(3000);
+
+    // Scroll the modal to load all rows (eBay lazy-loads compat table rows)
+    for (let i = 0; i < 10; i++) {
+      const scrolled = await _page.evaluate(() => {
+        // Find the scrollable modal container
+        const modal = document.querySelector('[class*="overlay"] [class*="scroll"], [class*="dialog"] [class*="scroll"], [role="dialog"] [style*="overflow"]');
+        if (modal) {
+          modal.scrollTop = modal.scrollHeight;
+          return true;
+        }
+        // Fallback: scroll the window
+        window.scrollTo(0, document.body.scrollHeight);
+        return false;
+      });
+      await _page.waitForTimeout(500);
+    }
+
+    // Extract all table rows
+    const entries = await _page.evaluate(() => {
+      const rows = [];
+      document.querySelectorAll('table tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 3) {
+          const year = cells[0]?.textContent?.trim();
+          const make = cells[1]?.textContent?.trim();
+          const model = cells[2]?.textContent?.trim();
+          if (!year || !make || !model) return;
+          if (year === 'Year' || make === 'Make') return; // skip header
+          rows.push({
+            year: parseInt(year) || null,
+            make,
+            model,
+            trim: cells[3]?.textContent?.trim() || '',
+            engine: cells[4]?.textContent?.trim() || '',
+          });
+        }
+      });
+      return rows;
+    });
+
+    return entries;
   } catch (e) {
     return [];
   }
@@ -252,19 +333,21 @@ async function main() {
 
       for (const itemId of itemIds) {
         try {
-          const result = await fetchItemCompatibility(itemId);
-          if (result.compatibility.length > 0) {
-            allCompat.push(...result.compatibility);
-            sourceListings.push({ itemId, seller, title: result.title, compatCount: result.compatibility.length });
+          // Scrape compatibility table from listing page (Playwright)
+          const entries = await scrapeCompatibilityFromListing(itemId);
+          if (entries.length > 0) {
+            allCompat.push(...entries);
+            sourceListings.push({ itemId, seller, compatCount: entries.length });
             if (!sourceSeller) sourceSeller = seller;
-            console.log(`      → ${itemId}: ${result.compatibility.length} compatibility entries`);
-            // Got good data from this seller, skip remaining items
-            break;
+            console.log(`      → ${itemId}: ${entries.length} compatibility entries`);
+            break; // Got good data, skip remaining items
+          } else {
+            console.log(`      → ${itemId}: no compat table`);
           }
         } catch (e) {
           console.log(`      → ${itemId}: ERROR ${e.message.substring(0, 50)}`);
         }
-        await new Promise(r => setTimeout(r, 1000)); // Rate limit Trading API
+        await new Promise(r => setTimeout(r, 2000));
       }
 
       if (allCompat.length > 0) break; // Got data from this seller, skip next seller
