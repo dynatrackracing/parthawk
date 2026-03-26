@@ -107,7 +107,7 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
     for (const item of items) {
       const key = (item.title || '').substring(0, 40).toUpperCase().trim();
       if (!groups[key]) {
-        groups[key] = { title: item.title, count: 0, totalRevenue: 0, prices: [], lastSold: null, pn: item.manufacturerPartNumber };
+        groups[key] = { title: item.title, count: 0, totalRevenue: 0, prices: [], lastSold: null, pn: item.manufacturerPartNumber, ebayItemId: item.ebayItemId };
       }
       const g = groups[key];
       g.count++;
@@ -128,6 +128,7 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
         maxPrice: Math.round(Math.max(...g.prices)),
         lastSold: g.lastSold,
         velocity: Math.round(g.count / (days / 7) * 10) / 10, // per week
+        ebayItemId: g.ebayItemId || null,
       }))
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
 

@@ -26,6 +26,45 @@ app.use(cors());
 
 app.get('/api/health-check', (req, res) => res.json({ ok: true, time: new Date(), env: process.env.NODE_ENV }));
 
+// Debug: test market cache lookup for a specific key
+app.get('/api/debug/market-cache', async (req, res) => {
+  const { key, pn } = req.query;
+  try {
+    const { getCachedPrice, buildSearchQuery } = require('./services/MarketPricingService');
+    const { extractPartNumbers } = require('./utils/partIntelligence');
+
+    const results = {};
+
+    // If PN provided, extract and look up
+    if (pn) {
+      const pns = extractPartNumbers(pn);
+      results.extractedPNs = pns;
+      if (pns.length > 0) {
+        const sq = buildSearchQuery({ title: pn });
+        results.searchQuery = sq;
+        results.cached = await getCachedPrice(sq.cacheKey);
+      }
+    }
+
+    // If key provided, look up directly
+    if (key) {
+      results.directLookup = await getCachedPrice(key);
+    }
+
+    // Sample from cache
+    const sample = await database.raw('SELECT part_number_base, market_avg_price, market_sold_count, last_updated FROM market_demand_cache ORDER BY last_updated DESC LIMIT 10');
+    results.cacheSample = sample.rows;
+
+    // Total counts
+    const counts = await database.raw('SELECT COUNT(*) as total, COUNT(CASE WHEN market_avg_price > 0 THEN 1 END) as with_price FROM market_demand_cache');
+    results.cacheStats = counts.rows[0];
+
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/items', require('./routes/items'));
 app.use('/cron', require('./routes/cron'));
 app.use('/autos', require('./routes/autos'));

@@ -70,26 +70,37 @@ var V=document.getElementById('vinInput');
 V.focus();
 V.addEventListener('keydown',function(e){if(e.key==='Enter')doScan()});
 
-// Camera photo processing — Image+canvas, no createImageBitmap (avoids full decode OOM)
+// Camera photo processing — Image+canvas, resize aggressively for mobile memory
 async function processVinPhoto(file) {
-  var url = URL.createObjectURL(file);
-  var img = new Image();
-  await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
-  var MAX_W = 640;
-  var scale = Math.min(1, MAX_W / img.naturalWidth);
-  var w = Math.round(img.naturalWidth * scale);
-  var h = Math.round(img.naturalHeight * scale);
-  var canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, w, h);
-  URL.revokeObjectURL(url);
-  img.src = '';
-  var dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-  var b64 = dataUrl.split(',')[1];
-  ctx.clearRect(0, 0, w, h);
-  canvas.width = 1; canvas.height = 1;
-  return b64;
+  try {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = function() { reject(new Error('Failed to load image')); }; img.src = url; });
+    // Resize to max 1280px on longest side — enough for VIN reading
+    var MAX_DIM = 1280;
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (w > MAX_DIM || h > MAX_DIM) {
+      if (w > h) { h = Math.round(h * (MAX_DIM / w)); w = MAX_DIM; }
+      else { w = Math.round(w * (MAX_DIM / h)); h = MAX_DIM; }
+    }
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url); img.src = '';
+    var b64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    // If still too large (>1.5MB base64), reduce further
+    if (b64.length > 1500000) {
+      canvas.width = Math.round(w * 0.5); canvas.height = Math.round(h * 0.5);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      b64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.width = 1; canvas.height = 1;
+    return b64;
+  } catch(err) {
+    throw new Error('Could not process photo: ' + err.message);
+  }
 }
 
 document.getElementById('camBtn').onclick=function(){

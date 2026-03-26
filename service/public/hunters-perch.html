@@ -142,8 +142,9 @@ function loadBestSellers(name) {
       d.bestSellers.slice(0, 30).forEach(function(item) {
         var hot = item.soldCount >= 3 ? '<span class="badge b-hot">HOT ' + item.soldCount + 'x</span> ' : '';
         h += '<div class="item-row">';
-        h += '<div><div class="item-title">' + hot + esc(item.title || '').substring(0, 80) + '</div>';
-        h += '<div class="item-meta">$' + item.avgPrice + ' avg · ' + item.soldCount + 'x sold · ' + item.velocity + '/wk</div></div>';
+        var searchUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent((item.title || '').substring(0, 60)) + '&LH_Sold=1&LH_Complete=1';
+        h += '<div><div class="item-title"><a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + hot + esc(item.title || '').substring(0, 80) + '</a></div>';
+        h += '<div class="item-meta">$' + item.avgPrice + ' avg · ' + item.soldCount + 'x sold · ' + item.velocity + '/wk · <a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#3b82f6;font-size:9px">eBay sold ↗</a></div></div>';
         h += '<div class="item-price">$' + item.totalRevenue + '</div>';
         h += '</div>';
       });
