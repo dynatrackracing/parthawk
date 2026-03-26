@@ -75,6 +75,7 @@ router.post('/:sellerId/scrape', async (req, res) => {
     const manager = new SoldItemsManager();
     const result = await manager.scrapeCompetitor({
       seller: sellerId,
+      categoryId: '0', // all categories — don't limit to ECU/Computers
       maxPages: parseInt(pages),
       useScraper: true, // force Playwright scraper
     });
