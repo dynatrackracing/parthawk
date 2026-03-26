@@ -2,7 +2,7 @@
 
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
-const { matchPartToListings, matchPartToSales, matchPartToYardVehicles, parseTitle } = require('../utils/partMatcher');
+const { matchPartToListings, matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
 
 // Diagnostic endpoint
 router.get('/debug/:id', async (req, res) => {
@@ -18,6 +18,7 @@ router.get('/debug/:id', async (req, res) => {
 
 // Get all active want list items with stock counts and sale data
 router.get('/items', async (req, res) => {
+  await loadModelsFromDB(); // ensure DB models are cached
   const items = await database('restock_want_list').where({ active: true }).orderBy('created_at', 'asc');
 
   const results = [];

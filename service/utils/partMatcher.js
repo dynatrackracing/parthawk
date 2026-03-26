@@ -13,6 +13,7 @@
  */
 
 const { database } = require('../database/database');
+const { log } = require('../lib/logger');
 
 // ============================================================
 // OEM PART NUMBER PATTERNS
@@ -121,6 +122,7 @@ function normalizePartNumber(pn) {
 
 // ============================================================
 // VEHICLE / PART PARSING FROM TITLES
+// Uses Auto table from database for model recognition
 // ============================================================
 
 const MAKES = [
@@ -132,70 +134,97 @@ const MAKES = [
   'mini','porsche','saab','isuzu',
 ];
 
-const MODELS = [
-  // Ford
-  'f150','f250','f350','f450','ranger','explorer','expedition','escape','edge',
-  'fusion','focus','taurus','mustang','bronco','econoline','e-series','e series',
-  'five hundred','flex','transit','transit connect','excursion','freestyle',
-  'windstar','contour','crown victoria','thunderbird',
-  // Toyota
-  'camry','corolla','tacoma','tundra','sequoia','highlander','rav4','4runner',
-  'prius','sienna','avalon','celica','matrix','yaris','venza','supra','fj cruiser',
-  'land cruiser','t100',
-  // Honda
-  'accord','civic','cr-v','crv','pilot','odyssey','ridgeline','fit','hr-v',
-  'element','insight','passport','prelude',
-  // Acura
-  'tsx','tl','mdx','rdx','ilx','rl','rsx','integra','cl','legend',
-  // Nissan
-  'pathfinder','titan','altima','sentra','rogue','murano','frontier','xterra',
-  'maxima','versa','quest','armada','nv200','nv2500','nv3500','juke','leaf',
-  // Infiniti
-  'm35','m45','fx35','fx45','q60','q50','q40','qx4','qx56','qx60','g35','g37',
-  // Dodge/Chrysler/Jeep/Ram
-  'charger','challenger','durango','dakota','caravan','grand caravan','dart',
-  'magnum','neon','stratus','avenger','journey','nitro',
-  'grand cherokee','wrangler','compass','patriot','liberty','cherokee','renegade',
-  'ram','ram 1500','ram 2500','ram 3500','promaster',
-  'pacifica','voyager','town country','town & country','pt cruiser','sebring',
-  '200','300',
-  // GM
-  'silverado','tahoe','suburban','equinox','traverse','malibu','impala',
-  'camaro','corvette','cobalt','cruze','sonic','spark','trax','blazer','colorado',
-  'yukon','sierra','terrain','envoy','acadia','canyon','savana','denali',
-  'lacrosse','lucerne','enclave','encore','regal','verano','rendezvous',
-  'solstice','g6','grand prix','grand am',
-  // Kia/Hyundai
+// Make aliases — map variant names to canonical make for model lookup
+const MAKE_ALIASES = {
+  'chevy': 'chevrolet', 'vw': 'volkswagen', 'ram': 'dodge',
+};
+
+// DB-loaded model cache: { make: [models sorted longest first] }
+let _dbModelsByMake = null;
+let _dbModelsFlat = null; // flat array for fallback
+
+// Fallback hardcoded models (used before DB loads or if Auto table is empty)
+const FALLBACK_MODELS = [
+  'challenger','charger','durango','journey','grand caravan','caravan','dart','magnum','ram',
+  'grand cherokee','wrangler','cherokee','compass','patriot','liberty','renegade',
+  'f150','f250','f350','ranger','explorer','escape','edge','expedition','fusion','focus',
+  'mustang','bronco','econoline','flex','transit','excursion','crown victoria','taurus',
+  'camry','corolla','tacoma','tundra','sequoia','highlander','rav4','4runner','prius','sienna',
+  'accord','civic','cr-v','crv','pilot','odyssey','ridgeline','fit','element','passport',
+  'tsx','tl','mdx','rdx','ilx','rsx','integra',
+  'pathfinder','titan','altima','sentra','rogue','murano','frontier','xterra','maxima','armada',
+  'silverado','tahoe','suburban','equinox','traverse','malibu','impala','camaro','colorado',
+  'yukon','sierra','terrain','envoy','acadia','trailblazer','blazer',
   'optima','forte','soul','sportage','sorento','sedona','rio','telluride',
-  'santa fe','tucson','elantra','sonata','accent','veloster','genesis','xg350',
-  'palisade','kona','venue','santa cruz',
-  // Subaru
-  'forester','outback','impreza','wrx','legacy','crosstrek','ascent','brz',
-  // VW/Audi
-  'jetta','passat','golf','tiguan','atlas','beetle','cc','touareg',
-  'a4','a6','q5','q7','a3','a5','s4','tt',
-  // BMW
-  'x3','x5','x1','328i','335i','528i','530i','325i',
-  // Mercedes
-  's550','c230','c300','e350','ml350','gl450','cls','slk',
-  // Volvo
-  'xc90','xc70','xc60','s60','s80','v70','c70','s70','c30','v50',
-  // Mazda
-  'mazda3','mazda6','cx-5','cx-9','miata','rx-8','tribute','mpv',
-  // Jaguar
-  'xj6','xk8','xf','s-type','x-type',
-  // Lexus
-  'gs300','gs350','is300','is250','rx350','rx330','es350','es300','ls430','gx470',
-  // Other
-  'vue','l100','l200','l300','ion','aura','sky', // Saturn
-  'sidekick','tracker','grand vitara','vitara','xl-7', // Suzuki/Geo
-  'metro','prizm','storm', // Geo
-  'town car','navigator','mkz','mkx','continental', // Lincoln
-  'mountaineer','mariner','sable','villager','grand marquis','milan', // Mercury
-  'p38','range rover','discovery','lr3','lr4','freelander', // Land Rover
-  'montero','endeavor','outlander','eclipse','galant','lancer', // Mitsubishi
-  'coupe','m35', // generic
+  'santa fe','tucson','elantra','sonata','accent','palisade',
+  'jetta','passat','golf','tiguan','beetle',
+  'xc90','xc70','s60','s80','v70','c70',
+  'forester','outback','impreza','wrx','legacy','crosstrek',
+  'town car','navigator','mkz',
+  'mariner','mountaineer','sable','grand marquis','milan',
+  'lacrosse','lucerne','enclave','regal',
+  'vue','ion','aura','l100',
+  'pacifica','voyager','pt cruiser','sebring','300','200','promaster',
+  'gs300','is300','rx350','es350','gx470',
+  'm35','fx35','q60','q40','qx4','g35','g37',
+  'mazda3','mazda6','cx-5','miata','tribute',
+  'xj6','xk8','xf',
+  'grand vitara','sidekick','tracker','metro',
+  'montero','endeavor','outlander','eclipse',
+  'p38','range rover','discovery',
+  'nv200','nv2500','nv3500',
 ];
+
+/**
+ * Load models from the Auto database table and cache them.
+ * Organized by make for efficient lookup.
+ */
+async function loadModelsFromDB() {
+  if (_dbModelsByMake) return; // already loaded
+  try {
+    const rows = await database.raw('SELECT DISTINCT LOWER(make) as make, LOWER(model) as model FROM "Auto" ORDER BY make, model');
+    const byMake = {};
+    for (const row of (rows.rows || rows)) {
+      const make = (row.make || '').trim();
+      const model = (row.model || '').trim();
+      if (!make || !model || model.length < 2) continue;
+      if (!byMake[make]) byMake[make] = new Set();
+      byMake[make].add(model);
+    }
+    // Sort each make's models longest-first (so "Grand Cherokee" matches before "Cherokee")
+    _dbModelsByMake = {};
+    const flat = new Set();
+    for (const [make, models] of Object.entries(byMake)) {
+      _dbModelsByMake[make] = [...models].sort((a, b) => b.length - a.length);
+      for (const m of models) flat.add(m);
+    }
+    // Merge fallback models into flat list
+    for (const m of FALLBACK_MODELS) flat.add(m);
+    _dbModelsFlat = [...flat].sort((a, b) => b.length - a.length);
+    log.info({ makes: Object.keys(byMake).length, totalModels: flat.size }, 'Loaded models from Auto table');
+  } catch (e) {
+    log.warn({ err: e.message }, 'Could not load models from Auto table, using fallback');
+    _dbModelsFlat = [...FALLBACK_MODELS].sort((a, b) => b.length - a.length);
+    _dbModelsByMake = {};
+  }
+}
+
+/**
+ * Get the model list — from DB if loaded, fallback otherwise.
+ */
+function getModels(forMake) {
+  // If DB models loaded and we know the make, use make-specific list
+  if (_dbModelsByMake && forMake) {
+    const canonical = MAKE_ALIASES[forMake] || forMake;
+    const makeModels = _dbModelsByMake[canonical];
+    if (makeModels && makeModels.length > 0) return makeModels;
+  }
+  // Fallback to flat list
+  return _dbModelsFlat || FALLBACK_MODELS;
+}
+
+// For backwards compatibility — expose as MODELS (flat list)
+const MODELS = FALLBACK_MODELS;
 
 // Part phrases — longest first for greedy matching
 const PART_PHRASES = [
@@ -269,9 +298,10 @@ function parseTitle(title) {
     if (re.test(titleLower)) { make = m; break; }
   }
 
-  // Extract models
+  // Extract models — use DB-loaded models for the detected make
+  const modelList = getModels(make);
   const models = [];
-  for (const model of MODELS) {
+  for (const model of modelList) {
     const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) models.push(model);
   }
@@ -623,6 +653,7 @@ module.exports = {
   matchPartToListings,
   matchPartToSales,
   matchPartToYardVehicles,
+  loadModelsFromDB,
   MAKES,
   MODELS,
   PART_PHRASES,

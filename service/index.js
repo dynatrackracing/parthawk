@@ -762,12 +762,18 @@ async function start() {
       }
     });
 
-    // Regenerate scout alerts on startup (after migration wipes stale data)
+    // Load Auto table models into partMatcher cache, then regenerate scout alerts
     try {
+      const { loadModelsFromDB } = require('./utils/partMatcher');
       const { generateAlerts } = require('./services/ScoutAlertService');
-      setTimeout(() => {
-        generateAlerts().then(r => log.info({ alertCount: r.alerts }, 'Scout alerts regenerated on startup'))
-          .catch(e => log.warn({ err: e.message }, 'Scout alert startup generation failed'));
+      setTimeout(async () => {
+        try {
+          await loadModelsFromDB();
+          const r = await generateAlerts();
+          log.info({ alertCount: r.alerts }, 'Scout alerts regenerated on startup');
+        } catch (e) {
+          log.warn({ err: e.message }, 'Scout alert startup generation failed');
+        }
       }, 10000); // delay 10s to let migrations finish
     } catch (e) { /* ignore */ }
 

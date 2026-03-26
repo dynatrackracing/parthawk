@@ -2,11 +2,14 @@
 
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
-const { parseTitle, matchPartToSales } = require('../utils/partMatcher');
+const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
 
 async function generateAlerts() {
   const startTime = Date.now();
   log.info('Generating scout alerts...');
+
+  // Ensure models are loaded from Auto table before parsing
+  await loadModelsFromDB();
 
   // 1. Get all active yard vehicles
   const vehicles = await database('yard_vehicle')
