@@ -214,14 +214,40 @@ async function main() {
         partType: entry.parts.partType || null,
       });
 
+      // Store top 5 comps as JSON
+      const topComps = soldItems.slice(0, 5).map(i => ({ title: i.title?.substring(0, 80), price: i.price }));
+      const velocity = metrics.count >= 20 ? 'high' : metrics.count >= 10 ? 'medium' : 'low';
+      const salesPerWeek = Math.round((metrics.count / 90) * 7 * 100) / 100;
+
       if (!DRY_RUN) {
         await db.raw(`
           INSERT INTO market_demand_cache
-            (id, part_number_base, ebay_avg_price, ebay_sold_90d, last_updated, "createdAt")
-          VALUES (gen_random_uuid(), ?, ?, ?, NOW(), NOW())
+            (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+             source, search_query, ebay_median_price, ebay_min_price, ebay_max_price,
+             market_velocity, sales_per_week, top_comps,
+             last_updated, "createdAt")
+          VALUES (gen_random_uuid(), ?, ?, ?,
+                  'apify', ?, ?, ?, ?,
+                  ?, ?, ?::jsonb,
+                  NOW(), NOW())
           ON CONFLICT (part_number_base)
-          DO UPDATE SET ebay_avg_price = EXCLUDED.ebay_avg_price, ebay_sold_90d = EXCLUDED.ebay_sold_90d, last_updated = NOW()
-        `, [sq.cacheKey, metrics.median, metrics.count]);
+          DO UPDATE SET
+            ebay_avg_price = EXCLUDED.ebay_avg_price,
+            ebay_sold_90d = EXCLUDED.ebay_sold_90d,
+            source = 'apify',
+            search_query = EXCLUDED.search_query,
+            ebay_median_price = EXCLUDED.ebay_median_price,
+            ebay_min_price = EXCLUDED.ebay_min_price,
+            ebay_max_price = EXCLUDED.ebay_max_price,
+            market_velocity = EXCLUDED.market_velocity,
+            sales_per_week = EXCLUDED.sales_per_week,
+            top_comps = EXCLUDED.top_comps,
+            last_updated = NOW()
+        `, [
+          sq.cacheKey, metrics.median, metrics.count,
+          entry.query, metrics.median, metrics.min, metrics.max,
+          velocity, salesPerWeek, JSON.stringify(topComps),
+        ]);
       }
       refreshed++;
     } catch (err) {
