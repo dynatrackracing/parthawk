@@ -143,7 +143,13 @@ function calculateMetrics(items, yourPrice) {
  */
 async function check(title, currentPrice) {
   const queryResult = buildSearchQuery(title);
-  const scraped = await scrapeSoldComps(queryResult.query);
+  let scraped = await scrapeSoldComps(queryResult.query);
+
+  // Retry once after 3s if eBay rate-limited us (0 results)
+  if (scraped.length === 0) {
+    await new Promise(r => setTimeout(r, 3000));
+    scraped = await scrapeSoldComps(queryResult.query);
+  }
 
   let filtered;
   if (queryResult.structured && queryResult.parts.partType) {
