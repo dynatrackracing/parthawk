@@ -44,22 +44,29 @@ async function scrapeSoldComps(searchQuery, maxPages = 1) {
       const $ = cheerio.load(response.data);
       const seen = new Set();
 
-      $('.s-item').each((_, el) => {
+      // 2024+ eBay layout uses .s-card, not .s-item
+      // Try both: ul.srp-results > li (card containers) and .s-item (legacy)
+      $('ul.srp-results > li').each((_, el) => {
         try {
           const $el = $(el);
-          const title = $el.find('.s-item__title span').first().text().trim()
-            || $el.find('.s-item__title').first().text().trim();
+          // Card-based title
+          let title = $el.find('.s-card__title').first().text().trim();
+          if (!title) title = $el.find('.s-item__title').first().text().trim();
+          title = title.replace(/Opens in a new window or tab$/i, '').trim();
           if (!title || title === 'Shop on eBay' || title === 'Results matching fewer words') return;
 
-          const priceText = $el.find('.s-item__price').first().text().trim();
+          // Card-based price
+          let priceText = $el.find('.s-card__price').first().text().trim();
+          if (!priceText) priceText = $el.find('.s-item__price').first().text().trim();
           const priceMatch = priceText.match(/\$([\d,]+\.?\d*)/);
           if (!priceMatch) return;
           const price = parseFloat(priceMatch[1].replace(',', ''));
           if (isNaN(price) || price <= 0) return;
 
-          const soldDateText = $el.find('.s-item__title--tagblock .POSITIVE').text().trim()
-            || $el.find('.s-item__ended-date').text().trim()
-            || $el.find('.s-item__endedDate').text().trim();
+          // Sold date
+          const innerText = $el.text() || '';
+          const soldMatch = innerText.match(/Sold\s+(\w+\s+\d+,?\s*\d*)/i);
+          const soldDateText = soldMatch ? soldMatch[1] : null;
 
           const key = title.substring(0, 50) + price;
           if (seen.has(key)) return;
