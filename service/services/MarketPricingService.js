@@ -15,7 +15,7 @@ const { database } = require('../database/database');
 const { extractPartNumbers } = require('../utils/partIntelligence');
 const priceCheckService = require('./PriceCheckService');
 
-const CACHE_TTL_HOURS = 24;
+const CACHE_TTL_HOURS = 72; // 3 days — market data doesn't change that fast
 
 /**
  * Build optimal search query for a part.

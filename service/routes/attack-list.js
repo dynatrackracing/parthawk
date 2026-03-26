@@ -98,6 +98,7 @@ router.get('/vehicle/:id/parts', async (req, res) => {
     }
 
     // Enrich with cached market data
+    let marketHits = 0, marketMisses = 0;
     try {
       const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('../services/MarketPricingService');
       const vYear = parseInt(vehicle.year) || 0;
@@ -114,9 +115,15 @@ router.get('/vehicle/:id/parts', async (req, res) => {
           p.marketMedian = cached.median;
           p.marketCount = cached.count;
           p.marketVelocity = cached.velocity;
+          marketHits++;
+        } else {
+          marketMisses++;
         }
       }
-    } catch (e) { /* market data optional */ }
+      log.info({ vehicleId: id, parts: (scored.parts || []).length, marketHits, marketMisses }, 'Market enrichment for vehicle parts');
+    } catch (e) {
+      log.warn({ err: e.message }, 'Market enrichment failed');
+    }
 
     res.json({
       success: true,
