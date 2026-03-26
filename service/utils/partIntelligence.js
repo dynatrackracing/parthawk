@@ -71,8 +71,19 @@ function isSkipWord(s) {
 
 function stripRevisionSuffix(pn) {
   if (!pn) return pn;
+  // Chrysler/Mopar: 56044691AA → 56044691, 68269652AD → 68269652
   if (/^\d{7,10}[A-Z]{2}$/.test(pn)) return pn.slice(0, -2);
+  // GM with letter prefix: A12345678AA → A12345678
   if (/^[A-Z]\d{7,9}[A-Z]{2}$/.test(pn)) return pn.slice(0, -2);
+  // Ford dash-separated: AL3T15604BD → AL3T15604 (normalized, dashes stripped)
+  // Match: 4+ alphanum + 4-6 alphanum + 1-2 letter suffix
+  if (/^[A-Z0-9]{4,}[A-Z0-9]{4,6}[A-Z]{1,2}$/.test(pn) && pn.length >= 10) {
+    const base = pn.replace(/[A-Z]{1,2}$/, '');
+    if (base.length >= 8) return base;
+  }
+  // Toyota/Lexus/Honda dash-format (normalized): 8966104840AA → 8966104840
+  // Pattern: digits + alphanums ending in 2-char alpha revision
+  // Also catches: 5C6035456A (VW) where last A is a revision
   if (pn.length >= 10 && /[A-Z]{1,2}$/.test(pn)) {
     const base = pn.replace(/[A-Z]{1,2}$/, '');
     if (base.length >= 8) return base;

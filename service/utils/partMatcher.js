@@ -96,6 +96,8 @@ function extractPartNumbers(title) {
 const FORD_SUFFIX = /^([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,2}$/;
 const CHRYSLER_SUFFIX = /^(\d{7,})[A-Z]{2}$/;
 const HONDA_SUFFIX = /^(\d{5}-[A-Z]{2,4})-[A-Z0-9]{1,4}$/;
+// Toyota/Lexus: 89661-04840-AA → 89661-04840 (strip 2-char revision after last dash)
+const TOYOTA_SUFFIX = /^(\d{5}-[A-Z0-9]{4,6})-[A-Z]{1,2}$/;
 const GENERIC_SUFFIX = /^(.{6,}?)[A-Z]{2}$/;
 
 function normalizePartNumber(pn) {
@@ -107,6 +109,9 @@ function normalizePartNumber(pn) {
   if (pn.includes('-')) {
     const ford = pn.match(FORD_SUFFIX);
     if (ford) return ford[1];
+    // Toyota/Lexus: 89661-04840-AA → 89661-04840
+    const toyota = pn.match(TOYOTA_SUFFIX);
+    if (toyota) return toyota[1];
     const honda = pn.match(HONDA_SUFFIX);
     if (honda) return honda[1];
     return pn;
