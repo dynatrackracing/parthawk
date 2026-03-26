@@ -683,6 +683,9 @@ app.get('/api/debug/makes', async (req, res) => {
 });
 
 
+// Instant Research — live eBay market research for a vehicle
+app.use('/api/instant-research', require('./routes/instant-research'));
+
 // Market pricing cache status
 app.get('/api/market-price/status', async (req, res) => {
   try {

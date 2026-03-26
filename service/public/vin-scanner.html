@@ -63,9 +63,16 @@ td{padding:6px;border-bottom:1px solid #1f1f1f}
     <div id="status" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
   </div>
   <div id="results"></div>
+  <div id="instantResearch" style="display:none">
+    <div class="card" style="border-color:#dc2626;border-width:2px">
+      <button onclick="runInstantResearch()" id="researchBtn" class="btn btn-red" style="width:100%;padding:14px;font-size:15px">Instant Research — What to Pull</button>
+      <div id="researchResults"></div>
+    </div>
+  </div>
   <div id="histArea"><span class="hist-link" onclick="loadHistory(this)">Show Recent Scans</span></div>
 </div>
 <script>
+function esc(s){if(!s)return '';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 var V=document.getElementById('vinInput');
 V.focus();
 V.addEventListener('keydown',function(e){if(e.key==='Enter')doScan()});
@@ -214,8 +221,49 @@ function render(data){
   }
 
   // Scan Another
-  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';">Scan Another</button></div>';
+  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';document.getElementById(\'instantResearch\').style.display=\'none\';">Scan Another</button></div>';
   document.getElementById('results').innerHTML=h;
+
+  // Show Instant Research button
+  var veh=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
+  window._lastVehicle=veh;
+  document.getElementById('instantResearch').style.display='block';
+  document.getElementById('researchResults').innerHTML='';
+}
+
+var _lastVehicle=null;
+async function runInstantResearch(){
+  if(!_lastVehicle)return;
+  var btn=document.getElementById('researchBtn');
+  var out=document.getElementById('researchResults');
+  btn.disabled=true;btn.textContent='Searching eBay... (15-30s)';
+  out.innerHTML='<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Searching eBay sold listings for '+esc(_lastVehicle)+'...</div></div>';
+  try{
+    var r=await fetch('/api/instant-research?vehicle='+encodeURIComponent(_lastVehicle)).then(function(r){return r.json()});
+    if(!r.parts||r.parts.length===0){
+      out.innerHTML='<div style="color:#6B7280;font-size:12px;padding:10px;text-align:center">No high-value parts found on eBay for this vehicle</div>';
+    }else{
+      var h='<div style="margin-top:10px">';
+      h+='<div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">eBay Market Research'+(r.cached?' (cached)':'')+'</div>';
+      r.parts.forEach(function(p){
+        var bc=p.badge==='GREAT'?'b-gr':p.badge==='GOOD'?'b-yl':p.badge==='FAIR'?'b-or':'b-rd';
+        h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px">';
+        h+='<div style="font-size:16px;flex-shrink:0">'+p.verdictIcon+'</div>';
+        h+='<div style="flex:1">';
+        h+='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span class="b '+bc+'">'+p.badge+' $'+p.avgPrice+'</span><span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span></div>';
+        h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.soldCount+'x sold · $'+p.estProfit+' profit/ea · ~$'+p.cogs+' pull cost · '+p.velocity+'</div>';
+        if(p.partNumbers&&p.partNumbers.length>0)h+='<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">'+p.partNumbers.slice(0,3).join(', ')+'</div>';
+        h+='</div>';
+        h+='<div style="font-weight:800;color:'+(p.verdict==='PULL'?'#22c55e':p.verdict==='RARE'?'#a855f7':'#9CA3AF')+';font-size:11px;white-space:nowrap">'+p.verdict+'</div>';
+        h+='</div>';
+      });
+      h+='</div>';
+      out.innerHTML=h;
+    }
+  }catch(err){
+    out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Research failed: '+err.message+'</div>';
+  }
+  btn.disabled=false;btn.textContent='Instant Research — What to Pull';
 }
 
 function loadHistory(el){
