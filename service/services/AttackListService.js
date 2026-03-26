@@ -458,16 +458,20 @@ class AttackListService {
       }
     }
 
-    // Fuzzy model match with ±1 year if no exact hits
+    // Word-boundary model match with ±1 year if no exact hits
+    // "Grand Cherokee" must NOT match "Cherokee" — require exact word boundary
     if (candidates.length === 0) {
-      const modelLower = model.toLowerCase();
+      const modelNorm = model.toUpperCase().replace(/[-]/g, ' ').trim();
+      const modelRe = new RegExp('\\b' + modelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       for (const [key, entry] of Object.entries(inventoryIndex)) {
         const [iMake, iModel, iYear] = key.split('|');
         const iYearNum = parseInt(iYear);
         if (iYearNum < year - 1 || iYearNum > year + 1) continue;
         if (!allMakes.includes(iMake)) continue;
-        const iModelLower = iModel.toLowerCase();
-        if (iModelLower.includes(modelLower) || modelLower.includes(iModelLower)) {
+        const iModelNorm = iModel.toUpperCase().replace(/[-]/g, ' ').trim();
+        // Exact match or word-boundary match (F-150 = F150, Grand Cherokee != Cherokee)
+        if (modelNorm === iModelNorm || modelRe.test(iModelNorm) ||
+            new RegExp('\\b' + iModelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(modelNorm)) {
           for (const item of entry.items) {
             if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
           }
@@ -486,15 +490,15 @@ class AttackListService {
         if (y1 < 100) y1 += y1 >= 70 ? 1900 : 2000;
         if (y2 < 100) y2 += y2 >= 70 ? 1900 : 2000;
         if (y1 > y2) { const tmp = y1; y1 = y2; y2 = tmp; }
-        // Vehicle year must be within the part's year range (with 1 year tolerance)
-        if (year < y1 - 1 || year > y2 + 1) continue;
+        // Vehicle year must be within the part's year range (exact, no tolerance)
+        if (year < y1 || year > y2) continue;
       } else {
         // Single year in title — must be within ±2 of vehicle year
         const singleYears = title.match(/\b((?:19|20)\d{2})\b/g);
         if (singleYears && singleYears.length >= 1) {
           const partYears = singleYears.map(Number);
           const closestYear = partYears.reduce((best, py) => Math.abs(py - year) < Math.abs(best - year) ? py : best, partYears[0]);
-          if (Math.abs(year - closestYear) > 2) continue;
+          if (Math.abs(year - closestYear) > 1) continue;
         }
         // No year in title — allow (generic part)
       }
@@ -537,12 +541,17 @@ class AttackListService {
     for (const m of allMakes) {
       const exactKey = `${m}|${modelUpper}`;
       if (salesIndex[exactKey]) candidateKeys.add(exactKey);
-      // Partial model match (yard "RAM 1500" ↔ sale "Ram", or "300" ↔ "300C")
+      // Word-boundary model match (yard "RAM 1500" ↔ sale "Ram 1500", NOT "Cherokee" ↔ "Grand Cherokee")
+      const modelRe = new RegExp('\\b' + modelUpper.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       for (const sKey of Object.keys(salesIndex)) {
         if (!sKey.startsWith(m + '|')) continue;
         const sModel = sKey.split('|')[1];
-        if (sModel && (modelUpper.includes(sModel) || sModel.includes(modelUpper))) {
-          candidateKeys.add(sKey);
+        if (sModel) {
+          const sModelNorm = sModel.replace(/[-]/g, ' ');
+          const sModelRe = new RegExp('\\b' + sModelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+          if (modelRe.test(sModelNorm) || sModelRe.test(modelUpper.replace(/[-]/g, ' '))) {
+            candidateKeys.add(sKey);
+          }
         }
       }
     }
@@ -558,11 +567,12 @@ class AttackListService {
         const sibModel = sib.model.toUpperCase();
         const sibKey = `${sib.make}|${sibModel}`;
         if (salesIndex[sibKey]) candidateKeys.add(sibKey);
-        // Also partial match siblings
+        // Also word-boundary match siblings
+        const sibRe = new RegExp('\\b' + sibModel.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
         for (const sKey of Object.keys(salesIndex)) {
           if (!sKey.startsWith(sib.make + '|')) continue;
           const sModel = sKey.split('|')[1];
-          if (sModel && (sibModel.includes(sModel) || sModel.includes(sibModel))) {
+          if (sModel && sibRe.test(sModel.replace(/[-]/g, ' '))) {
             candidateKeys.add(sKey);
           }
         }
@@ -603,11 +613,12 @@ class AttackListService {
     for (const m of allMakes) {
       const stockKey = `${m}|${modelUpper}`;
       stock += stockIndex[stockKey] || 0;
-      // Also check partial model matches
+      // Also check word-boundary model matches (F-150 = F150, NOT Cherokee = Grand Cherokee)
+      const stockModelRe = new RegExp('\\b' + modelUpper.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       for (const [sk, sv] of Object.entries(stockIndex)) {
         if (!sk.startsWith(m + '|')) continue;
         const sModel = sk.split('|')[1];
-        if (sModel !== modelUpper && (modelUpper.includes(sModel) || sModel.includes(modelUpper))) {
+        if (sModel !== modelUpper && stockModelRe.test(sModel.replace(/[-]/g, ' '))) {
           stock += sv;
         }
       }
