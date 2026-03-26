@@ -201,6 +201,9 @@ app.get('/admin/scout-alerts', (req, res) => {
 app.get('/admin/test', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'test.html'));
 });
+app.get('/admin/listing-tool', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'listing-tool.html'));
+});
 // private routes for admin only
 app.use('/private', require('./routes/private'));
 app.get('/test', (req, res) => {
