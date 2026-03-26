@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dynatrack Racing — Listing Generator</title>
+<title>Dynatrack Racing - Listing Generator</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -350,7 +350,7 @@
 <div class="container">
 
   <div class="api-section" id="apiSection">
-    <h3>One-time setup — Anthropic API key</h3>
+    <h3>One-time setup - Anthropic API key</h3>
     <p>This tool uses Claude AI to generate descriptions. Enter your Anthropic API key below. It's saved in your browser only and never sent anywhere except Anthropic's servers.</p>
     <div class="api-key-row">
       <input type="text" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" />
@@ -375,7 +375,7 @@
         </div>
         <div id="lookupStatus" style="font-size:11px; color:var(--text-muted); margin-top:5px; min-height:16px;"></div>
         <div id="ebayRefRow" style="display:none; margin-top:8px; display:none;">
-          <div style="font-size:11px; color:#b45309; font-weight:500; margin-bottom:4px;">⚠ Lookup couldn't confirm fitment — paste a reference eBay listing URL to extract details:</div>
+          <div style="font-size:11px; color:#b45309; font-weight:500; margin-bottom:4px;">⚠ Lookup couldn't confirm fitment - paste a reference eBay listing URL to extract details:</div>
           <div style="display:flex; gap:8px; align-items:center;">
             <input type="text" id="ebayRefUrl" placeholder="https://www.ebay.com/itm/..." style="flex:1; font-size:12px;" />
             <button onclick="lookupFromEbay()" style="white-space:nowrap; padding:8px 12px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); border:none; background:#1a5276; color:#fff; cursor:pointer; flex-shrink:0;">Use listing</button>
@@ -403,13 +403,13 @@
     </div>
 
     <div class="field" id="doesNotFitField" style="margin-top:12px; display:none;">
-      <label style="color:#b91c1c; font-weight:600;">⚠ Does NOT fit <span style="font-weight:400; color:var(--text-faint)">(auto-filled by Look up — edit or clear if needed)</span></label>
+      <label style="color:#b91c1c; font-weight:600;">⚠ Does NOT fit <span style="font-weight:400; color:var(--text-faint)">(auto-filled by Look up - edit or clear if needed)</span></label>
       <input type="text" id="doesNotFit" placeholder="e.g. 2WD models, manual transmission" style="border-color:#fca5a5;" />
       <div style="font-size:11px; color:#b91c1c; margin-top:4px;">This will appear in the listing. Clear the field to omit it.</div>
     </div>
 
     <div class="field" id="partNumberWarningField" style="margin-top:12px; display:none;">
-      <label style="color:#b45309; font-weight:600;">⚠ Part Number Match Required <span style="font-weight:400; color:var(--text-faint)">(auto-filled — edit if needed)</span></label>
+      <label style="color:#b45309; font-weight:600;">⚠ Part Number Match Required <span style="font-weight:400; color:var(--text-faint)">(auto-filled - edit if needed)</span></label>
       <input type="text" id="partNumberWarning" placeholder="" style="border-color:#fcd34d;" />
       <div style="font-size:11px; color:#b45309; margin-top:4px;" id="partNumberWarningSource"></div>
     </div>
@@ -421,13 +421,13 @@
       <div class="field">
         <label>What is being sold?</label>
         <select id="saleType" onchange="updateSaleUI()">
-          <option value="part">Part only — standard listing</option>
-          <option value="chrysler_programmed">Chrysler / Jeep / Dodge — programmed by Dynatrack (JTEC / NGC / GPEC)</option>
-          <option value="combo_ign">ECU Combo — ECU + Ignition Switch (plug and play set)</option>
-          <option value="combo_ign_bcm">ECU Combo — ECU + Ignition Switch + BCM (full plug and play set)</option>
+          <option value="part">Part only - standard listing</option>
+          <option value="chrysler_programmed">Chrysler / Jeep / Dodge - programmed by Dynatrack (JTEC / NGC / GPEC)</option>
+          <option value="combo_ign">ECU Combo - ECU + Ignition Switch (plug and play set)</option>
+          <option value="combo_ign_bcm">ECU Combo - ECU + Ignition Switch + BCM (full plug and play set)</option>
           <option value="honda_key">Honda ECU + Immobilizer + Key blank (plug and play)</option>
-          <option value="needs_programming">Computer — requires buyer programming (not serviced by Dynatrack)</option>
-          <option value="tested">Tested item — include test results in listing and title</option>
+          <option value="needs_programming">Computer - requires buyer programming (not serviced by Dynatrack)</option>
+          <option value="tested">Tested item - include test results in listing and title</option>
         </select>
       </div>
     </div>
@@ -459,7 +459,7 @@
         </div>
       </div>
       <div class="field" style="margin-top:8px;">
-        <label>Test notes <span style="font-weight:400;color:var(--text-faint)">(optional — e.g. all gauges functional, no warning lights)</span></label>
+        <label>Test notes <span style="font-weight:400;color:var(--text-faint)">(optional - e.g. all gauges functional, no warning lights)</span></label>
         <input type="text" id="testedNotes" placeholder="e.g. All gauges functional, no warning lights" />
       </div>
     </div>
@@ -471,7 +471,7 @@
       <div class="field">
         <label>Visual condition</label>
         <select id="condition">
-          <option value="good">Good — no visible damage</option>
+          <option value="good">Good - no visible damage</option>
           <option value="minor">Minor cosmetic wear</option>
           <option value="damage">Damage noted</option>
         </select>
@@ -483,8 +483,8 @@
     </div>
 
     <div class="field" id="programmingNoteField" style="margin-top:12px; display:none;">
-      <label>Programming note <span style="font-weight:400;color:var(--text-faint)">(auto-filled by Look up — edit if needed)</span></label>
-      <input type="text" id="programmingNote" placeholder="e.g. Direct replacement — no programming required." />
+      <label>Programming note <span style="font-weight:400;color:var(--text-faint)">(auto-filled by Look up - edit if needed)</span></label>
+      <input type="text" id="programmingNote" placeholder="e.g. Direct replacement - no programming required." />
       <div style="font-size:11px; color:var(--text-muted); margin-top:4px;" id="programmingNoteSource"></div>
     </div>
 
@@ -509,13 +509,13 @@
         <div style="font-size:12px; color:#B91C1C;">Lines marked in red could not be confirmed across multiple sources. Research those fields before this listing goes live.</div>
       </div>
     </div>
-    <div class="output-label">eBay listing title — copy and paste into the title field</div>
+    <div class="output-label">eBay listing title - copy and paste into the title field</div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px;">
       <div id="titleText" style="flex:1; font-size:15px; font-weight:600; background:var(--bg); border:1.5px solid var(--border); border-radius:6px; padding:10px 12px; min-height:2.4em; line-height:1.4; word-break:break-word;"></div>
       <button class="action-btn" id="copyTitleBtn" onclick="copyTitle()" style="white-space:nowrap; flex-shrink:0;">Copy title</button>
     </div>
     <div style="font-size:11px; color:var(--text-muted); margin-top:-12px; margin-bottom:16px;" id="titleCharCount"></div>
-    <div class="output-label">Generated description — review, then copy and paste into eBay</div>
+    <div class="output-label">Generated description - review, then copy and paste into eBay</div>
     <div class="output-text" id="outputText"></div>
     <div class="action-row">
       <button class="action-btn" id="copyBtn" onclick="copyText()">Copy description</button>
@@ -546,77 +546,77 @@
       color: '#7F1D1D',
       detect: p => /^(04|05|0[0-9][0-9][0-9][0-9][0-9][0-9][0-9])/i.test(p) || /^[0-9]{8}[A-Z]{2}$/i.test(p),
       url: p => `https://store.mopar.com/search#q=${encodeURIComponent(p)}&t=All`,
-      hint: 'Mopar eStore — official Chrysler/Jeep/Dodge/Ram catalog'
+      hint: 'Mopar eStore - official Chrysler/Jeep/Dodge/Ram catalog'
     },
     {
       name: 'Toyota / Lexus',
       color: '#1E3A5F',
       detect: p => /^\d{5}-\d{5}$/i.test(p) || /^\d{8}$/i.test(p) && /^9/.test(p),
       url: p => `https://parts.toyota.com/search?q=${encodeURIComponent(p)}`,
-      hint: 'Toyota Parts — official OEM catalog'
+      hint: 'Toyota Parts - official OEM catalog'
     },
     {
       name: 'Ford / Lincoln / Motorcraft',
       color: '#003087',
       detect: p => /^[A-Z]{1,3}[0-9]{1,2}[A-Z]-/i.test(p) || /^[0-9][A-Z][0-9]{1,2}[A-Z]-/i.test(p) || /^[A-Z]{2}[0-9]{2}-/i.test(p),
       url: p => `https://www.fordparts.com/en/search?searchterm=${encodeURIComponent(p)}`,
-      hint: 'Ford Parts — official OEM catalog'
+      hint: 'Ford Parts - official OEM catalog'
     },
     {
       name: 'GM / Chevy / GMC / Buick / Cadillac',
       color: '#003087',
       detect: p => /^\d{8}$/.test(p) && !/^9/.test(p) || /^\d{5}[A-Z]{2}$/.test(p),
       url: p => `https://www.gmpartsdirect.com/search?q=${encodeURIComponent(p)}`,
-      hint: 'GM Parts Direct — official GM catalog'
+      hint: 'GM Parts Direct - official GM catalog'
     },
     {
       name: 'Honda / Acura',
       color: '#CC0000',
       detect: p => /^\d{5}-[A-Z0-9]{3,5}-[A-Z0-9]{2,4}$/i.test(p),
       url: p => `https://parts.honda.com/#/parts/search?q=${encodeURIComponent(p)}`,
-      hint: 'Honda Parts — official OEM catalog'
+      hint: 'Honda Parts - official OEM catalog'
     },
     {
       name: 'Nissan / Infiniti',
       color: '#C3002F',
       detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) || /^[A-Z]{2}\d{3}-[A-Z0-9]{5}$/i.test(p),
       url: p => `https://www.nissanparts.cc/search?keywords=${encodeURIComponent(p)}`,
-      hint: 'Nissan Parts — OEM catalog'
+      hint: 'Nissan Parts - OEM catalog'
     },
     {
       name: 'BMW',
       color: '#1C69D4',
       detect: p => /^\d{2}\s?\d{2}\s?\d{1,2}\s?\d{3}\s?\d{3}$/i.test(p.replace(/[-\s]/g,'')),
       url: p => `https://www.realoem.com/bmw/enUS/showparts?q=${encodeURIComponent(p)}`,
-      hint: 'RealOEM — BMW parts catalog'
+      hint: 'RealOEM - BMW parts catalog'
     },
     {
       name: 'Mercedes-Benz',
       color: '#222222',
       detect: p => /^[A-Z]\s?\d{3}\s?\d{3}\s?\d{2,3}\s?\d{2,3}$/i.test(p.replace(/[-\s]/g,'')),
       url: p => `https://www.mbusa.com/en/owner/parts?partNumber=${encodeURIComponent(p)}`,
-      hint: 'Mercedes-Benz — OEM parts'
+      hint: 'Mercedes-Benz - OEM parts'
     },
     {
       name: 'Subaru',
       color: '#003087',
       detect: p => /^\d{5}[A-Z]{2}\d{3}$/i.test(p) || /^\d{4}[A-Z]\d{4}$/i.test(p),
       url: p => `https://parts.subaru.com/search?q=${encodeURIComponent(p)}`,
-      hint: 'Subaru Parts — official OEM catalog'
+      hint: 'Subaru Parts - official OEM catalog'
     },
     {
       name: 'Hyundai',
       color: '#002C5F',
       detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) && /^[^9]/.test(p),
       url: p => `https://www.hyundaipartsdeal.com/genuine/hyundai-${p.toLowerCase()}.html`,
-      hint: 'Hyundai Parts Deal — OEM catalog'
+      hint: 'Hyundai Parts Deal - OEM catalog'
     },
     {
       name: 'Kia',
       color: '#BB162B',
       detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) && /^[9]/.test(p),
       url: p => `https://www.kiapartsnow.com/genuine/kia-${p.toLowerCase()}.html`,
-      hint: 'Kia Parts Now — OEM catalog'
+      hint: 'Kia Parts Now - OEM catalog'
     }
   ];
 
@@ -704,17 +704,17 @@
             const engines = fitment.fits.engines || [];
             const trims = fitment.fits.trims || [];
             if (engines.length) document.getElementById('donorEngine').value = engines.join(', ');
-            statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fitment loaded from DarkHawk — high confidence</span>';
+            statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fitment loaded from DarkHawk - high confidence</span>';
             btn.disabled = false;
             btn.textContent = '🔍 Look up';
             return; // Skip Claude web search entirely
           }
-          // Medium confidence — continue to Claude for full lookup but keep DarkHawk data
-          statusEl.innerHTML = '<span style="color:var(--text-muted);">DarkHawk data found — verifying with web search...</span>';
+          // Medium confidence - continue to Claude for full lookup but keep DarkHawk data
+          statusEl.innerHTML = '<span style="color:var(--text-muted);">DarkHawk data found - verifying with web search...</span>';
         }
       }
     } catch (e) {
-      // DarkHawk unavailable — fall through silently to Claude web search
+      // DarkHawk unavailable - fall through silently to Claude web search
     }
 
     statusEl.innerHTML = '<span style="color:var(--text-muted);">Identifying part...</span>';
@@ -726,7 +726,7 @@
       let fullText = '';
 
       const deadline = Date.now() + 18000; // 18 second hard timeout per step
-      for (let i = 0; i < 1; i++) { // single search only — keeps token usage low
+      for (let i = 0; i < 1; i++) { // single search only - keeps token usage low
         if (Date.now() > deadline) break;
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), deadline - Date.now());
@@ -745,7 +745,7 @@
           });
           data = await res.json();
         } catch (fetchErr) {
-          break; // timeout or network — exit loop with whatever we have
+          break; // timeout or network - exit loop with whatever we have
         } finally {
           clearTimeout(timer);
         }
@@ -817,7 +817,7 @@ TIPM (totally integrated power module/fuse box/junction box), ABS (ABS module/pu
 CLUSTER (instrument cluster/gauge cluster), RADIO (radio/head unit/infotainment),
 THROTTLE (throttle body), MECHANICAL (mechanical part with no electronics), OTHER (anything else)
 
-Return ONLY valid JSON — no markdown, no explanation:
+Return ONLY valid JSON - no markdown, no explanation:
 {
   "partName": null,
   "category": null,
@@ -850,7 +850,7 @@ Replace null with confirmed values.`
         BCM:       'Confirm trim level. Research which trims it does NOT fit.',
         TCM:       'Confirm exact transmission type/code. Research what it does NOT fit.',
         TIPM:      'Confirm exact year/model. Research any year or sub-model exclusions.',
-        ABS:       'CRITICAL: Is this 2WD/FWD or AWD/4WD specific? ABS modules almost always differ by drivetrain. Confirm which drivetrain it fits and which it does NOT fit.',
+        ABS:       'CRITICAL: Is this 2WD/FWD or AWD/4WD specific? ABS modules almost always differ by drivetrain. Confirm which drivetrain it fits and which it does NOT fit. For ABS modules: Research whether this specific ABS unit requires any programming, calibration, or initialization after installation. Many 2015+ ABS modules require dealer calibration. Be specific - do not guess.',
         CLUSTER:   'Confirm trim and display type. Research exclusions. Does this German vehicle cluster require coding?',
         RADIO:     'Confirm trim and option package. Research which packages it does NOT fit.',
         THROTTLE:  'Confirm exact engine size/code. Research what engines it does NOT fit.',
@@ -866,16 +866,16 @@ Replace null with confirmed values.`
 
       const step2 = await runAgentic({
         role: 'user',
-        content: `Part confirmed: "${step1.partName}" — Category: ${category}
+        content: `Part confirmed: "${step1.partName}" - Category: ${category}
 Vehicle: ${step1.year} ${step1.make} ${step1.model}
 Part number: ${partNum}
 
 Task: ${categoryInstructions[category] || categoryInstructions.OTHER}
-${needsProgrammingResearch ? 'Also confirm: Does this specific part require programming to the vehicle, or is it plug-and-play? Search for a definitive answer — do not guess.' : ''}
+${needsProgrammingResearch ? 'Also confirm: Does this specific part require programming to the vehicle, or is it plug-and-play? Search for a definitive answer - do not guess.' : ''}
 
 Rules: North American market only. Only report confirmed facts from search results. Use JSON null (not the string "null") for anything not confirmed.
 
-Return ONLY valid JSON — no markdown fences, no explanation:
+Return ONLY valid JSON - no markdown fences, no explanation:
 {
   "engine": null,
   "drivetrain": null,
@@ -891,7 +891,7 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
       if (step1.year) document.getElementById('donorYear').value = String(step1.year).split('-')[0];
 
       let vehicleStr = [step1.make, step1.model].filter(Boolean).join(' ');
-      if (step2?.drivetrain && step2.drivetrain !== 'All Drivetrains') vehicleStr += ` — ${step2.drivetrain}`;
+      if (step2?.drivetrain && step2.drivetrain !== 'All Drivetrains') vehicleStr += ` - ${step2.drivetrain}`;
       if (step2?.trim) vehicleStr += ` (${step2.trim})`;
       if (vehicleStr) document.getElementById('donorVehicle').value = vehicleStr;
       if (step2?.engine) document.getElementById('donorEngine').value = step2.engine;
@@ -907,16 +907,41 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
         doesNotFitInput.value = '';
       }
 
-      // Programming note
+      // Programming note - priority: 1) programming_db.json 2) Claude research 3) default for ABS
       const progField = document.getElementById('programmingNoteField');
       const progInput = document.getElementById('programmingNote');
       const progSource = document.getElementById('programmingNoteSource');
-      if (needsProgrammingResearch && step2?.programmingNote && step2?.programmingRequired !== 'unknown') {
-        progField.style.display = 'block';
-        progInput.value = step2.programmingNote;
-        const isYes = step2.programmingRequired === 'yes';
-        progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required — confirmed by search' : '✓ No programming required — confirmed by search'}</span>`;
+
+      if (needsProgrammingResearch) {
+        // Priority 1: Check programming_db.json
+        const make = step1.make || '';
+        const year = step1.year || '';
+        const dbLookup = lookupProgramming(make, year, category.toLowerCase());
+
+        if (dbLookup.found) {
+          progField.style.display = 'block';
+          progInput.value = dbLookup.notes;
+          const isRequired = dbLookup.required === 'YES' || dbLookup.required === 'VERIFY';
+          const color = dbLookup.required === 'YES' ? '#b91c1c' : dbLookup.required === 'VERIFY' ? '#b45309' : '#15803d';
+          const label = dbLookup.required === 'YES' ? '⚠ Programming required' : dbLookup.required === 'VERIFY' ? '⚠ Verify programming' : '✓ No programming required';
+          progSource.innerHTML = `<span style="color:${color}; font-weight:500;">${label} - from programming database</span>`;
+        } else if (step2?.programmingNote && step2?.programmingRequired !== 'unknown') {
+          // Priority 2: Claude research result
+          progField.style.display = 'block';
+          progInput.value = step2.programmingNote;
+          const isYes = step2.programmingRequired === 'yes';
+          progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required - confirmed by search' : '✓ No programming required - confirmed by search'}</span>`;
+        } else if (category === 'ABS') {
+          // Priority 3: ABS default when no data
+          progField.style.display = 'block';
+          progInput.value = 'May require ABS module initialization or calibration after installation. Consult a qualified technician.';
+          progSource.innerHTML = '<span style="color:#b45309; font-weight:500;">⚠ ABS programming unknown - using default caution</span>';
+        } else {
+          progField.style.display = 'none';
+          progInput.value = '';
+        }
       } else {
+        // Non-programmable part types - hide programming note entirely
         progField.style.display = 'none';
         progInput.value = '';
       }
@@ -926,7 +951,7 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
       document.getElementById('ebayRefUrl').value = '';
       const conf = step1.confidence;
       const confColor = conf === 'high' ? '#15803d' : conf === 'medium' ? '#b45309' : '#b91c1c';
-      const confText = conf === 'high' ? '✓ Fitment confirmed' : conf === 'medium' ? '⚠ Verify fitment before listing' : '✗ Could not confirm — fill in manually';
+      const confText = conf === 'high' ? '✓ Fitment confirmed' : conf === 'medium' ? '⚠ Verify fitment before listing' : '✗ Could not confirm - fill in manually';
       statusEl.innerHTML = `<span style="color:${confColor}; font-weight:500;">${confText}</span>`;
 
     } catch (err) {
@@ -987,7 +1012,7 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
     const testedSpeed = document.getElementById('testedSpeed').value.trim();
     const testedMileage = document.getElementById('testedMileage').value.trim();
     const testedNotes = document.getElementById('testedNotes').value.trim();
-    const testedSuffix = [testedSpeed ? `Tested ${testedSpeed}MPH` : '', testedMileage ? testedMileage : '', testedNotes].filter(Boolean).join(' — ');
+    const testedSuffix = [testedSpeed ? `Tested ${testedSpeed}MPH` : '', testedMileage ? testedMileage : '', testedNotes].filter(Boolean).join(' - ');
 
     const conditionLine = condition === 'good'
       ? 'Cleaned and visually inspected. Removed from a running donor vehicle.'
@@ -996,22 +1021,22 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
       : `Cleaned and visually inspected. Damage noted${notes ? ': ' + notes : ''}. Removed from a running donor vehicle.`;
 
     const saleTypeInstructions = {
-      part: `Standard used part. Programming Note: if ECU/ECM/BCM/TCM or programmable module write "May require VIN-specific programming. Professional installation recommended." For non-programmable parts write "Direct replacement — no programming required."`,
-      chrysler_programmed: `Chrysler/Jeep/Dodge ECM/PCM programmed by Dynatrack Racing (JTEC, NGC, GPEC only — no diesel/Cummins). Use Chrysler template.`,
-      combo_ign: `ECU + Ignition Switch plug and play set. Part name: "[MAKE] ECU + IGNITION SWITCH COMBO — PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch". Programming Note: "Plug and play set — must be installed together. No additional programming required."`,
-      combo_ign_bcm: `ECU + Ignition Switch + BCM full set. Part name: "[MAKE] ECU + IGNITION SWITCH + BCM COMBO — PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch + Body Control Module (BCM)". Programming Note: "Plug and play set — all three components must be installed together. No additional programming required."`,
-      honda_key: `Honda ECU + immobilizer + key blank set. Part name: "HONDA ECU + IMMOBILIZER + KEY BLANK — PLUG AND PLAY SET". Add: "• What's Included: Honda ECU + Immobilizer Unit + Key Blank(s)". Programming Note: "Plug and play set — key blank must be cut to buyer's ignition. No dealer programming required once key is cut and full set is installed."`,
-      needs_programming: `Computer requiring buyer programming — Dynatrack does NOT program this. Programming Note: "Requires VIN-specific programming before use. Not included — take to dealer or qualified shop after purchase."`,
-      tested: `This item has been tested and confirmed working. Include a "• Tested:" bullet in Item Specifics after the Fits line with the test results. Keep it factual and concise e.g. "Tested: All gauges functional — 120MPH — 105K miles" or "Tested: Unit powers on, all functions verified". Do not use Programming Note for tested items unless the part separately requires programming.`
+      part: `Standard used part. Programming Note: if ECU/ECM/BCM/TCM or programmable module write "May require VIN-specific programming. Professional installation recommended." For non-programmable parts write "Direct replacement - no programming required."`,
+      chrysler_programmed: `Chrysler/Jeep/Dodge ECM/PCM programmed by Dynatrack Racing (JTEC, NGC, GPEC only - no diesel/Cummins). Use Chrysler template.`,
+      combo_ign: `ECU + Ignition Switch plug and play set. Part name: "[MAKE] ECU + IGNITION SWITCH COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch". Programming Note: "Plug and play set - must be installed together. No additional programming required."`,
+      combo_ign_bcm: `ECU + Ignition Switch + BCM full set. Part name: "[MAKE] ECU + IGNITION SWITCH + BCM COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch + Body Control Module (BCM)". Programming Note: "Plug and play set - all three components must be installed together. No additional programming required."`,
+      honda_key: `Honda ECU + immobilizer + key blank set. Part name: "HONDA ECU + IMMOBILIZER + KEY BLANK - PLUG AND PLAY SET". Add: "• What's Included: Honda ECU + Immobilizer Unit + Key Blank(s)". Programming Note: "Plug and play set - key blank must be cut to buyer's ignition. No dealer programming required once key is cut and full set is installed."`,
+      needs_programming: `Computer requiring buyer programming - Dynatrack does NOT program this. Programming Note: "Requires VIN-specific programming before use. Not included - take to dealer or qualified shop after purchase."`,
+      tested: `This item has been tested and confirmed working. Include a "• Tested:" bullet in Item Specifics after the Fits line with the test results. Keep it factual and concise e.g. "Tested: All gauges functional - 120MPH - 105K miles" or "Tested: Unit powers on, all functions verified". Do not use Programming Note for tested items unless the part separately requires programming.`
     };
 
     const chryslerTemplate = `Programmed ECU ECM PCM [YEAR RANGE] [MAKE] [MODEL] [ENGINE]
 
 Item Specifics
 • Part Number: ${partNum}
-• Fits: [year range make model engine/trim — confirmed fitment only]
-[DOES NOT FIT LINE — only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
-[PART NUMBER WARNING LINE — only if part number warning is provided above, otherwise omit entirely]
+• Fits: [year range make model engine/trim - confirmed fitment only]
+[DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
+[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
 • Condition: Inspected for Damage
 • Warranty: 30-Day Hassle-Free Returns
 • Shipping: Ships within 1 Business Day (North Carolina, USA)
@@ -1025,15 +1050,15 @@ We are dismantlers based in North Carolina, specializing in high-quality OEM com
 • Support: Available Mon-Fri for any questions.
 • Shipping: Fast domestic shipping. (Hawaii/Alaska residents: please message for a quote prior to purchase).`;
 
-    const standardTemplate = `[PART NAME IN ALL CAPS — e.g. Kia Sportage 2010-2014 Fuse Box Junction Relay Interior OEM]
+    const standardTemplate = `[PART NAME IN ALL CAPS - e.g. Kia Sportage 2010-2014 Fuse Box Junction Relay Interior OEM]
 
 Item Specifics
 • Part Number: ${partNum}
-• Fits: [year range make model — confirmed fitment only, e.g. 2010-2014 Kia Sportage]
-[DOES NOT FIT LINE — only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
-[PART NUMBER WARNING LINE — only if part number warning is provided above, otherwise omit entirely]
-[WHATS INCLUDED LINE — only if sale type requires it, otherwise omit]
-• Programming Note: [per sale type instructions — one short sentence]
+• Fits: [year range make model - confirmed fitment only, e.g. 2010-2014 Kia Sportage]
+[DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
+[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
+[WHATS INCLUDED LINE - only if sale type requires it, otherwise omit]
+• Programming Note: [per sale type instructions - one short sentence]
 • Condition: ${conditionLine}
 • Warranty: 30-Day Hassle-Free Returns
 • Shipping: Ships within 1 Business Day (North Carolina, USA)
@@ -1059,10 +1084,10 @@ IMPORTANT FORMATTING RULES:
     TITLE: Dodge Ram 1500 5.9L 1997 Programmed ECU ECM PCM Engine Control 56040440AC
 - Part number always goes at the end before any condition/mileage/test notes
 - End notes only when relevant: "Programmed" for pre-programmed ECUs, drivetrain if specific (AWD/2WD)
-${isTested && testedSuffix ? `- This is a TESTED item — append the following at the very end of the title: ${testedSuffix}` : ''}
-- Title must be 80 characters or under — cut filler words to fit, never exceed 80
+${isTested && testedSuffix ? `- This is a TESTED item - append the following at the very end of the title: ${testedSuffix}` : ''}
+- Title must be 80 characters or under - cut filler words to fit, never exceed 80
 - After the TITLE: line, leave one blank line then output the listing body exactly as templated
-- Do NOT include a "Removed From" bullet — omit it entirely
+- Do NOT include a "Removed From" bullet - omit it entirely
 - Keep each bullet to one line
 - No extra blank lines between bullets
 - Do not add any fields not shown in the template above`;
@@ -1094,63 +1119,59 @@ ${isTested && testedSuffix ? `- This is a TESTED item — append the following a
     const partTypeRules = {
       ecu: {
         query: `"${partNum}" ECM PCM engine control module fitment application`,
-        fitmentFields: 'MUST include exact engine size and code (e.g. 2.4L 4-cyl, 3.5L V6). ECUs are engine AND transmission specific — include trans type if confirmed (auto/manual). Year range must be exact.',
-        programmingRule: 'ECUs ALWAYS require VIN-specific programming. Write exactly: "Requires VIN-specific programming — must be programmed to your vehicle before use."',
+        fitmentFields: 'MUST include exact engine size and code (e.g. 2.4L 4-cyl, 3.5L V6). ECUs are engine AND transmission specific - include trans type if confirmed (auto/manual). Year range must be exact.',
+        programmingRule: 'ECUs ALWAYS require VIN-specific programming. Write exactly: "Requires VIN-specific programming - must be programmed to your vehicle before use."',
       },
       bcm: {
         query: `"${partNum}" body control module BCM compatibility fitment`,
-        fitmentFields: 'Year/make/model/trim. BCMs are often trim-specific — include trim level if confirmed. Engine is usually NOT relevant for BCMs.',
-        programmingRule: 'BCMs require programming to VIN. Write exactly: "Requires VIN-specific programming — must be paired to your vehicle."',
+        fitmentFields: 'Year/make/model/trim. BCMs are often trim-specific - include trim level if confirmed. Engine is usually NOT relevant for BCMs.',
+        programmingRule: 'BCMs require programming to VIN. Write exactly: "Requires VIN-specific programming - must be paired to your vehicle."',
       },
       tipm: {
         query: `"${partNum}" TIPM fuse box integrated power module fitment`,
-        fitmentFields: 'Exact year/make/model. Engine is sometimes relevant on TIPMs — include if confirmed. TIPMs are highly specific.',
-        programmingRule: 'TIPMs require programming. Write exactly: "VIN-specific — requires dealer or professional programming before use."',
+        fitmentFields: 'Exact year/make/model. Engine is sometimes relevant on TIPMs - include if confirmed. TIPMs are highly specific.',
+        programmingRule: 'TIPMs require programming. Write exactly: "VIN-specific - requires dealer or professional programming before use."',
       },
       tcm: {
         query: `"${partNum}" transmission control module TCM fitment application`,
-        fitmentFields: 'Year/make/model AND transmission type (e.g. 6-speed automatic, 5-speed manual). TCMs are transmission-specific — this is the most important field.',
-        programmingRule: 'TCMs require programming. Write exactly: "Requires VIN-specific programming — must be programmed to your vehicle and transmission."',
+        fitmentFields: 'Year/make/model AND transmission type (e.g. 6-speed automatic, 5-speed manual). TCMs are transmission-specific - this is the most important field.',
+        programmingRule: 'TCMs require programming. Write exactly: "Requires VIN-specific programming - must be programmed to your vehicle and transmission."',
       },
       abs: {
         query: `"${partNum}" ABS pump module anti-lock brake fitment`,
-        fitmentFields: 'Year/make/model. CRITICAL: check if part is 2WD or 4WD specific — many ABS units differ. If it fits all drivetrains, write "All Drivetrains". Engine is NOT relevant for ABS.',
-        programmingRule: 'ABS units are direct replacement. Write exactly: "Direct replacement — no programming required."',
+        fitmentFields: 'Year/make/model. CRITICAL: check if part is 2WD or 4WD specific - many ABS units differ. If it fits all drivetrains, write "All Drivetrains". Engine is NOT relevant for ABS.',
+        programmingRule: null, // Determined by programming_db.json lookup or Claude research
       },
       amplifier: {
         query: `"${partNum}" amplifier OEM audio fitment application`,
         fitmentFields: 'Year/make/model and audio package (e.g. Bose, Harman Kardon, premium audio). Engine and drivetrain are NOT relevant for amplifiers.',
-        programmingRule: 'Amplifiers are direct replacement. Write exactly: "Direct replacement — no programming required."',
       },
       cluster: {
         query: `"${partNum}" instrument cluster speedometer fitment`,
-        fitmentFields: 'Year/make/model/trim. Note if analog vs digital display. Engine may matter on clusters — include if confirmed. Trim level often determines cluster type.',
-        programmingRule: 'Clusters are direct replacement. Write exactly: "Direct replacement — no programming required."',
+        fitmentFields: 'Year/make/model/trim. Note if analog vs digital display. Engine may matter on clusters - include if confirmed. Trim level often determines cluster type.',
+        programmingRule: 'Clusters are direct replacement. Write exactly: "Direct replacement - no programming required."',
       },
       throttle: {
         query: `"${partNum}" throttle body fitment engine application`,
-        fitmentFields: 'Year/make/model AND exact engine (e.g. 2.4L 4-cyl, 3.5L V6). Throttle bodies are engine-specific — engine is the most critical field. Drivetrain is NOT relevant.',
-        programmingRule: 'Throttle bodies are direct replacement. Write exactly: "Direct replacement — no programming required."',
+        fitmentFields: 'Year/make/model AND exact engine (e.g. 2.4L 4-cyl, 3.5L V6). Throttle bodies are engine-specific - engine is the most critical field. Drivetrain is NOT relevant.',
       },
       radio: {
         query: `"${partNum}" radio head unit OEM fitment application`,
         fitmentFields: 'Year/make/model and trim/option package. Engine and drivetrain are NOT relevant for radios.',
-        programmingRule: 'Radios are direct replacement. Write exactly: "Direct replacement — no programming required."',
+        programmingRule: 'Radios are direct replacement. Write exactly: "Direct replacement - no programming required."',
       },
       idm: {
         query: `"${partNum}" IDM injector driver module diesel fitment`,
-        fitmentFields: 'Year/make/model/engine. IDMs are engine and calibration specific — include exact diesel engine code.',
-        programmingRule: 'IDMs are direct replacement. Write exactly: "Direct replacement — no programming required."',
+        fitmentFields: 'Year/make/model/engine. IDMs are engine and calibration specific - include exact diesel engine code.',
+        programmingRule: 'IDMs are direct replacement. Write exactly: "Direct replacement - no programming required."',
       },
       mechanical: {
         query: `"${partNum}" OEM part fitment application`,
         fitmentFields: 'Year/make/model. Include engine only if the part is engine-specific. Drivetrain only if relevant.',
-        programmingRule: 'Mechanical parts are direct replacement. Write exactly: "Direct replacement — no programming required."',
       },
       generic: {
         query: `"${partNum}" OEM part fitment application vehicle`,
         fitmentFields: 'Year/make/model. Include engine and drivetrain only if the search results show the part is specific to them.',
-        programmingRule: 'Only include a programming note if the part type clearly requires it. If uncertain, omit the Programming Note bullet entirely.',
       }
     };
 
@@ -1173,7 +1194,7 @@ ${isTested && testedSuffix ? `- This is a TESTED item — append the following a
 IMPORTANT: Use North American vehicle names only. If search results show both a North American model and a foreign-market equivalent (e.g. Ford Escape vs Ford Kuga, Chevy Cruze vs Holden Cruze), always use the North American name in the listing.
 
 PART TYPE: ${partType.toUpperCase()}
-DETECTED MAKE: ${detectedCat ? detectedCat.name : 'Unknown — use RockAuto'}
+DETECTED MAKE: ${detectedCat ? detectedCat.name : 'Unknown - use RockAuto'}
 
 Do ONE web search using this query: ${enrichedQuery}
 ${catalogHint}
@@ -1188,30 +1209,36 @@ ${strategy.fitmentFields}
 
 ═══ DOES NOT FIT ═══
 ${confirmedDoesNotFit
-  ? `CONFIRMED EXCLUSION — include this line exactly: "• Does NOT fit: ${confirmedDoesNotFit}"`
-  : 'No confirmed exclusions — omit the Does NOT fit line entirely. Do not guess or invent exclusions.'
+  ? `CONFIRMED EXCLUSION - include this line exactly: "• Does NOT fit: ${confirmedDoesNotFit}"`
+  : 'No confirmed exclusions - omit the Does NOT fit line entirely. Do not guess or invent exclusions.'
 }
 
 ═══ PART NUMBER WARNING ═══
 ${confirmedPartNumberWarning
   ? `INCLUDE THIS LINE after the Does NOT fit line (or after Fits if no exclusions): "• ⚠ IMPORTANT: ${confirmedPartNumberWarning}"`
-  : 'No part number warning needed — omit entirely.'
+  : 'No part number warning needed - omit entirely.'
 }
 
 ═══ PROGRAMMING NOTE ═══
+PROGRAMMING NOTE RULES:
+- ONLY include a "Programming Note:" bullet for these part types: ECU, BCM, TCM, TIPM, ABS, Radio, Cluster, Immobilizer
+- For amplifiers, throttle bodies, mechanical parts, and all other part types: do NOT include any programming note bullet at all. Omit it entirely.
+- Never write "Direct replacement - no programming required" for parts that obviously don't need programming. Buyers know an amplifier doesn't need programming.
 ${confirmedProgrammingNote
-  ? `USE THIS EXACT PROGRAMMING NOTE — do not change it: "${confirmedProgrammingNote}"`
+  ? `USE THIS EXACT PROGRAMMING NOTE - do not change it: "${confirmedProgrammingNote}"`
   : programmingNoteFieldVisible
-    ? 'Programming note field was shown but left blank — omit the Programming Note bullet entirely.'
-    : 'This part type does not require a programming note — omit the Programming Note bullet entirely.'
+    ? 'Programming note field was shown but left blank - omit the Programming Note bullet entirely.'
+    : 'This part type does not require a programming note - omit the Programming Note bullet entirely.'
 }
+
+FORMATTING RULE: Never use em dashes (the long dash character) anywhere in the output. Use regular hyphens/dashes (-) only. This is a hard requirement.
 
 ═══ SALE TYPE ═══
 ${saleTypeInstructions[saleType]}
 ${partName ? 'Part name hint: ' + partName : ''}
 ${donorInfo ? 'Donor vehicle: ' + donorInfo : ''}
 
-OUTPUT only the completed listing — no preamble, no explanation:
+OUTPUT only the completed listing - no preamble, no explanation:
 
 ${isChrysler ? chryslerTemplate : standardTemplate}`;
 
@@ -1321,7 +1348,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
             lineEl.style.margin = '2px 0';
             lineEl.textContent = line;
           } else if (idx === 0 && line.trim() !== '') {
-            // Title line — bold
+            // Title line - bold
             lineEl.style.fontWeight = '700';
             lineEl.style.fontSize = '17px';
             lineEl.textContent = line;
@@ -1336,15 +1363,15 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
             bold.textContent = 'About Dynatrack Racing';
             lineEl.appendChild(bold);
             if (nextLine && !nextLine.startsWith('•')) {
-              lineEl.appendChild(document.createTextNode(' — ' + nextLine));
+              lineEl.appendChild(document.createTextNode(' - ' + nextLine));
               skipNext = true;
             }
           } else if (line === 'Item Specifics') {
-            // Section headers — bold
+            // Section headers - bold
             lineEl.style.fontWeight = '700';
             lineEl.textContent = line;
           } else if (line.startsWith('•')) {
-            // Bullet lines — bold the label (text before first colon)
+            // Bullet lines - bold the label (text before first colon)
             const colonIdx = line.indexOf(':');
             if (colonIdx !== -1) {
               const label = line.substring(0, colonIdx + 1); // "• Part Number:"
@@ -1488,7 +1515,7 @@ North American vehicles only. Replace nulls with confirmed values from the listi
       if (r.partName) document.getElementById('partName').value = r.partName;
       if (r.year) document.getElementById('donorYear').value = String(r.year).split('-')[0];
       let vehicleStr = [r.make, r.model].filter(Boolean).join(' ');
-      if (r.drivetrain && r.drivetrain !== 'All Drivetrains') vehicleStr += ` — ${r.drivetrain}`;
+      if (r.drivetrain && r.drivetrain !== 'All Drivetrains') vehicleStr += ` - ${r.drivetrain}`;
       if (r.trim) vehicleStr += ` (${r.trim})`;
       if (vehicleStr) document.getElementById('donorVehicle').value = vehicleStr;
       if (r.engine) document.getElementById('donorEngine').value = r.engine;
@@ -1505,14 +1532,14 @@ North American vehicles only. Replace nulls with confirmed values from the listi
         progField.style.display = 'block';
         progInput.value = r.programmingNote;
         const isYes = r.programmingRequired === 'yes';
-        progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required — from reference listing' : '✓ No programming required — from reference listing'}</span>`;
+        progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required - from reference listing' : '✓ No programming required - from reference listing'}</span>`;
       } else { progField.style.display = 'none'; progInput.value = ''; }
 
       document.getElementById('ebayRefRow').style.display = 'none';
-      statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fields populated from eBay reference — verify before generating</span>';
+      statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fields populated from eBay reference - verify before generating</span>';
 
     } catch (err) {
-      statusEl.innerHTML = `<span style="color:#b91c1c;">Failed: ${err.message} — fill in fields manually.</span>`;
+      statusEl.innerHTML = `<span style="color:#b91c1c;">Failed: ${err.message} - fill in fields manually.</span>`;
     }
   }
 
@@ -1546,6 +1573,33 @@ North American vehicles only. Replace nulls with confirmed values from the listi
   });
 
   loadKey();
+
+  // ── Programming DB ─────────────────────────────────────────
+  let programmingDB = null;
+  fetch('/admin/programming_db.json')
+    .then(r => r.json())
+    .then(data => { programmingDB = data.rules || data; console.log('Programming DB loaded:', Object.keys(programmingDB).length, 'entries'); })
+    .catch(() => { console.log('Programming DB not available'); });
+
+  function lookupProgramming(brand, year, moduleType) {
+    if (!programmingDB) return { found: false };
+    const typeMap = { 'ecu': 'ECM', 'bcm': 'BCM', 'tcm': 'TCM', 'tipm': 'TIPM', 'abs': 'ABS', 'radio': 'Radio', 'cluster': 'Cluster', 'idm': 'IDM' };
+    const dbType = typeMap[moduleType] || moduleType.toUpperCase();
+    // Brand normalization
+    const brandMap = {
+      'ford': 'Ford', 'toyota': 'Toyota', 'honda': 'Honda', 'dodge': 'Chrysler', 'chrysler': 'Chrysler',
+      'jeep': 'Chrysler', 'ram': 'Chrysler', 'chevrolet': 'GM', 'gmc': 'GM', 'buick': 'GM', 'cadillac': 'GM',
+      'pontiac': 'GM', 'saturn': 'GM', 'nissan': 'Nissan', 'infiniti': 'Nissan', 'bmw': 'BMW',
+      'mercedes': 'Mercedes', 'mazda': 'Mazda', 'kia': 'Hyundai/Kia', 'hyundai': 'Hyundai/Kia',
+      'subaru': 'Subaru', 'volkswagen': 'VW/Audi', 'audi': 'VW/Audi', 'volvo': 'Volvo',
+      'lexus': 'Toyota', 'acura': 'Honda', 'lincoln': 'Ford', 'mercury': 'Ford',
+    };
+    const brandGroup = brandMap[(brand || '').toLowerCase()] || brand;
+    const key = brandGroup + '|' + dbType + '|' + parseInt(year);
+    const match = programmingDB[key];
+    if (match) return { found: true, required: match.r, notes: match.n };
+    return { found: false };
+  }
 </script>
 </body>
 </html>
