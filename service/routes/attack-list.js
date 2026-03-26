@@ -426,10 +426,22 @@ router.post('/manual', async (req, res) => {
             };
             if (!v.year && get(29)) v.year = parseInt(get(29));
             if (get(26)) v.make = get(26);
-            if (get(28)) v.model = get(28);
-            if (get(13)) v.trim = get(13);
-            const disp = get(13) || get(71);
-            if (disp) v.engine = disp;
+            if (get(28)) {
+              // Use NHTSA model but strip trim suffixes to keep it clean
+              const nhtsaModel = get(28);
+              // Only override if parser didn't get a model, or NHTSA is more specific
+              if (!v.model || v.model.toUpperCase() === nhtsaModel.split(' ')[0].toUpperCase()) {
+                v.model = nhtsaModel.split(/\s+(LE|SE|XLE|SR5|LX|EX|SXT|RT|Limited|Sport|Base|Touring)\b/i)[0];
+              }
+            }
+            if (get(38)) v.trim_level = get(38); // NHTSA var 38 = trim
+            // Engine: displacement (var 13) + cylinders (var 71)
+            const disp = get(13);
+            const cyl = get(71);
+            if (disp && !v.engine) {
+              const d = parseFloat(disp);
+              v.engine = (!isNaN(d) ? d.toFixed(1) : disp) + 'L' + (cyl ? ' ' + (parseInt(cyl) <= 4 ? '4-cyl' : parseInt(cyl) === 6 ? 'V6' : parseInt(cyl) === 8 ? 'V8' : cyl + '-cyl') : '');
+            }
           } catch (e) { /* skip individual VIN errors */ }
         }
       } catch (e) {
@@ -456,9 +468,9 @@ router.post('/manual', async (req, res) => {
     res.json({
       success: true,
       generated_at: new Date().toISOString(),
-      total_lines: lines.length,
+      total_lines: vehicles_raw.length,
       parsed_count: valid.length,
-      skipped_count: lines.length - valid.length,
+      skipped_count: vehicles_raw.length - valid.length,
       vehicles: scored,
     });
   } catch (err) {

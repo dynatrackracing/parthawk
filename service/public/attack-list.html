@@ -553,7 +553,7 @@
         </div>
       </div>
       <div class="v-expanded" id="vexp-${v.id}">
-        ${hasPartsPreloaded ? renderExpandedParts(v) : '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;">Tap to load parts...</div>'}
+        ${hasPartsPreloaded ? renderExpandedParts(v) : (v.parts && v.parts.length === 0 ? '<div style="padding:12px 0;color:#6B7280;font-size:12px;">No parts matched for this vehicle</div>' : '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;">Tap to load parts...</div>')}
       </div>
     </div>`;
   }
