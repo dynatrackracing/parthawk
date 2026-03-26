@@ -223,4 +223,46 @@ async function batchPriceCheck(parts) {
   return results;
 }
 
-module.exports = { buildSearchQuery, batchPriceCheck, getCachedPrice, singlePriceCheck };
+/**
+ * Full pricing pass: score all yard vehicles, collect matched parts, batch price them.
+ */
+async function runPricingPass() {
+  log.info('[MarketPricing] Starting full pricing pass');
+  const AttackListService = require('./AttackListService');
+  const service = new AttackListService();
+
+  try {
+    const allResults = await service.getAllYardsAttackList({ daysBack: 90 });
+    const parts = [];
+    for (const yard of allResults) {
+      for (const v of (yard.vehicles || [])) {
+        for (const p of (v.parts || [])) {
+          if (p.partType && p.price > 50) {
+            parts.push({
+              title: p.title,
+              make: v.make,
+              model: v.model,
+              year: parseInt(v.year),
+              partType: p.partType,
+            });
+          }
+        }
+      }
+    }
+
+    if (parts.length === 0) {
+      log.info('[MarketPricing] No parts to price');
+      return { parts: 0, results: 0 };
+    }
+
+    log.info({ partCount: parts.length }, '[MarketPricing] Collected parts, starting batch');
+    const results = await batchPriceCheck(parts);
+    log.info({ partCount: parts.length, results: results.size }, '[MarketPricing] Pricing pass complete');
+    return { parts: parts.length, results: results.size };
+  } catch (err) {
+    log.error({ err: err.message }, '[MarketPricing] Pricing pass failed');
+    throw err;
+  }
+}
+
+module.exports = { buildSearchQuery, batchPriceCheck, getCachedPrice, singlePriceCheck, runPricingPass };

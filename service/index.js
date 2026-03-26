@@ -160,6 +160,18 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
+// Market pricing batch trigger — kicks off full pricing pass in background
+app.post('/api/market-price/run-batch', async (req, res) => {
+  res.json({ started: true, message: 'Pricing pass started in background. Check /api/debug/full for market_demand_cache freshness.' });
+  try {
+    const { runPricingPass } = require('./services/MarketPricingService');
+    const result = await runPricingPass();
+    log.info({ result }, '[MarketPricing] Manual batch complete');
+  } catch (err) {
+    log.error({ err: err.message }, '[MarketPricing] Manual batch failed');
+  }
+});
+
 // Market pricing test route — scrapes eBay sold comps for a single query
 app.get('/api/market-price', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
