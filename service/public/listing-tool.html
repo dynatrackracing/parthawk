@@ -368,7 +368,7 @@
       <div class="field">
         <label>OEM part number <span class="req">*</span></label>
         <div style="display:flex; gap:8px; align-items:center;">
-          <input type="text" id="partNum" placeholder="e.g. 22030-65010" style="flex:1;" />
+          <input type="text" id="partNum" placeholder="e.g. 22030-65010" style="flex:1;" onblur="checkDarkHawkFitment(this.value)" />
           <button id="lookupBtn" onclick="lookupPartNumber()" title="Look up fitment by part number" style="white-space:nowrap; padding:8px 14px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); border:none; background:var(--gold); color:#1a1a1a; cursor:pointer; transition:opacity 0.12s; flex-shrink:0;">
             🔍 Look up
           </button>
@@ -1412,6 +1412,9 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
         document.getElementById('verifyBanner').style.display = hasWarnings ? 'flex' : 'none';
         document.getElementById('outputCard').classList.add('visible');
         document.getElementById('outputCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        // Fire-and-forget write-back to DarkHawk
+        saveFitmentToDarkHawk();
       } else {
         document.getElementById('status').textContent = 'No response received. Please try again.';
       }
@@ -1572,6 +1575,75 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
     const match = programmingDB[key];
     if (match) return { found: true, required: match.r, notes: match.n };
     return { found: false };
+  }
+
+  // ── DarkHawk fitment check (on part number blur) ─────────────
+  async function checkDarkHawkFitment(partNumber) {
+    if (!partNumber || partNumber.length < 5) return;
+    try {
+      const res = await fetch(`/api/listing-tool/parts-lookup?partNumber=${encodeURIComponent(partNumber)}`);
+      const json = await res.json();
+      if (!json.success || !json.data) return;
+
+      const statusEl = document.getElementById('lookupStatus');
+
+      if (json.source === 'cache') {
+        const d = json.data;
+        if (d.part_name) document.getElementById('partName').value = d.part_name;
+        if (d.year) document.getElementById('donorYear').value = d.year;
+        if (d.make || d.model) document.getElementById('donorVehicle').value = [d.make, d.model].filter(Boolean).join(' ');
+        if (d.engine) document.getElementById('donorEngine').value = d.engine;
+        if (d.does_not_fit) {
+          document.getElementById('doesNotFit').value = d.does_not_fit;
+          document.getElementById('doesNotFitField').style.display = 'block';
+        }
+        if (d.programming_note) {
+          document.getElementById('programmingNote').value = d.programming_note;
+          document.getElementById('programmingNoteField').style.display = 'block';
+          document.getElementById('programmingNoteSource').innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk cache (lister-confirmed)</span>';
+        }
+        statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fitment loaded from DarkHawk - verify before generating</span>';
+        return;
+      }
+
+      if (json.source === 'database' && json.data.compatibility?.length > 0) {
+        const c = json.data.compatibility[0];
+        if (c.year) document.getElementById('donorYear').value = c.year;
+        if (c.make || c.model) document.getElementById('donorVehicle').value = [c.make, c.model].filter(Boolean).join(' ');
+        if (c.engine) document.getElementById('donorEngine').value = c.engine;
+        statusEl.innerHTML = '<span style="color:#15803d;">✓ Partial fitment from database - generate to save complete data</span>';
+      }
+    } catch (e) { /* DarkHawk unavailable - silent */ }
+  }
+
+  // ── Write fitment back to DarkHawk (fire-and-forget after generate) ──
+  async function saveFitmentToDarkHawk() {
+    const partNumber = document.getElementById('partNum').value.trim();
+    if (!partNumber || partNumber.length < 5) return;
+
+    const vehicleStr = document.getElementById('donorVehicle').value.trim();
+    const parts = vehicleStr.split(/\s+/);
+    const make = parts[0] || '';
+    const model = parts.slice(1).join(' ').split(' - ')[0].split(' (')[0].trim();
+    if (!make) return;
+
+    try {
+      await fetch('/api/listing-tool/save-fitment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partNumber,
+          partName: document.getElementById('partName').value.trim() || null,
+          partType: detectPartType() || null,
+          year: document.getElementById('donorYear').value.trim() || null,
+          make, model: model || null,
+          engine: document.getElementById('donorEngine').value.trim() || null,
+          doesNotFit: document.getElementById('doesNotFit').value.trim() || null,
+          programmingRequired: document.getElementById('programmingNote').value ? 'yes' : null,
+          programmingNote: document.getElementById('programmingNote').value.trim() || null,
+        }),
+      });
+    } catch (e) { /* non-blocking */ }
   }
 </script>
 </body>

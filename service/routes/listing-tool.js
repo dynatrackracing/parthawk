@@ -3,6 +3,9 @@
 const router = require('express-promise-router')();
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { database } = require('../database/database');
+const { normalizePartNumber } = require('../lib/partNumberUtils');
+const { v4: uuidv4 } = require('uuid');
 
 const EBAY_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -111,6 +114,164 @@ router.get('/ebay-lookup', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, error: `Failed to fetch listing: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/listing-tool/parts-lookup?partNumber=68212710AC
+ * Check if we have fitment data for this part number.
+ * Priority: part_fitment_cache > fitment_data > Item+Auto JOIN
+ */
+router.get('/parts-lookup', async (req, res) => {
+  const { partNumber } = req.query;
+  if (!partNumber) return res.status(400).json({ success: false, error: 'partNumber required' });
+
+  const pnBase = normalizePartNumber(partNumber.trim());
+
+  try {
+    // 1. Check part_fitment_cache (our confirmed lister data)
+    try {
+      const cached = await database('part_fitment_cache')
+        .where('part_number_base', pnBase)
+        .orWhere('part_number_exact', partNumber.trim().toUpperCase())
+        .first();
+      if (cached) {
+        return res.json({ success: true, source: 'cache', data: cached });
+      }
+    } catch (e) { /* table may not exist yet */ }
+
+    // 2. Check fitment_data (partsLookup legacy)
+    try {
+      const fd = await database('fitment_data')
+        .where('part_number', partNumber.trim())
+        .orWhere('part_number_base', pnBase)
+        .first();
+      if (fd) {
+        return res.json({ success: true, source: 'fitment_data', data: fd });
+      }
+    } catch (e) { /* table may not exist */ }
+
+    // 3. Check Item + Auto + AutoItemCompatibility JOIN
+    const fromItems = await database('Item as i')
+      .join('AutoItemCompatibility as aic', 'aic.itemId', 'i.id')
+      .join('Auto as a', 'a.id', 'aic.autoId')
+      .where(function() {
+        this.where('i.manufacturerPartNumber', 'ilike', `%${pnBase}%`)
+          .orWhere('i.manufacturerPartNumber', 'ilike', `%${partNumber.trim()}%`);
+      })
+      .select('i.title', 'i.manufacturerPartNumber', 'a.year', 'a.make', 'a.model', 'a.engine', 'a.trim')
+      .limit(20);
+
+    if (fromItems.length > 0) {
+      return res.json({
+        success: true,
+        source: 'database',
+        data: { partNumber: partNumber.trim(), partNumberBase: pnBase, compatibility: fromItems },
+      });
+    }
+
+    // 4. Nothing found
+    return res.json({ success: true, source: 'none', data: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/listing-tool/save-fitment
+ * Write confirmed fitment data back to the database.
+ */
+router.post('/save-fitment', async (req, res) => {
+  const {
+    partNumber, partName, partType, year, yearRange,
+    make, model, engine, trim, drivetrain,
+    doesNotFit, programmingRequired, programmingNote,
+  } = req.body;
+
+  if (!partNumber) return res.status(400).json({ success: false, error: 'partNumber required' });
+
+  const pnExact = partNumber.trim().toUpperCase();
+  const pnBase = normalizePartNumber(pnExact);
+
+  try {
+    // Ensure table exists
+    try { await database.raw('SELECT 1 FROM part_fitment_cache LIMIT 0'); }
+    catch (e) {
+      await database.raw(`
+        CREATE TABLE IF NOT EXISTS part_fitment_cache (
+          id SERIAL PRIMARY KEY, part_number_exact VARCHAR(50) NOT NULL,
+          part_number_base VARCHAR(50) NOT NULL UNIQUE, part_name TEXT,
+          part_type VARCHAR(30), year INTEGER, year_range VARCHAR(20),
+          make VARCHAR(50), model VARCHAR(50), engine VARCHAR(50),
+          trim VARCHAR(50), drivetrain VARCHAR(30), does_not_fit TEXT,
+          programming_required VARCHAR(20), programming_note TEXT,
+          source VARCHAR(30) DEFAULT 'listing_tool',
+          confirmed_at TIMESTAMP DEFAULT NOW(), created_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+    }
+
+    // Upsert
+    await database.raw(`
+      INSERT INTO part_fitment_cache (
+        part_number_exact, part_number_base, part_name, part_type,
+        year, year_range, make, model, engine, trim, drivetrain,
+        does_not_fit, programming_required, programming_note,
+        source, confirmed_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listing_tool', NOW(), NOW())
+      ON CONFLICT (part_number_base) DO UPDATE SET
+        part_number_exact = EXCLUDED.part_number_exact,
+        part_name = COALESCE(EXCLUDED.part_name, part_fitment_cache.part_name),
+        part_type = COALESCE(EXCLUDED.part_type, part_fitment_cache.part_type),
+        year = COALESCE(EXCLUDED.year, part_fitment_cache.year),
+        year_range = COALESCE(EXCLUDED.year_range, part_fitment_cache.year_range),
+        make = COALESCE(EXCLUDED.make, part_fitment_cache.make),
+        model = COALESCE(EXCLUDED.model, part_fitment_cache.model),
+        engine = COALESCE(EXCLUDED.engine, part_fitment_cache.engine),
+        trim = COALESCE(EXCLUDED.trim, part_fitment_cache.trim),
+        drivetrain = COALESCE(EXCLUDED.drivetrain, part_fitment_cache.drivetrain),
+        does_not_fit = COALESCE(EXCLUDED.does_not_fit, part_fitment_cache.does_not_fit),
+        programming_required = COALESCE(EXCLUDED.programming_required, part_fitment_cache.programming_required),
+        programming_note = COALESCE(EXCLUDED.programming_note, part_fitment_cache.programming_note),
+        source = 'listing_tool',
+        confirmed_at = NOW()
+    `, [
+      pnExact, pnBase, partName || null, partType || null,
+      year ? parseInt(year) : null, yearRange || null,
+      make || null, model || null, engine || null, trim || null, drivetrain || null,
+      doesNotFit || null, programmingRequired || null, programmingNote || null,
+    ]);
+
+    // Also ensure Auto + AutoItemCompatibility link exists
+    if (make && model && year) {
+      try {
+        let auto = await database('Auto')
+          .where({ year: parseInt(year), make, model })
+          .first();
+        if (!auto) {
+          [auto] = await database('Auto')
+            .insert({ id: uuidv4(), year: parseInt(year), make, model, engine: engine || '', trim: trim || '', createdAt: new Date(), updatedAt: new Date() })
+            .returning('*');
+        }
+        if (auto) {
+          const item = await database('Item')
+            .where('manufacturerPartNumber', 'ilike', `%${pnBase}%`)
+            .first();
+          if (item) {
+            const existing = await database('AutoItemCompatibility')
+              .where({ autoId: auto.id, itemId: item.id }).first();
+            if (!existing) {
+              await database('AutoItemCompatibility')
+                .insert({ autoId: auto.id, itemId: item.id, createdAt: new Date() });
+            }
+          }
+        }
+      } catch (e) { /* Auto link is optional */ }
+    }
+
+    res.json({ success: true, message: 'Fitment saved' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
