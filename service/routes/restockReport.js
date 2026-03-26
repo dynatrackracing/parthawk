@@ -308,4 +308,36 @@ router.get('/report', async (req, res) => {
   }
 });
 
+/**
+ * GET /restock/found-items
+ * Returns all claimed scout alerts (GOT ONE) for BONE PILE items,
+ * so the BONE PILE page can show "FOUND — Pulled from LKQ Raleigh"
+ */
+router.get('/found-items', async (req, res) => {
+  try {
+    const found = await database('scout_alerts')
+      .where('source', 'bone_pile')
+      .where('claimed', true)
+      .select('source_title', 'yard_name', 'claimed_at', 'vehicle_year', 'vehicle_make', 'vehicle_model');
+
+    // Build lookup by normalized title prefix for matching against report items
+    const foundMap = {};
+    for (const f of found) {
+      // Key by first 40 chars of title (same dedup key used in alert generation)
+      const key = (f.source_title || '').substring(0, 40).toLowerCase();
+      if (!foundMap[key]) {
+        foundMap[key] = {
+          yard: f.yard_name,
+          date: f.claimed_at,
+          vehicle: [f.vehicle_year, f.vehicle_make, f.vehicle_model].filter(Boolean).join(' '),
+        };
+      }
+    }
+
+    res.json({ success: true, found: foundMap, count: found.length });
+  } catch (err) {
+    res.json({ success: true, found: {}, count: 0 });
+  }
+});
+
 module.exports = router;

@@ -76,6 +76,8 @@ const TIER_CONFIG = {
 };
 
 let currentDays = 30;
+let foundItems = {};
+let hideFound = false;
 
 function setPeriod(days) {
   currentDays = days;
@@ -84,32 +86,55 @@ function setPeriod(days) {
   load();
 }
 
+function toggleHideFound() {
+  hideFound = document.getElementById('hideFoundCb').checked;
+  load();
+}
+
+// Check if a report item has been FOUND (pulled from a yard via Scout Alerts)
+function getFoundInfo(item) {
+  // Match by sample title prefix (same key used in alert generation)
+  const key = (item.sampleTitle || '').substring(0, 40).toLowerCase();
+  return foundItems[key] || null;
+}
+
 async function load() {
   document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Generating report...</div>';
   try {
-    const res = await fetch('/restock/report?days=' + currentDays);
-    const d = await res.json();
+    const [reportRes, foundRes] = await Promise.all([
+      fetch('/restock/report?days=' + currentDays).then(r => r.json()),
+      fetch('/restock/found-items').then(r => r.json()).catch(() => ({ found: {} })),
+    ]);
+    const d = reportRes;
+    foundItems = foundRes.found || {};
     if (!d.success) throw new Error(d.error);
 
+    const foundCount = Object.keys(foundItems).length;
     const listingsNote = d.summary.activeListings != null ? ' | ' + d.summary.activeListings + ' active listings' : '';
     document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || 0) + ' sales analyzed' + listingsNote + ')';
 
-    document.getElementById('summary').innerHTML =
+    let summaryHtml =
       `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
       `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
-      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>` +
+      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>`;
+    if (foundCount > 0) summaryHtml += `<div class="stat"><div class="stat-label">Found</div><div class="stat-value" style="color:#22c55e">${foundCount}</div></div>`;
+    summaryHtml +=
       `<div class="stat"><div class="stat-label">Sales</div><div class="stat-value">${d.summary.salesAnalyzed || 0}</div></div>` +
       `<div class="stat"><div class="stat-label">Listings</div><div class="stat-value">${d.summary.activeListings || 0}</div></div>`;
+    document.getElementById('summary').innerHTML = summaryHtml;
 
     let html = '';
+    if (foundCount > 0) {
+      html += `<div style="display:flex;justify-content:flex-end;padding:4px 8px;font-size:11px"><label style="color:#6B7280;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="hideFoundCb" onchange="toggleHideFound()" ${hideFound ? 'checked' : ''} style="accent-color:#22c55e"> Hide found</label></div>`;
+    }
     for (const tier of ['green', 'yellow', 'orange']) {
       const items = d.tiers[tier] || [];
       if (items.length === 0) continue;
       const cfg = TIER_CONFIG[tier];
       html += renderSection(tier, cfg, items);
     }
-    if (!html) {
-      html = '<div class="loading" style="padding:30px;">';
+    if (!html || html.indexOf('<table>') === -1) {
+      html += '<div class="loading" style="padding:30px;">';
       if ((d.summary.salesAnalyzed || 0) === 0) {
         html += '<div style="font-size:14px;font-weight:600;color:#F0F0F0;margin-bottom:8px;">No sales found in the last ' + currentDays + ' days</div>';
         html += '<div style="font-size:12px;color:#9CA3AF;line-height:1.6;">Try a wider window, or sync your eBay data:<br>Settings > Sync > Your Data</div>';
@@ -127,21 +152,36 @@ async function load() {
 
 function renderSection(tier, cfg, items) {
   const soldLabel = 'Sold ' + currentDays + 'd';
+  // Filter out found items if hideFound is on
+  const visibleItems = hideFound ? items.filter(i => !getFoundInfo(i)) : items;
+  if (visibleItems.length === 0) return '';
+
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
-      <span>${cfg.icon} ${cfg.label} (${items.length})</span>
+      <span>${cfg.icon} ${cfg.label} (${visibleItems.length})</span>
       <span style="font-size:9px;color:#6B7280">Score ${tier === 'green' ? '75+' : tier === 'yellow' ? '60-74' : '40-59'}</span>
     </div>
     <table><tr>
       <th>Score</th><th>Action</th><th>Vehicle</th><th>Part</th><th>Part #</th>
       <th>${soldLabel}</th><th>Stock</th><th>Avg $</th><th>Rev</th>
     </tr>`;
-  for (const i of items) {
+  for (const i of visibleItems) {
     const vehicle = [i.yearRange, i.make, i.model].filter(Boolean).join(' ');
     const pn = i.basePn || (i.variantPns && i.variantPns[0]) || '';
-    h += `<tr>
+    const found = getFoundInfo(i);
+
+    // FOUND banner — full-width green bar
+    if (found) {
+      const fDate = found.date ? new Date(found.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : '';
+      h += `<tr><td colspan="9" style="padding:0"><div style="background:#064e3b;border:2px solid #22c55e;border-radius:6px;padding:8px 12px;margin:4px 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="color:#22c55e;font-weight:800;font-size:12px;letter-spacing:0.05em">FOUND — Pulled from ${found.yard || 'yard'}</span>
+        <span style="color:#86efac;font-size:10px">${fDate ? 'Found ' + fDate : ''} ${found.vehicle ? '(' + found.vehicle + ')' : ''}</span>
+      </div></td></tr>`;
+    }
+
+    h += `<tr${found ? ' style="opacity:0.5"' : ''}>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
-      <td style="font-size:10px;font-weight:600">${i.action}</td>
+      <td style="font-size:10px;font-weight:600">${found ? 'INCOMING' : i.action}</td>
       <td style="font-weight:600">${vehicle || i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
       <td class="mono" style="max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${pn}">${pn}</td>
@@ -151,7 +191,7 @@ function renderSection(tier, cfg, items) {
       <td>$${Math.round(i.revenue).toLocaleString()}</td>
     </tr>`;
     if (i.sampleTitle) {
-      h += `<tr><td colspan="9" style="font-size:10px;color:#9CA3AF;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)}</td></tr>`;
+      h += `<tr${found ? ' style="opacity:0.5"' : ''}><td colspan="9" style="font-size:10px;color:#9CA3AF;padding:1px 6px 4px">${i.sampleTitle.substring(0,90)}</td></tr>`;
     }
   }
   h += '</table></div>';
