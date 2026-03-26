@@ -2,7 +2,7 @@
 
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
-const { normalizePartNumber } = require('../lib/partNumberUtils');
+const { normalizePartNumber, extractPartNumbers: sharedExtractPNs } = require('../utils/partMatcher');
 
 // Make detection — word boundaries, scans entire title
 const MAKE_PATTERNS = [
@@ -181,8 +181,8 @@ router.get('/report', async (req, res) => {
       const model = make ? extractModel(title, make) : null;
       let pt = extractPartType(title);
       if (!pt) pt = getPartLabel(title, make, model);
-      const pns = extractPartNumbers(title);
-      const basePn = pns.length > 0 ? normalizePartNumber(pns[0]) : null;
+      const pns = sharedExtractPNs(title);
+      const basePn = pns.length > 0 ? pns[0].base : null;
       const key = `${make || '?'}|${model || ''}|${pt}|${basePn || title.substring(0, 30)}`;
 
       if (!groups[key]) {
@@ -191,7 +191,7 @@ router.get('/report', async (req, res) => {
       const g = groups[key];
       g.sold++;
       g.totalPrice += parseFloat(sale.salePrice) || 0;
-      for (const pn of pns) g.allPns.add(pn);
+      for (const pn of pns) g.allPns.add(pn.raw);
       if (!g.lastSold || new Date(sale.soldDate) > new Date(g.lastSold)) g.lastSold = sale.soldDate;
     }
 
@@ -201,9 +201,11 @@ router.get('/report', async (req, res) => {
     for (const l of listings) {
       const qty = parseInt(l.quantityAvailable) || 1;
       listingTitles.push({ title: (l.title || '').toUpperCase(), qty });
-      for (const pn of extractPartNumbers(l.title || '')) {
-        const base = normalizePartNumber(pn);
-        if (base) stockByBasePn[base] = (stockByBasePn[base] || 0) + qty;
+      // Use shared part number extractor (handles all OEM formats)
+      const pns = sharedExtractPNs(l.title || '');
+      for (const pn of pns) {
+        if (pn.base) stockByBasePn[pn.base] = (stockByBasePn[pn.base] || 0) + qty;
+        if (pn.raw && pn.raw !== pn.base) stockByBasePn[pn.raw] = (stockByBasePn[pn.raw] || 0) + qty;
       }
       // Also index by SKU as part number
       if (l.sku) {
