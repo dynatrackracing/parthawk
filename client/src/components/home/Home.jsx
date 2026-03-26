@@ -72,7 +72,8 @@ const Home = () => {
             { label: '🦅 HAWK EYE', href: '/admin/vin' },
             { label: '🛡️ NEST PROTECTOR', href: '/admin/gate' },
             { label: '🦴 BONE PILE', href: '/admin/restock' },
-            { label: '🪹 HUNTERS PERCH', href: '/admin/restock-list' },
+            { label: '🪹 SCOUR STREAM', href: '/admin/restock-list' },
+            { label: '🔭 HUNTERS PERCH', href: '/admin/hunters-perch' },
             { label: '📡 SCOUT ALERTS', href: '/admin/scout-alerts' },
           ].map(link => (
             <a key={link.href} href={link.href}

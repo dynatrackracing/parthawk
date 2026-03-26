@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — HUNTERS PERCH</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+header{background:#141414;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+nav{display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px}
+nav::-webkit-scrollbar{display:none}
+nav a{color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a}
+nav a.active{color:#DC2626;font-weight:700}
+.container{padding:12px;max-width:800px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.add-row{display:flex;gap:8px}
+.add-input{flex:1;padding:10px;border:1px solid #333;border-radius:8px;font-size:13px;background:#141414;color:#F0F0F0;outline:none}
+.add-input:focus{border-color:#dc2626}
+.btn{padding:8px 14px;border-radius:6px;border:none;font-size:12px;font-weight:700;cursor:pointer}
+.btn-red{background:#dc2626;color:#fff}
+.btn-sm{padding:6px 10px;font-size:11px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;cursor:pointer}
+.btn-sm:disabled{opacity:.3}
+.seller-card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;margin-bottom:12px;overflow:hidden}
+.seller-header{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2a2a;cursor:pointer}
+.seller-name{font-size:14px;font-weight:700}
+.seller-stats{font-size:10px;color:#6B7280}
+.seller-body{padding:0}
+.item-row{padding:8px 14px;border-bottom:1px solid #1f1f1f;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.item-row:last-child{border-bottom:none}
+.item-title{font-size:12px;font-weight:600;flex:1;line-height:1.3}
+.item-price{font-size:13px;font-weight:700;color:#22c55e;white-space:nowrap}
+.item-meta{font-size:10px;color:#6B7280;margin-top:2px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase}
+.b-hot{background:#7f1d1d;color:#dc2626}
+.b-good{background:#064e3b;color:#22c55e}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:30px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
+    <div>
+      <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
+      <div style="font-size:10px;color:#6B7280;margin-top:1px">HUNTERS PERCH <span id="sellerCount" style="color:#dc2626;font-weight:700"></span></div>
+    </div>
+  </div>
+</header>
+<nav>
+  <a href="/">THE NEST</a>
+  <a href="/admin/pull">DAILY FEED</a>
+  <a href="/admin/vin">HAWK EYE</a>
+  <a href="/admin/gate">NEST PROTECTOR</a>
+  <a href="/admin/restock">BONE PILE</a>
+  <a href="/admin/restock-list">SCOUR STREAM</a>
+  <a href="/admin/hunters-perch" class="active">HUNTERS PERCH</a>
+  <a href="/admin/scout-alerts">SCOUT ALERTS</a>
+</nav>
+<div class="container">
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Track a Competitor</div>
+    <div class="add-row">
+      <input type="text" class="add-input" id="addInput" placeholder="eBay seller ID (e.g. instrumentclusterstore)" autocomplete="off">
+      <button class="btn btn-red" id="addBtn" onclick="addSeller()">Track</button>
+    </div>
+  </div>
+  <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div></div>
+  <div id="sellers"></div>
+</div>
+<script>
+var sellersData = [];
+
+function load() {
+  fetch('/competitors/sellers')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('loading').style.display = 'none';
+      if (!d.success || !d.sellers) { document.getElementById('sellers').innerHTML = '<div class="empty">Could not load sellers</div>'; return; }
+      sellersData = d.sellers;
+      document.getElementById('sellerCount').textContent = '(' + d.sellers.length + ' sellers)';
+      renderSellers();
+    })
+    .catch(function(err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('sellers').innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
+    });
+}
+
+function renderSellers() {
+  if (sellersData.length === 0) {
+    document.getElementById('sellers').innerHTML = '<div class="empty">No competitors tracked yet. Add one above.</div>';
+    return;
+  }
+  var h = '';
+  sellersData.forEach(function(s) {
+    h += '<div class="seller-card" id="seller-' + esc(s.name) + '">';
+    h += '<div class="seller-header" onclick="toggleSeller(\'' + esc(s.name) + '\')">';
+    h += '<div><div class="seller-name">' + esc(s.name) + '</div>';
+    h += '<div class="seller-stats">' + (s.soldItemCount || 0) + ' items tracked';
+    if (s.lastScrapedAt) {
+      var d = Math.floor((Date.now() - new Date(s.lastScrapedAt).getTime()) / 3600000);
+      h += ' · scraped ' + (d < 1 ? 'just now' : d < 24 ? d + 'h ago' : Math.floor(d/24) + 'd ago');
+    }
+    h += '</div></div>';
+    h += '<button class="btn-sm" onclick="event.stopPropagation();scrapeSeller(\'' + esc(s.name) + '\',this)">Scrape</button>';
+    h += '</div>';
+    h += '<div class="seller-body" id="body-' + esc(s.name) + '" style="display:none"></div>';
+    h += '</div>';
+  });
+  document.getElementById('sellers').innerHTML = h;
+}
+
+function toggleSeller(name) {
+  var body = document.getElementById('body-' + name);
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    if (!body.dataset.loaded) {
+      body.innerHTML = '<div style="padding:12px;text-align:center"><div class="spinner"></div></div>';
+      loadBestSellers(name);
+    }
+  } else {
+    body.style.display = 'none';
+  }
+}
+
+function loadBestSellers(name) {
+  fetch('/competitors/' + encodeURIComponent(name) + '/best-sellers?days=90')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var body = document.getElementById('body-' + name);
+      body.dataset.loaded = '1';
+      if (!d.success || !d.bestSellers || d.bestSellers.length === 0) {
+        body.innerHTML = '<div style="padding:12px;color:#6B7280;font-size:12px;text-align:center">No sold items. Scrape this seller first.</div>';
+        return;
+      }
+      var h = '<div style="padding:8px 14px;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a">' + d.totalSold + ' sold · $' + d.totalRevenue.toLocaleString() + ' revenue · ' + d.uniqueProducts + ' products (90d)</div>';
+      d.bestSellers.slice(0, 30).forEach(function(item) {
+        var hot = item.soldCount >= 3 ? '<span class="badge b-hot">HOT ' + item.soldCount + 'x</span> ' : '';
+        h += '<div class="item-row">';
+        h += '<div><div class="item-title">' + hot + esc(item.title || '').substring(0, 80) + '</div>';
+        h += '<div class="item-meta">$' + item.avgPrice + ' avg · ' + item.soldCount + 'x sold · ' + item.velocity + '/wk</div></div>';
+        h += '<div class="item-price">$' + item.totalRevenue + '</div>';
+        h += '</div>';
+      });
+      body.innerHTML = h;
+    })
+    .catch(function() {
+      document.getElementById('body-' + name).innerHTML = '<div style="padding:12px;color:#dc2626;font-size:12px">Failed to load</div>';
+    });
+}
+
+function scrapeSeller(name, btn) {
+  btn.disabled = true; btn.textContent = 'Scraping...';
+  fetch('/competitors/' + encodeURIComponent(name) + '/scrape', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      btn.textContent = 'Started';
+      setTimeout(function() { btn.disabled = false; btn.textContent = 'Scrape'; var body = document.getElementById('body-' + name); if (body) { body.dataset.loaded = ''; body.style.display = 'none'; } }, 30000);
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = 'Scrape'; });
+}
+
+function addSeller() {
+  var inp = document.getElementById('addInput');
+  var name = inp.value.trim().toLowerCase();
+  if (!name) return;
+  var btn = document.getElementById('addBtn');
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/competitors/' + encodeURIComponent(name) + '/scrape', { method: 'POST' })
+    .then(function() {
+      inp.value = '';
+      btn.disabled = false; btn.textContent = 'Track';
+      // Add to SoldItemSeller table
+      return fetch('/competitors/sellers');
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) { sellersData = d.sellers; renderSellers(); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = 'Track'; });
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>

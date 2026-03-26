@@ -33,7 +33,7 @@ async function generateAlerts() {
   // 2. Gather parts we need from both sources
   const partsToMatch = [];
 
-  // HUNTERS PERCH — manual want list
+  // SCOUR STREAM (formerly HUNTERS PERCH) — manual want list
   const wantList = await database('restock_want_list').where({ active: true });
   for (const item of wantList) {
     const parsed = parseTitle(item.title);

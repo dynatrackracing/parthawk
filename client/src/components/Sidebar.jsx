@@ -194,6 +194,10 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               </a>
               <a href="/admin/restock-list" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <ClockIcon />
+                <span className="text-xs font-semibold tracking-wide">SCOUR STREAM</span>
+              </a>
+              <a href="/admin/hunters-perch" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
+                <SearchIcon />
                 <span className="text-xs font-semibold tracking-wide">HUNTERS PERCH</span>
               </a>
               <a href="/admin/scout-alerts" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">

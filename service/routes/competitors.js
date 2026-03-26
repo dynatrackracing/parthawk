@@ -59,6 +59,15 @@ router.post('/alerts/:id/dismiss', async (req, res) => {
 router.post('/:sellerId/scrape', async (req, res) => {
   const { sellerId } = req.params;
   const { pages = 5 } = req.query;
+
+  // Auto-add seller to SoldItemSeller if not exists
+  try {
+    const exists = await database('SoldItemSeller').where('name', sellerId).first();
+    if (!exists) {
+      await database('SoldItemSeller').insert({ name: sellerId, enabled: true, itemsScraped: 0, createdAt: new Date(), updatedAt: new Date() });
+    }
+  } catch (e) { /* ignore duplicate */ }
+
   res.json({ started: true, seller: sellerId, maxPages: parseInt(pages) });
 
   // Run in background

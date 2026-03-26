@@ -2,7 +2,7 @@
  * partIntelligence.js — Unified matching engine for DarkHawk
  *
  * ONE module for: PN extraction, stock counting, model matching, year parsing.
- * Used by: DAILY FEED, HAWK EYE, BONE PILE, HUNTERS PERCH, SCOUT ALERTS.
+ * Used by: DAILY FEED, HAWK EYE, BONE PILE, SCOUR STREAM, SCOUT ALERTS.
  *
  * REPLACES: partNumberExtractor.js, partMatcher.extractPartNumbers(),
  * AttackListService local regexes, and all inline ILIKE stock queries.
