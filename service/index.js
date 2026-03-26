@@ -88,6 +88,7 @@ app.use('/restock-want-list', require('./routes/restock-want-list'));
 app.use('/scout-alerts', require('./routes/scout-alerts'));
 app.use('/opportunities', require('./routes/opportunities'));
 app.use('/api/fitment', require('./routes/fitment'));
+app.use('/api/listing-tool', require('./routes/listing-tool'));
 app.get('/admin/opportunities', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'opportunities.html'));
 });

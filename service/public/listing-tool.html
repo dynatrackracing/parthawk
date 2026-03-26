@@ -1436,111 +1436,66 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
 
   async function lookupFromEbay() {
     const url = document.getElementById('ebayRefUrl').value.trim();
-    const partNum = document.getElementById('partNum').value.trim();
-    const apiKey = localStorage.getItem('dt_anthropic_key') || document.getElementById('apiKeyInput').value.trim();
     const statusEl = document.getElementById('lookupStatus');
     if (!url) { statusEl.innerHTML = '<span style="color:#b91c1c;">Paste an eBay URL first.</span>'; return; }
-    if (!apiKey) { statusEl.innerHTML = '<span style="color:#b91c1c;">Save your API key first.</span>'; return; }
+    if (!url.includes('ebay.com/itm/')) { statusEl.innerHTML = '<span style="color:#b91c1c;">Must be an eBay item URL (ebay.com/itm/...)</span>'; return; }
 
-    const apiHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    };
-
-    statusEl.innerHTML = '<span style="color:var(--text-muted);">Searching for listing data...</span>';
-
-    // Extract item number from URL for a targeted search
-    const itemMatch = url.match(/\/itm\/(\d+)/);
-    const itemNum = itemMatch ? itemMatch[1] : '';
-    const searchQuery = itemNum
-      ? `ebay item ${itemNum} ${partNum} OEM fitment`
-      : `ebay ${partNum} OEM fitment year make model`;
+    statusEl.innerHTML = '<span style="color:var(--text-muted);">Fetching listing data...</span>';
 
     try {
-      const jsonTemplate = `{
-  "partName": null,
-  "year": null,
-  "make": null,
-  "model": null,
-  "engine": null,
-  "drivetrain": null,
-  "trim": null,
-  "doesNotFit": null,
-  "programmingRequired": null,
-  "programmingNote": null
-}`;
+      const res = await fetch(`/api/listing-tool/ebay-lookup?url=${encodeURIComponent(url)}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Lookup failed');
+      const r = json.data;
 
-      let messages = [{
-        role: 'user',
-        content: `Search eBay for part number "${partNum}"${itemNum ? ` or item number ${itemNum}` : ''}. Find the listing title and item specifics to extract the vehicle fitment.
+      // Part name from title
+      if (r.title) document.getElementById('partName').value = extractPartNameFromTitle(r.title);
 
-The reference URL is: ${url}
-
-From the search results, extract fitment data and return ONLY valid JSON (no markdown):
-${jsonTemplate}
-North American vehicles only. Replace nulls with confirmed values from the listing.`
-      }];
-
-      let fullText = '';
-      for (let i = 0; i < 2; i++) {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: apiHeaders,
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 800,
-            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-            messages
-          })
-        });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error.message);
-        const texts = data.content.filter(b => b.type === 'text').map(b => b.text);
-        if (texts.length) fullText += texts.join('');
-        if (data.stop_reason !== 'tool_use') break;
-        const toolResults = data.content.filter(b => b.type === 'tool_use')
-          .map(b => ({ type: 'tool_result', tool_use_id: b.id, content: b.input ? JSON.stringify(b.input) : 'done' }));
-        messages = [...messages, { role: 'assistant', content: data.content }, { role: 'user', content: toolResults }];
+      // Part number
+      if (r.partNumber && !document.getElementById('partNum').value) {
+        document.getElementById('partNum').value = r.partNumber;
       }
 
-      if (!fullText.trim()) throw new Error('No data returned from search.');
+      // Year/make/model from compatibility table or item specifics
+      if (r.compatibility && r.compatibility.length > 0) {
+        const first = r.compatibility[0];
+        document.getElementById('donorYear').value = first.year || '';
+        document.getElementById('donorVehicle').value = [first.make, first.model].filter(Boolean).join(' ');
+        if (first.engine) document.getElementById('donorEngine').value = first.engine;
+      } else if (r.title) {
+        const yearMatch = r.title.match(/\b((?:19|20)\d{2})\b/);
+        if (yearMatch) document.getElementById('donorYear').value = yearMatch[0];
+      }
 
-      const cleaned = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const matches = [...cleaned.matchAll(/\{[\s\S]*\}/g)];
-      if (!matches.length) throw new Error('Could not extract fitment data from listing.');
-      const r = JSON.parse(matches[matches.length - 1][0]);
+      // Donor vehicle from item specifics
+      const specMake = r.itemSpecifics?.['Brand'] || '';
+      const specModel = r.itemSpecifics?.['Fitment Type'] || '';
+      const donorVehicle = r.itemSpecifics?.['Donor Vehicle'];
+      if (donorVehicle && !document.getElementById('donorVehicle').value) {
+        document.getElementById('donorVehicle').value = donorVehicle;
+      }
 
-      if (r.partName) document.getElementById('partName').value = r.partName;
-      if (r.year) document.getElementById('donorYear').value = String(r.year).split('-')[0];
-      let vehicleStr = [r.make, r.model].filter(Boolean).join(' ');
-      if (r.drivetrain && r.drivetrain !== 'All Drivetrains') vehicleStr += ` - ${r.drivetrain}`;
-      if (r.trim) vehicleStr += ` (${r.trim})`;
-      if (vehicleStr) document.getElementById('donorVehicle').value = vehicleStr;
-      if (r.engine) document.getElementById('donorEngine').value = r.engine;
-
-      const dnfField = document.getElementById('doesNotFitField');
-      const dnfInput = document.getElementById('doesNotFit');
-      if (r.doesNotFit) { dnfField.style.display = 'block'; dnfInput.value = r.doesNotFit; }
-      else { dnfField.style.display = 'none'; dnfInput.value = ''; }
-
-      const progField = document.getElementById('programmingNoteField');
-      const progInput = document.getElementById('programmingNote');
-      const progSource = document.getElementById('programmingNoteSource');
-      if (r.programmingNote && r.programmingRequired !== 'unknown') {
-        progField.style.display = 'block';
-        progInput.value = r.programmingNote;
-        const isYes = r.programmingRequired === 'yes';
-        progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required - from reference listing' : '✓ No programming required - from reference listing'}</span>`;
-      } else { progField.style.display = 'none'; progInput.value = ''; }
-
+      const sellerNote = r.seller ? ` (from ${r.seller}'s listing)` : '';
       document.getElementById('ebayRefRow').style.display = 'none';
-      statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fields populated from eBay reference - verify before generating</span>';
+      statusEl.innerHTML = `<span style="color:#15803d; font-weight:500;">✓ Fields populated from eBay listing${sellerNote} - verify before generating</span>`;
 
     } catch (err) {
       statusEl.innerHTML = `<span style="color:#b91c1c;">Failed: ${err.message} - fill in fields manually.</span>`;
     }
+  }
+
+  function extractPartNameFromTitle(title) {
+    return title
+      .replace(/\bOEM\b/gi, '')
+      .replace(/\bNEW\b/gi, '')
+      .replace(/\bGENUINE\b/gi, '')
+      .replace(/\bTESTED\b/gi, '')
+      .replace(/\bWORKING\b/gi, '')
+      .replace(/\bPROGRAMMED\b/gi, '')
+      .replace(/\bFAST SHIP\w*/gi, '')
+      .replace(/\bFREE SHIP\w*/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
     function clearOutput() {
