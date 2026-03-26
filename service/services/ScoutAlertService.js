@@ -58,7 +58,7 @@ async function generateAlerts() {
     const seen = new Map();
     for (const sale of bonePileSales) {
       const parsed = parseTitle(sale.title);
-      if (!parsed || (!parsed.make && parsed.models.length === 0)) continue;
+      if (!parsed || parsed.models.length === 0) continue; // MUST have a model
       const key = (parsed.make || '') + '|' + (parsed.models[0] || '') + '|' + sale.title.substring(0, 40);
       if (!seen.has(key)) {
         seen.set(key, {
@@ -129,7 +129,12 @@ function scoreMatch(part, vehicle) {
 
   let modelMatch = false;
   for (const m of part.models) {
-    if (vModel.includes(m.toLowerCase()) || m.toLowerCase().includes(vModel)) {
+    const mLower = m.toLowerCase();
+    // Exact model match — check both directions but require word boundary
+    // "challenger" must match "challenger", not "journey"
+    // Use word-boundary regex to prevent "ram" matching "program"
+    const re = new RegExp('\\b' + mLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+    if (re.test(vModel) || re.test(vMake + ' ' + vModel)) {
       modelMatch = true;
       break;
     }

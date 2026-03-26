@@ -762,6 +762,15 @@ async function start() {
       }
     });
 
+    // Regenerate scout alerts on startup (after migration wipes stale data)
+    try {
+      const { generateAlerts } = require('./services/ScoutAlertService');
+      setTimeout(() => {
+        generateAlerts().then(r => log.info({ alertCount: r.alerts }, 'Scout alerts regenerated on startup'))
+          .catch(e => log.warn({ err: e.message }, 'Scout alert startup generation failed'));
+      }, 10000); // delay 10s to let migrations finish
+    } catch (e) { /* ignore */ }
+
     // LKQ scrape cron - runs every night at 2:00 AM (spec section 4.3)
     const LKQScraper = require('./scrapers/LKQScraper');
     const lkqScrapeJob = schedule.scheduleJob('0 2 * * *', async function (scheduledTime) {
