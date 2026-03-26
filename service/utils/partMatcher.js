@@ -12,7 +12,7 @@
  *  - Make/model/part-type parsing from titles
  *  - Matching against YourListing, YourSale, yard_vehicle
  *
- * Used by: SCOUR STREAM, BONE PILE, SCOUT ALERTS, DAILY FEED, HAWK EYE
+ * Used by: SCOUR STREAM, THE QUARRY, SCOUT ALERTS, DAILY FEED, HAWK EYE
  */
 
 const { database } = require('../database/database');

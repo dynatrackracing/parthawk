@@ -51,7 +51,7 @@ async function generateAlerts() {
     }
   }
 
-  // BONE PILE — recently sold items with low/no stock
+  // THE QUARRY — recently sold items with low/no stock
   try {
     const bonePileSales = await database('YourSale')
       .where('soldDate', '>=', database.raw("NOW() - INTERVAL '60 days'"))

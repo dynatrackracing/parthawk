@@ -190,7 +190,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
               </a>
               <a href="/admin/restock" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <ChartIcon />
-                <span className="text-xs font-semibold tracking-wide">BONE PILE</span>
+                <span className="text-xs font-semibold tracking-wide">THE QUARRY</span>
               </a>
               <a href="/admin/restock-list" className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 text-gray-500 hover:text-gray-200 hover:bg-white/5">
                 <ClockIcon />

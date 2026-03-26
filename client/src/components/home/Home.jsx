@@ -71,7 +71,7 @@ const Home = () => {
             { label: '🎯 DAILY FEED', href: '/admin/pull' },
             { label: '🦅 HAWK EYE', href: '/admin/vin' },
             { label: '🛡️ NEST PROTECTOR', href: '/admin/gate' },
-            { label: '🦴 BONE PILE', href: '/admin/restock' },
+            { label: '🦴 THE QUARRY', href: '/admin/restock' },
             { label: '🪹 SCOUR STREAM', href: '/admin/restock-list' },
             { label: '🔭 HUNTERS PERCH', href: '/admin/hunters-perch' },
             { label: '📡 SCOUT ALERTS', href: '/admin/scout-alerts' },

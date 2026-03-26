@@ -320,8 +320,8 @@ router.get('/report', async (req, res) => {
 
 /**
  * GET /restock/found-items
- * Returns all claimed scout alerts (GOT ONE) for BONE PILE items,
- * so the BONE PILE page can show "FOUND — Pulled from LKQ Raleigh"
+ * Returns all claimed scout alerts (GOT ONE) for THE QUARRY items,
+ * so the THE QUARRY page can show "FOUND — Pulled from LKQ Raleigh"
  */
 router.get('/found-items', async (req, res) => {
   try {

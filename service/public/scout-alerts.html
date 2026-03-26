@@ -80,7 +80,7 @@ nav a.active{color:#DC2626;font-weight:700}
   <a href="/admin/pull">DAILY FEED</a>
   <a href="/admin/vin">HAWK EYE</a>
   <a href="/admin/gate">NEST PROTECTOR</a>
-  <a href="/admin/restock">BONE PILE</a>
+  <a href="/admin/restock">THE QUARRY</a>
   <a href="/admin/restock-list">SCOUR STREAM</a>
   <a href="/admin/scout-alerts" class="active">SCOUT ALERTS</a>
 </nav>
@@ -175,7 +175,7 @@ function load(page) {
 
       // Summary cards — filtered counts
       var sh = '<div class="summary-bar">';
-      sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">BONE</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">QUARRY</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
       sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
@@ -200,7 +200,7 @@ function load(page) {
         alerts.forEach(function(a) {
           var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
           var srcClass = a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
-          var srcLabel = a.source === 'bone_pile' ? 'BONE' : 'PERCH';
+          var srcLabel = a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
           var soldTag = a.justSold ? '<span class="badge b-sold">SOLD ' + a.justSold.toUpperCase() + '</span>' : '';
           var priceStr = a.part_value ? '$' + a.part_value : '';
           var setStr = '';
