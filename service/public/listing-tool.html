@@ -530,6 +530,8 @@
 <script>
   const API_KEY_STORAGE = 'dt_anthropic_key';
 
+  const PROGRAMMED_SALE_TYPES = ['chrysler_programmed', 'combo_ign', 'combo_ign_bcm', 'honda_key'];
+
   function updateSaleUI() {
     const val = document.getElementById('saleType').value;
     document.getElementById('chryslerNote').style.display = val === 'chrysler_programmed' ? 'block' : 'none';
@@ -537,6 +539,12 @@
     document.getElementById('hondaNote').style.display = val === 'honda_key' ? 'block' : 'none';
     document.getElementById('testedNote').style.display = val === 'tested' ? 'block' : 'none';
     document.getElementById('testedFields').style.display = val === 'tested' ? 'block' : 'none';
+
+    // Hide programming note for pre-programmed sale types - DynaTrack provides programming
+    if (PROGRAMMED_SALE_TYPES.includes(val)) {
+      document.getElementById('programmingNoteField').style.display = 'none';
+      document.getElementById('programmingNote').value = '';
+    }
   }
 
   // ── OEM Catalog lookup ───────────────────────────────────────────
@@ -907,12 +915,20 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
         doesNotFitInput.value = '';
       }
 
-      // Programming note - priority: 1) programming_db.json 2) Claude research 3) default for ABS
+      // Programming note - skip entirely for pre-programmed sale types
+      const currentSaleType = document.getElementById('saleType').value;
+      const skipProgramming = PROGRAMMED_SALE_TYPES.includes(currentSaleType);
+
+      // Priority: 1) skip if pre-programmed 2) programming_db.json 3) Claude research 4) ABS default
       const progField = document.getElementById('programmingNoteField');
       const progInput = document.getElementById('programmingNote');
       const progSource = document.getElementById('programmingNoteSource');
 
-      if (needsProgrammingResearch) {
+      if (skipProgramming) {
+        // Pre-programmed sale type - DynaTrack provides programming, hide field
+        progField.style.display = 'none';
+        progInput.value = '';
+      } else if (needsProgrammingResearch) {
         // Priority 1: Check programming_db.json
         const make = step1.make || '';
         const year = step1.year || '';
@@ -1232,6 +1248,8 @@ ${confirmedProgrammingNote
 }
 
 FORMATTING RULE: Never use em dashes (the long dash character) anywhere in the output. Use regular hyphens/dashes (-) only. This is a hard requirement.
+
+SALE TYPE OVERRIDE: When the sale type is chrysler_programmed, combo_ign, combo_ign_bcm, or honda_key, do NOT include any "Programming Note:" bullet. DynaTrack provides the programming for these listings. The template already includes the correct buyer-facing language.
 
 ═══ SALE TYPE ═══
 ${saleTypeInstructions[saleType]}
