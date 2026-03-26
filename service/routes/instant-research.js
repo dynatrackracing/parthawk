@@ -35,22 +35,17 @@ async function searchPhase(vehicle, terms) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const prompt = `Search eBay sold/completed listings for a ${vehicle}. Focus on: ${terms}
+  const prompt = `Search eBay for recently SOLD used OEM parts from a ${vehicle}. Focus on: ${terms}
 
-For each part type with real sold listings, return:
-{"partType":"name","avgPrice":0,"soldCount":0,"priceRange":[0,0],"partNumbers":[],"velocity":"fast/medium/slow"}
+Search eBay sold listings for each part type. For each with real results, return JSON:
+[{"partType":"ECM","avgPrice":175,"soldCount":8,"priceRange":[120,250],"partNumbers":["if visible"],"velocity":"medium"}]
 
-Rules:
-- ONLY parts with actual sold listings on eBay
-- Skip anything under $50 average
-- velocity: fast=10+/month, medium=3-9/month, slow=1-2/month
-
-Return ONLY a JSON array. No explanation.`;
+Rules: Only real sold data. Skip under $50. velocity: fast=10+/mo, medium=3-9/mo, slow=1-2/mo.`;
 
   const res = await axios.post('https://api.anthropic.com/v1/messages', {
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 1500,
-    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+    max_tokens: 4096,
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }],
     messages: [{ role: 'user', content: prompt }],
   }, {
     headers: {
@@ -58,24 +53,52 @@ Return ONLY a JSON array. No explanation.`;
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
-    timeout: 30000,
+    timeout: 60000,
   });
 
-  // Extract text from response (may have tool_use blocks interspersed)
-  const textBlocks = (res.data.content || []).filter(b => b.type === 'text');
-  const text = textBlocks.map(b => b.text).join('');
+  const data = res.data;
+  if (data.error) {
+    log.error({ error: data.error }, '[InstantResearch] API error');
+    throw new Error(data.error.message || JSON.stringify(data.error));
+  }
 
-  // Parse JSON from response
-  const jsonMatch = text.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) return [];
+  // Log the response structure for debugging
+  const blockTypes = (data.content || []).map(b => b.type);
+  log.info({ vehicle, stopReason: data.stop_reason, blockTypes, blockCount: blockTypes.length }, '[InstantResearch] API response');
 
-  try {
-    const parts = JSON.parse(jsonMatch[0]);
-    return Array.isArray(parts) ? parts : [];
-  } catch (e) {
-    log.warn({ text: text.substring(0, 200) }, 'Failed to parse research JSON');
+  // Extract ALL text from the response (may include text blocks between tool results)
+  const textBlocks = (data.content || []).filter(b => b.type === 'text');
+  const fullText = textBlocks.map(b => b.text).join('\n');
+
+  if (!fullText) {
+    log.warn({ vehicle, blockTypes }, '[InstantResearch] No text blocks in response');
     return [];
   }
+
+  // Parse JSON — try multiple extraction methods
+  const cleaned = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  // Method 1: find a JSON array
+  const arrayMatch = cleaned.match(/\[[\s\S]*?\]/);
+  if (arrayMatch) {
+    try {
+      const parts = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(parts) && parts.length > 0) return parts;
+    } catch (e) { /* try next method */ }
+  }
+
+  // Method 2: find individual JSON objects and collect them
+  const objMatches = [...cleaned.matchAll(/\{[^{}]*"partType"[^{}]*\}/g)];
+  if (objMatches.length > 0) {
+    const parts = [];
+    for (const m of objMatches) {
+      try { parts.push(JSON.parse(m[0])); } catch (e) { /* skip bad ones */ }
+    }
+    if (parts.length > 0) return parts;
+  }
+
+  log.warn({ vehicle, textLength: fullText.length, textSample: fullText.substring(0, 300) }, '[InstantResearch] Could not parse JSON');
+  return [];
 }
 
 function processResults(allParts) {
