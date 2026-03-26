@@ -3,7 +3,23 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
-const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches } = require('../utils/partIntelligence');
+const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange } = require('../utils/partIntelligence');
+
+// Part types that require EXACT year matching (no ±1 tolerance)
+// These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
+const PN_EXACT_YEAR_TYPES = new Set([
+  'ECM', 'PCM', 'ECU', 'BCM', 'TIPM', 'ABS', 'TCM', 'TCU',
+  'FUSE', 'JUNCTION', 'AMPLIFIER', 'AMP', 'RADIO', 'CLUSTER',
+  'INSTRUMENT', 'SPEEDOMETER', 'THROTTLE'
+]);
+
+function partRequiresExactYear(title) {
+  const upper = (title || '').toUpperCase();
+  for (const type of PN_EXACT_YEAR_TYPES) {
+    if (upper.includes(type)) return true;
+  }
+  return false;
+}
 
 /**
  * AttackListService - Scores yard vehicles by pull value
@@ -484,45 +500,23 @@ class AttackListService {
     for (const item of candidates) {
       const title = (item.title || '').toUpperCase();
 
-      // Year range check from title
-      const rangeMatch = title.match(/\b((?:19|20)?\d{2})\s*[-–]\s*((?:19|20)?\d{2})\b/);
-      if (rangeMatch) {
-        let y1 = parseInt(rangeMatch[1]), y2 = parseInt(rangeMatch[2]);
-        if (y1 < 100) y1 += y1 >= 70 ? 1900 : 2000;
-        if (y2 < 100) y2 += y2 >= 70 ? 1900 : 2000;
-        if (y1 > y2) { const tmp = y1; y1 = y2; y2 = tmp; }
-        // Vehicle year must be within the part's year range (exact, no tolerance)
-        if (year < y1 || year > y2) continue;
+      // Year filtering: PN-specific parts require EXACT year match.
+      // Generational parts (mirrors, handles, trim) get ±1 tolerance.
+      const pns = piExtractPNs(item.title || '');
+      const hasPn = pns.length > 0;
+      const needsExactYear = hasPn || partRequiresExactYear(item.title || '');
+      const range = piParseYearRange(item.title || '');
+
+      if (needsExactYear) {
+        // PN parts: strict year match only, no tolerance
+        if (!range) continue; // No year in title + has PN = can't confirm year, skip
+        if (year < range.start || year > range.end) continue;
       } else {
-        // Short range at start of title: "05-07 Ford..." or "97-01 Jeep..."
-        const shortRangeMatch = title.match(/^(\d{2})\s*[-–]\s*(\d{2})\b/);
-        if (shortRangeMatch) {
-          let s = parseInt(shortRangeMatch[1]), e = parseInt(shortRangeMatch[2]);
-          s += (s < 50 ? 2000 : 1900);
-          e += (e < 50 ? 2000 : 1900);
-          if (s >= 1980 && s <= 2030 && e >= 1980 && e <= 2030) {
-            const sy1 = Math.min(s, e), sy2 = Math.max(s, e);
-            if (year < sy1 || year > sy2) continue;
-          }
-        } else {
-          // Single 4-digit year in title
-          let yearNums = title.match(/\b((?:19|20)\d{2})\b/g);
-          // Fallback: 2-digit year at start of title ("13 Caravan...")
-          if ((!yearNums || yearNums.length === 0)) {
-            const shortMatch = title.match(/^(\d{2})\b/);
-            if (shortMatch) {
-              let y = parseInt(shortMatch[1]);
-              y += (y < 50 ? 2000 : 1900);
-              if (y >= 1980 && y <= 2030) yearNums = [String(y)];
-            }
-          }
-          if (yearNums && yearNums.length >= 1) {
-            const partYears = yearNums.map(Number);
-            const closestYear = partYears.reduce((best, py) => Math.abs(py - year) < Math.abs(best - year) ? py : best, partYears[0]);
-            if (Math.abs(year - closestYear) > 1) continue;
-          }
-          // No year in title — allow (generic part)
+        // Generational parts: allow ±1 year tolerance
+        if (range) {
+          if (year < range.start - 1 || year > range.end + 1) continue;
         }
+        // No year in title for non-PN part — allow (generic/generational)
       }
 
       // Engine displacement check — if both vehicle and part specify displacement, they must match
@@ -609,17 +603,28 @@ class AttackListService {
     }
 
     // Filter each candidate's individual sales by year range
-    const allMatchedSales = []; // for weighted avg across all types
+    // PN-specific parts: strict year match. Generational parts: ±1 tolerance.
+    const allMatchedSales = [];
     for (const cKey of candidateKeys) {
       const entry = salesIndex[cKey];
       for (const sale of entry.sales) {
-        // Year must fall within the sale's fitment range
+        const saleHasPn = piExtractPNs(sale.title || '').length > 0;
+        const saleNeedsExactYear = saleHasPn || partRequiresExactYear(sale.title || '');
+
         if (sale.yearStart > 0 && sale.yearEnd > 0) {
-          // Has year range — strict check
-          if (year < sale.yearStart || year > sale.yearEnd) continue;
+          if (saleNeedsExactYear) {
+            // PN parts: strict year match, no tolerance
+            if (year < sale.yearStart || year > sale.yearEnd) continue;
+          } else {
+            // Generational parts: ±1 tolerance
+            if (year < sale.yearStart - 1 || year > sale.yearEnd + 1) continue;
+          }
         } else {
-          // No year in sale title — don't let ancient vehicles match modern parts
-          // A 1997 vehicle should not match a yearless sale from 2024
+          // No year in sale title
+          if (saleNeedsExactYear) {
+            continue; // PN part with no year = can't confirm, skip
+          }
+          // Generational part with no year — skip for old vehicles
           const currentYear = new Date().getFullYear();
           if (year < currentYear - 15) continue;
         }
