@@ -3,7 +3,7 @@
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
-const { extractPartNumbers } = require('../utils/partIntelligence');
+const { extractPartNumbers, parseYearRange: piParseYearRange } = require('../utils/partIntelligence');
 
 /**
  * Count stocked items for a HUNTERS PERCH entry.
@@ -168,16 +168,26 @@ router.get('/just-sold', async (req, res) => {
     .select('title', 'salePrice', 'soldDate')
     .orderBy('soldDate', 'desc');
 
-  // Pre-parse each want list item
-  const parsedWantList = wantList.map(item => ({
-    title: item.title,
-    parsed: parseTitle(item.title)
-  })).filter(w => w.parsed);
+  // Pre-parse each want list item (with numeric model fix for Mazda 6, BMW 3, etc.)
+  const parsedWantList = wantList.map(item => {
+    const parsed = parseTitle(item.title);
+    if (parsed && parsed.models.length === 0) {
+      // Handle numeric model names: "Mazda 6", "BMW 3", "Audi 4"
+      const numMatch = item.title.match(/\b(mazda|bmw|audi|saab)\s*(\d{1,2})\b/i);
+      if (numMatch) parsed.models.push(numMatch[1].toLowerCase() + ' ' + numMatch[2]);
+      // Handle combined form: "Mazda6", "Mazda3"
+      const combined = item.title.match(/\b(mazda|bmw)(\d{1,2})\b/i);
+      if (combined && parsed.models.length === 0) parsed.models.push(combined[1].toLowerCase() + ' ' + combined[2]);
+    }
+    return { title: item.title, parsed, yearRange: piParseYearRange(item.title) };
+  }).filter(w => w.parsed);
 
-  // Group sales by want list item — strict matching: model + part phrase/words
+  // Group sales by want list item — strict matching: model + part phrase + year overlap
   const grouped = new Map();
   for (const sale of recentSales) {
     const saleLower = (sale.title || '').toLowerCase();
+    // Normalize for numeric models: "Mazda6" → "Mazda 6", "BMW328i" → "BMW 328i"
+    const saleNorm = saleLower.replace(/([a-z])(\d)/gi, '$1 $2');
 
     for (const want of parsedWantList) {
       const p = want.parsed;
@@ -185,7 +195,10 @@ router.get('/just-sold', async (req, res) => {
       // Must match at least one model (or make if no model)
       let vehicleMatch = false;
       if (p.models.length > 0) {
-        vehicleMatch = p.models.some(m => saleLower.includes(m.toLowerCase()));
+        vehicleMatch = p.models.some(m => {
+          const mLower = m.toLowerCase();
+          return saleLower.includes(mLower) || saleNorm.includes(mLower);
+        });
       } else if (p.make) {
         vehicleMatch = saleLower.includes(p.make.toLowerCase());
       }
@@ -201,10 +214,11 @@ router.get('/just-sold', async (req, res) => {
       }
       if (!partMatch) continue;
 
-      // Also check part numbers if available
-      let pnMatch = false;
-      if (p.partNumbers.length > 0) {
-        pnMatch = p.partNumbers.some(pn => saleLower.includes(pn.raw.toLowerCase()) || saleLower.includes(pn.base.toLowerCase()));
+      // Year range filtering: sale's year range must overlap want list's year range
+      const saleYearRange = piParseYearRange(sale.title);
+      if (saleYearRange && want.yearRange) {
+        const overlaps = saleYearRange.start <= want.yearRange.end && saleYearRange.end >= want.yearRange.start;
+        if (!overlaps) continue; // Wrong year range — skip
       }
 
       const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
