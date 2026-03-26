@@ -139,16 +139,75 @@ const MAKE_ALIASES = {
   'chevy': 'chevrolet', 'vw': 'volkswagen', 'ram': 'dodge',
 };
 
+// Model→Make reverse lookup for when title has model but no make word
+// (e.g. "Charger 2012 ECM" — Charger implies Dodge)
+const MODEL_IMPLIES_MAKE = {
+  'charger': 'dodge', 'challenger': 'dodge', 'durango': 'dodge', 'dakota': 'dodge',
+  'magnum': 'dodge', 'journey': 'dodge', 'dart': 'dodge', 'neon': 'dodge',
+  'grand cherokee': 'jeep', 'wrangler': 'jeep', 'cherokee': 'jeep',
+  'compass': 'jeep', 'patriot': 'jeep', 'liberty': 'jeep', 'renegade': 'jeep',
+  'pacifica': 'chrysler', 'sebring': 'chrysler', 'pt cruiser': 'chrysler',
+  'town country': 'chrysler', 'town & country': 'chrysler',
+  'grand caravan': 'dodge', 'caravan': 'dodge',
+  'f150': 'ford', 'f250': 'ford', 'f350': 'ford', 'f450': 'ford',
+  'explorer': 'ford', 'expedition': 'ford', 'escape': 'ford', 'edge': 'ford',
+  'ranger': 'ford', 'fusion': 'ford', 'focus': 'ford', 'mustang': 'ford',
+  'taurus': 'ford', 'flex': 'ford', 'bronco': 'ford', 'econoline': 'ford',
+  'transit': 'ford', 'transit connect': 'ford', 'five hundred': 'ford',
+  'excursion': 'ford', 'windstar': 'ford', 'crown victoria': 'ford',
+  'camry': 'toyota', 'corolla': 'toyota', 'tacoma': 'toyota', 'tundra': 'toyota',
+  'sequoia': 'toyota', 'highlander': 'toyota', 'rav4': 'toyota', '4runner': 'toyota',
+  'prius': 'toyota', 'sienna': 'toyota', 'avalon': 'toyota',
+  'accord': 'honda', 'civic': 'honda', 'cr-v': 'honda', 'crv': 'honda',
+  'pilot': 'honda', 'odyssey': 'honda', 'ridgeline': 'honda', 'fit': 'honda',
+  'tsx': 'acura', 'tl': 'acura', 'mdx': 'acura', 'rdx': 'acura', 'ilx': 'acura',
+  'pathfinder': 'nissan', 'titan': 'nissan', 'altima': 'nissan', 'sentra': 'nissan',
+  'rogue': 'nissan', 'murano': 'nissan', 'frontier': 'nissan', 'xterra': 'nissan',
+  'maxima': 'nissan', 'armada': 'nissan', 'nv200': 'nissan',
+  'm35': 'infiniti', 'fx35': 'infiniti', 'q60': 'infiniti', 'g35': 'infiniti', 'qx4': 'infiniti',
+  'silverado': 'chevrolet', 'tahoe': 'chevrolet', 'suburban': 'chevrolet',
+  'equinox': 'chevrolet', 'traverse': 'chevrolet', 'malibu': 'chevrolet',
+  'impala': 'chevrolet', 'camaro': 'chevrolet', 'trailblazer': 'chevrolet',
+  'colorado': 'chevrolet', 'blazer': 'chevrolet', 'cobalt': 'chevrolet',
+  'yukon': 'gmc', 'sierra': 'gmc', 'terrain': 'gmc', 'envoy': 'gmc', 'acadia': 'gmc',
+  'optima': 'kia', 'forte': 'kia', 'soul': 'kia', 'sportage': 'kia',
+  'sorento': 'kia', 'sedona': 'kia', 'rio': 'kia',
+  'santa fe': 'hyundai', 'tucson': 'hyundai', 'elantra': 'hyundai', 'sonata': 'hyundai',
+  'xc90': 'volvo', 'xc70': 'volvo', 's60': 'volvo', 'v70': 'volvo', 'c70': 'volvo',
+  'gs300': 'lexus', 'is300': 'lexus', 'rx350': 'lexus', 'es350': 'lexus',
+  'jetta': 'volkswagen', 'passat': 'volkswagen', 'golf': 'volkswagen',
+  'forester': 'subaru', 'outback': 'subaru', 'impreza': 'subaru',
+  'vue': 'saturn', 'ion': 'saturn', 'l100': 'saturn', 'aura': 'saturn',
+  'mariner': 'mercury', 'mountaineer': 'mercury', 'grand marquis': 'mercury',
+  'lacrosse': 'buick', 'lucerne': 'buick', 'enclave': 'buick',
+  'escalade': 'cadillac', 'srx': 'cadillac',
+  'town car': 'lincoln', 'navigator': 'lincoln',
+  'solstice': 'pontiac', 'grand prix': 'pontiac', 'g6': 'pontiac',
+  'montero': 'mitsubishi', 'endeavor': 'mitsubishi', 'outlander': 'mitsubishi',
+  'grand vitara': 'suzuki', 'sidekick': 'suzuki',
+  'p38': 'land rover', 'range rover': 'land rover', 'discovery': 'land rover',
+  'xj6': 'jaguar', 'xk8': 'jaguar', 'xf': 'jaguar',
+  'promaster': 'ram', 'ram 1500': 'ram', 'ram 2500': 'ram', 'ram 3500': 'ram',
+  'mazda3': 'mazda', 'mazda6': 'mazda', 'miata': 'mazda', 'cx-5': 'mazda',
+};
+
 // DB-loaded model cache: { make: [models sorted longest first] }
 let _dbModelsByMake = null;
 let _dbModelsFlat = null; // flat array for fallback
 
 // Fallback hardcoded models (used before DB loads or if Auto table is empty)
+// Multi-word models MUST come before their single-word components
 const FALLBACK_MODELS = [
-  'challenger','charger','durango','journey','grand caravan','caravan','dart','magnum','ram',
-  'grand cherokee','wrangler','cherokee','compass','patriot','liberty','renegade',
+  // Multi-word models first (sorted longest-first at runtime)
+  'transit connect','five hundred','grand cherokee','grand caravan','grand vitara',
+  'grand prix','grand am','grand marquis','town car','town country','town & country',
+  'crown victoria','pt cruiser','land cruiser','fj cruiser','santa fe','santa cruz',
+  'ram 1500','ram 2500','ram 3500','range rover',
+  // Single-word models
+  'challenger','charger','durango','journey','dakota','caravan','dart','magnum','ram',
+  'wrangler','cherokee','compass','patriot','liberty','renegade',
   'f150','f250','f350','ranger','explorer','escape','edge','expedition','fusion','focus',
-  'mustang','bronco','econoline','flex','transit','excursion','crown victoria','taurus',
+  'mustang','bronco','econoline','flex','transit','excursion','taurus',
   'camry','corolla','tacoma','tundra','sequoia','highlander','rav4','4runner','prius','sienna',
   'accord','civic','cr-v','crv','pilot','odyssey','ridgeline','fit','element','passport',
   'tsx','tl','mdx','rdx','ilx','rsx','integra',
@@ -299,11 +358,20 @@ function parseTitle(title) {
   }
 
   // Extract models — use DB-loaded models for the detected make
+  // Also try all models if no make-specific list (handles "Charger ECM" with no "Dodge" in title)
   const modelList = getModels(make);
   const models = [];
   for (const model of modelList) {
     const re = new RegExp('\\b' + model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
     if (re.test(titleLower)) models.push(model);
+  }
+
+  // If no make found but we found models, infer make from model
+  if (!make && models.length > 0) {
+    for (const m of models) {
+      const implied = MODEL_IMPLIES_MAKE[m.toLowerCase()];
+      if (implied) { make = implied; break; }
+    }
   }
 
   // Extract part phrase
@@ -331,7 +399,13 @@ function parseTitle(title) {
   // Extract part numbers
   const partNumbers = extractPartNumbers(title);
 
-  return { make, models, partPhrase, partWords, partNumbers, yearStart, yearEnd };
+  // Deduplicate models: if "transit connect" and "transit" both found,
+  // remove "transit" because "transit connect" is more specific
+  const dedupedModels = models.filter(m => {
+    return !models.some(other => other !== m && other.includes(m));
+  });
+
+  return { make, models: dedupedModels, partPhrase, partWords, partNumbers, yearStart, yearEnd };
 }
 
 // ============================================================
