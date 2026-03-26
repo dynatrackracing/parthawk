@@ -58,13 +58,14 @@ async function getCachedPrice(cacheKey) {
       .first();
 
     if (row) {
+      const price = parseFloat(row.ebay_avg_price) || 0;
+      const count = parseInt(row.ebay_sold_90d) || 0;
+      if (price === 0 && count === 0) return null; // Empty cache entry
       return {
-        median: parseFloat(row.market_avg_price) || 0,
-        avg: parseFloat(row.market_avg_price) || 0,
-        count: parseInt(row.market_sold_count) || parseInt(row.ebay_sold_90d) || 0,
-        velocity: (parseInt(row.ebay_sold_90d) || 0) / 13,
-        min: null,
-        max: null,
+        median: price,
+        avg: price,
+        count: count,
+        velocity: count / 13,
         cached: true,
         checkedAt: row.last_updated,
       };
@@ -80,31 +81,25 @@ async function getCachedPrice(cacheKey) {
  */
 async function cachePrice(cacheKey, part, result) {
   try {
+    // Table columns: id, part_number_base, ebay_sold_90d, ebay_avg_price,
+    // ebay_active_listings, market_score, last_updated, createdAt
     await database.raw(`
       INSERT INTO market_demand_cache
-        (id, part_number_base, make, model, part_type,
-         market_avg_price, market_sold_count, ebay_sold_90d,
-         last_updated, "createdAt", "updatedAt")
+        (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+         last_updated, "createdAt")
       VALUES (
-        gen_random_uuid(), ?, ?, ?, ?,
-        ?, ?, ?,
-        NOW(), NOW(), NOW()
+        gen_random_uuid(), ?, ?, ?,
+        NOW(), NOW()
       )
       ON CONFLICT (part_number_base)
       DO UPDATE SET
-        market_avg_price = EXCLUDED.market_avg_price,
-        market_sold_count = EXCLUDED.market_sold_count,
+        ebay_avg_price = EXCLUDED.ebay_avg_price,
         ebay_sold_90d = EXCLUDED.ebay_sold_90d,
-        last_updated = NOW(),
-        "updatedAt" = NOW()
+        last_updated = NOW()
     `, [
       cacheKey,
-      part.make || null,
-      part.model || null,
-      part.partType || null,
-      result.median || result.avg,
-      result.count,
-      result.count,
+      result.median || result.avg || 0,
+      result.count || 0,
     ]);
   } catch (err) {
     log.warn({ err: err.message, cacheKey }, '[MarketPricing] Cache write error');
