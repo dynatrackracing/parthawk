@@ -24,6 +24,8 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors());
 
 
+app.get('/api/health-check', (req, res) => res.json({ ok: true, time: new Date(), env: process.env.NODE_ENV }));
+
 app.use('/items', require('./routes/items'));
 app.use('/cron', require('./routes/cron'));
 app.use('/autos', require('./routes/autos'));
