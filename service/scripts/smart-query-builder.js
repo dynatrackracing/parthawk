@@ -1,33 +1,33 @@
-'use strict';
-
 /**
- * Smart Query Builder for eBay Sold Items Search
+ * DARKHAWK — Smart Query Builder + Relevance Scorer
  *
- * The goal: Build a search query that finds COMPARABLE items
+ * Combined module for DarkHawk's price check pipeline.
  *
- * Priority order:
- * 1. PART TYPE (ECU, ABS, throttle body, TIPM, etc.) - MOST IMPORTANT
- * 2. MAKE (Honda, Ford, BMW, etc.)
- * 3. MODEL (CR-V, Explorer, 323i, etc.) - but simplified
- * 4. YEAR RANGE (2005-2006, 1999-2000, etc.)
+ * What this does:
+ *   1. Takes an eBay listing title
+ *   2. Extracts: make, model, years, partType
+ *   3. Builds an optimized eBay search query
+ *   4. Scores scraped sold comps against the original listing for relevance
  *
- * What to AVOID:
- * - Multiple model variants (323i 328i 528i → just use 3-series or E46)
- * - Marketing words (programmed, OEM, genuine, tested)
- * - Generic words (module, assembly, unit)
+ * Usage:
+ *   const { buildSearchQuery, filterRelevantItems } = require('./smart-query-builder');
+ *   const result = buildSearchQuery('Honda CR-V 2005-2006 ECU ECM Engine Module');
+ *   const filtered = filterRelevantItems(result.parts, scrapedItems);
  */
 
-// Part type patterns - order matters (more specific first)
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+//  PART TYPE EXTRACTION
+// ═══════════════════════════════════════════════════════════════
+
 const PART_TYPES = [
-  // Engine/Powertrain
   { pattern: /\b(ECU|ECM|PCM)\b/i, type: 'ECU ECM' },
   { pattern: /\bengine\s*(control|computer)\s*(module|unit)?\b/i, type: 'ECU ECM' },
   { pattern: /\b(TCM|TCU)\b/i, type: 'TCM transmission module' },
   { pattern: /\btransmission\s*(control|computer)\s*(module|unit)?\b/i, type: 'TCM transmission module' },
   { pattern: /\bthrottle\s*body\b/i, type: 'throttle body' },
   { pattern: /\b(MAF|mass\s*air\s*flow)\b/i, type: 'MAF mass air flow sensor' },
-
-  // Electrical/Body
   { pattern: /\bTIPM\b/i, type: 'TIPM' },
   { pattern: /\b(fuse\s*box|relay\s*box|power\s*distribution)\b/i, type: 'fuse box' },
   { pattern: /\b(BCM|body\s*control\s*module)\b/i, type: 'BCM body control module' },
@@ -35,65 +35,49 @@ const PART_TYPES = [
   { pattern: /\bSAM\s*(module|relay|fuse)?\b/i, type: 'SAM module' },
   { pattern: /\binstrument\s*cluster\b/i, type: 'instrument cluster' },
   { pattern: /\bspeedometer\b/i, type: 'instrument cluster speedometer' },
-
-  // Brakes/Suspension
   { pattern: /\bABS\b.*\b(pump|module|unit)\b/i, type: 'ABS module pump' },
   { pattern: /\banti[- ]?lock\s*brake\b/i, type: 'ABS module pump' },
   { pattern: /\bbrake\s*(booster|master)\b/i, type: 'brake booster' },
-
-  // HVAC
   { pattern: /\b(AC|A\/C|climate)\s*control\b/i, type: 'AC climate control' },
   { pattern: /\bheater\s*(control|module|panel)\b/i, type: 'heater control' },
   { pattern: /\bblower\s*motor\b/i, type: 'blower motor' },
-
-  // Lighting
+  { pattern: /\bHVAC\s*(module|control)\b/i, type: 'HVAC module' },
   { pattern: /\bheadlight\s*(assembly)?\b/i, type: 'headlight' },
   { pattern: /\btail\s*light\b/i, type: 'tail light' },
-
-  // Drivetrain/Transmission
+  { pattern: /\bblind\s*spot\s*(sensor|monitor|module)\b/i, type: 'blind spot sensor' },
+  { pattern: /\bparking\s*(sensor|assist)\b/i, type: 'parking sensor' },
+  { pattern: /\b(backup|rear|reverse)\s*camera\b/i, type: 'backup camera' },
+  { pattern: /\bliftgate\s*(module|motor|actuator|control)\b/i, type: 'liftgate module' },
+  { pattern: /\btailgate\s*(module|motor|actuator|control)\b/i, type: 'tailgate module' },
+  { pattern: /\bsteering\s*(module|control|angle|sensor)\b/i, type: 'steering module' },
+  { pattern: /\bairbag\s*(module|sensor|SRS)\b/i, type: 'airbag module' },
+  { pattern: /\bSRS\s*(module|sensor)\b/i, type: 'airbag module' },
   { pattern: /\bgear\s*(selector|shifter)\b/i, type: 'gear selector shifter' },
-  { pattern: /\bshift(er)?\s*(assembly|lever|knob)?\b/i, type: 'gear selector shifter' },
-
-  // Ignition/Locks
   { pattern: /\bignition\s*(switch|cylinder|lock)\b/i, type: 'ignition switch cylinder' },
-  { pattern: /\bcylinder\s*lock\b/i, type: 'ignition switch cylinder' },
-  { pattern: /\block\s*cylinder\b/i, type: 'ignition switch cylinder' },
-
-  // Infotainment/Electronics
   { pattern: /\b(HMI|multimedia)\s*(interface|module|control)?\b/i, type: 'HMI multimedia module' },
   { pattern: /\binfotainment\b/i, type: 'HMI multimedia module' },
   { pattern: /\bdisplay\s*(screen|unit|module)\b/i, type: 'display screen' },
   { pattern: /\bnavigation\s*(unit|module|system)?\b/i, type: 'navigation unit' },
-
-  // Motors/Mechanical
   { pattern: /\bwiper\s*motor\b/i, type: 'wiper motor' },
-  { pattern: /\bwindshield\s*wiper\s*motor\b/i, type: 'wiper motor' },
   { pattern: /\bwindow\s*(motor|regulator)\b/i, type: 'window motor regulator' },
   { pattern: /\bpower\s*steering\s*(pump|motor)\b/i, type: 'power steering pump' },
   { pattern: /\bstarter\s*(motor)?\b/i, type: 'starter motor' },
   { pattern: /\balternator\b/i, type: 'alternator' },
-  { pattern: /\bconvertible\s*top\b/i, type: 'convertible top motor' },
-  { pattern: /\bsoft\s*top\s*(motor|lift|pump)\b/i, type: 'convertible top motor' },
-  { pattern: /\btop\s*lift\s*motor\b/i, type: 'convertible top motor' },
-  { pattern: /\btrunk\s*(lid\s*)?(motor|actuator|latch)\b/i, type: 'trunk motor latch' },
-  { pattern: /\bliftgate\s*(motor|strut|actuator)\b/i, type: 'liftgate motor' },
-  { pattern: /\btailgate\s*(motor|strut|actuator)\b/i, type: 'tailgate motor' },
   { pattern: /\bdoor\s*(lock\s*)?(motor|actuator)\b/i, type: 'door lock actuator' },
   { pattern: /\bseat\s*(motor|actuator)\b/i, type: 'seat motor' },
   { pattern: /\bsunroof\s*(motor|actuator)\b/i, type: 'sunroof motor' },
-  { pattern: /\bmoonroof\s*(motor|actuator)\b/i, type: 'sunroof motor' },
-
-  // Other
   { pattern: /\bamp(lifier)?\b/i, type: 'amplifier' },
   { pattern: /\bradio\b/i, type: 'radio' },
   { pattern: /\bstereo\b/i, type: 'stereo radio' },
   { pattern: /\binverter\b/i, type: 'inverter' },
-  { pattern: /\bconverter\b/i, type: 'converter' },
   { pattern: /\bmirror\s*(assembly)?\b/i, type: 'mirror' },
   { pattern: /\bsensor\b/i, type: 'sensor' },
 ];
 
-// Known makes with common model simplifications
+// ═══════════════════════════════════════════════════════════════
+//  MAKE / MODEL EXTRACTION
+// ═══════════════════════════════════════════════════════════════
+
 const MAKES = [
   'Honda', 'Toyota', 'Ford', 'Chevrolet', 'Chevy', 'Dodge', 'Jeep', 'Chrysler',
   'BMW', 'Mercedes', 'Audi', 'Volkswagen', 'VW', 'Nissan', 'Mazda', 'Subaru',
@@ -102,326 +86,182 @@ const MAKES = [
   'Ram', 'Volvo', 'Saab', 'Jaguar', 'Land Rover', 'Mini', 'Porsche', 'Fiat',
 ];
 
-// BMW model simplification
 const BMW_MODELS = {
   '323i': '3-series', '325i': '3-series', '328i': '3-series', '330i': '3-series', '335i': '3-series',
   '525i': '5-series', '528i': '5-series', '530i': '5-series', '535i': '5-series', '540i': '5-series',
   'X3': 'X3', 'X5': 'X5', 'X6': 'X6',
 };
 
-// Words to always remove
 const NOISE_WORDS = [
   'oem', 'genuine', 'new', 'used', 'programmed', 'tested', 'working', 'good',
   'assembly', 'module', 'unit', 'part', 'auto', 'car', 'truck', 'vehicle',
   'for', 'fits', 'and', 'the', 'with', 'or', 'a', 'an', 'to', 'from',
 ];
 
-// Words that are likely part descriptions (nouns we want to keep)
-const PART_DESCRIPTOR_WORDS = [
-  'motor', 'pump', 'sensor', 'switch', 'relay', 'fuse', 'valve', 'actuator',
-  'control', 'computer', 'controller', 'regulator', 'solenoid', 'coil',
-  'injector', 'compressor', 'condenser', 'evaporator', 'radiator', 'fan',
-  'belt', 'pulley', 'tensioner', 'bracket', 'mount', 'hose', 'pipe', 'tube',
-  'cover', 'lid', 'cap', 'door', 'panel', 'trim', 'bezel', 'grille', 'bumper',
-  'mirror', 'glass', 'handle', 'latch', 'lock', 'hinge', 'strut', 'spring',
-  'shock', 'arm', 'link', 'bar', 'rod', 'shaft', 'axle', 'bearing', 'hub',
-  'caliper', 'rotor', 'pad', 'drum', 'cylinder', 'master', 'slave', 'booster',
-  'rack', 'pinion', 'gear', 'transmission', 'transfer', 'differential',
-  'intake', 'exhaust', 'manifold', 'header', 'catalytic', 'muffler', 'resonator',
-  'filter', 'cleaner', 'box', 'housing', 'case', 'body', 'block', 'head',
-  'gasket', 'seal', 'oring', 'clamp', 'clip', 'bolt', 'nut', 'screw',
-  'wiring', 'harness', 'connector', 'plug', 'socket', 'terminal', 'ground',
-  'antenna', 'speaker', 'amplifier', 'radio', 'stereo', 'display', 'screen',
-  'camera', 'navigation', 'gps', 'bluetooth', 'usb', 'aux', 'cd', 'dvd',
-  'headlight', 'taillight', 'foglight', 'signal', 'marker', 'bulb', 'led',
-  'wiper', 'washer', 'nozzle', 'reservoir', 'tank', 'bottle', 'canister',
-  'pedal', 'lever', 'knob', 'button', 'dial', 'gauge', 'cluster', 'speedometer',
-  'tachometer', 'odometer', 'fuel', 'temperature', 'pressure', 'level',
-  'airbag', 'seatbelt', 'pretensioner', 'buckle', 'retractor',
-  'sunroof', 'moonroof', 'convertible', 'top', 'roof', 'soft', 'hard',
-  'trunk', 'hood', 'tailgate', 'liftgate', 'hatch', 'gate',
-  'window', 'windshield', 'rear', 'front', 'side', 'driver', 'passenger',
-  'left', 'right', 'upper', 'lower', 'inner', 'outer', 'center', 'middle',
-  'electric', 'electronic', 'power', 'manual', 'automatic', 'hybrid',
-  'abs', 'ecu', 'ecm', 'pcm', 'tcm', 'bcm', 'tipm', 'gem', 'sam',
-  'ac', 'hvac', 'climate', 'heater', 'blower', 'vent', 'duct',
-  'key', 'ignition', 'immobilizer', 'transponder', 'remote', 'fob',
-  'steering', 'column', 'wheel', 'tilt', 'telescopic', 'clock',
-];
-
-/**
- * Extract part type from title
- */
 function extractPartType(title) {
   for (const { pattern, type } of PART_TYPES) {
-    if (pattern.test(title)) {
-      return type;
-    }
+    if (pattern.test(title)) return type;
   }
   return null;
 }
 
-/**
- * Extract descriptive words from title when part type is unknown
- * This is our fallback to handle categories we don't explicitly know
- */
-function extractDescriptiveWords(title, make, model) {
-  // Clean the title - remove year ranges first
-  const cleanedTitle = title
-    .replace(/\b(19|20)\d{2}[-\s]*(19|20)?\d{2,4}\b/g, ' ')  // Remove year ranges like 2004-2009
-    .replace(/\b(19|20)\d{2}\b/g, ' ')  // Remove single years
-    .replace(/[,()[\]{}'"]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-
-  const words = cleanedTitle.split(' ').filter(w => w.length > 2);
-
-  // Remove make, model, and noise words
-  const makeLower = make?.toLowerCase();
-  const modelLower = model?.toLowerCase();
-
-  const descriptive = words.filter(word => {
-    // Skip noise words
-    if (NOISE_WORDS.includes(word)) return false;
-    // Skip make/model
-    if (word === makeLower || word === modelLower) return false;
-    // Skip part numbers (alphanumeric patterns like AB123CD or 123ABC)
-    if (/\d/.test(word) && /[a-z]/i.test(word) && word.length > 5) return false;
-    // Skip pure numbers
-    if (/^\d+$/.test(word)) return false;
-    return true;
-  });
-
-  // Prioritize known part descriptor words, then take others
-  const prioritized = [];
-  const others = [];
-
-  for (const word of descriptive) {
-    if (PART_DESCRIPTOR_WORDS.includes(word)) {
-      prioritized.push(word);
-    } else {
-      others.push(word);
-    }
-  }
-
-  // Return up to 4 most relevant words (prioritized first)
-  return [...prioritized, ...others].slice(0, 4).join(' ');
-}
-
-/**
- * Extract make from title (whole word match only)
- */
 function extractMake(title) {
-  const titleLower = title.toLowerCase();
   for (const make of MAKES) {
-    // Use word boundary regex to avoid matching "Ram" in "Programmed"
-    const pattern = new RegExp(`\\b${make.toLowerCase()}\\b`);
-    if (pattern.test(titleLower)) {
-      return make;
-    }
+    if (new RegExp(`\\b${make}\\b`, 'i').test(title)) return make;
   }
   return null;
 }
 
-/**
- * Extract model from title (simplified)
- */
 function extractModel(title, make) {
-  // For BMW, simplify to series
+  if (!title) return null;
   if (make && make.toLowerCase() === 'bmw') {
-    for (const [model, series] of Object.entries(BMW_MODELS)) {
-      if (title.includes(model)) {
-        return series;
-      }
+    for (const [variant, series] of Object.entries(BMW_MODELS)) {
+      if (title.includes(variant)) return series;
     }
-    // BMW chassis codes
-    const bmwChassis = title.match(/\b(E[0-9]{2}|F[0-9]{2}|G[0-9]{2})\b/i);
-    if (bmwChassis) return bmwChassis[1].toUpperCase();
+    const chassis = title.match(/\b(E[0-9]{2}|F[0-9]{2}|G[0-9]{2})\b/i);
+    if (chassis) return chassis[1].toUpperCase();
   }
-
-  // Common model patterns by make - order matters (specific patterns first)
   const modelPatterns = [
-    // Honda
     /\b(CR-V|CRV|Civic|Accord|Pilot|Odyssey|Fit|HR-V|Element|Ridgeline|Insight)\b/i,
-    // Toyota
     /\b(Camry|Corolla|RAV4|Highlander|Tacoma|Tundra|4Runner|Prius|Sienna|Avalon|Yaris|Supra)\b/i,
-    // Ford
-    /\b(F-?150|F-?250|F-?350|Explorer|Escape|Mustang|Focus|Fusion|Edge|Expedition|Ranger|Bronco|E-?[0-9]{3}|E[0-9]{3}|Econoline|Van)\b/i,
-    // Dodge/Ram
+    /\b(F-?150|F-?250|F-?350|Explorer|Escape|Mustang|Focus|Fusion|Edge|Expedition|Ranger|Bronco|E-?[0-9]{3}|Econoline)\b/i,
     /\b(RAM|Charger|Challenger|Durango|Dakota|Caravan|Journey|Nitro|Avenger|Magnum)\b/i,
-    // Jeep
     /\b(Wrangler|Cherokee|Grand Cherokee|Commander|Liberty|Compass|Patriot|Renegade|Gladiator)\b/i,
-    // Chrysler
     /\b(PT Cruiser|300|Town & Country|Pacifica|Sebring|200|Crossfire)\b/i,
-    // Chevrolet/GMC
     /\b(Silverado|Tahoe|Suburban|Equinox|Traverse|Malibu|Impala|Cruze|Camaro|Corvette|Colorado|Trailblazer|Blazer|Sierra|Yukon|Acadia|Terrain)\b/i,
-    // Mazda
     /\b(Mazda\s*[2356]|MX-?5|Miata|CX-?[357]|CX-?[39]0?|RX-?[78]|Tribute|MPV)\b/i,
-    // Hyundai
     /\b(Elantra|Sonata|Tucson|Santa Fe|Veloster|Accent|Genesis|Palisade|Kona|Ioniq)\b/i,
-    // Kia
     /\b(Rio|Optima|Sorento|Sportage|Soul|Forte|Telluride|Stinger|Seltos|Carnival|Sedona)\b/i,
-    // Mitsubishi
     /\b(Outlander|Lancer|Eclipse|Galant|Montero|Endeavor|Mirage|Pajero)\b/i,
-    // Nissan
     /\b(Altima|Maxima|Sentra|Rogue|Murano|Pathfinder|Frontier|Titan|Xterra|Versa|370Z|350Z|GT-R)\b/i,
-    // Subaru
     /\b(Outback|Forester|Impreza|WRX|Legacy|Crosstrek|Ascent|BRZ)\b/i,
-    // Volkswagen
     /\b(Jetta|Passat|Golf|Tiguan|Atlas|Beetle|GTI|Touareg|CC)\b/i,
-    // Audi
     /\b(A[3-8]|Q[357]|S[3-8]|RS[3-7]|TT|R8|e-tron)\b/i,
-    // Mercedes
     /\b([A-Z]-?Class|[CES][0-9]{3}|GL[ABCEKS]?|ML[0-9]{3}|SL[KS]?|AMG|Sprinter)\b/i,
-    // Porsche
     /\b(Cayenne|911|Boxster|Cayman|Panamera|Macan|Taycan)\b/i,
-    // Lexus
-    /\b([GILNR][SXCT][0-9]{3}|ES|IS|GS|LS|NX|RX|GX|LX|UX)\b/i,
-    // Acura
     /\b(TL|TSX|MDX|RDX|ILX|TLX|NSX|Integra|RSX|Legend)\b/i,
-    // Infiniti
-    /\b(G[0-9]{2}|Q[0-9]{2}|QX[0-9]{2}|FX[0-9]{2}|EX[0-9]{2}|JX[0-9]{2}|M[0-9]{2})\b/i,
+    /\b(G[0-9]{2}|Q[0-9]{2}|QX[0-9]{2}|FX[0-9]{2}|EX[0-9]{2}|M[0-9]{2})\b/i,
   ];
-
   for (const pattern of modelPatterns) {
     const match = title.match(pattern);
     if (match) {
-      // Don't return the make as the model
-      const model = match[1];
-      if (make && model.toLowerCase() === make.toLowerCase()) {
-        continue;
-      }
-      return model;
+      if (make && match[1].toLowerCase() === make.toLowerCase()) continue;
+      return match[1];
     }
   }
-
   return null;
 }
 
-/**
- * Extract year or year range
- */
 function extractYears(title) {
-  // Year range pattern: 2005-2006, 2005-06
-  const dashRangeMatch = title.match(/\b((?:19|20)\d{2})[-]((?:19|20)?\d{2})\b/);
-  if (dashRangeMatch) {
-    const startYear = dashRangeMatch[1];
-    let endYear = dashRangeMatch[2];
-    // Handle 2-digit end year (2005-06 -> 2005-2006)
-    if (endYear.length === 2) {
-      const century = startYear.substring(0, 2);
-      endYear = century + endYear;
-    }
-    // Validate it's a reasonable range (not model numbers like 2500-3500)
-    const start = parseInt(startYear);
-    const end = parseInt(endYear);
-    if (end >= start && end - start <= 20 && start >= 1990 && end <= 2030) {
-      return `${startYear}-${endYear}`;
-    }
+  const dashRange = title.match(/\b((?:19|20)\d{2})[-]((?:19|20)?\d{2})\b/);
+  if (dashRange) {
+    const startYear = dashRange[1];
+    let endYear = dashRange[2];
+    if (endYear.length === 2) endYear = startYear.substring(0, 2) + endYear;
+    const start = parseInt(startYear), end = parseInt(endYear);
+    if (end >= start && end - start <= 20 && start >= 1990 && end <= 2030) return `${startYear}-${endYear}`;
   }
-
-  // Two consecutive years with space: 1999 2000
-  const spaceRangeMatch = title.match(/\b((?:19|20)\d{2})\s+((?:19|20)\d{2})\b/);
-  if (spaceRangeMatch) {
-    const start = parseInt(spaceRangeMatch[1]);
-    const end = parseInt(spaceRangeMatch[2]);
-    // Must be consecutive or close years
-    if (end > start && end - start <= 5) {
-      return `${spaceRangeMatch[1]}-${spaceRangeMatch[2]}`;
-    }
+  const spaceRange = title.match(/\b((?:19|20)\d{2})\s+((?:19|20)\d{2})\b/);
+  if (spaceRange) {
+    const start = parseInt(spaceRange[1]), end = parseInt(spaceRange[2]);
+    if (end > start && end - start <= 5) return `${spaceRange[1]}-${spaceRange[2]}`;
   }
-
-  // Single year pattern (but not model numbers like 2500)
   const yearMatches = title.match(/\b(19|20)\d{2}\b/g);
   if (yearMatches) {
-    // Filter to valid years (1990-2030)
-    const validYears = yearMatches.filter(y => {
-      const num = parseInt(y);
-      return num >= 1990 && num <= 2030;
-    });
-    if (validYears.length > 0) {
-      return validYears[0];
-    }
+    const valid = yearMatches.filter(y => { const n = parseInt(y); return n >= 1990 && n <= 2030; });
+    if (valid.length > 0) return valid[0];
   }
-
   return null;
 }
 
-/**
- * Build optimized search query from title
- */
+function extractDescriptiveWords(title, make, model) {
+  const cleaned = title.replace(/\b(19|20)\d{2}[-\s]*(19|20)?\d{2,4}\b/g, ' ').replace(/\b(19|20)\d{2}\b/g, ' ').replace(/[,()[\]{}'"]/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+  const words = cleaned.split(' ').filter(w => w.length > 2);
+  const makeLower = make?.toLowerCase();
+  const modelLower = model?.toLowerCase();
+  const PART_DESCRIPTORS = ['motor','pump','sensor','switch','relay','fuse','valve','actuator','control','computer','controller','regulator','solenoid','coil','injector','compressor','condenser','radiator','fan','alternator','starter','caliper','rotor','bearing','hub','rack','harness','antenna','speaker','amplifier','radio','stereo','display','screen','camera','navigation','headlight','taillight','wiper','cluster','speedometer','airbag','sunroof','liftgate','tailgate','mirror'];
+  const descriptive = words.filter(word => {
+    if (NOISE_WORDS.includes(word)) return false;
+    if (word === makeLower || word === modelLower) return false;
+    if (/\d/.test(word) && /[a-z]/i.test(word) && word.length > 5) return false;
+    if (/^\d+$/.test(word)) return false;
+    return true;
+  });
+  const prioritized = descriptive.sort((a, b) => (PART_DESCRIPTORS.includes(a) ? 0 : 1) - (PART_DESCRIPTORS.includes(b) ? 0 : 1));
+  return prioritized.slice(0, 3).join(' ') || null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BUILD SEARCH QUERY
+// ═══════════════════════════════════════════════════════════════
+
 function buildSearchQuery(title) {
   const partType = extractPartType(title);
   const make = extractMake(title);
   const model = extractModel(title, make);
   const years = extractYears(title);
-
-  // Build query with priority: make + model + year + part type
   const parts = [];
-
   if (make) parts.push(make);
   if (model) parts.push(model);
   if (years) parts.push(years);
-
-  // If we have a known part type, use it
-  // Otherwise, extract descriptive words as fallback
   let descriptiveWords = null;
-  if (partType) {
-    parts.push(partType);
-  } else if (make || model) {
-    // We have vehicle info but no recognized part type
-    // Extract descriptive words from the title as fallback
-    descriptiveWords = extractDescriptiveWords(title, make, model);
-    if (descriptiveWords) {
-      parts.push(descriptiveWords);
-    }
-  }
-
-  // If we couldn't extract any structured data, fall back to cleaned title
+  if (partType) { parts.push(partType); }
+  else if (make || model) { descriptiveWords = extractDescriptiveWords(title, make, model); if (descriptiveWords) parts.push(descriptiveWords); }
   if (parts.length < 2) {
-    const fallback = title
-      .replace(/[,()]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .toLowerCase()
-      .split(' ')
-      .filter(w => w.length > 2 && !NOISE_WORDS.includes(w))
-      .slice(0, 6)
-      .join(' ');
+    const fallback = title.replace(/[,()]/g, ' ').replace(/\s+/g, ' ').toLowerCase().split(' ').filter(w => w.length > 2 && !NOISE_WORDS.includes(w)).slice(0, 6).join(' ');
     return { query: fallback, structured: false, parts: {} };
   }
-
-  return {
-    query: parts.join(' ').toLowerCase(),
-    structured: true,
-    parts: {
-      make,
-      model,
-      years,
-      partType: partType || descriptiveWords,  // Use descriptive words as partType fallback
-      isInferredPartType: !partType && !!descriptiveWords  // Flag that we inferred it
-    }
-  };
+  return { query: parts.join(' ').toLowerCase(), structured: true, parts: { make, model, years, partType: partType || descriptiveWords, isInferredPartType: !partType && !!descriptiveWords } };
 }
 
-// Test the query builder
-if (require.main === module) {
-  const TEST_TITLES = [
-    'Honda CR-V 2.4L A/T 2005-2006 Programmed ECU ECM Engine Module',
-    'Programmed PT Cruiser 2006-2010 TIPM Fuse Box Power Module',
-    'Dodge RAM 2500 3500 5.9L Programmed ECU ECM PCM Engine Control',
-    'Ford Explorer 2014 2015 ABS Anti Lock Brake Pump Assembly',
-    'BMW 323i 328i 528i 1999 2000 Electronic Throttle Body Assembly',
-  ];
+// ═══════════════════════════════════════════════════════════════
+//  RELEVANCE SCORING
+// ═══════════════════════════════════════════════════════════════
 
-  console.log('=== Smart Query Builder Test ===\n');
-
-  TEST_TITLES.forEach((title, i) => {
-    const result = buildSearchQuery(title);
-    console.log(`[${i + 1}] ${title.substring(0, 60)}...`);
-    console.log(`    Query: "${result.query}"`);
-    console.log(`    Parts: ${JSON.stringify(result.parts)}`);
-    console.log('');
-  });
+function parseYearRange(yearStr) {
+  if (!yearStr) return null;
+  if (yearStr.includes('-')) { const [s, e] = yearStr.split('-').map(y => parseInt(y)); return [s, e]; }
+  const y = parseInt(yearStr); return [y, y];
 }
 
-module.exports = { buildSearchQuery, extractPartType, extractMake, extractModel, extractYears };
+function yearsOverlap(r1, r2) {
+  if (!r1 || !r2) return false;
+  return r1[0] <= r2[1] && r2[0] <= r1[1];
+}
+
+function normalizePartType(pt) {
+  if (!pt) return null;
+  return pt.toLowerCase().replace(/\s+/g, ' ').replace(/module|unit|assembly/g, '').trim();
+}
+
+function scoreRelevance(ourItem, scrapedItem) {
+  const scraped = { title: scrapedItem.title, partType: extractPartType(scrapedItem.title), make: extractMake(scrapedItem.title), model: extractModel(scrapedItem.title, extractMake(scrapedItem.title)), years: extractYears(scrapedItem.title) };
+  const breakdown = { partType: 0, make: 0, model: 0, years: 0 };
+  const ourPart = normalizePartType(ourItem.partType);
+  const scrapedPart = normalizePartType(scraped.partType);
+  if (ourPart && scrapedPart) {
+    if (ourPart === scrapedPart) breakdown.partType = 40;
+    else if (ourPart.includes(scrapedPart) || scrapedPart.includes(ourPart)) breakdown.partType = 30;
+    else { const overlap = ourPart.split(' ').filter(p => scrapedPart.split(' ').includes(p)); if (overlap.length > 0) breakdown.partType = 20; }
+  }
+  if (ourItem.make && scraped.make && ourItem.make.toLowerCase() === scraped.make.toLowerCase()) breakdown.make = 25;
+  if (ourItem.model && scraped.model) {
+    const a = ourItem.model.toLowerCase().replace(/[-\s]/g, ''), b = scraped.model.toLowerCase().replace(/[-\s]/g, '');
+    if (a === b) breakdown.model = 20; else if (a.includes(b) || b.includes(a)) breakdown.model = 15;
+  }
+  const ourYears = parseYearRange(ourItem.years), scrapedYears = parseYearRange(scraped.years);
+  if (yearsOverlap(ourYears, scrapedYears)) breakdown.years = 15;
+  else if (ourYears && scrapedYears && Math.abs(ourYears[0] - scrapedYears[0]) <= 2) breakdown.years = 8;
+  const score = breakdown.partType + breakdown.make + breakdown.model + breakdown.years;
+  const isRelevant = breakdown.partType >= 30 && (breakdown.make >= 25 || (breakdown.model >= 15 && breakdown.years >= 8));
+  return { score, breakdown, isRelevant, extracted: scraped };
+}
+
+function filterRelevantItems(ourItem, scrapedItems) {
+  const scored = scrapedItems.map(item => ({ ...item, relevance: scoreRelevance(ourItem, item) }));
+  const relevant = scored.filter(item => item.relevance.isRelevant);
+  relevant.sort((a, b) => b.relevance.score - a.relevance.score);
+  return { total: scrapedItems.length, relevant: relevant.length, filtered: scrapedItems.length - relevant.length, items: relevant, avgScore: relevant.length > 0 ? relevant.reduce((sum, i) => sum + i.relevance.score, 0) / relevant.length : 0 };
+}
+
+module.exports = { buildSearchQuery, extractPartType, extractMake, extractModel, extractYears, scoreRelevance, filterRelevantItems };
