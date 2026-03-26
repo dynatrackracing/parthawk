@@ -160,6 +160,7 @@ app.get('/test', (req, res) => {
 
 // Market pricing test route — scrapes eBay sold comps for a single query
 app.get('/api/market-price', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Provide ?q=searchquery or ?q=68163904AC' });
   try {
@@ -167,7 +168,8 @@ app.get('/api/market-price', async (req, res) => {
     const result = await singlePriceCheck(q);
     res.json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    log.error({ err, query: q }, 'Market price check failed');
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 

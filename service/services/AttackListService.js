@@ -3,7 +3,7 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
-const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange } = require('../utils/partIntelligence');
+const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
 
 // Part types that require EXACT year matching (no ±1 tolerance)
 // These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
@@ -677,19 +677,29 @@ class AttackListService {
       if (seenTypes.has(partType)) continue;
       seenTypes.add(partType);
 
-      // Stock: check by part numbers extracted from sale titles using shared partIntelligence
+      // Stock: check by part numbers extracted from sale titles
+      // Try exact PN first, fall back to base ONLY if exact returns 0
+      // Never sum both — base includes exact, so summing double counts
       let ptStock = 0;
-      const salePartNums = new Set();
+      const exactPNs = [];
+      const basePNs = [];
       for (const t of (ptData.titles || [])) {
         const pns = piExtractPNs(t);
         for (const pn of pns) {
-          salePartNums.add(pn.normalized);
-          if (pn.base !== pn.normalized) salePartNums.add(pn.base);
+          exactPNs.push(pn.normalized);
+          if (pn.base !== pn.normalized) basePNs.push(pn.base);
         }
       }
-      if (salePartNums.size > 0 && stockPartNumbers) {
-        for (const spn of salePartNums) {
-          ptStock += stockPartNumbers[spn] || 0;
+      if (stockPartNumbers) {
+        // Try exact normalized PNs first
+        for (const pn of exactPNs) {
+          if (stockPartNumbers[pn]) { ptStock = stockPartNumbers[pn]; break; }
+        }
+        // Only fall back to base if exact found nothing
+        if (ptStock === 0) {
+          for (const pn of basePNs) {
+            if (stockPartNumbers[pn]) { ptStock = stockPartNumbers[pn]; break; }
+          }
         }
       }
 
