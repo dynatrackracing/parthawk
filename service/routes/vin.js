@@ -32,6 +32,9 @@ router.post('/decode-photo', async (req, res) => {
     if (!imageBase64 || imageBase64.length < 1000) {
       return res.status(400).json({ error: 'No image provided or image too small (' + (imageBase64?.length || 0) + ' chars)' });
     }
+    if (imageBase64.length > 2000000) {
+      return res.status(400).json({ error: 'Image too large — max 2MB base64' });
+    }
     log.info({ imageSize: imageBase64.length }, 'VIN photo received');
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -42,7 +45,7 @@ router.post('/decode-photo', async (req, res) => {
     // Call Claude Vision via raw fetch (avoids SDK dependency issues)
     const fetchRes = await axios.post('https://api.anthropic.com/v1/messages', {
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 100,
+      max_tokens: 200,
       messages: [{
         role: 'user',
         content: [

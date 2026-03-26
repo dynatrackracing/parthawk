@@ -2,18 +2,115 @@
 
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
-const { matchPartToListings, matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
+const { matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
+const { extractPartNumbers } = require('../utils/partNumberExtractor');
+
+/**
+ * Count stocked items for a HUNTERS PERCH entry.
+ * TIER 1: Part number match (from architect's partNumberExtractor)
+ * TIER 2: Year + Model + Part phrase (vehicle-specific)
+ * TIER 3: Keyword fallback (flagged as unreliable)
+ */
+async function countStockedForEntry(knex, title) {
+  // TIER 1: Part number match
+  const partNumbers = extractPartNumbers(title);
+  const realPNs = partNumbers.filter(pn => pn.normalized.length >= 6);
+
+  if (realPNs.length > 0) {
+    let q = knex('YourListing').where('listingStatus', 'Active');
+    q = q.where(function() {
+      for (const pn of realPNs) {
+        this.orWhere('title', 'ilike', `%${pn.normalized}%`);
+        if (pn.base !== pn.normalized) this.orWhere('title', 'ilike', `%${pn.base}%`);
+        // Also match with original formatting (dashes etc)
+        const rawUp = pn.raw.toUpperCase();
+        if (rawUp !== pn.normalized) this.orWhere('title', 'ilike', `%${rawUp}%`);
+      }
+    });
+    const listings = await q.select('title').limit(20);
+    return {
+      stock: listings.length,
+      matchedTitles: listings.map(l => l.title),
+      method: 'PART_NUMBER',
+      debug: `PN: ${realPNs[0].raw} (${listings.length} found)`
+    };
+  }
+
+  // TIER 2: Year + Model + Part phrase (vehicle-specific via Auto table)
+  await loadModelsFromDB();
+  const parsed = parseTitle(title);
+  if (parsed && parsed.models.length > 0 && parsed.partPhrase) {
+    let q = knex('YourListing').where('listingStatus', 'Active');
+    q = q.where(function() {
+      for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
+    });
+    q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
+    const allListings = await q.select('title').limit(50);
+    // Year filter
+    const filtered = parsed.yearStart && parsed.yearEnd
+      ? allListings.filter(l => {
+          const ly = extractYearsFromListingTitle(l.title);
+          if (!ly) return true;
+          return ly.start <= parsed.yearEnd && ly.end >= parsed.yearStart;
+        })
+      : allListings;
+    const yearLabel = parsed.yearStart ? (parsed.yearStart === parsed.yearEnd ? String(parsed.yearStart) : parsed.yearStart + '-' + parsed.yearEnd) : null;
+    const debug = [yearLabel, parsed.models.join('/'), '"' + parsed.partPhrase + '"'].filter(Boolean).join(' + ');
+    return {
+      stock: filtered.length,
+      matchedTitles: filtered.slice(0, 10).map(l => l.title),
+      method: 'VEHICLE_MATCH',
+      debug: `${debug} (${filtered.length} found)`
+    };
+  }
+
+  // TIER 3: Keyword fallback — flag as unreliable
+  if (parsed && parsed.make && parsed.partPhrase) {
+    let q = knex('YourListing').where('listingStatus', 'Active');
+    q = q.andWhere('title', 'ilike', `%${parsed.make}%`);
+    q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
+    const allListings = await q.select('title').limit(50);
+    const filtered = parsed.yearStart && parsed.yearEnd
+      ? allListings.filter(l => {
+          const ly = extractYearsFromListingTitle(l.title);
+          if (!ly) return true;
+          return ly.start <= parsed.yearEnd && ly.end >= parsed.yearStart;
+        })
+      : allListings;
+    return {
+      stock: filtered.length,
+      matchedTitles: filtered.slice(0, 10).map(l => l.title),
+      method: 'KEYWORD',
+      debug: `${parsed.make} + "${parsed.partPhrase}" (${filtered.length} found, keyword)`
+    };
+  }
+
+  return { stock: 0, matchedTitles: [], method: 'NO_MATCH', debug: 'Could not extract part number or vehicle' };
+}
+
+function extractYearsFromListingTitle(title) {
+  const range = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
+  if (range) {
+    const start = parseInt(range[1] + range[2]);
+    const end = range[3] ? parseInt(range[3] + range[4]) : parseInt(range[1] + range[4]);
+    return { start, end };
+  }
+  const single = title.match(/\b((?:19|20)\d{2})\b/);
+  if (single) { const y = parseInt(single[1]); return { start: y, end: y }; }
+  return null;
+}
 
 // Diagnostic endpoint
 router.get('/debug/:id', async (req, res) => {
   const item = await database('restock_want_list').where({ id: req.params.id }).first();
   if (!item) return res.status(404).json({ error: 'Not found' });
 
-  const listings = await matchPartToListings(item.title);
+  const pns = extractPartNumbers(item.title);
+  const listings = await countStockedForEntry(database, item.title);
   const sales = await matchPartToSales(item.title);
   const parsed = parseTitle(item.title);
 
-  res.json({ wantTitle: item.title, parsed, listings, sales });
+  res.json({ wantTitle: item.title, extractedPNs: pns, parsed, listings, sales });
 });
 
 // Get all active want list items with stock counts and sale data
@@ -21,9 +118,10 @@ router.get('/items', async (req, res) => {
   await loadModelsFromDB(); // ensure DB models are cached
   const items = await database('restock_want_list').where({ active: true }).orderBy('created_at', 'asc');
 
+  const knex = database;
   const results = [];
   for (const item of items) {
-    const listings = await matchPartToListings(item.title);
+    const listings = await countStockedForEntry(knex, item.title);
     const sales = await matchPartToSales(item.title);
 
     results.push({
@@ -38,8 +136,7 @@ router.get('/items', async (req, res) => {
       lastSold: sales.lastSold,
       matchedTitles: listings.matchedTitles,
       matchMethod: listings.method,
-      similar: listings.similar || null,
-      confidence: listings.method === 'none' ? 'none' : (listings.method === 'model_phrase' || listings.method === 'part_number') ? 'high' : 'low',
+      confidence: listings.method === 'PART_NUMBER' ? 'high' : listings.method === 'VEHICLE_MATCH' ? 'medium' : listings.method === 'KEYWORD' ? 'low' : 'none',
       matchDebug: listings.debug,
       created_at: item.created_at
     });
