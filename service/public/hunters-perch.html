@@ -159,8 +159,24 @@ function scrapeSeller(name, btn) {
   fetch('/competitors/' + encodeURIComponent(name) + '/scrape', { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function() {
-      btn.textContent = 'Started';
-      setTimeout(function() { btn.disabled = false; btn.textContent = 'Scrape'; var body = document.getElementById('body-' + name); if (body) { body.dataset.loaded = ''; body.style.display = 'none'; } }, 30000);
+      btn.textContent = 'Scraping eBay...';
+      // Poll every 10s for up to 2 minutes until new data appears
+      var attempts = 0;
+      var poll = setInterval(function() {
+        attempts++;
+        fetch('/competitors/' + encodeURIComponent(name) + '/best-sellers?days=90')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.totalSold > 0 || attempts >= 12) {
+              clearInterval(poll);
+              btn.disabled = false; btn.textContent = 'Scrape';
+              // Refresh seller data and auto-expand
+              var body = document.getElementById('body-' + name);
+              if (body) { body.dataset.loaded = ''; body.style.display = 'block'; loadBestSellers(name); }
+              load(); // refresh seller list for updated counts
+            }
+          }).catch(function() {});
+      }, 10000);
     })
     .catch(function() { btn.disabled = false; btn.textContent = 'Scrape'; });
 }
