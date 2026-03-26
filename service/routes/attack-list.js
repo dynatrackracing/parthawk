@@ -323,15 +323,62 @@ router.post('/manual', async (req, res) => {
       return res.status(400).json({ success: false, error: 'text is required' });
     }
 
-    const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) {
+    const lines = text.split(/\n/).map(l => l.trim());
+    if (lines.filter(l => l).length === 0) {
       return res.status(400).json({ success: false, error: 'No vehicles found in input' });
     }
-    if (lines.length > 200) {
+
+    // Multi-line parsing: group metadata lines with their vehicle header
+    const metaRe = /^(color|vin|section|stock|available|row|space|mileage|odometer|engine|trim|drive|trans|status|date|location|notes?)\s*[:#]/i;
+    const vehicles_raw = [];
+    let currentBlock = [];
+
+    for (const line of lines) {
+      if (!line) {
+        // Blank line — flush current block
+        if (currentBlock.length > 0) { vehicles_raw.push(currentBlock); currentBlock = []; }
+        continue;
+      }
+      if (metaRe.test(line) && currentBlock.length > 0) {
+        // Metadata line — append to current block
+        currentBlock.push(line);
+      } else if (/\b(?:19|20)\d{2}\b/.test(line) || /^\d{2}\s+[A-Za-z]/.test(line)) {
+        // Looks like a new vehicle (has a year) — flush and start new
+        if (currentBlock.length > 0) vehicles_raw.push(currentBlock);
+        currentBlock = [line];
+      } else if (currentBlock.length > 0) {
+        // Unknown line — could be continuation, append
+        currentBlock.push(line);
+      } else {
+        // Standalone line — try as single vehicle
+        currentBlock = [line];
+      }
+    }
+    if (currentBlock.length > 0) vehicles_raw.push(currentBlock);
+
+    if (vehicles_raw.length > 200) {
       return res.status(400).json({ success: false, error: 'Max 200 vehicles per manual list' });
     }
 
-    const parsed = lines.map((line, idx) => parseVehicleLine(line, idx));
+    // Parse each block: first line is the vehicle, rest is metadata
+    const parsed = vehicles_raw.map((block, idx) => {
+      const v = parseVehicleLine(block[0], idx);
+      // Merge metadata from continuation lines
+      for (let i = 1; i < block.length; i++) {
+        const meta = block[i];
+        const vinM = meta.match(/^vin\s*:\s*([A-HJ-NPR-Z0-9]{17})/i);
+        if (vinM && !v.vin) v.vin = vinM[1].toUpperCase();
+        const colorM = meta.match(/^color\s*:\s*(.+)/i);
+        if (colorM && !v.color) v.color = colorM[1].trim();
+        const rowM = meta.match(/row\s*:\s*([A-Za-z0-9]+)/i);
+        if (rowM && !v.row) v.row = rowM[1].trim();
+        const stockM = meta.match(/^stock\s*[#:]?\s*:?\s*(.+)/i);
+        if (stockM) v.stockNumber = stockM[1].trim();
+        const engM = meta.match(/^engine\s*:\s*(.+)/i);
+        if (engM && !v.engine) v.engine = engM[1].trim();
+      }
+      return v;
+    });
     const valid = parsed.filter(v => v.year && v.make && v.model);
 
     if (valid.length === 0) {
