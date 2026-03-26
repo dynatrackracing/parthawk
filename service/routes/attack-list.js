@@ -99,14 +99,17 @@ router.get('/vehicle/:id/parts', async (req, res) => {
 
     // Enrich with cached market data
     try {
-      const { getCachedPrice } = require('../services/MarketPricingService');
-      const { extractPartNumbers: piPNs } = require('../utils/partIntelligence');
+      const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('../services/MarketPricingService');
+      const vYear = parseInt(vehicle.year) || 0;
       for (const p of (scored.parts || [])) {
-        const pns = piPNs(p.title || '');
-        const cacheKey = pns.length > 0
-          ? pns[0].base
-          : [scored.make, scored.model, p.partType].filter(Boolean).map(s => (s || '').toUpperCase()).join('|');
-        const cached = await getCachedPrice(cacheKey);
+        const sq = buildMktQuery({
+          title: p.title || '',
+          make: scored.make || vehicle.make,
+          model: scored.model || vehicle.model,
+          year: vYear,
+          partType: p.partType,
+        });
+        const cached = await getCachedPrice(sq.cacheKey);
         if (cached) {
           p.marketMedian = cached.median;
           p.marketCount = cached.count;

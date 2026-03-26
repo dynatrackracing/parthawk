@@ -199,15 +199,20 @@ class AttackListService {
 
     // Enrich with cached market data (async context — safe to await here)
     try {
-      const { getCachedPrice } = require('./MarketPricingService');
+      const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('./MarketPricingService');
       for (const vehicle of scored) {
         if (!vehicle.parts) continue;
+        const vYear = parseInt(vehicle.year) || 0;
         for (const p of vehicle.parts) {
-          const pns = piExtractPNs(p.title || '');
-          const cacheKey = pns.length > 0
-            ? pns[0].base
-            : [vehicle.make, vehicle.model, p.partType].filter(Boolean).map(s => (s || '').toUpperCase()).join('|');
-          const cached = await getCachedPrice(cacheKey);
+          // Build cache key SAME WAY as MarketPricingService.buildSearchQuery
+          const sq = buildMktQuery({
+            title: p.title || '',
+            make: vehicle.make,
+            model: vehicle.model,
+            year: vYear,
+            partType: p.partType,
+          });
+          const cached = await getCachedPrice(sq.cacheKey);
           if (cached) {
             p.marketMedian = cached.median;
             p.marketCount = cached.count;
@@ -215,7 +220,7 @@ class AttackListService {
           }
         }
       }
-    } catch (e) { /* market data optional — don't crash if cache table missing */ }
+    } catch (e) { /* market data optional */ }
 
     return {
       vehicles: scored,
