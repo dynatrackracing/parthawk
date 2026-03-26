@@ -291,4 +291,4 @@ async function runPricingPass() {
   }
 }
 
-module.exports = { buildSearchQuery, batchPriceCheck, getCachedPrice, singlePriceCheck, runPricingPass };
+module.exports = { buildSearchQuery, batchPriceCheck, getCachedPrice, cachePrice, scrapeComps, singlePriceCheck, runPricingPass };

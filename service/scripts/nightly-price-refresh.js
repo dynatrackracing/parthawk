@@ -5,33 +5,56 @@
  * Pre-warms market_demand_cache with the EXACT keys that the attack list
  * enrichment reads via MarketPricingService.getCachedPrice().
  *
- * Strategy: query distinct make/model/partType combos from YourSale (last 180d),
- * build cache keys using MarketPricingService.buildSearchQuery() so they match
- * what getAttackList() and /vehicle/:id/parts look up.
+ * Uses MarketPricingService.scrapeComps() which tries V2 (axios+cheerio)
+ * first, then falls back to V1 (Playwright stealth) when rate-limited.
  *
- * Schedule: 4 AM daily via Task Scheduler or cron alongside LKQ scrape.
- * Usage:   node service/scripts/nightly-price-refresh.js [--limit N] [--test]
+ * Offset tracking: stores last offset in price-refresh-state.json so each
+ * run picks up where the last left off. 100 parts/night at ~7s/part ≈ 12 min.
+ * Full 1176-key coverage every ~12 days.
+ *
+ * Schedule: 4 AM daily via run-price-refresh.bat
+ * Usage:   node service/scripts/nightly-price-refresh.js [--limit N] [--test] [--reset]
  */
 
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 process.chdir(path.resolve(__dirname, '..', '..'));
 require('dotenv').config();
 
 const { database } = require('../database/database');
-const priceCheck = require('../services/PriceCheckServiceV2');
-const { buildSearchQuery } = require('../services/MarketPricingService');
+const { buildSearchQuery, scrapeComps, cachePrice } = require('../services/MarketPricingService');
 const { extractPartNumbers } = require('../utils/partIntelligence');
 
-const DELAY_MS = 3000; // 3s between scrapes to avoid eBay rate limiting
+const STATE_FILE = path.resolve(__dirname, '..', '..', 'price-refresh-state.json');
 const DAYS_BACK = 180;
 
 // Parse CLI args
 const args = process.argv.slice(2);
 const testMode = args.includes('--test');
+const resetMode = args.includes('--reset');
 const limitIdx = args.indexOf('--limit');
-const MAX_PARTS = limitIdx >= 0 ? parseInt(args[limitIdx + 1]) || 200 : (testMode ? 10 : 200);
+const MAX_PARTS = limitIdx >= 0 ? parseInt(args[limitIdx + 1]) || 100 : (testMode ? 10 : 100);
+
+function loadState() {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+    }
+  } catch (e) { /* corrupt file, start fresh */ }
+  return { offset: 0, lastRun: null, totalKeys: 0 };
+}
+
+function saveState(state) {
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+function delay() {
+  // 5 seconds + random 1-3 second jitter
+  const ms = 5000 + Math.floor(Math.random() * 2000 + 1000);
+  return new Promise(r => setTimeout(r, ms));
+}
 
 async function main() {
   console.log('═══════════════════════════════════════════');
@@ -40,8 +63,14 @@ async function main() {
   if (testMode) console.log('** TEST MODE — limit ' + MAX_PARTS + ' parts **');
   console.log('═══════════════════════════════════════════\n');
 
-  // Step 1: Get distinct make/model/partType combos from YourSale
-  // These are the combos that scoreVehicle() produces and getAttackList() enriches
+  // Load offset state
+  let state = loadState();
+  if (resetMode) {
+    state = { offset: 0, lastRun: null, totalKeys: 0 };
+    console.log('   Offset reset to 0\n');
+  }
+
+  // Step 1: Get distinct cache keys from YourSale
   console.log('1. Querying distinct part combos from YourSale (last ' + DAYS_BACK + ' days)...');
 
   const combos = await database.raw(`
@@ -58,18 +87,13 @@ async function main() {
 
   const rows = combos.rows || combos;
 
-  // Deduplicate by cache key — this is what matters for the attack list lookup
-  const seen = new Map(); // cacheKey → { query, method, count, avgPrice }
+  // Deduplicate by cache key
+  const seen = new Map();
   for (const row of rows) {
     const title = (row.title || '').trim();
     if (!title) continue;
 
-    // Extract make/model/year/partType the same way AttackListService does
-    const pns = extractPartNumbers(title);
     const price = parseFloat(row.salePrice) || 0;
-
-    // Build the cache key using the SAME function the attack list enrichment uses
-    // For PN parts: key = base PN. For keyword parts: key = YEAR|MAKE|MODEL|PARTTYPE
     const sq = buildSearchQuery({ title, year: null, make: null, model: null, partType: null });
 
     if (!seen.has(sq.cacheKey)) {
@@ -88,24 +112,34 @@ async function main() {
     }
   }
 
-  // Sort by frequency (most-sold combos first) and limit
-  const uniqueParts = Array.from(seen.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, MAX_PARTS);
+  // Sort by frequency (most-sold combos first) — stable order for offset tracking
+  const allKeys = Array.from(seen.values())
+    .sort((a, b) => b.count - a.count);
 
-  console.log('   Found ' + rows.length + ' sales → ' + seen.size + ' unique cache keys');
-  console.log('   Refreshing top ' + uniqueParts.length + ' by frequency\n');
+  const totalKeys = allKeys.length;
 
-  if (uniqueParts.length === 0) {
+  // Apply offset — wrap around if we've gone past the end
+  let offset = state.offset || 0;
+  if (offset >= totalKeys) offset = 0;
+
+  const slice = allKeys.slice(offset, offset + MAX_PARTS);
+  const nextOffset = (offset + slice.length >= totalKeys) ? 0 : offset + slice.length;
+
+  console.log('   Found ' + rows.length + ' sales → ' + totalKeys + ' unique cache keys');
+  console.log('   Offset: ' + offset + ' → ' + nextOffset + ' (processing ' + slice.length + ')');
+  if (state.lastRun) console.log('   Last run: ' + state.lastRun);
+  console.log();
+
+  if (slice.length === 0) {
     console.log('   No parts to refresh. Exiting.');
     await database.destroy();
     return;
   }
 
-  // Step 2: Check which keys are already fresh in cache, skip those
+  // Step 2: Check which keys are already fresh, skip those
   let alreadyCached = 0;
   const toRefresh = [];
-  for (const part of uniqueParts) {
+  for (const part of slice) {
     try {
       const existing = await database('market_demand_cache')
         .where('part_number_base', part.cacheKey)
@@ -122,7 +156,7 @@ async function main() {
   console.log('   Already fresh (< 24h): ' + alreadyCached);
   console.log('   Need refresh: ' + toRefresh.length + '\n');
 
-  // Step 3: Scrape comps for each
+  // Step 3: Scrape comps using MarketPricingService.scrapeComps (V2 → V1 fallback)
   let refreshed = 0, failed = 0, skipped = 0;
 
   for (let i = 0; i < toRefresh.length; i++) {
@@ -132,29 +166,16 @@ async function main() {
       const label = (part.sampleTitle || part.query).substring(0, 50);
       process.stdout.write(`\r   [${i + 1}/${toRefresh.length}] ${label}...`);
 
-      const result = await priceCheck.check(part.query, part.totalPrice / part.count || 0);
+      const result = await scrapeComps(part.query);
 
-      if (result.metrics.count === 0) {
+      if (!result || result.count === 0) {
         skipped++;
-        await new Promise(r => setTimeout(r, DELAY_MS));
+        await delay();
         continue;
       }
 
-      // Upsert into market_demand_cache using the EXACT cache key format
-      await database.raw(`
-        INSERT INTO market_demand_cache
-          (id, part_number_base, ebay_avg_price, ebay_sold_90d, last_updated, "createdAt")
-        VALUES (gen_random_uuid(), ?, ?, ?, NOW(), NOW())
-        ON CONFLICT (part_number_base)
-        DO UPDATE SET
-          ebay_avg_price = EXCLUDED.ebay_avg_price,
-          ebay_sold_90d = EXCLUDED.ebay_sold_90d,
-          last_updated = NOW()
-      `, [
-        part.cacheKey,
-        result.metrics.median,
-        result.metrics.count,
-      ]);
+      // Cache using MarketPricingService.cachePrice — exact same format
+      await cachePrice(part.cacheKey, {}, result);
 
       refreshed++;
     } catch (err) {
@@ -162,25 +183,40 @@ async function main() {
       if (failed <= 5) console.error(`\n   ERROR on "${part.cacheKey}": ${err.message}`);
     }
 
-    // Rate limit
+    // Rate limit: 5s + 1-3s jitter
     if (i < toRefresh.length - 1) {
-      await new Promise(r => setTimeout(r, DELAY_MS));
+      await delay();
     }
   }
 
-  // Step 4: Summary
+  // Step 4: Save offset state
+  state.offset = nextOffset;
+  state.lastRun = new Date().toISOString();
+  state.totalKeys = totalKeys;
+  state.lastRefreshed = refreshed;
+  state.lastSkipped = skipped;
+  state.lastFailed = failed;
+  saveState(state);
+
+  // Step 5: Summary
   const { rows: [stats] } = await database.raw(`
     SELECT COUNT(*) as total, COUNT(CASE WHEN ebay_avg_price > 0 THEN 1 END) as with_price
     FROM market_demand_cache
   `);
 
+  const coverage = totalKeys > 0 ? Math.round((parseInt(stats.with_price) / totalKeys) * 100) : 0;
+  const daysToFull = toRefresh.length > 0 ? Math.ceil(totalKeys / MAX_PARTS) : '∞';
+
   console.log('\n\n═══════════════════════════════════════════');
   console.log('COMPLETE');
-  console.log('  Already cached: ' + alreadyCached);
-  console.log('  Refreshed:      ' + refreshed);
-  console.log('  Skipped:        ' + skipped + ' (no comps found)');
-  console.log('  Failed:         ' + failed);
-  console.log('  Cache total:    ' + stats.total + ' entries (' + stats.with_price + ' with prices)');
+  console.log('  Window:       ' + offset + '-' + (offset + slice.length) + ' of ' + totalKeys);
+  console.log('  Already fresh: ' + alreadyCached);
+  console.log('  Refreshed:     ' + refreshed);
+  console.log('  Skipped:       ' + skipped + ' (no comps found)');
+  console.log('  Failed:        ' + failed);
+  console.log('  Next offset:   ' + nextOffset);
+  console.log('  Cache total:   ' + stats.total + ' entries (' + stats.with_price + ' with prices)');
+  console.log('  Coverage:      ' + coverage + '% (' + daysToFull + ' days to full cycle)');
   console.log('═══════════════════════════════════════════');
 
   await database.destroy();
