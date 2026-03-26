@@ -97,6 +97,24 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       }
     }
 
+    // Enrich with cached market data
+    try {
+      const { getCachedPrice } = require('../services/MarketPricingService');
+      const { extractPartNumbers: piPNs } = require('../utils/partIntelligence');
+      for (const p of (scored.parts || [])) {
+        const pns = piPNs(p.title || '');
+        const cacheKey = pns.length > 0
+          ? pns[0].base
+          : [scored.make, scored.model, p.partType].filter(Boolean).map(s => (s || '').toUpperCase()).join('|');
+        const cached = await getCachedPrice(cacheKey);
+        if (cached) {
+          p.marketMedian = cached.median;
+          p.marketCount = cached.count;
+          p.marketVelocity = cached.velocity;
+        }
+      }
+    } catch (e) { /* market data optional */ }
+
     res.json({
       success: true,
       id,

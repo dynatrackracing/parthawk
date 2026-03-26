@@ -197,6 +197,26 @@ class AttackListService {
       return b.est_value - a.est_value;
     });
 
+    // Enrich with cached market data (async context — safe to await here)
+    try {
+      const { getCachedPrice } = require('./MarketPricingService');
+      for (const vehicle of scored) {
+        if (!vehicle.parts) continue;
+        for (const p of vehicle.parts) {
+          const pns = piExtractPNs(p.title || '');
+          const cacheKey = pns.length > 0
+            ? pns[0].base
+            : [vehicle.make, vehicle.model, p.partType].filter(Boolean).map(s => (s || '').toUpperCase()).join('|');
+          const cached = await getCachedPrice(cacheKey);
+          if (cached) {
+            p.marketMedian = cached.median;
+            p.marketCount = cached.count;
+            p.marketVelocity = cached.velocity;
+          }
+        }
+      }
+    } catch (e) { /* market data optional — don't crash if cache table missing */ }
+
     return {
       vehicles: scored,
       scored_at: new Date().toISOString(),
