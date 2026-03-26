@@ -877,22 +877,7 @@ class AttackListService {
     // === TOTAL VALUE: sum of all FILTERED part prices ===
     const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
-    // === ENRICH WITH MARKET DATA (cache read only, no live scraping) ===
-    try {
-      const { getCachedPrice } = require('./MarketPricingService');
-      for (const p of filteredParts) {
-        const pns = piExtractPNs(p.title || '');
-        const cacheKey = pns.length > 0
-          ? pns[0].base
-          : [make, model, p.partType].filter(Boolean).map(s => (s || '').toUpperCase()).join('|');
-        const market = await getCachedPrice(cacheKey);
-        if (market) {
-          p.marketMedian = market.median;
-          p.marketCount = market.count;
-          p.marketVelocity = market.velocity;
-        }
-      }
-    } catch (e) { /* market data optional */ }
+    // Market data enrichment happens in getAttackList() after scoring (async context)
 
     // === SCORING: driven primarily by total dollar value ===
     let score = 0;
