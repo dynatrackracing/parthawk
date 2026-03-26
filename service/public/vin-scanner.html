@@ -69,6 +69,14 @@ td{padding:6px;border-bottom:1px solid #1f1f1f}
       <div id="researchResults"></div>
     </div>
   </div>
+  <div class="card">
+    <div class="card-title">Standalone Research</div>
+    <input type="text" class="vin-input" id="researchInput" placeholder="2011 Toyota Sequoia 5.7L" style="font-size:14px;letter-spacing:0">
+    <div class="btn-row">
+      <button class="btn btn-red" id="standaloneBtn" onclick="runStandaloneResearch()" style="flex:1">Research Vehicle</button>
+    </div>
+    <div id="standaloneResults"></div>
+  </div>
   <div id="histArea"><span class="hist-link" onclick="loadHistory(this)">Show Recent Scans</span></div>
 </div>
 <script>
@@ -265,6 +273,35 @@ async function runInstantResearch(){
   }
   btn.disabled=false;btn.textContent='Instant Research — What to Pull';
 }
+
+async function runStandaloneResearch(){
+  var inp=document.getElementById('researchInput');
+  var v=inp.value.trim();if(!v)return;
+  var btn=document.getElementById('standaloneBtn');
+  var out=document.getElementById('standaloneResults');
+  btn.disabled=true;btn.textContent='Searching eBay...';
+  out.innerHTML='<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Searching sold listings for '+esc(v)+'...</div></div>';
+  try{
+    var r=await fetch('/api/instant-research?vehicle='+encodeURIComponent(v)).then(function(r){return r.json()});
+    if(r.error){out.innerHTML='<div style="color:#dc2626;padding:10px;font-size:12px">'+esc(r.error)+'</div>';return;}
+    if(!r.parts||r.parts.length===0){out.innerHTML='<div style="color:#6B7280;padding:10px;font-size:12px;text-align:center">No high-value parts found'+(r.cached?' (cached)':'')+'</div>';return;}
+    var h='<div style="margin-top:10px">';
+    if(r.totalValue)h+='<div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap"><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Total Value</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalValue+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Est. Profit</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalProfit+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Parts to Pull</div><div style="font-size:18px;font-weight:800;color:#dc2626">'+(r.pullCount||0)+'</div></div></div>';
+    r.parts.forEach(function(p){
+      var bc=p.badge==='GREAT'?'b-gr':p.badge==='GOOD'?'b-yl':p.badge==='FAIR'?'b-or':'b-rd';
+      h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px">';
+      h+='<div style="font-size:16px;flex-shrink:0">'+(p.verdictIcon||'')+'</div>';
+      h+='<div style="flex:1"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span class="b '+bc+'">'+p.badge+' $'+p.avgPrice+'</span><span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span></div>';
+      h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.soldCount+'x sold · $'+p.estProfit+' profit · ~$'+p.cogs+' cost · '+p.velocity+'</div>';
+      if(p.partNumbers&&p.partNumbers.length>0)h+='<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">'+p.partNumbers.slice(0,3).join(', ')+'</div>';
+      h+='</div><div style="font-weight:800;color:'+(p.verdict==='PULL'?'#22c55e':p.verdict==='RARE'?'#a855f7':'#9CA3AF')+';font-size:11px;white-space:nowrap">'+p.verdict+'</div></div>';
+    });
+    h+='</div>';
+    out.innerHTML=h;
+  }catch(err){out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Error: '+err.message+'</div>';}
+  btn.disabled=false;btn.textContent='Research Vehicle';
+}
+document.getElementById('researchInput').addEventListener('keydown',function(e){if(e.key==='Enter')runStandaloneResearch()});
 
 function loadHistory(el){
   if(el)el.textContent='Loading...';

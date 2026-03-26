@@ -175,7 +175,43 @@ router.get('/', async (req, res) => {
     `, [cacheKey, vehicle, JSON.stringify(filtered)]);
   } catch (e) { /* cache write optional */ }
 
-  res.json({ vehicle, parts: filtered, cached: false });
+  const totalValue = filtered.reduce((s, p) => s + p.avgPrice, 0);
+  const totalProfit = filtered.reduce((s, p) => s + p.estProfit, 0);
+
+  res.json({
+    vehicle, parts: filtered, cached: false,
+    totalValue, totalProfit,
+    pullCount: filtered.filter(p => p.verdict === 'PULL' || p.verdict === 'RARE').length,
+  });
+});
+
+// Dropdown data for vehicle selection
+router.get('/years', async (req, res) => {
+  try {
+    const r = await database.raw('SELECT DISTINCT year FROM "Auto" WHERE year >= 1995 ORDER BY year DESC');
+    res.json((r.rows || r).map(r => r.year));
+  } catch (e) { res.json([]); }
+});
+
+router.get('/makes', async (req, res) => {
+  try {
+    const r = await database.raw('SELECT DISTINCT make FROM "Auto" WHERE year = ? ORDER BY make', [req.query.year]);
+    res.json((r.rows || r).map(r => r.make));
+  } catch (e) { res.json([]); }
+});
+
+router.get('/models', async (req, res) => {
+  try {
+    const r = await database.raw('SELECT DISTINCT model FROM "Auto" WHERE year = ? AND LOWER(make) = LOWER(?) ORDER BY model', [req.query.year, req.query.make]);
+    res.json((r.rows || r).map(r => r.model));
+  } catch (e) { res.json([]); }
+});
+
+router.get('/engines', async (req, res) => {
+  try {
+    const r = await database.raw('SELECT DISTINCT engine FROM "Auto" WHERE year = ? AND LOWER(make) = LOWER(?) AND LOWER(model) = LOWER(?) AND engine IS NOT NULL ORDER BY engine', [req.query.year, req.query.make, req.query.model]);
+    res.json((r.rows || r).map(r => r.engine));
+  } catch (e) { res.json([]); }
 });
 
 module.exports = router;
