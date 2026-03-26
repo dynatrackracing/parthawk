@@ -498,8 +498,11 @@ const COLOR_WORDS = new Set([
 
 function parseVehicleLine(line, idx) {
   const raw = line;
-  // Clean up: remove leading bullets, numbers, dashes, tabs
-  let cleaned = line.replace(/^[\s\-•*#\d.)\]]+/, '').trim();
+  // Clean up: remove leading bullets, dashes, tabs — but NOT 4-digit years
+  // Old regex had \d which stripped years like "2011"
+  let cleaned = line.replace(/^[\s\-•*#)\]]+/, '').trim();
+  // Strip leading list numbers like "1. " or "3) " but NOT years
+  cleaned = cleaned.replace(/^\d{1,2}[.)]\s+/, '').trim();
   if (!cleaned) return { raw, error: 'empty' };
 
   // Extract VIN if present (17-char alphanumeric, no I/O/Q)
