@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(process.cwd(), '.pw-browsers');
+// Use default Playwright browser path (system-installed) — don't override to .pw-browsers
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
