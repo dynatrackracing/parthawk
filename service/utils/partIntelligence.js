@@ -150,6 +150,13 @@ function parseYearRange(title) {
     const yr = parseInt(singleMatch[1]);
     if (yr >= 1980 && yr <= 2030) return { start: yr, end: yr };
   }
+  // 2-digit year at start of string: "13 Caravan..." → 2013
+  const shortStart = title.match(/^(\d{2})\b/);
+  if (shortStart) {
+    let y = parseInt(shortStart[1]);
+    y += (y < 50 ? 2000 : 1900);
+    if (y >= 1980 && y <= 2030) return { start: y, end: y };
+  }
   return null;
 }
 

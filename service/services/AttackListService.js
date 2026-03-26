@@ -470,9 +470,9 @@ class AttackListService {
         if (iYearNum < year - 1 || iYearNum > year + 1) continue;
         if (!allMakes.includes(iMake)) continue;
         const iModelNorm = iModel.toUpperCase().replace(/[-]/g, ' ').trim();
-        // Exact match or word-boundary match (F-150 = F150, Grand Cherokee != Cherokee)
-        if (modelNorm === iModelNorm || modelRe.test(iModelNorm) ||
-            new RegExp('\\b' + iModelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(modelNorm)) {
+        // One-directional: exact match OR vehicle model appears in inventory model
+        // Cherokee (inventory) must NOT match Grand Cherokee (vehicle)
+        if (modelNorm === iModelNorm || modelRe.test(iModelNorm)) {
           for (const item of entry.items) {
             if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
           }
@@ -494,14 +494,35 @@ class AttackListService {
         // Vehicle year must be within the part's year range (exact, no tolerance)
         if (year < y1 || year > y2) continue;
       } else {
-        // Single year in title — must be within ±2 of vehicle year
-        const singleYears = title.match(/\b((?:19|20)\d{2})\b/g);
-        if (singleYears && singleYears.length >= 1) {
-          const partYears = singleYears.map(Number);
-          const closestYear = partYears.reduce((best, py) => Math.abs(py - year) < Math.abs(best - year) ? py : best, partYears[0]);
-          if (Math.abs(year - closestYear) > 1) continue;
+        // Short range at start of title: "05-07 Ford..." or "97-01 Jeep..."
+        const shortRangeMatch = title.match(/^(\d{2})\s*[-–]\s*(\d{2})\b/);
+        if (shortRangeMatch) {
+          let s = parseInt(shortRangeMatch[1]), e = parseInt(shortRangeMatch[2]);
+          s += (s < 50 ? 2000 : 1900);
+          e += (e < 50 ? 2000 : 1900);
+          if (s >= 1980 && s <= 2030 && e >= 1980 && e <= 2030) {
+            const sy1 = Math.min(s, e), sy2 = Math.max(s, e);
+            if (year < sy1 || year > sy2) continue;
+          }
+        } else {
+          // Single 4-digit year in title
+          let yearNums = title.match(/\b((?:19|20)\d{2})\b/g);
+          // Fallback: 2-digit year at start of title ("13 Caravan...")
+          if ((!yearNums || yearNums.length === 0)) {
+            const shortMatch = title.match(/^(\d{2})\b/);
+            if (shortMatch) {
+              let y = parseInt(shortMatch[1]);
+              y += (y < 50 ? 2000 : 1900);
+              if (y >= 1980 && y <= 2030) yearNums = [String(y)];
+            }
+          }
+          if (yearNums && yearNums.length >= 1) {
+            const partYears = yearNums.map(Number);
+            const closestYear = partYears.reduce((best, py) => Math.abs(py - year) < Math.abs(best - year) ? py : best, partYears[0]);
+            if (Math.abs(year - closestYear) > 1) continue;
+          }
+          // No year in title — allow (generic part)
         }
-        // No year in title — allow (generic part)
       }
 
       // Engine displacement check — if both vehicle and part specify displacement, they must match
@@ -510,6 +531,15 @@ class AttackListService {
         const pDispMatch = title.match(/(\d+\.\d)L/);
         if (vDispMatch && pDispMatch && vDispMatch[1] !== pDispMatch[1]) continue;
       }
+
+      // Title-based model sanity check: catch bad Auto table links
+      // If the part title names a DIFFERENT model than the vehicle, skip it
+      const vehicleModelUpper = model.toUpperCase();
+      if (title.includes('CHEROKEE') && !title.includes('GRAND CHEROKEE') && vehicleModelUpper.includes('GRAND CHEROKEE')) continue;
+      if (title.includes('GRAND CHEROKEE') && !vehicleModelUpper.includes('GRAND CHEROKEE') && vehicleModelUpper.includes('CHEROKEE')) continue;
+      if (title.includes('CARAVAN') && !title.includes('GRAND CARAVAN') && vehicleModelUpper.includes('GRAND CARAVAN')) continue;
+      if (title.includes('TRANSIT') && !title.includes('TRANSIT CONNECT') && vehicleModelUpper.includes('TRANSIT CONNECT')) continue;
+      if (title.includes('TRANSIT CONNECT') && !vehicleModelUpper.includes('TRANSIT CONNECT') && vehicleModelUpper.includes('TRANSIT')) continue;
 
       matchedParts.push(item);
     }
