@@ -86,6 +86,10 @@ app.use('/api/parts-lookup', require('./routes/partsLookup'));
 app.use('/restock', require('./routes/restockReport'));
 app.use('/restock-want-list', require('./routes/restock-want-list'));
 app.use('/scout-alerts', require('./routes/scout-alerts'));
+app.use('/opportunities', require('./routes/opportunities'));
+app.get('/admin/opportunities', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'opportunities.html'));
+});
 app.get('/admin/restock', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'restock.html'));
 });

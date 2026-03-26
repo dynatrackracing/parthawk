@@ -1,355 +1,326 @@
 'use strict';
 
-const { log } = require('../lib/logger');
-const SoldItem = require('../models/SoldItem');
-const YourSale = require('../models/YourSale');
-const YourListing = require('../models/YourListing');
-const Item = require('../models/Item');
-const { raw } = require('objection');
-
 /**
- * OpportunityService - Finds high-demand parts you're NOT stocking
- * Based on market demand, your inventory gaps, and competition
+ * OpportunityService — Surfaces parts with strong market demand we don't stock.
+ *
+ * Data sources (no scraping — reads existing caches):
+ *   1. market_demand_cache — eBay sold comps (median price, sold count)
+ *   2. YourListing — current active stock
+ *   3. YourSale — our historical sales (proven seller bonus)
+ *
+ * Scoring (max 110):
+ *   Demand:   max 35pts (eBay sold count)
+ *   Price:    max 25pts (median price tiers)
+ *   Velocity: max 15pts (sales per week)
+ *   History:  20pts if we've sold this before
+ *   Scarcity: max 15pts (niche high-margin parts)
+ *   Floor: median >= $300 + any market signal → minimum 75
+ *
+ * Hard excludes: complete engines, complete transmissions, body panels.
+ * Always allows: modules, sensors, pumps, throttle bodies, amplifiers, etc.
  */
-class OpportunityService {
-  constructor() {
-    this.log = log.child({ class: 'OpportunityService' }, true);
+
+const { database } = require('../database/database');
+const { extractPartNumbers } = require('../utils/partIntelligence');
+
+// ── Hard exclude / allow filters ────────────────────────────────
+
+const ENGINE_ALLOW_WORDS = [
+  'MODULE', 'COMPUTER', 'CONTROL', 'SENSOR', 'MOUNT', 'HARNESS', 'COVER',
+  'VALVE', 'COIL', 'INJECTOR', 'PUMP', 'THROTTLE', 'INTAKE', 'BELT',
+  'PULLEY', 'TENSIONER', 'SOLENOID', 'ALTERNATOR', 'STARTER', 'TURBO',
+];
+
+const TRANS_ALLOW_WORDS = [
+  'MODULE', 'COMPUTER', 'CONTROL', 'SENSOR', 'SOLENOID', 'MOUNT',
+  'HARNESS', 'FILTER', 'COOLER', 'PAN', 'TCM', 'TCU',
+];
+
+const BODY_PANEL_WORDS = [
+  'bumper cover', 'bumper assembly', 'fender', 'hood panel', 'quarter panel',
+  'door shell', 'door assembly', 'bed side', 'radiator support', 'tailgate shell',
+  'trunk lid', 'roof panel', 'rocker panel',
+];
+
+const ALWAYS_ALLOW_TYPES = new Set([
+  'ECM', 'PCM', 'ECU', 'BCM', 'TCM', 'TCU', 'ABS', 'TIPM', 'IPDM',
+  'AMP', 'AMPLIFIER', 'CLUSTER', 'RADIO', 'THROTTLE', 'STEERING',
+  'YAW', 'CAMERA', 'REGULATOR', 'MIRROR', 'BLOWER', 'FAN',
+]);
+
+function shouldExclude(title) {
+  if (!title) return true;
+  const t = title.toUpperCase();
+
+  for (const type of ALWAYS_ALLOW_TYPES) {
+    if (t.includes(type)) return false;
   }
 
-  /**
-   * Get opportunity recommendations
-   * @param {Object} options
-   * @param {number} options.minDemand - Minimum market sales (default: 10)
-   * @param {number} options.maxCompetition - Maximum competitors (default: 10)
-   * @param {number} options.daysBack - Days to look back (default: 30)
-   * @param {number} options.limit - Number of results (default: 50)
-   */
-  async getOpportunities({ minDemand = 10, maxCompetition = 10, daysBack = 30, limit = 50 } = {}) {
-    this.log.info({ minDemand, maxCompetition, daysBack, limit }, 'Getting opportunity recommendations');
+  if (t.includes('ENGINE') && !ENGINE_ALLOW_WORDS.some(w => t.includes(w))) return true;
+  if (t.includes('TRANSMISSION') && !TRANS_ALLOW_WORDS.some(w => t.includes(w))) return true;
 
-    const cutoffDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  const tLower = title.toLowerCase();
+  if (BODY_PANEL_WORDS.some(w => tLower.includes(w))) return true;
 
-    // Get market demand data
-    const marketDemand = await this.getMarketDemand({ cutoffDate });
-
-    // Get your current inventory
-    const yourInventory = await this.getYourInventory();
-
-    // Get your sales history
-    const yourHistory = await this.getYourSalesHistory({ cutoffDate });
-
-    // Get competition data
-    const competition = await this.getCompetitionData();
-
-    // Find opportunities (high demand items you don't have)
-    const opportunities = this.findOpportunities({
-      marketDemand,
-      yourInventory,
-      yourHistory,
-      competition,
-      minDemand,
-      maxCompetition,
-      limit,
-    });
-
-    this.log.info({ opportunityCount: opportunities.length }, 'Found opportunities');
-    return { opportunities };
-  }
-
-  /**
-   * Get market demand from sold items + market_demand_cache for broader coverage.
-   */
-  async getMarketDemand({ cutoffDate }) {
-    // Primary: SoldItem table (competitor research)
-    let soldResults = [];
-    try {
-      soldResults = await SoldItem.query()
-        .select(
-          'categoryId',
-          'categoryTitle',
-          'title',
-          raw('COUNT(*) as "soldCount"'),
-          raw('AVG("soldPrice") as "avgPrice"'),
-          raw('array_agg(DISTINCT compatibility) as "compatibilities"')
-        )
-        .where('soldDate', '>=', cutoffDate)
-        .groupBy('categoryId', 'categoryTitle', 'title')
-        .orderBy('soldCount', 'desc');
-    } catch (e) {
-      this.log.warn({ err: e.message }, 'SoldItem query failed, using cache only');
-    }
-
-    // Supplement with market_demand_cache for parts with high market demand
-    try {
-      const { database } = require('../database/database');
-      const cacheRows = await database('market_demand_cache')
-        .where('ebay_sold_90d', '>=', 5)
-        .orderBy('ebay_sold_90d', 'desc')
-        .limit(200);
-
-      for (const row of cacheRows) {
-        // Only add if not already in soldResults
-        const base = row.part_number_base;
-        const exists = soldResults.some(r =>
-          (r.title || '').toUpperCase().includes(base.toUpperCase()));
-        if (!exists) {
-          soldResults.push({
-            categoryId: null,
-            categoryTitle: null,
-            title: base,
-            soldCount: row.ebay_sold_90d,
-            avgPrice: parseFloat(row.ebay_avg_price) || 0,
-            compatibilities: [],
-          });
-        }
-      }
-    } catch (e) { /* ignore */ }
-
-    return soldResults;
-  }
-
-  /**
-   * Get your current inventory
-   */
-  async getYourInventory() {
-    const results = await YourListing.query()
-      .select('title', 'sku')
-      .where('listingStatus', 'Active');
-
-    const inventorySet = new Set();
-    for (const item of results) {
-      inventorySet.add(this.normalizeTitle(item.title));
-      if (item.sku) {
-        inventorySet.add(item.sku.toLowerCase());
-      }
-    }
-    return inventorySet;
-  }
-
-  /**
-   * Get your sales history
-   */
-  async getYourSalesHistory({ cutoffDate }) {
-    const results = await YourSale.query()
-      .select('title', 'sku')
-      .where('soldDate', '>=', cutoffDate);
-
-    const historySet = new Set();
-    for (const item of results) {
-      historySet.add(this.normalizeTitle(item.title));
-      if (item.sku) {
-        historySet.add(item.sku.toLowerCase());
-      }
-    }
-    return historySet;
-  }
-
-  /**
-   * Get competition data
-   */
-  async getCompetitionData() {
-    const results = await Item.query()
-      .select(
-        'title',
-        raw('COUNT(DISTINCT seller) as "competitorCount"'),
-        raw('AVG(price) as "avgPrice"')
-      )
-      .groupBy('title');
-
-    const competitorMap = {};
-    for (const row of results) {
-      const key = this.normalizeTitle(row.title);
-      competitorMap[key] = {
-        competitorCount: parseInt(row.competitorCount, 10),
-        avgPrice: parseFloat(row.avgPrice),
-      };
-    }
-    return competitorMap;
-  }
-
-  /**
-   * Normalize title for matching
-   */
-  normalizeTitle(title) {
-    if (!title) return '';
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  /**
-   * Check if you have this item in stock
-   */
-  hasInStock(title, yourInventory) {
-    const normalized = this.normalizeTitle(title);
-    if (yourInventory.has(normalized)) return true;
-
-    // Check for partial matches
-    for (const inv of yourInventory) {
-      const words = normalized.split(' ').filter(w => w.length > 3);
-      let matches = 0;
-      for (const word of words) {
-        if (inv.includes(word)) matches++;
-      }
-      if (matches / words.length > 0.7) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Check if you've sold this before
-   */
-  hasSoldBefore(title, yourHistory) {
-    const normalized = this.normalizeTitle(title);
-    if (yourHistory.has(normalized)) return true;
-
-    // Check for partial matches
-    for (const hist of yourHistory) {
-      const words = normalized.split(' ').filter(w => w.length > 3);
-      let matches = 0;
-      for (const word of words) {
-        if (hist.includes(word)) matches++;
-      }
-      if (matches / words.length > 0.5) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Find best matching competition data
-   */
-  findCompetitionMatch(title, competition) {
-    const normalized = this.normalizeTitle(title);
-    const words = normalized.split(' ').filter(w => w.length > 3);
-
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (const [key, data] of Object.entries(competition)) {
-      const keyWords = key.split(' ').filter(w => w.length > 3);
-      let matchCount = 0;
-      for (const word of words) {
-        if (keyWords.includes(word)) matchCount++;
-      }
-      const score = matchCount / Math.max(words.length, keyWords.length);
-      if (score > bestScore && score > 0.3) {
-        bestScore = score;
-        bestMatch = data;
-      }
-    }
-
-    return bestMatch;
-  }
-
-  /**
-   * Extract compatibility info from array
-   */
-  extractCompatibility(compatibilities) {
-    const result = [];
-    if (!compatibilities) return result;
-
-    for (const compat of compatibilities) {
-      if (Array.isArray(compat)) {
-        result.push(...compat);
-      } else if (compat) {
-        result.push(compat);
-      }
-    }
-
-    // Deduplicate
-    const seen = new Set();
-    return result.filter(c => {
-      const key = JSON.stringify(c);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 5); // Limit to 5 compatibility entries
-  }
-
-  /**
-   * Find opportunities
-   */
-  findOpportunities({ marketDemand, yourInventory, yourHistory, competition, minDemand, maxCompetition, limit }) {
-    const opportunities = [];
-
-    for (const demand of marketDemand) {
-      const soldCount = parseInt(demand.soldCount, 10);
-
-      // Skip if below minimum demand
-      if (soldCount < minDemand) continue;
-
-      // Check if you have this in stock
-      const youHaveInStock = this.hasInStock(demand.title, yourInventory);
-
-      // Skip if you already have it
-      if (youHaveInStock) continue;
-
-      // Check if you've sold it before
-      const youHaveSoldBefore = this.hasSoldBefore(demand.title, yourHistory);
-
-      // Get competition data
-      const comp = this.findCompetitionMatch(demand.title, competition);
-      const competitorCount = comp?.competitorCount || 0;
-
-      // Skip if too much competition
-      if (competitorCount > maxCompetition) continue;
-
-      // Calculate opportunity score
-      const demandScore = Math.min(100, (soldCount / 20) * 100); // 20+ sales = 100
-      const priceScore = Math.min(100, (parseFloat(demand.avgPrice) / 300) * 100); // $300+ = 100
-      const competitionScore = Math.max(0, 100 - (competitorCount * 10));
-      const historyBonus = youHaveSoldBefore ? 20 : 0;
-
-      const opportunityScore = Math.round(
-        demandScore * 0.35 +
-        priceScore * 0.25 +
-        competitionScore * 0.25 +
-        historyBonus * 0.15
-      );
-
-      // Extract compatibility
-      const compatibility = this.extractCompatibility(demand.compatibilities);
-
-      // Generate recommendation
-      let recommendation;
-      if (opportunityScore >= 80 && youHaveSoldBefore) {
-        recommendation = 'HIGH PRIORITY - You have sold this before and demand is strong';
-      } else if (opportunityScore >= 70) {
-        recommendation = 'Source this part - high demand, low competition';
-      } else if (opportunityScore >= 50) {
-        recommendation = 'Consider sourcing - moderate opportunity';
-      } else {
-        recommendation = 'Low priority opportunity';
-      }
-
-      opportunities.push({
-        partCategory: demand.categoryTitle || demand.categoryId,
-        title: demand.title,
-        compatibility,
-        marketSalesLast30Days: soldCount,
-        avgSoldPrice: parseFloat(demand.avgPrice)?.toFixed(2),
-        competitorCount,
-        competitorAvgPrice: comp?.avgPrice?.toFixed(2),
-        youHaveInStock,
-        youHaveSoldBefore,
-        opportunityScore,
-        recommendation,
-        breakdown: {
-          demandScore: Math.round(demandScore),
-          priceScore: Math.round(priceScore),
-          competitionScore: Math.round(competitionScore),
-          historyBonus,
-        },
-      });
-    }
-
-    // Sort by opportunity score
-    opportunities.sort((a, b) => b.opportunityScore - a.opportunityScore);
-
-    return opportunities.slice(0, limit);
-  }
+  return false;
 }
 
-module.exports = OpportunityService;
+// ── Part type detection ─────────────────────────────────────────
+
+function detectPartType(title) {
+  const t = (title || '').toUpperCase();
+  if (t.includes('TCM') || t.includes('TCU') || t.includes('TRANSMISSION CONTROL')) return 'TCM';
+  if (t.includes('BCM') || t.includes('BODY CONTROL')) return 'BCM';
+  if (t.includes('ECM') || t.includes('ECU') || t.includes('PCM') || t.includes('ENGINE CONTROL') || t.includes('ENGINE COMPUTER')) return 'ECM';
+  if (t.includes('ABS') || t.includes('ANTI LOCK') || t.includes('ANTI-LOCK') || t.includes('BRAKE MODULE')) return 'ABS';
+  if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX') || t.includes('IPDM')) return 'TIPM';
+  if (t.includes('AMPLIFIER') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE') || t.includes('JBL')) return 'AMP';
+  if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT')) return 'CLUSTER';
+  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO')) return 'RADIO';
+  if (t.includes('THROTTLE')) return 'THROTTLE';
+  if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
+  if (t.includes('YAW RATE')) return 'YAW';
+  if (t.includes('CAMERA')) return 'CAMERA';
+  if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
+  if (t.includes('MIRROR')) return 'MIRROR';
+  if (t.includes('BLOWER')) return 'BLOWER';
+  if (t.includes('ALTERNATOR')) return 'ALTERNATOR';
+  if (t.includes('STARTER')) return 'STARTER';
+  if (t.includes('INTAKE MANIFOLD')) return 'INTAKE';
+  if (t.includes('VALVE COVER')) return 'VALVE COVER';
+  return null;
+}
+
+// ── Parse cache key back into components ────────────────────────
+
+function parseCacheKey(key) {
+  if (key.includes('|')) {
+    const parts = key.split('|');
+    return {
+      type: 'KEYWORD',
+      year: /^\d{4}$/.test(parts[0]) ? parseInt(parts[0]) : null,
+      make: parts.length >= 2 ? parts[1] : null,
+      model: parts.length >= 3 ? parts[2] : null,
+      partType: parts.length >= 4 ? parts[3] : null,
+    };
+  }
+  return { type: 'PN', pn: key, year: null, make: null, model: null, partType: null };
+}
+
+// ── Main opportunity finder ─────────────────────────────────────
+
+async function findOpportunities() {
+  // 1. Load market demand cache
+  const cacheRows = await database('market_demand_cache')
+    .where('ebay_avg_price', '>', 0)
+    .select('part_number_base', 'ebay_avg_price', 'ebay_sold_90d', 'last_updated');
+
+  if (cacheRows.length === 0) return [];
+
+  // 2. Load active stock — index by base PN
+  const listings = await database('YourListing')
+    .where('listingStatus', 'Active')
+    .whereNotNull('title')
+    .select('title', 'quantityAvailable');
+
+  const stockByPN = new Set();
+  for (const listing of listings) {
+    const pns = extractPartNumbers(listing.title || '');
+    for (const pn of pns) {
+      stockByPN.add(pn.base);
+      stockByPN.add(pn.normalized);
+    }
+  }
+
+  // 3. Load our 180d sales history — index by base PN and by keyword combo
+  const salesRows = await database.raw(`
+    SELECT title, COUNT(*) as cnt, ROUND(AVG("salePrice")::numeric, 2) as avg_price,
+           MAX("soldDate") as last_sold
+    FROM "YourSale"
+    WHERE "soldDate" > NOW() - INTERVAL '180 days' AND title IS NOT NULL
+    GROUP BY title
+  `);
+
+  const salesByPN = new Map();
+  const salesByKeyword = new Map(); // "MAKE|MODEL|PARTTYPE" → {count, avgPrice, lastSold}
+
+  for (const row of (salesRows.rows || salesRows)) {
+    const title = row.title || '';
+    const cnt = parseInt(row.cnt) || 0;
+    const price = parseFloat(row.avg_price) || 0;
+
+    const pns = extractPartNumbers(title);
+    for (const pn of pns) {
+      if (!salesByPN.has(pn.base)) {
+        salesByPN.set(pn.base, { count: 0, avgPrice: 0, lastSold: null, sampleTitle: title });
+      }
+      const e = salesByPN.get(pn.base);
+      e.count += cnt;
+      e.avgPrice = price;
+      if (!e.lastSold || new Date(row.last_sold) > new Date(e.lastSold)) e.lastSold = row.last_sold;
+    }
+
+    // Keyword index for make|model|partType matching
+    const partType = detectPartType(title);
+    if (partType) {
+      const titleUpper = title.toUpperCase();
+      // Build a rough keyword key
+      const MAKES = ['FORD','TOYOTA','HONDA','DODGE','JEEP','CHRYSLER','RAM','CHEVROLET','GMC',
+        'NISSAN','BMW','MERCEDES','MAZDA','KIA','HYUNDAI','SUBARU','LEXUS','ACURA','CADILLAC',
+        'BUICK','LINCOLN','VOLVO','AUDI','VOLKSWAGEN','INFINITI','MITSUBISHI','PONTIAC','SATURN',
+        'MERCURY','SCION','MINI','PORSCHE','JAGUAR','LAND ROVER'];
+      let make = null;
+      for (const m of MAKES) { if (titleUpper.includes(m)) { make = m; break; } }
+      if (make) {
+        const kwKey = [make, partType].join('|');
+        if (!salesByKeyword.has(kwKey)) {
+          salesByKeyword.set(kwKey, { count: 0, avgPrice: 0, lastSold: null });
+        }
+        const e = salesByKeyword.get(kwKey);
+        e.count += cnt;
+        e.avgPrice = price;
+        if (!e.lastSold || new Date(row.last_sold) > new Date(e.lastSold)) e.lastSold = row.last_sold;
+      }
+    }
+  }
+
+  // 4. Score each market cache entry
+  const opportunities = [];
+
+  for (const row of cacheRows) {
+    const key = row.part_number_base;
+    const median = parseFloat(row.ebay_avg_price) || 0;
+    const soldCount = parseInt(row.ebay_sold_90d) || 0;
+    const parsed = parseCacheKey(key);
+
+    // Demand threshold
+    if (median >= 150 && soldCount < 1) continue;
+    if (median < 150 && soldCount < 2) continue;
+
+    // Check stock
+    let inStock = false;
+    if (parsed.type === 'PN') {
+      inStock = stockByPN.has(parsed.pn);
+    } else if (parsed.make && parsed.partType) {
+      // For keyword keys, check if we have a listing with this make+model+partType
+      try {
+        let q = database('YourListing').where('listingStatus', 'Active')
+          .where('title', 'ilike', `%${parsed.make}%`);
+        if (parsed.model && parsed.model !== parsed.partType) {
+          q = q.where('title', 'ilike', `%${parsed.model}%`);
+        }
+        const ptKeywords = {
+          'ECM': ['ECM','ECU','PCM'], 'BCM': ['BCM'], 'ABS': ['ABS'],
+          'TIPM': ['TIPM','FUSE','IPDM'], 'TCM': ['TCM','TCU'],
+          'AMP': ['Amplifier','AMP'], 'CLUSTER': ['Cluster','Speedometer'],
+          'RADIO': ['Radio','Stereo'], 'STEERING': ['Steering','EPS'],
+          'MIRROR': ['Mirror'], 'THROTTLE': ['Throttle'],
+        };
+        const kws = ptKeywords[parsed.partType] || [parsed.partType];
+        q = q.where(function() {
+          for (const kw of kws) this.orWhere('title', 'ilike', `%${kw}%`);
+        });
+        const match = await q.first();
+        inStock = !!match;
+      } catch (e) { inStock = false; }
+    }
+
+    if (inStock) continue;
+
+    // Sales history check
+    let soldByUs = null;
+    if (parsed.type === 'PN') {
+      soldByUs = salesByPN.get(parsed.pn) || null;
+    } else if (parsed.make && parsed.partType) {
+      const kwKey = [parsed.make, parsed.partType].join('|');
+      soldByUs = salesByKeyword.get(kwKey) || null;
+    }
+    const historyBonus = !!soldByUs;
+
+    // Build description
+    let description;
+    if (parsed.type === 'KEYWORD') {
+      description = [parsed.year, parsed.make, parsed.model, parsed.partType].filter(Boolean).join(' ');
+    } else {
+      // Try to find a sample title from our sales
+      const saleEntry = salesByPN.get(parsed.pn);
+      if (saleEntry?.sampleTitle) {
+        description = saleEntry.sampleTitle;
+      } else {
+        try {
+          const sample = await database('YourSale').where('title', 'ilike', `%${parsed.pn}%`).first('title');
+          description = sample ? sample.title : `Part Number ${parsed.pn}`;
+        } catch (e) {
+          description = `Part Number ${parsed.pn}`;
+        }
+      }
+    }
+
+    // Hard exclude
+    if (shouldExclude(description)) continue;
+
+    const partType = parsed.partType || detectPartType(description);
+    const velocity = soldCount > 0 ? Math.round((soldCount / 90) * 7 * 10) / 10 : 0;
+
+    // ── SCORING ──
+    let demandScore = 0;
+    if (soldCount >= 50) demandScore = 35;
+    else if (soldCount >= 30) demandScore = 30;
+    else if (soldCount >= 20) demandScore = 25;
+    else if (soldCount >= 10) demandScore = 20;
+    else if (soldCount >= 5) demandScore = 14;
+    else if (soldCount >= 2) demandScore = 8;
+    else if (soldCount >= 1) demandScore = 4;
+
+    let priceScore = 0;
+    if (median >= 400) priceScore = 25;
+    else if (median >= 300) priceScore = 22;
+    else if (median >= 200) priceScore = 18;
+    else if (median >= 150) priceScore = 14;
+    else if (median >= 100) priceScore = 10;
+    else if (median >= 75) priceScore = 6;
+    else if (median >= 50) priceScore = 3;
+
+    let velocityScore = 0;
+    if (velocity >= 5) velocityScore = 15;
+    else if (velocity >= 3) velocityScore = 12;
+    else if (velocity >= 2) velocityScore = 10;
+    else if (velocity >= 1) velocityScore = 7;
+    else if (velocity >= 0.5) velocityScore = 4;
+
+    const historyScore = historyBonus ? 20 : 0;
+
+    let scarcityScore = 0;
+    if (soldCount <= 5 && median >= 200) scarcityScore = 15;
+    else if (soldCount <= 10 && median >= 150) scarcityScore = 10;
+    else if (soldCount <= 20 && median >= 100) scarcityScore = 5;
+
+    let score = demandScore + priceScore + velocityScore + historyScore + scarcityScore;
+
+    if (median >= 300 && soldCount >= 1) score = Math.max(75, score);
+
+    let recommendation;
+    if (score >= 85) recommendation = 'HIGH PRIORITY — strong demand, high margin';
+    else if (score >= 70) recommendation = 'STRONG — proven market, worth hunting';
+    else if (score >= 55) recommendation = 'MODERATE — good opportunity if convenient';
+    else if (score >= 40) recommendation = 'WATCH — market exists, check yard availability';
+    else recommendation = 'LOW — limited data, may be niche';
+
+    opportunities.push({
+      cacheKey: key, description, partType,
+      make: parsed.make, model: parsed.model, year: parsed.year,
+      marketMedian: median, soldCount, velocity, score,
+      demandScore, priceScore, velocityScore, historyScore, scarcityScore,
+      recommendation, inStock: false, soldByUs: historyBonus,
+      lastSoldByUs: soldByUs?.lastSold || null,
+      ourAvgPrice: soldByUs?.avgPrice || null,
+      ourSoldCount: soldByUs?.count || null,
+      lastUpdated: row.last_updated,
+    });
+  }
+
+  opportunities.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
+  return opportunities;
+}
+
+module.exports = { findOpportunities, shouldExclude, parseCacheKey };

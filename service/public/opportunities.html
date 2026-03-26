@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — OPPORTUNITIES</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a;
+    --border: #2a2a2a; --red: #DC2626; --red-dim: #7f1d1d;
+    --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
+    --gray: #9ca3af; --text: #F0F0F0; --text-mid: #d1d5db;
+    --text-muted: #9CA3AF; --text-faint: #6B7280;
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 16px; position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; }
+  .header-left p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+  .sort-bar {
+    display: flex; gap: 6px; padding: 10px 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .sort-btn {
+    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-muted); font-size: 11px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .sort-btn.active { background: #064e3b; color: #22c55e; border-color: #22c55e44; }
+
+  .status-bar {
+    padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;
+  }
+
+  .opp-list { padding: 0; }
+  .opp-card {
+    border-bottom: 1px solid var(--border); background: var(--surface2);
+    padding: 12px 14px; cursor: pointer;
+  }
+  .opp-card:active { background: var(--surface); }
+
+  .opp-top { display: flex; align-items: center; gap: 10px; }
+  .opp-score {
+    width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+  }
+  .opp-score.green { background: #064e3b; color: #22c55e; }
+  .opp-score.yellow { background: #713f12; color: #eab308; }
+  .opp-score.orange { background: #7c2d12; color: #f97316; }
+  .opp-score.gray { background: #1f2937; color: #6B7280; }
+
+  .opp-info { flex: 1; min-width: 0; }
+  .opp-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opp-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .opp-right { text-align: right; flex-shrink: 0; }
+  .opp-price { font-size: 14px; font-weight: 700; color: var(--green); }
+  .opp-sold { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+  .opp-chips { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .chip-type { background: #1e3a5f; color: #60a5fa; }
+  .chip-proven { background: #064e3b; color: #22c55e; }
+  .chip-velocity { background: #713f12; color: #eab308; }
+
+  .opp-expanded { display: none; padding: 10px 0 4px; margin-top: 8px; border-top: 1px solid var(--border); }
+  .opp-expanded.open { display: block; }
+  .opp-detail { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+  .opp-detail strong { color: var(--text-mid); }
+  .opp-rec { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .rec-high { color: #22c55e; }
+  .rec-strong { color: #eab308; }
+  .rec-moderate { color: #f97316; }
+  .rec-low { color: #6B7280; }
+
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-faint); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>OPPORTUNITIES</h1>
+    <p>Market gaps — parts selling on eBay we don't stock</p>
+  </div>
+</header>
+
+<div class="sort-bar">
+  <button class="sort-btn active" data-sort="score">Score</button>
+  <button class="sort-btn" data-sort="price">Price</button>
+  <button class="sort-btn" data-sort="sold">Sold Count</button>
+  <button class="sort-btn" data-sort="velocity">Velocity</button>
+</div>
+
+<div class="status-bar">
+  <span id="statusText">Loading...</span>
+  <span id="statusCount"></span>
+</div>
+
+<div class="opp-list" id="oppList">
+  <div class="loading" id="loadingMsg">Analyzing market gaps...</div>
+</div>
+
+<script>
+let allOpps = [];
+let currentSort = 'score';
+
+async function load() {
+  try {
+    const res = await fetch('/opportunities?sort=' + currentSort);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    allOpps = data.opportunities;
+    document.getElementById('statusText').textContent = data.total + ' opportunities found';
+    document.getElementById('statusCount').textContent = 'Updated ' + new Date(data.generated_at).toLocaleTimeString();
+    render();
+  } catch(e) {
+    document.getElementById('loadingMsg').textContent = 'Error: ' + e.message;
+  }
+}
+
+function scoreColor(score) {
+  if (score >= 80) return 'green';
+  if (score >= 60) return 'yellow';
+  if (score >= 40) return 'orange';
+  return 'gray';
+}
+
+function recClass(score) {
+  if (score >= 85) return 'rec-high';
+  if (score >= 70) return 'rec-strong';
+  if (score >= 55) return 'rec-moderate';
+  return 'rec-low';
+}
+
+function render() {
+  const list = document.getElementById('oppList');
+  if (allOpps.length === 0) {
+    list.innerHTML = '<div class="empty">No opportunities found. Run the nightly price refresh to populate market data.</div>';
+    return;
+  }
+
+  list.innerHTML = allOpps.map((o, i) => {
+    const color = scoreColor(o.score);
+    const chips = [];
+    if (o.partType) chips.push('<span class="chip chip-type">' + o.partType + '</span>');
+    if (o.soldByUs) chips.push('<span class="chip chip-proven">PROVEN SELLER</span>');
+    if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
+
+    const desc = o.description.length > 80 ? o.description.substring(0, 77) + '...' : o.description;
+    const makeModel = [o.make, o.model].filter(Boolean).join(' ');
+
+    return '<div class="opp-card" onclick="toggle(' + i + ')">' +
+      '<div class="opp-top">' +
+        '<div class="opp-score ' + color + '">' + o.score + '</div>' +
+        '<div class="opp-info">' +
+          '<div class="opp-title">' + esc(desc) + '</div>' +
+          '<div class="opp-meta">' +
+            (makeModel ? '<span>' + esc(makeModel) + '</span>' : '') +
+            (o.year ? '<span>' + o.year + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="opp-right">' +
+          '<div class="opp-price">$' + Math.round(o.marketMedian) + '</div>' +
+          '<div class="opp-sold">' + o.soldCount + ' sold</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="opp-chips">' + chips.join('') + '</div>' +
+      '<div class="opp-expanded" id="exp-' + i + '">' +
+        '<div class="opp-detail">' +
+          '<strong>Market median:</strong> $' + o.marketMedian.toFixed(2) + '<br>' +
+          '<strong>eBay sold (90d):</strong> ' + o.soldCount + ' &nbsp; <strong>Velocity:</strong> ' + o.velocity + '/week<br>' +
+          '<strong>Score breakdown:</strong> Demand ' + o.demandScore + ' + Price ' + o.priceScore + ' + Velocity ' + o.velocityScore + ' + History ' + o.historyScore + ' + Scarcity ' + o.scarcityScore + '<br>' +
+          (o.soldByUs ? '<strong>We sold:</strong> ' + o.ourSoldCount + 'x @ $' + (o.ourAvgPrice||0) + ' avg, last ' + (o.lastSoldByUs ? new Date(o.lastSoldByUs).toLocaleDateString() : '?') + '<br>' : '') +
+          '<strong>Cache key:</strong> ' + esc(o.cacheKey) +
+        '</div>' +
+        '<div class="opp-rec ' + recClass(o.score) + '">' + esc(o.recommendation) + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggle(idx) {
+  const el = document.getElementById('exp-' + idx);
+  if (el) el.classList.toggle('open');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Sort buttons
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSort = btn.dataset.sort;
+
+    if (currentSort === 'price') allOpps.sort((a, b) => b.marketMedian - a.marketMedian);
+    else if (currentSort === 'sold') allOpps.sort((a, b) => b.soldCount - a.soldCount);
+    else if (currentSort === 'velocity') allOpps.sort((a, b) => b.velocity - a.velocity);
+    else allOpps.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
+
+    render();
+  });
+});
+
+load();
+</script>
+</body>
+</html>
