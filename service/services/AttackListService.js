@@ -542,17 +542,14 @@ class AttackListService {
     for (const m of allMakes) {
       const exactKey = `${m}|${modelUpper}`;
       if (salesIndex[exactKey]) candidateKeys.add(exactKey);
-      // Word-boundary model match (yard "RAM 1500" ↔ sale "Ram 1500", NOT "Cherokee" ↔ "Grand Cherokee")
-      const modelRe = new RegExp('\\b' + modelUpper.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      // One-directional model match: vehicle model must appear in sale model.
+      // "Grand Cherokee" (vehicle) matches "Grand Cherokee" (sale) — yes.
+      // "Cherokee" (sale) must NOT match "Grand Cherokee" (vehicle) — removed reverse check.
       for (const sKey of Object.keys(salesIndex)) {
         if (!sKey.startsWith(m + '|')) continue;
         const sModel = sKey.split('|')[1];
-        if (sModel) {
-          const sModelNorm = sModel.replace(/[-]/g, ' ');
-          const sModelRe = new RegExp('\\b' + sModelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-          if (modelRe.test(sModelNorm) || sModelRe.test(modelUpper.replace(/[-]/g, ' '))) {
-            candidateKeys.add(sKey);
-          }
+        if (sModel && piModelMatches(sModel, model)) {
+          candidateKeys.add(sKey);
         }
       }
     }
@@ -588,7 +585,13 @@ class AttackListService {
       for (const sale of entry.sales) {
         // Year must fall within the sale's fitment range
         if (sale.yearStart > 0 && sale.yearEnd > 0) {
+          // Has year range — strict check
           if (year < sale.yearStart || year > sale.yearEnd) continue;
+        } else {
+          // No year in sale title — don't let ancient vehicles match modern parts
+          // A 1997 vehicle should not match a yearless sale from 2024
+          const currentYear = new Date().getFullYear();
+          if (year < currentYear - 15) continue;
         }
         // Year matches — count this sale
         salesDemand.count++;
@@ -639,19 +642,16 @@ class AttackListService {
       if (seenTypes.has(partType)) continue;
       seenTypes.add(partType);
 
-      // Stock: check by part numbers extracted from sale titles, not by make alone
+      // Stock: check by part numbers extracted from sale titles using shared partIntelligence
       let ptStock = 0;
-      // Extract part numbers from the sale titles for this part type
       const salePartNums = new Set();
       for (const t of (ptData.titles || [])) {
-        const chrysler = t.match(/\b(\d{8})[A-Z]{2}\b/);
-        if (chrysler) salePartNums.add(chrysler[1]);
-        const toyota = t.match(/\b(\d{5}-[A-Z0-9]{3,5})/);
-        if (toyota) salePartNums.add(toyota[1]);
-        const ford = t.match(/\b([A-Z]{1,4}\d{1,2}[A-Z]-[A-Z0-9]{4,6})/);
-        if (ford) salePartNums.add(ford[1]);
+        const pns = piExtractPNs(t);
+        for (const pn of pns) {
+          salePartNums.add(pn.normalized);
+          if (pn.base !== pn.normalized) salePartNums.add(pn.base);
+        }
       }
-      // Check stock by part number match in stockPartNumbers index
       if (salePartNums.size > 0 && stockPartNumbers) {
         for (const spn of salePartNums) {
           ptStock += stockPartNumbers[spn] || 0;
