@@ -66,6 +66,19 @@ router.post('/session', async (req, res) => {
 });
 
 /**
+ * GET /cogs/yard-profile/:yardId
+ * Get yard profile with COGS reference for the gate negotiation screen
+ */
+router.get('/yard-profile/:yardId', async (req, res) => {
+  try {
+    const profile = await COGSService.getYardProfile(req.params.yardId);
+    res.json({ success: true, ...profile });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /cogs/yards
  * Get all yards with their cost profiles for gate negotiation UI
  */

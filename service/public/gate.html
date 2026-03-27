@@ -2,269 +2,244 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>DarkHawk — NEST PROTECTOR</title>
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk - NEST PROTECTOR</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a;
-    --border: #2a2a2a; --red: #DC2626; --red-dim: #7f1d1d;
-    --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
-    --green-dim: #064e3b; --text: #F0F0F0; --text-mid: #d1d5db;
-    --text-muted: #6b7280;
-  }
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 20px; }
-  header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
-  header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .container { padding: 16px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
-  .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
-  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
-  select, input[type="number"], input[type="text"] {
-    width: 100%; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-size: 15px; margin-bottom: 12px; appearance: none;
-  }
-  select:focus, input:focus { outline: none; border-color: var(--red); }
-  .part-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
-  .part-row .field { flex: 1; }
-  .part-row .field label { margin-bottom: 5px; }
-  .part-row .field input, .part-row .field select { margin-bottom: 0; }
-  .remove-btn { background: var(--red-dim); border: none; color: var(--red); border-radius: 8px; padding: 10px 12px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
-  .add-btn { width: 100%; padding: 10px; background: var(--surface2); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }
-  .calc-btn { width: 100%; padding: 14px; background: var(--red); border: none; border-radius: 10px; color: white; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; }
-  .calc-btn:disabled { opacity: 0.5; }
-  .result-card { display: none; }
-  .result-card.visible { display: block; }
-  .result-hero { text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 12px; }
-  .result-hero.excellent { background: var(--green-dim); }
-  .result-hero.acceptable { background: var(--yellow-dim); }
-  .result-hero.leave { background: var(--red-dim); }
-  .result-hero .max-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .result-hero .max-amount { font-size: 52px; font-weight: 800; letter-spacing: -0.04em; margin: 4px 0; }
-  .result-hero.excellent .max-amount { color: var(--green); }
-  .result-hero.acceptable .max-amount { color: var(--yellow); }
-  .result-hero.leave .max-amount { color: var(--red); }
-  .result-hero .max-sub { font-size: 13px; color: var(--text-muted); }
-  .breakdown-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-  .breakdown-row:last-child { border-bottom: none; }
-  .breakdown-label { color: var(--text-muted); }
-  .breakdown-value { font-weight: 600; }
-  .cogs-bar { height: 8px; background: var(--surface2); border-radius: 4px; margin: 12px 0; overflow: hidden; }
-  .cogs-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-  .cogs-fill.excellent { background: var(--green); }
-  .cogs-fill.acceptable { background: var(--yellow); }
-  .cogs-fill.leave { background: var(--red); }
-  .cogs-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
-  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
-  .spinner.visible { display: block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--rd:#7f1d1d;--y:#eab308;--yd:#713f12;--g:#22c55e;--gd:#064e3b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
+  body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:60px;-webkit-tap-highlight-color:transparent}
+
+  header{background:var(--s);border-bottom:1px solid var(--b);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+  header img{height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))}
+  header h1{font-size:16px;font-weight:900;letter-spacing:2px}
+  header h1 span{color:var(--r)}
+  header p{font-size:10px;color:var(--tf);margin-top:1px}
+
+  .c{padding:12px;max-width:500px;margin:0 auto}
+  .card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
+  .card-title{font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+  label{display:block;font-size:11px;color:var(--tf);margin-bottom:4px}
+  select,input[type="number"]{width:100%;padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:15px;appearance:none}
+  select:focus,input:focus{outline:none;border-color:var(--r)}
+
+  /* Summary hero */
+  .hero{text-align:center;padding:16px 12px;border-radius:10px;margin-bottom:4px}
+  .hero.green{background:var(--gd)} .hero.yellow{background:var(--yd)} .hero.red{background:var(--rd)}
+  .hero .mv{font-size:12px;color:var(--tf);margin-bottom:2px}
+  .hero .mv b{color:var(--tm);font-size:14px}
+  .hero .target-label{font-size:11px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;margin-top:8px}
+  .hero .target-amount{font-size:48px;font-weight:800;letter-spacing:-.04em}
+  .hero.green .target-amount{color:var(--g)} .hero.yellow .target-amount{color:var(--y)} .hero.red .target-amount{color:var(--r)}
+  .hero .ceiling{font-size:13px;color:var(--tf);margin-top:4px}
+  .hero .ceiling b{color:var(--y)}
+  .hero .blended{font-size:12px;margin-top:6px;font-weight:600}
+  .bar{height:6px;background:var(--s2);border-radius:3px;margin:8px 0 4px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:3px;transition:width .3s}
+  .bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--tf)}
+
+  /* Parts list */
+  .part{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .part-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .part-dot.green{background:var(--g)} .part-dot.yellow{background:var(--y)} .part-dot.red{background:var(--r)}
+  .part-info{flex:1;min-width:0}
+  .part-type{font-size:12px;font-weight:600}
+  .part-meta{font-size:10px;color:var(--tf);margin-top:1px}
+  .part-cogs{width:60px;text-align:center;padding:8px 4px;background:var(--bg);border:1px solid var(--b);border-radius:6px;color:var(--t);font-size:15px;font-weight:700;flex-shrink:0}
+  .part-cogs:focus{border-color:var(--r)}
+  .part-pct{font-size:11px;font-weight:700;width:40px;text-align:right;flex-shrink:0}
+  .part-pct.green{color:var(--g)} .part-pct.yellow{color:var(--y)} .part-pct.red{color:var(--r)}
+  .part-rm{width:32px;height:32px;border:1px solid var(--b);border-radius:6px;background:var(--s);color:var(--r);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .add-btn{width:100%;padding:10px;background:var(--s2);border:1px dashed var(--b);border-radius:8px;color:var(--tf);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px}
+
+  /* Breakdown */
+  .brow{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid #1f1f1f}
+  .brow:last-child{border:none}
+  .brow .bl{color:var(--tf)} .brow .bv{font-weight:600}
 </style>
 </head>
 <body>
-<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:10px">
-    <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:55px;background:none !important;border-radius:6px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DarkHawk"></a>
-    <div><span style="font-size:18px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><p style="font-size:11px;color:#6B7280;margin-top:1px">NEST PROTECTOR</p></div>
-  </div>
-</header>
-<nav style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px;">
-  <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">THE NEST</a>
-  <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">DAILY FEED</a>
-  <a href="/admin/vin" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">HAWK EYE</a>
-  <a href="/admin/gate" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;font-weight:700;">NEST PROTECTOR</a>
-  <a href="/admin/restock" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">THE QUARRY</a>
-  <a href="/admin/restock-list" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">SCOUR STREAM</a>
-  <a href="/admin/hunters-perch" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">HUNTERS PERCH</a>
-  <a href="/admin/scout-alerts" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">SCOUT ALERTS</a>
-</nav>
 
-<div class="container">
+<header>
+  <a href="/"><img src="/admin/darkhawk-logo-sm.png" alt="DH"></a>
+  <div><h1>DARK<span>HAWK</span></h1><p>NEST PROTECTOR</p></div>
+</header>
+
+<div class="c">
   <div class="card">
     <div class="card-title">Yard</div>
-    <label>Select yard</label>
-    <select id="yardSelect">
-      <option value="">Loading yards...</option>
-    </select>
+    <select id="yardSel" onchange="onYardChange()"><option value="">Loading...</option></select>
+  </div>
+
+  <div class="card" id="summaryCard" style="display:none">
+    <div class="hero" id="hero">
+      <div class="mv">Total Market Value: <b id="totalMV">$0</b></div>
+      <div class="target-label">Max Parts Spend (Target)</div>
+      <div class="target-amount" id="targetAmt">$0</div>
+      <div class="ceiling">Absolute max: <b id="ceilingAmt">$0</b> (35% ceiling)</div>
+      <div class="blended" id="blendedPct">0% COGS</div>
+    </div>
+    <div class="bar"><div class="bar-fill" id="barFill" style="width:0"></div></div>
+    <div class="bar-labels"><span>0%</span><span style="color:var(--g)">25%</span><span style="color:var(--y)">35%</span><span>100%</span></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Parts You Plan to Pull</div>
+    <div class="card-title">Parts</div>
     <div id="partsList"></div>
     <button class="add-btn" onclick="addPart()">+ Add Part</button>
   </div>
 
-  <button class="calc-btn" onclick="calculate()" id="calcBtn">
-    Calculate Max Spend
-  </button>
-
-  <div class="card result-card" id="resultCard">
-    <div id="marketValueHero" style="text-align:center;padding:10px 0 6px;font-size:13px;color:var(--text-muted);">
-      Total Market Value: <span id="totalMV" style="font-weight:700;color:var(--text);font-size:16px;"></span>
-    </div>
-    <div class="result-hero" id="resultHero">
-      <div class="max-label">Max Parts Spend (Target)</div>
-      <div class="max-amount" id="maxAmount">$0</div>
-      <div class="max-sub" id="maxSub"></div>
-    </div>
-    <div id="ceilingRow" style="text-align:center;padding:8px 0 12px;font-size:14px;color:var(--text-muted);">
-      Absolute max: <span id="ceilingAmount" style="font-weight:700;color:var(--yellow);"></span> <span style="font-size:11px;">(35% ceiling)</span>
-    </div>
-    <div class="cogs-bar"><div class="cogs-fill" id="cogsFill" style="width:0%"></div></div>
-    <div class="cogs-labels"><span>0%</span><span style="color:var(--green)">25%</span><span style="color:var(--yellow)">35%</span><span>100%</span></div>
-    <div id="breakdownRows" style="margin-top:12px;"></div>
+  <div class="card" id="breakdownCard" style="display:none">
+    <div class="card-title">Breakdown</div>
+    <div id="breakdown"></div>
   </div>
 </div>
 
 <script>
-  const PART_TYPES = [
-    { type: 'ECM', label: 'ECM/PCM/ECU', defaultValue: 180 },
-    { type: 'BCM', label: 'BCM', defaultValue: 120 },
-    { type: 'TCM', label: 'TCM/TCU', defaultValue: 130 },
-    { type: 'ABS', label: 'ABS Module', defaultValue: 110 },
-    { type: 'TIPM', label: 'TIPM/Fuse Box', defaultValue: 95 },
-    { type: 'Amplifier', label: 'Amplifier', defaultValue: 85 },
-    { type: 'Cluster', label: 'Cluster', defaultValue: 75 },
-    { type: 'Radio', label: 'Radio', defaultValue: 65 },
-    { type: 'Mirror', label: 'Side Mirror', defaultValue: 55 },
-    { type: 'Other', label: 'Other', defaultValue: 50 },
-  ];
+let yards = [];
+let yardProfile = null;
+let partIdCounter = 0;
 
-  let partCount = 0;
-  let yards = [];
+async function loadYards() {
+  const r = await fetch('/cogs/yards');
+  const d = await r.json();
+  yards = d.yards || [];
+  const sel = document.getElementById('yardSel');
+  sel.innerHTML = '<option value="">Select a yard...</option>' +
+    yards.map(y => '<option value="' + y.id + '">' + y.name + ' (' + y.distance_from_base + 'mi - $' + y.entry_fee + ' gate)</option>').join('');
+}
 
-  async function loadYards() {
-    const res = await fetch('/cogs/yards');
-    const data = await res.json();
-    yards = data.yards || [];
-    const sel = document.getElementById('yardSelect');
-    sel.innerHTML = '<option value="">Select a yard...</option>' +
-      yards.map(y => `<option value="${y.id}">${y.name} (${y.distance_from_base}mi from ${y.region === 'fl' ? 'Tampa' : 'NC'} — $${y.entry_fee} gate)</option>`).join('');
-  }
+async function onYardChange() {
+  const id = document.getElementById('yardSel').value;
+  if (!id) { yardProfile = null; document.getElementById('summaryCard').style.display = 'none'; return; }
 
-  function addPart(type = 'ECM', value = 180) {
-    partCount++;
-    const id = partCount;
-    const div = document.createElement('div');
-    div.className = 'part-row';
-    div.id = 'part-' + id;
-    div.innerHTML = `
-      <div class="field">
-        <label>Part Type</label>
-        <select onchange="updateDefaultValue(${id})">
-          ${PART_TYPES.map(p => `<option value="${p.type}" ${p.type === type ? 'selected' : ''} data-default="${p.defaultValue}">${p.label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field">
-        <label>Est. Value ($)</label>
-        <input type="number" id="val-${id}" value="${value}" min="0" step="5" />
-      </div>
-      <button class="remove-btn" onclick="removePart(${id})">✕</button>`;
-    document.getElementById('partsList').appendChild(div);
-  }
+  const r = await fetch('/cogs/yard-profile/' + id);
+  const d = await r.json();
+  if (!d.success) return;
+  yardProfile = d;
 
-  function updateDefaultValue(id) {
-    const sel = document.querySelector(`#part-${id} select`);
-    const opt = sel.options[sel.selectedIndex];
-    const defVal = opt.getAttribute('data-default');
-    document.getElementById('val-' + id).value = defVal;
-  }
+  document.getElementById('summaryCard').style.display = 'block';
+  document.getElementById('breakdownCard').style.display = 'block';
 
-  function removePart(id) {
-    document.getElementById('part-' + id)?.remove();
-  }
+  // Reset parts with this yard's COGS reference
+  document.getElementById('partsList').innerHTML = '';
+  partIdCounter = 0;
+  addPart('ECM');
+  addPart('BCM');
+}
 
-  async function calculate() {
-    const yardId = document.getElementById('yardSelect').value;
-    if (!yardId) { alert('Select a yard first'); return; }
+function getPartTypes() {
+  if (!yardProfile) return [];
+  return Object.entries(yardProfile.cogsReference).map(([key, val]) => ({
+    type: key, label: val.label, cogs: val.cogs,
+    marketValue: yardProfile.defaultMarketValues[key] || 50,
+  }));
+}
 
-    const parts = [];
-    document.querySelectorAll('.part-row').forEach(row => {
-      const sel = row.querySelector('select');
-      const val = row.querySelector('input[type="number"]');
-      if (sel && val) {
-        parts.push({ partType: sel.value, marketValue: parseFloat(val.value) || 0 });
-      }
-    });
+function addPart(defaultType) {
+  partIdCounter++;
+  const id = partIdCounter;
+  const types = getPartTypes();
+  const selected = defaultType ? types.find(t => t.type === defaultType) : types[0];
+  if (!selected) return;
 
-    if (!parts.length) { alert('Add at least one part'); return; }
+  const div = document.createElement('div');
+  div.className = 'part';
+  div.id = 'p' + id;
+  div.innerHTML =
+    '<div class="part-dot green" id="dot' + id + '"></div>' +
+    '<div class="part-info">' +
+      '<select id="type' + id + '" onchange="onTypeChange(' + id + ')" style="font-size:13px;padding:6px 8px;margin-bottom:2px">' +
+        types.map(t => '<option value="' + t.type + '" ' + (t.type === selected.type ? 'selected' : '') + ' data-cogs="' + t.cogs + '" data-mv="' + t.marketValue + '">' + t.label + '</option>').join('') +
+      '</select>' +
+      '<div class="part-meta">Market: $<span id="mv' + id + '">' + selected.marketValue + '</span></div>' +
+    '</div>' +
+    '<input type="number" class="part-cogs" id="cogs' + id + '" value="' + selected.cogs + '" min="0" step="1" oninput="recalc()" />' +
+    '<div class="part-pct green" id="pct' + id + '">0%</div>' +
+    '<button class="part-rm" onclick="rmPart(' + id + ')">x</button>';
 
-    const btn = document.getElementById('calcBtn');
-    btn.disabled = true;
-    btn.textContent = 'Calculating...';
+  document.getElementById('partsList').appendChild(div);
+  recalc();
+}
 
-    try {
-      const res = await fetch('/cogs/gate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yardId, parts }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      renderResult(data);
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+function onTypeChange(id) {
+  const sel = document.getElementById('type' + id);
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('cogs' + id).value = opt.dataset.cogs;
+  document.getElementById('mv' + id).textContent = opt.dataset.mv;
+  recalc();
+}
 
-    btn.disabled = false;
-    btn.textContent = 'Calculate Max Spend';
-  }
+function rmPart(id) {
+  document.getElementById('p' + id)?.remove();
+  recalc();
+}
 
-  function renderResult(data) {
-    const card = document.getElementById('resultCard');
-    const hero = document.getElementById('resultHero');
-    const maxAmount = document.getElementById('maxAmount');
-    const maxSub = document.getElementById('maxSub');
-    const cogsFill = document.getElementById('cogsFill');
-    const breakdown = document.getElementById('breakdownRows');
+function recalc() {
+  if (!yardProfile) return;
 
-    card.classList.add('visible');
+  let totalMV = 0, totalCogs = 0;
+  const parts = document.querySelectorAll('[id^="p"]');
 
-    // Status: excellent (green <25%), acceptable (yellow 25-35%), leave (red >35% or negative)
-    hero.className = 'result-hero ' + data.status;
-    cogsFill.className = 'cogs-fill ' + data.status;
+  parts.forEach(p => {
+    const id = p.id.replace('p', '');
+    const mvEl = document.getElementById('mv' + id);
+    const cogsEl = document.getElementById('cogs' + id);
+    const pctEl = document.getElementById('pct' + id);
+    const dotEl = document.getElementById('dot' + id);
+    if (!mvEl || !cogsEl) return;
 
-    // Total market value at top
-    document.getElementById('totalMV').textContent = '$' + data.totalMarketValue;
+    const mv = parseFloat(mvEl.textContent) || 0;
+    const cogs = parseFloat(cogsEl.value) || 0;
+    totalMV += mv;
+    totalCogs += cogs;
 
-    // Target (big number)
-    maxAmount.textContent = data.status === 'leave' ? 'SKIP' : '$' + data.maxPartSpend;
-    maxSub.textContent = data.status === 'leave' ? 'Overhead exceeds budget' : 'Aim for this price (25% COGS)';
+    // Per-part COGS %
+    const pct = mv > 0 ? (cogs / mv) * 100 : 0;
+    pctEl.textContent = Math.round(pct) + '%';
+    const color = pct <= 25 ? 'green' : pct <= 35 ? 'yellow' : 'red';
+    pctEl.className = 'part-pct ' + color;
+    dotEl.className = 'part-dot ' + color;
+  });
 
-    // 35% ceiling (smaller, below)
-    document.getElementById('ceilingAmount').textContent = '$' + data.ceilingPartSpend;
+  const overhead = yardProfile.fixedOverhead;
+  const currentTotal = totalCogs + overhead;
+  const blended = totalMV > 0 ? (currentTotal / totalMV) * 100 : 0;
+  const target = Math.max(0, Math.round(totalMV * 0.30 - overhead));
+  const ceiling = Math.max(0, Math.round(totalMV * 0.35 - overhead));
 
-    // COGS bar — fill to where the target sits relative to total value
-    const targetPct = data.totalMarketValue > 0 ? Math.min(100, ((data.maxPartSpend + data.fixedOverhead) / data.totalMarketValue) * 100) : 0;
-    cogsFill.style.width = targetPct + '%';
+  // Color
+  const color = blended <= 25 ? 'green' : blended <= 35 ? 'yellow' : 'red';
 
-    // Breakdown
-    const cogsColor = data.blendedCogs <= 25 ? '#22c55e' : data.blendedCogs <= 35 ? '#eab308' : '#ef4444';
-    breakdown.innerHTML = `
-      <div class="breakdown-row"><span class="breakdown-label">Gate fee</span><span class="breakdown-value">$${data.entryFee}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Mileage (${data.yardName})</span><span class="breakdown-value">$${data.mileageCost}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Fixed overhead</span><span class="breakdown-value">$${data.fixedOverhead}</span></div>
-      <div class="breakdown-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
-        <span class="breakdown-label" style="font-weight:600;">Target spend (25%)</span>
-        <span class="breakdown-value" style="color:#22c55e;">$${data.maxPartSpend}</span>
-      </div>
-      <div class="breakdown-row">
-        <span class="breakdown-label" style="font-weight:600;">Absolute max (35%)</span>
-        <span class="breakdown-value" style="color:#eab308;">$${data.ceilingPartSpend}</span>
-      </div>
-      <div class="breakdown-row">
-        <span class="breakdown-label">Blended COGS at target</span>
-        <span class="breakdown-value" style="color:${cogsColor};">${data.blendedCogs}%</span>
-      </div>`;
+  // Hero
+  document.getElementById('totalMV').textContent = '$' + Math.round(totalMV);
+  document.getElementById('targetAmt').textContent = ceiling <= 0 ? 'SKIP' : '$' + target;
+  document.getElementById('ceilingAmt').textContent = '$' + ceiling;
+  document.getElementById('blendedPct').textContent = blended.toFixed(1) + '% COGS';
+  document.getElementById('blendedPct').style.color = color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)';
 
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  const hero = document.getElementById('hero');
+  hero.className = 'hero ' + color;
 
-  // Init
-  loadYards();
-  addPart('ECM', 180);
-  addPart('BCM', 120);
+  // Bar
+  const barPct = Math.min(100, blended);
+  const fill = document.getElementById('barFill');
+  fill.style.width = barPct + '%';
+  fill.style.background = color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)';
+
+  // Breakdown
+  document.getElementById('breakdown').innerHTML =
+    '<div class="brow"><span class="bl">Gate fee</span><span class="bv">$' + yardProfile.entryFee + '</span></div>' +
+    '<div class="brow"><span class="bl">Mileage (' + yardProfile.name + ')</span><span class="bv">$' + yardProfile.mileageCost + '</span></div>' +
+    '<div class="brow"><span class="bl">Fixed overhead</span><span class="bv">$' + overhead + '</span></div>' +
+    '<div class="brow"><span class="bl">Current parts total</span><span class="bv">$' + Math.round(totalCogs) + '</span></div>' +
+    '<div class="brow" style="border-top:1px solid var(--b);padding-top:8px;margin-top:2px"><span class="bl" style="font-weight:600">Target (30%)</span><span class="bv" style="color:var(--g)">$' + target + '</span></div>' +
+    '<div class="brow"><span class="bl" style="font-weight:600">Absolute max (35%)</span><span class="bv" style="color:var(--y)">$' + ceiling + '</span></div>' +
+    '<div class="brow"><span class="bl" style="font-weight:600">Blended COGS</span><span class="bv" style="color:' + (color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)') + '">' + blended.toFixed(1) + '%</span></div>';
+}
+
+loadYards();
 </script>
 </body>
 </html>
