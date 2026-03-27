@@ -152,6 +152,12 @@ class SoldItemsManager {
             return;
           }
 
+          // Price floor: skip items under $100
+          const price = parseFloat(item.soldPrice) || 0;
+          if (price < 100) {
+            return;
+          }
+
           const toInsert = {
             id: uuidv4(),
             ebayItemId: item.ebayItemId,
@@ -301,6 +307,12 @@ class SoldItemsManager {
           if (!item.ebayItemId) {
             this.log.warn({ item }, 'Skipping item without ebayItemId');
             errors++;
+            return;
+          }
+
+          // Price floor: skip items under $100
+          const price = parseFloat(item.soldPrice) || 0;
+          if (price < 100) {
             return;
           }
 

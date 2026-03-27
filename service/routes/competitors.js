@@ -191,6 +191,35 @@ function matchesAny(key, titleSet) {
 }
 
 /**
+ * POST /competitors/cleanup
+ * Purge sold data older than 90 days for all sellers EXCEPT importapart and pro-rebuild.
+ * These two are permanent fixtures - their data is never purged.
+ */
+router.post('/cleanup', async (req, res) => {
+  const protectedSellers = ['importapart', 'pro-rebuild'];
+  const retentionDays = parseInt(req.query.days) || 90;
+
+  try {
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+
+    const result = await database('SoldItem')
+      .where('soldDate', '<', cutoff)
+      .whereNotIn('seller', protectedSellers)
+      .del();
+
+    res.json({
+      success: true,
+      purged: result,
+      retentionDays,
+      protectedSellers,
+      cutoffDate: cutoff.toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /competitors/seed-defaults
  * Add default competitors if not already tracked.
  */
