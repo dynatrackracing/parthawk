@@ -161,6 +161,7 @@ router.get('/gap-intel', async (req, res) => {
         score,
         ebayItemId: group.ebayItemId,
         partNumber: partNumber,
+        partType: extractPartType(group.title),
         confluence: isConfluence,
         sellerCount: sellerCount,
       });
@@ -253,7 +254,7 @@ router.get('/emerging', async (req, res) => {
       if (!signal) continue;
 
       emerging.push({
-        title: group.title, partNumber, signal, signalStrength: Math.round(signalStrength),
+        title: group.title, partNumber, partType: extractPartType(group.title), signal, signalStrength: Math.round(signalStrength),
         sellers: Array.from(group.sellers), totalCount: group.totalCount, recentCount: group.recentCount,
         olderCount: group.olderCount, medianPrice: Math.round(median),
         totalRevenue: Math.round(group.prices.reduce(function(a, b) { return a + b; }, 0)),
@@ -282,17 +283,22 @@ function normalizeTitle(title) {
     .replace(/[^A-Z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .substring(0, 50);
+    .substring(0, 65);
 }
+
+// Critical auto parts keywords that must never be filtered out
+var KEEP_WORDS = new Set(['ECU','ECM','BCM','TCM','ABS','AMP','PCM','SRS','MAF','EPS','OEM','TIPM','HVAC','BCM','LED','A/C','AC']);
 
 // Helper: check if a normalized key matches any title in a set (fuzzy - 70% word overlap)
 function matchesAny(key, titleSet) {
   if (titleSet.has(key)) return true;
-  const words = key.split(' ').filter(w => w.length > 3);
+  var words = key.split(' ').filter(function(w) {
+    return w.length > 3 || KEEP_WORDS.has(w);
+  });
   if (words.length === 0) return false;
-  for (const t of titleSet) {
-    let matches = 0;
-    for (const w of words) {
+  for (var t of titleSet) {
+    var matches = 0;
+    for (var w of words) {
       if (t.includes(w)) matches++;
     }
     if (matches / words.length >= 0.7) return true;
@@ -321,6 +327,38 @@ function extractPartNumber(title) {
       if (/^(19|20)\d{2}$/.test(candidate)) continue; // skip years
       if (/^\d{1,3},?\d{3}$/.test(candidate)) continue; // skip mileage
       return candidate.toUpperCase();
+    }
+  }
+  return null;
+}
+
+var PART_TYPES = [
+  { keywords: ['ECU', 'ECM', 'PCM', 'ENGINE CONTROL', 'ENGINE COMPUTER'], type: 'ECM' },
+  { keywords: ['BCM', 'BODY CONTROL'], type: 'BCM' },
+  { keywords: ['TCM', 'TRANSMISSION CONTROL', 'TRANS CONTROL'], type: 'TCM' },
+  { keywords: ['ABS', 'ANTI LOCK', 'ANTILOCK', 'BRAKE PUMP', 'BRAKE MODULE'], type: 'ABS' },
+  { keywords: ['TIPM', 'TOTALLY INTEGRATED', 'POWER MODULE'], type: 'TIPM' },
+  { keywords: ['FUSE BOX', 'FUSE RELAY', 'JUNCTION BOX', 'RELAY BOX'], type: 'FUSE BOX' },
+  { keywords: ['AMPLIFIER', 'AMP ', 'AUDIO AMP', 'BOSE', 'BANG', 'HARMAN', 'JBL', 'ALPINE', 'INFINITY'], type: 'AMP' },
+  { keywords: ['RADIO', 'STEREO', 'HEAD UNIT', 'INFOTAINMENT', 'NAVIGATION'], type: 'RADIO' },
+  { keywords: ['CLUSTER', 'INSTRUMENT CLUSTER', 'SPEEDOMETER', 'GAUGE'], type: 'CLUSTER' },
+  { keywords: ['THROTTLE BODY', 'THROTTLE ASSY'], type: 'THROTTLE' },
+  { keywords: ['HVAC', 'CLIMATE CONTROL', 'A/C CONTROL', 'HEATER CONTROL'], type: 'HVAC' },
+  { keywords: ['AIRBAG', 'AIR BAG', 'SRS', 'RESTRAINT'], type: 'AIRBAG' },
+  { keywords: ['STEERING MODULE', 'STEERING CONTROL', 'EPS', 'POWER STEERING CONTROL'], type: 'STEERING' },
+  { keywords: ['CAMERA', 'BACKUP CAM', 'REAR VIEW', 'SURROUND VIEW'], type: 'CAMERA' },
+  { keywords: ['BLIND SPOT', 'LANE ASSIST', 'LANE DEPARTURE'], type: 'SENSOR' },
+  { keywords: ['LIFTGATE', 'LIFT GATE', 'TAILGATE MODULE'], type: 'LIFTGATE' },
+  { keywords: ['PARKING SENSOR', 'PARK ASSIST', 'PDC'], type: 'SENSOR' },
+  { keywords: ['TRANSFER CASE MODULE', 'TRANSFER CASE CONTROL'], type: 'XFER' },
+];
+
+function extractPartType(title) {
+  if (!title) return null;
+  var upper = title.toUpperCase();
+  for (var i = 0; i < PART_TYPES.length; i++) {
+    for (var j = 0; j < PART_TYPES[i].keywords.length; j++) {
+      if (upper.includes(PART_TYPES[i].keywords[j])) return PART_TYPES[i].type;
     }
   }
   return null;
@@ -386,22 +424,22 @@ router.post('/seed-defaults', async (req, res) => {
  * Query: deleteData=true to also remove their SoldItem records
  */
 router.delete('/:sellerId', async (req, res) => {
-  const { sellerId } = req.params;
+  const sellerName = req.params.sellerId.toLowerCase().trim();
   const deleteData = req.query.deleteData === 'true';
 
   try {
     // Remove from SoldItemSeller
-    const deleted = await database('SoldItemSeller').where('name', sellerId).del();
+    const deleted = await database('SoldItemSeller').where('name', sellerName).del();
 
     let itemsDeleted = 0;
     if (deleteData) {
-      const result = await database('SoldItem').where('seller', sellerId).del();
+      const result = await database('SoldItem').where('seller', sellerName).del();
       itemsDeleted = result;
     }
 
     res.json({
       success: true,
-      seller: sellerId,
+      seller: sellerName,
       removed: deleted > 0,
       itemsDeleted,
     });
@@ -415,31 +453,31 @@ router.delete('/:sellerId', async (req, res) => {
  * Trigger scrape for a specific competitor seller. Runs in background.
  */
 router.post('/:sellerId/scrape', async (req, res) => {
-  const { sellerId } = req.params;
+  const sellerName = req.params.sellerId.toLowerCase().trim();
   const { pages = 3 } = req.query;
 
   // Auto-add seller to SoldItemSeller if not exists
   try {
-    const exists = await database('SoldItemSeller').where('name', sellerId).first();
+    const exists = await database('SoldItemSeller').where('name', sellerName).first();
     if (!exists) {
-      await database('SoldItemSeller').insert({ name: sellerId, enabled: true, itemsScraped: 0, createdAt: new Date(), updatedAt: new Date() });
+      await database('SoldItemSeller').insert({ name: sellerName, enabled: true, itemsScraped: 0, createdAt: new Date(), updatedAt: new Date() });
     }
   } catch (e) { /* ignore duplicate */ }
 
-  res.json({ started: true, seller: sellerId, maxPages: parseInt(pages) });
+  res.json({ started: true, seller: sellerName, maxPages: parseInt(pages) });
 
   // Run in background
   try {
     const manager = new SoldItemsManager();
     const result = await manager.scrapeCompetitor({
-      seller: sellerId,
+      seller: sellerName,
       categoryId: '6030',
       maxPages: parseInt(pages),
       useScraper: false,
     });
-    log.info({ seller: sellerId, result }, 'Manual competitor scrape complete');
+    log.info({ seller: sellerName, result }, 'Manual competitor scrape complete');
   } catch (err) {
-    log.error({ err: err.message, seller: sellerId }, 'Manual competitor scrape failed');
+    log.error({ err: err.message, seller: sellerName }, 'Manual competitor scrape failed');
   }
 });
 
@@ -462,7 +500,7 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
     // Group by approximate title (first 40 chars) to find repeated sellers
     const groups = {};
     for (const item of items) {
-      const key = (item.title || '').substring(0, 40).toUpperCase().trim();
+      const key = normalizeTitle(item.title);
       if (!groups[key]) {
         groups[key] = { title: item.title, count: 0, totalRevenue: 0, prices: [], lastSold: null, pn: item.manufacturerPartNumber, ebayItemId: item.ebayItemId };
       }

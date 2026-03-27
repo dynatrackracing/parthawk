@@ -98,12 +98,13 @@ function loadEmerging() {
       d.emerging.forEach(function(item) {
         var signalBadge = item.signal === 'NEW' ? '<span class="badge" style="background:#1e3a5f;color:#3b82f6">NEW</span> ' : '<span class="badge" style="background:#422006;color:#f59e0b">ACCEL ' + item.recentCount + 'x</span> ';
         var pn = item.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partNumber) + '</span>' : '';
+        var ptBadge = item.partType ? '<span style="font-size:9px;font-weight:700;color:#a78bfa;background:#2e1065;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partType) + '</span>' : '';
         var sellerList = item.sellers.slice(0, 3).join(', ');
         var searchUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent((item.title || '').substring(0, 60)) + '&_sacat=6030&LH_Sold=1&LH_Complete=1';
         h += '<div class="item-row" style="align-items:center">';
         h += '<div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:800;color:#f59e0b;background:#422006;border-radius:6px;padding:4px 6px">' + item.signalStrength + '</div></div>';
         h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + signalBadge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(item.title || '') + '</a></div>';
-        h += '<div class="item-meta">' + pn + item.totalCount + 'x sold by ' + esc(sellerList) + ' · $' + item.medianPrice + ' median · $' + item.totalRevenue.toLocaleString() + ' rev</div></div>';
+        h += '<div class="item-meta">' + ptBadge + pn + item.totalCount + 'x sold by ' + esc(sellerList) + ' · $' + item.medianPrice + ' median · $' + item.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div class="item-price">$' + item.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
         h += '</div>';
       });
@@ -143,11 +144,12 @@ function loadGapIntel() {
         var sellerList = gap.sellers.slice(0, 4).join(', ');
         var searchUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent((gap.title || '').substring(0, 60)) + '&_sacat=6030&LH_Sold=1&LH_Complete=1';
         var pn = gap.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(gap.partNumber) + '</span>' : '';
+        var ptBadge = gap.partType ? '<span style="font-size:9px;font-weight:700;color:#a78bfa;background:#2e1065;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(gap.partType) + '</span>' : '';
 
         h += '<div class="item-row" style="align-items:center' + (gap.confluence ? ';border-left:3px solid #3b82f6' : '') + '">';
         h += '<div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:800;color:' + scoreColor + ';background:' + scoreBg + ';border-radius:6px;padding:4px 6px;font-variant-numeric:tabular-nums">' + gap.score + '</div></div>';
         h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + confluenceBadge + badge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(gap.title || '') + '</a></div>';
-        h += '<div class="item-meta">' + pn + gap.soldCount + 'x sold by ' + esc(sellerList) + ' · $' + gap.medianPrice + ' median · $' + gap.totalRevenue.toLocaleString() + ' rev</div></div>';
+        h += '<div class="item-meta">' + ptBadge + pn + gap.soldCount + 'x sold by ' + esc(sellerList) + ' · $' + gap.medianPrice + ' median · $' + gap.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div class="item-price">$' + gap.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
         h += '</div>';
       });
@@ -186,7 +188,14 @@ function renderSellers() {
     h += '<div class="seller-card" id="seller-' + esc(s.name) + '">';
     h += '<div class="seller-header" onclick="toggleSeller(\'' + esc(s.name) + '\')">';
     h += '<div><div class="seller-name">' + esc(s.name) + '</div>';
-    h += '<div class="seller-stats">' + (s.soldItemCount || 0) + ' items tracked';
+    var healthColor = '#6B7280';
+    if (s.lastScrapedAt) {
+      var hoursAgo = Math.floor((Date.now() - new Date(s.lastScrapedAt).getTime()) / 3600000);
+      if (hoursAgo > 48) healthColor = '#dc2626';
+      else if (hoursAgo > 24) healthColor = '#eab308';
+      else healthColor = '#22c55e';
+    }
+    h += '<div class="seller-stats"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + healthColor + ';margin-right:4px"></span>' + (s.soldItemCount || 0) + ' items tracked';
     if (s.lastScrapedAt) {
       var d = Math.floor((Date.now() - new Date(s.lastScrapedAt).getTime()) / 3600000);
       h += ' · scraped ' + (d < 1 ? 'just now' : d < 24 ? d + 'h ago' : Math.floor(d/24) + 'd ago');
