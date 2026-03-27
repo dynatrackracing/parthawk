@@ -130,12 +130,22 @@ router.get('/gap-intel', async (req, res) => {
       // Extract part number from title - common OEM patterns
       const partNumber = extractPartNumber(group.title);
 
-      // Score: volume 35%, price 30%, seller breadth 15%, part number bonus 20%
+      const sellerCount = group.sellers.size;
+      const isConfluence = sellerCount >= 2;
       const volumeScore = Math.min(100, (group.count / 30) * 100);
       const priceScore = Math.min(100, (median / 500) * 100);
-      const sellerScore = Math.min(100, (group.sellers.size / 3) * 100);
       const partNumberScore = partNumber ? 100 : 0;
-      const score = Math.round(volumeScore * 0.35 + priceScore * 0.30 + sellerScore * 0.15 + partNumberScore * 0.20);
+      // Confluence reshapes the weights - multi-seller validation is the strongest signal
+      let score;
+      if (isConfluence) {
+        const confluenceScore = Math.min(100, (sellerCount / 4) * 100); // 2=50, 3=75, 4+=100
+        score = Math.round(confluenceScore * 0.30 + volumeScore * 0.25 + priceScore * 0.25 + partNumberScore * 0.20);
+        // Confluence floor: never below 60 if 2+ sellers agree
+        score = Math.max(60, score);
+      } else {
+        const sellerScore = Math.min(100, (sellerCount / 3) * 100);
+        score = Math.round(volumeScore * 0.35 + priceScore * 0.30 + sellerScore * 0.15 + partNumberScore * 0.20);
+      }
 
       gaps.push({
         title: group.title,
@@ -151,6 +161,8 @@ router.get('/gap-intel', async (req, res) => {
         score,
         ebayItemId: group.ebayItemId,
         partNumber: partNumber,
+        confluence: isConfluence,
+        sellerCount: sellerCount,
       });
     }
 
