@@ -217,6 +217,7 @@ class AttackListService {
             p.marketMedian = cached.median;
             p.marketCount = cached.count;
             p.marketVelocity = cached.velocity;
+            p.marketCheckedAt = cached.checkedAt;
           }
         }
       }

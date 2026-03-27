@@ -574,21 +574,40 @@
       </div>`;
     }
 
+    // Sort parts: fresh market data + high price on top, no data on bottom
+    parts.sort((a, b) => {
+      // Freshness rank: 1=fresh ✅, 2=stale ⚠️, 3=old ❌, 4=none ❓
+      const fA = a.marketCheckedAt ? (Math.floor((Date.now() - new Date(a.marketCheckedAt).getTime()) / 86400000) <= 60 ? 1 : 2) : (a.marketMedian > 0 ? 1 : 4);
+      const fB = b.marketCheckedAt ? (Math.floor((Date.now() - new Date(b.marketCheckedAt).getTime()) / 86400000) <= 60 ? 1 : 2) : (b.marketMedian > 0 ? 1 : 4);
+      if (fA !== fB) return fA - fB;
+      // Then by display price descending
+      const pA = (a.marketMedian > 0 ? a.marketMedian : a.price) || 0;
+      const pB = (b.marketMedian > 0 ? b.marketMedian : b.price) || 0;
+      return pB - pA;
+    });
+
     // Pullable parts
     for (const p of parts) {
       if (!p) continue;
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
-      const vc = p.verdict === 'GREAT' ? 'verdict-great' : p.verdict === 'GOOD' ? 'verdict-good' : p.verdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
-      const price = p.price != null ? p.price : 0;
+      // Use market median for badge when available, fall back to our historical avg
+      const displayPrice = (p.marketMedian > 0) ? p.marketMedian : (p.price != null ? p.price : 0);
+      const badgeVerdict = displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
+      const vc = badgeVerdict === 'GREAT' ? 'verdict-great' : badgeVerdict === 'GOOD' ? 'verdict-good' : badgeVerdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
+      const price = displayPrice;
       const inStock = p.in_stock != null ? p.in_stock : 0;
       const sold90d = p.sold_90d != null ? p.sold_90d : 0;
-      // Price freshness indicator
+      // Price freshness indicator — based on market_demand_cache.last_updated, NOT lastSoldDate
       let freshness = '❓';
-      if (p.lastSoldDate) {
-        const daysAgo = Math.floor((Date.now() - new Date(p.lastSoldDate).getTime()) / 86400000);
-        if (daysAgo <= 60) freshness = '✅';
-        else if (daysAgo <= 90) freshness = '⚠️';
-        else freshness = '❌';
+      let freshnessRank = 4; // for sorting: 1=fresh, 2=stale, 3=old, 4=none
+      if (p.marketCheckedAt) {
+        const daysAgo = Math.floor((Date.now() - new Date(p.marketCheckedAt).getTime()) / 86400000);
+        if (daysAgo <= 60) { freshness = '✅'; freshnessRank = 1; }
+        else if (daysAgo <= 90) { freshness = '⚠️'; freshnessRank = 2; }
+        else { freshness = '❌'; freshnessRank = 3; }
+      } else if (p.marketMedian > 0) {
+        // Has market data but no checkedAt — treat as fresh (from current enrichment)
+        freshness = '✅'; freshnessRank = 1;
       }
       html += `<div class="part-detail" id="pd-${v.id}-${pid}">
         <div class="pd-header">

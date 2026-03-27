@@ -115,6 +115,7 @@ router.get('/vehicle/:id/parts', async (req, res) => {
           p.marketMedian = cached.median;
           p.marketCount = cached.count;
           p.marketVelocity = cached.velocity;
+          p.marketCheckedAt = cached.checkedAt;
           marketHits++;
         } else {
           marketMisses++;

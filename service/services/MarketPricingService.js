@@ -23,7 +23,7 @@ try {
   log.info('[MarketPricing] PriceCheckService V1 (Playwright) not available, V2-only mode');
 }
 
-const CACHE_TTL_HOURS = 72; // 3 days — market data doesn't change that fast
+const CACHE_TTL_HOURS = 2160; // 90 days — Apify/drip data is valid for a full cycle
 
 /**
  * Build optimal search query for a part.
