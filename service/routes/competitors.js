@@ -404,7 +404,7 @@ router.delete('/:sellerId', async (req, res) => {
  */
 router.post('/:sellerId/scrape', async (req, res) => {
   const { sellerId } = req.params;
-  const { pages = 5 } = req.query;
+  const { pages = 3 } = req.query;
 
   // Auto-add seller to SoldItemSeller if not exists
   try {
