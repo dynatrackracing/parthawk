@@ -255,8 +255,14 @@ async function main() {
 
   for (const loc of LOCATIONS) {
     console.log(`\n━━━ ${loc.name} ━━━`);
-    const vehicles = await scrapePages(loc.slug);
-    if (vehicles.length > 0) await saveYard(loc, vehicles);
+    try {
+      const vehicles = await scrapePages(loc.slug);
+      if (vehicles.length > 0) await saveYard(loc, vehicles);
+      else console.log('  0 vehicles found — site may be down or blocked');
+    } catch (e) {
+      console.error(`  YARD ERROR [${loc.name}]: ${e.message.substring(0, 100)}`);
+      // Continue to next yard — don't kill the whole run
+    }
   }
 
   await decodeVins();
