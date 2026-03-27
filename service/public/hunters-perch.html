@@ -121,7 +121,6 @@ function load() {
       document.getElementById('loading').style.display = 'none';
       if (!d.success || !d.sellers) { document.getElementById('sellers').innerHTML = '<div class="empty">Could not load sellers</div>'; return; }
       sellersData = d.sellers;
-      document.getElementById('sellerCount').textContent = '(' + d.sellers.length + ' sellers)';
       renderSellers();
     })
     .catch(function(err) {
