@@ -53,6 +53,144 @@ router.post('/alerts/:id/dismiss', async (req, res) => {
 });
 
 /**
+ * GET /competitors/gap-intel
+ * Gap intelligence: parts competitors sell that we have never sold or stocked.
+ * Scored by competitor revenue volume and median price.
+ * Query: days (default 90), limit (default 50)
+ */
+router.get('/gap-intel', async (req, res) => {
+  const days = parseInt(req.query.days) || 90;
+  const limit = parseInt(req.query.limit) || 50;
+
+  try {
+    // Get all competitor sold items grouped by normalized title (first 50 chars uppercase)
+    const competitorItems = await database('SoldItem')
+      .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${days} days'`))
+      .whereNot('seller', 'dynatrack')
+      .whereNot('seller', 'dynatrackracing')
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId', 'condition');
+
+    // Group competitor items by normalized title
+    const compGroups = {};
+    for (const item of competitorItems) {
+      const key = normalizeTitle(item.title);
+      if (!key || key.length < 10) continue;
+      if (!compGroups[key]) {
+        compGroups[key] = {
+          title: item.title,
+          sellers: new Set(),
+          count: 0,
+          totalRevenue: 0,
+          prices: [],
+          lastSold: null,
+          ebayItemId: item.ebayItemId,
+        };
+      }
+      const g = compGroups[key];
+      g.sellers.add(item.seller);
+      g.count++;
+      g.totalRevenue += parseFloat(item.soldPrice) || 0;
+      g.prices.push(parseFloat(item.soldPrice) || 0);
+      if (!g.lastSold || new Date(item.soldDate) > new Date(g.lastSold)) g.lastSold = item.soldDate;
+    }
+
+    // Get all YOUR sold titles (from YourSale) - normalized
+    const yourSales = await database('YourSale')
+      .select('title');
+    const yourSoldTitles = new Set(yourSales.map(s => normalizeTitle(s.title)).filter(Boolean));
+
+    // Get all YOUR active listing titles (from YourListing) - normalized
+    const yourListings = await database('YourListing')
+      .where('listingStatus', 'Active')
+      .select('title');
+    const yourListingTitles = new Set(yourListings.map(l => normalizeTitle(l.title)).filter(Boolean));
+
+    // Get all Item table titles for your seller - normalized
+    const yourItems = await database('Item')
+      .whereRaw("LOWER(seller) LIKE '%dynatrack%'")
+      .select('title');
+    const yourItemTitles = new Set(yourItems.map(i => normalizeTitle(i.title)).filter(Boolean));
+
+    // Find gaps: competitor parts that we have never sold, listed, or stocked
+    const gaps = [];
+    for (const [key, group] of Object.entries(compGroups)) {
+      // Check if we have ever dealt with this part
+      const inYourSales = matchesAny(key, yourSoldTitles);
+      const inYourListings = matchesAny(key, yourListingTitles);
+      const inYourItems = matchesAny(key, yourItemTitles);
+
+      if (inYourSales || inYourListings || inYourItems) continue;
+
+      // Calculate median price
+      const sorted = group.prices.sort((a, b) => a - b);
+      const median = sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+        : sorted[Math.floor(sorted.length / 2)];
+
+      // Score: weighted by volume (40%), median price (35%), seller count (25%)
+      const volumeScore = Math.min(100, (group.count / 5) * 100);
+      const priceScore = Math.min(100, (median / 300) * 100);
+      const sellerScore = Math.min(100, (group.sellers.size / 3) * 100);
+      const score = Math.round(volumeScore * 0.4 + priceScore * 0.35 + sellerScore * 0.25);
+
+      gaps.push({
+        title: group.title,
+        normalizedTitle: key,
+        sellers: Array.from(group.sellers),
+        soldCount: group.count,
+        totalRevenue: Math.round(group.totalRevenue),
+        medianPrice: Math.round(median),
+        avgPrice: Math.round(group.totalRevenue / group.count),
+        minPrice: Math.round(Math.min(...group.prices)),
+        maxPrice: Math.round(Math.max(...group.prices)),
+        lastSold: group.lastSold,
+        score,
+        ebayItemId: group.ebayItemId,
+      });
+    }
+
+    // Sort by score descending
+    gaps.sort((a, b) => b.score - a.score);
+
+    res.json({
+      success: true,
+      days,
+      totalGaps: gaps.length,
+      gaps: gaps.slice(0, limit),
+    });
+  } catch (err) {
+    log.error({ err }, 'Gap intel error');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Helper: normalize a title for fuzzy matching
+function normalizeTitle(title) {
+  if (!title) return '';
+  return title
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 50);
+}
+
+// Helper: check if a normalized key matches any title in a set (fuzzy - 70% word overlap)
+function matchesAny(key, titleSet) {
+  if (titleSet.has(key)) return true;
+  const words = key.split(' ').filter(w => w.length > 3);
+  if (words.length === 0) return false;
+  for (const t of titleSet) {
+    let matches = 0;
+    for (const w of words) {
+      if (t.includes(w)) matches++;
+    }
+    if (matches / words.length >= 0.7) return true;
+  }
+  return false;
+}
+
+/**
  * POST /competitors/:sellerId/scrape
  * Trigger scrape for a specific competitor seller. Runs in background.
  */
