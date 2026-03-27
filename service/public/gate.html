@@ -40,15 +40,15 @@
   .bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--tf)}
 
   /* Parts list */
-  .part{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .part{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;overflow:hidden}
   .part-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
   .part-dot.green{background:var(--g)} .part-dot.yellow{background:var(--y)} .part-dot.red{background:var(--r)}
   .part-info{flex:1;min-width:0}
   .part-type{font-size:12px;font-weight:600}
   .part-meta{font-size:10px;color:var(--tf);margin-top:1px}
-  .part-cogs{width:60px;text-align:center;padding:8px 4px;background:var(--bg);border:1px solid var(--b);border-radius:6px;color:var(--t);font-size:15px;font-weight:700;flex-shrink:0}
+  .part-cogs{width:54px;text-align:center;padding:8px 2px;background:var(--bg);border:1px solid var(--b);border-radius:6px;color:var(--t);font-size:15px;font-weight:700;flex-shrink:0}
   .part-cogs:focus{border-color:var(--r)}
-  .part-pct{font-size:11px;font-weight:700;width:40px;text-align:right;flex-shrink:0}
+  .part-pct{font-size:11px;font-weight:700;width:34px;text-align:right;flex-shrink:0}
   .part-pct.green{color:var(--g)} .part-pct.yellow{color:var(--y)} .part-pct.red{color:var(--r)}
   .part-rm{width:32px;height:32px;border:1px solid var(--b);border-radius:6px;background:var(--s);color:var(--r);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .add-btn{width:100%;padding:10px;background:var(--s2);border:1px dashed var(--b);border-radius:8px;color:var(--tf);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px}
@@ -150,7 +150,7 @@ function addPart(defaultType) {
   div.innerHTML =
     '<div class="part-dot green" id="dot' + id + '"></div>' +
     '<div class="part-info">' +
-      '<select id="type' + id + '" onchange="onTypeChange(' + id + ')" style="font-size:13px;padding:6px 8px;margin-bottom:2px">' +
+      '<select id="type' + id + '" onchange="onTypeChange(' + id + ')" style="font-size:13px;padding:6px 8px;margin-bottom:2px;width:100%">' +
         types.map(t => '<option value="' + t.type + '" ' + (t.type === selected.type ? 'selected' : '') + ' data-cogs="' + t.cogs + '" data-mv="' + t.marketValue + '">' + t.label + '</option>').join('') +
       '</select>' +
       '<div class="part-meta">Market: $<span id="mv' + id + '">' + selected.marketValue + '</span></div>' +
