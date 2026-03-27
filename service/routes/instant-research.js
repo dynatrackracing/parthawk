@@ -152,6 +152,50 @@ router.get('/', async (req, res) => {
         revenue: avg * sold, verdict: verdict.label, verdictIcon: verdict.icon,
       });
 
+      // Write-back to market_demand_cache (fire-and-forget — never block the response)
+      try {
+        const { extractPartNumbers } = require('../utils/partIntelligence');
+        const pns = extractPartNumbers(info.title || '');
+        const cacheKey = (pns.length > 0 && pns[0].base) ? pns[0].base
+          : [parsed.year, parsed.make, parsed.model, type].filter(Boolean).map(s => String(s).toUpperCase()).join('|');
+        const velocity = sold >= 15 ? 'high' : sold >= 8 ? 'medium' : 'low';
+        const topComps = comps.slice(0, 5).map(c => ({ title: (c.title || '').substring(0, 80), price: c.price || c.soldPrice }));
+
+        await database.raw(`
+          INSERT INTO market_demand_cache
+            (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+             source, search_query, ebay_median_price, ebay_min_price, ebay_max_price,
+             market_velocity, sales_per_week, top_comps, last_updated, "createdAt")
+          VALUES (gen_random_uuid(), ?, ?, ?, 'hawkeye', ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())
+          ON CONFLICT (part_number_base) DO UPDATE SET
+            ebay_avg_price = EXCLUDED.ebay_avg_price, ebay_sold_90d = EXCLUDED.ebay_sold_90d,
+            source = CASE WHEN market_demand_cache.source = 'apify' THEN market_demand_cache.source ELSE 'hawkeye' END,
+            search_query = COALESCE(EXCLUDED.search_query, market_demand_cache.search_query),
+            ebay_median_price = EXCLUDED.ebay_median_price,
+            ebay_min_price = EXCLUDED.ebay_min_price, ebay_max_price = EXCLUDED.ebay_max_price,
+            market_velocity = EXCLUDED.market_velocity, sales_per_week = EXCLUDED.sales_per_week,
+            top_comps = EXCLUDED.top_comps, last_updated = NOW()
+        `, [
+          cacheKey, avg, sold,
+          info.pn || `${parsed.year} ${parsed.make} ${parsed.model} ${type}`,
+          avg, Math.min(...prices), Math.max(...prices),
+          velocity, Math.round((sold / 90) * 7 * 100) / 100, JSON.stringify(topComps),
+        ]);
+      } catch (e) { /* write-back is optional — never block */ }
+
+      // Also write fitment to part_fitment_cache if we have a PN
+      if (info.pn) {
+        try {
+          const pnBase = require('../lib/partNumberUtils').normalizePartNumber(info.pn);
+          await database.raw(`
+            INSERT INTO part_fitment_cache
+              (part_number_exact, part_number_base, part_type, year, make, model, engine, source, confirmed_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'hawkeye', NOW(), NOW())
+            ON CONFLICT (part_number_base) DO NOTHING
+          `, [info.pn, pnBase, type, parsed.year, parsed.make, parsed.model, parsed.engine || info.engine]);
+        } catch (e) { /* optional */ }
+      }
+
       // Rate limit between scrapes
       await new Promise(r => setTimeout(r, 1500));
     } catch (e) {
