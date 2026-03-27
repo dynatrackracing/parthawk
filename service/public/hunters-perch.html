@@ -147,6 +147,7 @@ function renderSellers() {
     h += '<div style="display:flex;gap:6px">';
     h += '<a href="https://www.ebay.com/sch/i.html?_ssn=' + encodeURIComponent(s.name) + '&LH_Sold=1&LH_Complete=1&_ipg=240" target="_blank" rel="noopener" class="btn-sm" style="text-decoration:none;display:flex;align-items:center" onclick="event.stopPropagation()">Store ↗</a>';
     h += '<button class="btn-sm" onclick="event.stopPropagation();scrapeSeller(\'' + esc(s.name) + '\',this)">Scrape</button>';
+    h += '<button class="btn-sm" style="color:#dc2626;border-color:#dc2626" onclick="event.stopPropagation();removeSeller(\'' + esc(s.name) + '\',this)">✕</button>';
     h += '</div></div>';
     h += '<div class="seller-body" id="body-' + esc(s.name) + '" style="display:none"></div>';
     h += '</div>';
@@ -224,6 +225,22 @@ function scrapeSeller(name, btn) {
       }, 10000);
     })
     .catch(function() { btn.disabled = false; btn.textContent = 'Scrape'; });
+}
+
+function removeSeller(name, btn) {
+  if (!confirm('Remove ' + name + ' from tracking?\n\nClick OK to keep their data for gap intel.\nTheir sold history will remain in the database.')) return;
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/competitors/' + encodeURIComponent(name), { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        sellersData = sellersData.filter(function(s) { return s.name !== name; });
+        renderSellers();
+      } else {
+        btn.disabled = false; btn.textContent = '✕';
+      }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '✕'; });
 }
 
 function addSeller() {

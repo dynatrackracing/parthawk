@@ -191,6 +191,61 @@ function matchesAny(key, titleSet) {
 }
 
 /**
+ * POST /competitors/seed-defaults
+ * Add default competitors if not already tracked.
+ */
+router.post('/seed-defaults', async (req, res) => {
+  const defaults = ['importapart', 'pro-rebuild'];
+  const added = [];
+  for (const name of defaults) {
+    try {
+      const exists = await database('SoldItemSeller').where('name', name).first();
+      if (!exists) {
+        await database('SoldItemSeller').insert({
+          name,
+          enabled: true,
+          itemsScraped: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        added.push(name);
+      }
+    } catch (e) { /* ignore duplicate */ }
+  }
+  res.json({ success: true, added });
+});
+
+/**
+ * DELETE /competitors/:sellerId
+ * Remove a seller from tracking. Optionally delete their sold data.
+ * Query: deleteData=true to also remove their SoldItem records
+ */
+router.delete('/:sellerId', async (req, res) => {
+  const { sellerId } = req.params;
+  const deleteData = req.query.deleteData === 'true';
+
+  try {
+    // Remove from SoldItemSeller
+    const deleted = await database('SoldItemSeller').where('name', sellerId).del();
+
+    let itemsDeleted = 0;
+    if (deleteData) {
+      const result = await database('SoldItem').where('seller', sellerId).del();
+      itemsDeleted = result;
+    }
+
+    res.json({
+      success: true,
+      seller: sellerId,
+      removed: deleted > 0,
+      itemsDeleted,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /competitors/:sellerId/scrape
  * Trigger scrape for a specific competitor seller. Runs in background.
  */
