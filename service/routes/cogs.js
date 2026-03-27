@@ -47,7 +47,7 @@ router.post('/session', async (req, res) => {
       date: new Date(),
       parts_cost: totalPaid,
       gate_fee: session.entryFee,
-      tax_paid: session.taxOnParts,
+      tax_paid: 0,
       mileage: session.mileageCost,
       total_true_cogs: session.totalTrueCost,
       total_market_value: session.totalMarketValue,
@@ -74,7 +74,7 @@ router.get('/yards', async (req, res) => {
     const yards = await database('yard')
       .where('enabled', true)
       .where(function() { this.where('flagged', false).orWhereNull('flagged'); })
-      .select('id', 'name', 'chain', 'distance_from_base', 'entry_fee', 'tax_rate', 'visit_frequency')
+      .select('id', 'name', 'chain', 'distance_from_base', 'entry_fee', 'visit_frequency')
       .orderBy('distance_from_base', 'asc');
 
     const BASE_ADDRESSES = {

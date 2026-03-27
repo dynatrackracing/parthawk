@@ -100,13 +100,19 @@
   </button>
 
   <div class="card result-card" id="resultCard">
+    <div id="marketValueHero" style="text-align:center;padding:10px 0 6px;font-size:13px;color:var(--text-muted);">
+      Total Market Value: <span id="totalMV" style="font-weight:700;color:var(--text);font-size:16px;"></span>
+    </div>
     <div class="result-hero" id="resultHero">
-      <div class="max-label">Max Parts Spend</div>
+      <div class="max-label">Max Parts Spend (Target)</div>
       <div class="max-amount" id="maxAmount">$0</div>
       <div class="max-sub" id="maxSub"></div>
     </div>
+    <div id="ceilingRow" style="text-align:center;padding:8px 0 12px;font-size:14px;color:var(--text-muted);">
+      Absolute max: <span id="ceilingAmount" style="font-weight:700;color:var(--yellow);"></span> <span style="font-size:11px;">(35% ceiling)</span>
+    </div>
     <div class="cogs-bar"><div class="cogs-fill" id="cogsFill" style="width:0%"></div></div>
-    <div class="cogs-labels"><span>0%</span><span>35% ceiling</span><span>100%</span></div>
+    <div class="cogs-labels"><span>0%</span><span style="color:var(--green)">25%</span><span style="color:var(--yellow)">35%</span><span>100%</span></div>
     <div id="breakdownRows" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -214,23 +220,43 @@
     const breakdown = document.getElementById('breakdownRows');
 
     card.classList.add('visible');
+
+    // Status: excellent (green <25%), acceptable (yellow 25-35%), leave (red >35% or negative)
     hero.className = 'result-hero ' + data.status;
     cogsFill.className = 'cogs-fill ' + data.status;
 
+    // Total market value at top
+    document.getElementById('totalMV').textContent = '$' + data.totalMarketValue;
+
+    // Target (big number)
     maxAmount.textContent = data.status === 'leave' ? 'SKIP' : '$' + data.maxPartSpend;
-    maxSub.textContent = data.message;
+    maxSub.textContent = data.status === 'leave' ? 'Overhead exceeds budget' : 'Aim for this price (25% COGS)';
 
-    // COGS bar — show what 35% of market value represents
-    const cogsPercent = Math.min(100, (data.maxTotalCost / data.totalMarketValue) * 100);
-    cogsFill.style.width = Math.min(100, cogsPercent) + '%';
+    // 35% ceiling (smaller, below)
+    document.getElementById('ceilingAmount').textContent = '$' + data.ceilingPartSpend;
 
+    // COGS bar — fill to where the target sits relative to total value
+    const targetPct = data.totalMarketValue > 0 ? Math.min(100, ((data.maxPartSpend + data.fixedOverhead) / data.totalMarketValue) * 100) : 0;
+    cogsFill.style.width = targetPct + '%';
+
+    // Breakdown
+    const cogsColor = data.blendedCogs <= 25 ? '#22c55e' : data.blendedCogs <= 35 ? '#eab308' : '#ef4444';
     breakdown.innerHTML = `
-      <div class="breakdown-row"><span class="breakdown-label">Total market value</span><span class="breakdown-value">$${data.totalMarketValue}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">35% COGS ceiling</span><span class="breakdown-value">$${data.maxTotalCost}</span></div>
       <div class="breakdown-row"><span class="breakdown-label">Gate fee</span><span class="breakdown-value">$${data.entryFee}</span></div>
       <div class="breakdown-row"><span class="breakdown-label">Mileage (${data.yardName})</span><span class="breakdown-value">$${data.mileageCost}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Tax rate</span><span class="breakdown-value">${data.taxRate}</span></div>
-      <div class="breakdown-row" style="font-weight:700;"><span class="breakdown-label">Max you should pay</span><span class="breakdown-value" style="color:${data.status === 'leave' ? '#ef4444' : data.status === 'acceptable' ? '#eab308' : '#22c55e'}">$${data.maxPartSpend}</span></div>`;
+      <div class="breakdown-row"><span class="breakdown-label">Fixed overhead</span><span class="breakdown-value">$${data.fixedOverhead}</span></div>
+      <div class="breakdown-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
+        <span class="breakdown-label" style="font-weight:600;">Target spend (25%)</span>
+        <span class="breakdown-value" style="color:#22c55e;">$${data.maxPartSpend}</span>
+      </div>
+      <div class="breakdown-row">
+        <span class="breakdown-label" style="font-weight:600;">Absolute max (35%)</span>
+        <span class="breakdown-value" style="color:#eab308;">$${data.ceilingPartSpend}</span>
+      </div>
+      <div class="breakdown-row">
+        <span class="breakdown-label">Blended COGS at target</span>
+        <span class="breakdown-value" style="color:${cogsColor};">${data.blendedCogs}%</span>
+      </div>`;
 
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }

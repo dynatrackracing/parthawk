@@ -4,49 +4,28 @@ const { database } = require('../database/database');
 
 /**
  * COGSService - True cost of goods calculation
- * 
- * Spec Section 6: COGS includes parts cost, core fees, sales tax,
- * entry/gate fees, and mileage. All allocated proportionally by market value.
- * Puller sees ONE number. System calculates everything in background.
- * 
- * COGS ceiling: 35% of perceived market value
+ *
+ * COGS = parts cost + gate fee + mileage. NO TAX - that's accounting, not pulling.
+ * Puller sees TWO numbers: max parts spend (target) and 35% ceiling (absolute max).
+ * Green under 25%, yellow 25-35%, red over 35%.
  */
 class COGSService {
 
   /**
-   * Calculate true COGS for a pull session
-   * @param {Object} session
-   * @param {string} session.yardId - Yard being visited
-   * @param {Array} session.parts - [{ partType, marketValue, pullCost }]
-   * @param {number} session.totalPaid - Amount paid at gate
-   * @param {string} session.pullerId - Puller ID for mileage calc
+   * Calculate true COGS for a pull session (post-pull recording)
    */
   static async calculateSession(session) {
     const { yardId, parts, totalPaid } = session;
-
-    // Get yard cost profile
     const yard = await database('yard').where('id', yardId).first();
     if (!yard) throw new Error('Yard not found');
 
-    // Fixed overhead components
     const entryFee = parseFloat(yard.entry_fee) || 0;
-    const taxRate = parseFloat(yard.tax_rate) || 0;
     const distanceMiles = parseFloat(yard.distance_from_base) || 0;
+    const mileageCost = distanceMiles * 2 * 0.67; // IRS rate, round trip
 
-    // IRS standard mileage rate 2024: $0.67/mile
-    const mileageRate = 0.67;
-    const mileageCost = distanceMiles * 2 * mileageRate; // round trip
-
-    // Sales tax on parts
-    const taxOnParts = totalPaid * taxRate;
-
-    // Total true cost of session
-    const totalTrueCost = totalPaid + taxOnParts + entryFee + mileageCost;
-
-    // Total market value of all parts
+    // Total true cost = parts + gate + mileage (NO TAX)
+    const totalTrueCost = totalPaid + entryFee + mileageCost;
     const totalMarketValue = parts.reduce((sum, p) => sum + (p.marketValue || 0), 0);
-
-    // Blended COGS rate
     const blendedCogsRate = totalMarketValue > 0 ? (totalTrueCost / totalMarketValue) * 100 : 0;
 
     // Allocate cost to each part proportionally by market value
@@ -54,7 +33,6 @@ class COGSService {
       const valueShare = totalMarketValue > 0 ? part.marketValue / totalMarketValue : 0;
       const allocatedCost = totalTrueCost * valueShare;
       const cogsRate = part.marketValue > 0 ? (allocatedCost / part.marketValue) * 100 : 0;
-
       return {
         ...part,
         allocatedCost: Math.round(allocatedCost * 100) / 100,
@@ -66,7 +44,6 @@ class COGSService {
     return {
       session: {
         totalPaid,
-        taxOnParts: Math.round(taxOnParts * 100) / 100,
         entryFee,
         mileageCost: Math.round(mileageCost * 100) / 100,
         totalTrueCost: Math.round(totalTrueCost * 100) / 100,
@@ -81,38 +58,43 @@ class COGSService {
 
   /**
    * Gate negotiation: what's the max you should pay?
-   * Given planned parts and their market values, calculate max spend
-   * to stay under the 35% COGS ceiling
-   * 
-   * @param {string} yardId
-   * @param {Array} plannedParts - [{ partType, marketValue }]
-   * @returns {Object} negotiation guidance
+   *
+   * Returns TWO numbers:
+   *   maxPartSpend - the TARGET (25% COGS ideal)
+   *   ceilingPartSpend - the WALL (35% COGS absolute max)
+   *
+   * Formula: maxPartSpend = (totalMarketValue * targetRate) - gateFee - mileage
+   * No tax in the calculation.
    */
   static async calculateGateMax(yardId, plannedParts) {
     const yard = await database('yard').where('id', yardId).first();
     if (!yard) throw new Error('Yard not found');
 
     const entryFee = parseFloat(yard.entry_fee) || 0;
-    const taxRate = parseFloat(yard.tax_rate) || 0;
     const distanceMiles = parseFloat(yard.distance_from_base) || 0;
     const mileageCost = distanceMiles * 2 * 0.67;
+    const fixedOverhead = entryFee + mileageCost;
 
     const totalMarketValue = plannedParts.reduce((sum, p) => sum + (p.marketValue || 0), 0);
 
-    // Fixed overhead (gate fee + mileage, before parts)
-    const fixedOverhead = entryFee + mileageCost;
+    // Target: 25% COGS (ideal)
+    const targetTotal = totalMarketValue * 0.25;
+    const targetPartSpend = targetTotal - fixedOverhead;
 
-    // Max total cost to stay at 35% COGS
-    const maxTotalCost = totalMarketValue * 0.35;
+    // Ceiling: 35% COGS (absolute max)
+    const ceilingTotal = totalMarketValue * 0.35;
+    const ceilingPartSpend = ceilingTotal - fixedOverhead;
 
-    // Max parts spend = max total cost - fixed overhead - tax
-    // tax = parts_spend * taxRate, so:
-    // max_parts + (max_parts * taxRate) + fixedOverhead = maxTotalCost
-    // max_parts * (1 + taxRate) = maxTotalCost - fixedOverhead
-    const maxPartSpend = (maxTotalCost - fixedOverhead) / (1 + taxRate);
+    // Blended COGS % if they pay the target amount
+    const blendedCogs = totalMarketValue > 0
+      ? ((Math.max(0, targetPartSpend) + fixedOverhead) / totalMarketValue) * 100
+      : 0;
 
-    const status = maxPartSpend <= 0 ? 'leave' :
-                   maxPartSpend < 50 ? 'tight' : 'go';
+    // Status based on whether target is achievable
+    let status;
+    if (ceilingPartSpend <= 0) status = 'leave';
+    else if (targetPartSpend <= 0) status = 'acceptable'; // can pull but tight
+    else status = 'excellent';
 
     return {
       yardName: yard.name,
@@ -120,24 +102,19 @@ class COGSService {
       fixedOverhead: Math.round(fixedOverhead * 100) / 100,
       entryFee,
       mileageCost: Math.round(mileageCost * 100) / 100,
-      taxRate: (taxRate * 100).toFixed(2) + '%',
-      maxPartSpend: Math.max(0, Math.round(maxPartSpend)),
-      maxTotalCost: Math.round(maxTotalCost),
-      message: maxPartSpend <= 0
-        ? 'Overhead alone exceeds 35% COGS ceiling. Not worth the trip for this list.'
-        : `Max parts spend to stay under 35% COGS: $${Math.max(0, Math.round(maxPartSpend))}`,
+      maxPartSpend: Math.max(0, Math.round(targetPartSpend)),
+      ceilingPartSpend: Math.max(0, Math.round(ceilingPartSpend)),
+      maxTotalCost: Math.round(ceilingTotal),
+      blendedCogs: Math.round(blendedCogs * 10) / 10,
       status,
-      breakdown: {
-        ceiling: '35% of $' + Math.round(totalMarketValue) + ' = $' + Math.round(maxTotalCost),
-        overhead: 'Gate $' + entryFee + ' + Mileage $' + Math.round(mileageCost) + ' = $' + Math.round(fixedOverhead),
-        available_for_parts: '$' + Math.max(0, Math.round(maxPartSpend)) + ' (before ' + (taxRate * 100).toFixed(1) + '% tax)',
-      }
+      message: ceilingPartSpend <= 0
+        ? 'Overhead alone exceeds 35% ceiling. Not worth the trip for this list.'
+        : targetPartSpend <= 0
+          ? `Tight - overhead takes most of the budget. Max absolute: $${Math.round(ceilingPartSpend)}`
+          : `Target: $${Math.round(targetPartSpend)} (25% COGS). Ceiling: $${Math.round(ceilingPartSpend)} (35%)`,
     };
   }
 
-  /**
-   * Quick COGS warning levels
-   */
   static getVerdictLabel(cogsRate) {
     if (cogsRate <= 25) return { label: 'Excellent', color: 'green' };
     if (cogsRate <= 35) return { label: 'Acceptable', color: 'yellow' };
