@@ -64,7 +64,7 @@ const APIFY_BASE = 'https://api.apify.com/v2';
 
 // Actors to try in order — caffein.dev works, tested
 const ACTORS = [
-  { id: 'caffein.dev~ebay-sold-listings', buildInput: (q) => ({ keyword: q, categoryId: '0', maxItems: 30 }) },
+  { id: 'caffein.dev~ebay-sold-listings', buildInput: (q) => ({ keyword: q, categoryId: '0', count: 20 }) },
   { id: 'dtrungtin~ebay-items-scraper', buildInput: (q) => ({ searchQuery: q, categoryId: '6030', maxItems: 20, soldItems: true }) },
   { id: 'marielise.dev~ebay-sold-listings-intelligence', buildInput: (q) => ({ keyword: q, maxItems: 20 }) },
 ];
