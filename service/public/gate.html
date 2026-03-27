@@ -11,65 +11,94 @@
   :root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--rd:#7f1d1d;--y:#eab308;--yd:#713f12;--g:#22c55e;--gd:#064e3b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
   body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:60px;-webkit-tap-highlight-color:transparent}
 
-  header{background:var(--s);border-bottom:1px solid var(--b);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
-  header img{height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))}
-  header h1{font-size:16px;font-weight:900;letter-spacing:2px}
-  header h1 span{color:var(--r)}
-  header p{font-size:10px;color:var(--tf);margin-top:1px}
+  /* Header + Nav (matches all other admin pages) */
+  .top-header{background:var(--s);border-bottom:1px solid var(--b);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+  .top-header img{height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))}
+  .top-header .brand{font-size:16px;font-weight:900;letter-spacing:2px}
+  .top-header .brand span{color:var(--r)}
+  .top-header .sub{font-size:10px;color:var(--tf);margin-top:1px}
+  nav{display:flex;gap:6px;padding:6px 14px;background:var(--bg);border-bottom:1px solid var(--b);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;font-size:11px}
+  nav::-webkit-scrollbar{display:none}
+  nav a{color:var(--tf);text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:var(--s2)}
+  nav a.active{color:var(--r);font-weight:700}
 
-  .c{padding:12px;max-width:500px;margin:0 auto}
+  .c{padding:12px;max-width:520px;margin:0 auto}
   .card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
   .card-title{font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
-  label{display:block;font-size:11px;color:var(--tf);margin-bottom:4px}
-  select,input[type="number"]{width:100%;padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:15px;appearance:none}
-  select:focus,input:focus{outline:none;border-color:var(--r)}
+  select{width:100%;padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:15px;appearance:none}
+  select:focus{outline:none;border-color:var(--r)}
 
-  /* Summary hero */
+  /* Hero summary */
   .hero{text-align:center;padding:16px 12px;border-radius:10px;margin-bottom:4px}
   .hero.green{background:var(--gd)} .hero.yellow{background:var(--yd)} .hero.red{background:var(--rd)}
-  .hero .mv{font-size:12px;color:var(--tf);margin-bottom:2px}
-  .hero .mv b{color:var(--tm);font-size:14px}
+  .hero .mv{font-size:13px;color:var(--tf);margin-bottom:2px}
+  .hero .mv b{color:var(--tm);font-size:15px}
   .hero .target-label{font-size:11px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;margin-top:8px}
   .hero .target-amount{font-size:48px;font-weight:800;letter-spacing:-.04em}
   .hero.green .target-amount{color:var(--g)} .hero.yellow .target-amount{color:var(--y)} .hero.red .target-amount{color:var(--r)}
   .hero .ceiling{font-size:13px;color:var(--tf);margin-top:4px}
   .hero .ceiling b{color:var(--y)}
-  .hero .blended{font-size:12px;margin-top:6px;font-weight:600}
+  .hero .blended{font-size:13px;margin-top:6px;font-weight:700}
   .bar{height:6px;background:var(--s2);border-radius:3px;margin:8px 0 4px;overflow:hidden}
   .bar-fill{height:100%;border-radius:3px;transition:width .3s}
   .bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--tf)}
 
-  /* Parts list */
-  .part{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;overflow:hidden}
-  .part-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  /* Part rows - desktop: single line. Mobile: two lines */
+  .part{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:12px;margin-bottom:8px}
+  .part-top{display:flex;align-items:center;gap:8px}
+  .part-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
   .part-dot.green{background:var(--g)} .part-dot.yellow{background:var(--y)} .part-dot.red{background:var(--r)}
-  .part-info{flex:1;min-width:0}
-  .part-type{font-size:12px;font-weight:600}
-  .part-meta{font-size:10px;color:var(--tf);margin-top:1px}
-  .part-cogs{width:54px;text-align:center;padding:8px 2px;background:var(--bg);border:1px solid var(--b);border-radius:6px;color:var(--t);font-size:15px;font-weight:700;flex-shrink:0}
-  .part-cogs:focus{border-color:var(--r)}
-  .part-pct{font-size:11px;font-weight:700;width:34px;text-align:right;flex-shrink:0}
+  .part-name{font-size:14px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .part-mv{font-size:12px;color:var(--tf);flex-shrink:0}
+  .part-rm{width:28px;height:28px;border:1px solid var(--b);border-radius:6px;background:var(--s);color:var(--r);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .part-bottom{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid #222}
+  .cogs-label{font-size:11px;color:var(--tf);flex-shrink:0}
+  .cogs-input{width:70px;text-align:center;padding:10px 6px;background:var(--bg);border:2px solid var(--b);border-radius:8px;color:var(--t);font-size:18px;font-weight:700;flex-shrink:0}
+  .cogs-input:focus{border-color:var(--r);outline:none}
+  .part-pct{font-size:14px;font-weight:700;flex-shrink:0;margin-left:auto}
   .part-pct.green{color:var(--g)} .part-pct.yellow{color:var(--y)} .part-pct.red{color:var(--r)}
-  .part-rm{width:32px;height:32px;border:1px solid var(--b);border-radius:6px;background:var(--s);color:var(--r);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .add-btn{width:100%;padding:10px;background:var(--s2);border:1px dashed var(--b);border-radius:8px;color:var(--tf);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px}
+  .part-select{font-size:13px;padding:6px 8px;background:var(--s);border:1px solid var(--b);border-radius:6px;color:var(--t);flex:1;min-width:0;appearance:none}
+
+  .add-btn{width:100%;padding:12px;background:var(--s2);border:1px dashed var(--b);border-radius:8px;color:var(--tf);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
 
   /* Breakdown */
-  .brow{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid #1f1f1f}
+  .brow{display:flex;justify-content:space-between;padding:7px 0;font-size:12px;border-bottom:1px solid #1f1f1f}
   .brow:last-child{border:none}
   .brow .bl{color:var(--tf)} .brow .bv{font-weight:600}
+
+  /* Mobile: stack the bottom row items */
+  @media(max-width:500px){
+    .part-mv{font-size:11px}
+    .hero .target-amount{font-size:42px}
+  }
 </style>
 </head>
 <body>
 
-<header>
+<div class="top-header">
   <a href="/"><img src="/admin/darkhawk-logo-sm.png" alt="DH"></a>
-  <div><h1>DARK<span>HAWK</span></h1><p>NEST PROTECTOR</p></div>
-</header>
+  <div>
+    <div class="brand">DARK<span>HAWK</span></div>
+    <div class="sub">NEST PROTECTOR</div>
+  </div>
+</div>
+<nav>
+  <a href="/">THE NEST</a>
+  <a href="/admin/pull">DAILY FEED</a>
+  <a href="/admin/vin">HAWK EYE</a>
+  <a href="/admin/gate" class="active">NEST PROTECTOR</a>
+  <a href="/admin/restock">THE QUARRY</a>
+  <a href="/admin/restock-list">SCOUR STREAM</a>
+  <a href="/admin/opportunities">OPPORTUNITIES</a>
+  <a href="/admin/hunters-perch">HUNTERS PERCH</a>
+  <a href="/admin/scout-alerts">SCOUT ALERTS</a>
+  <a href="/admin/listing-tool">LISTING TOOL</a>
+</nav>
 
 <div class="c">
   <div class="card">
     <div class="card-title">Yard</div>
-    <select id="yardSel" onchange="onYardChange()"><option value="">Loading...</option></select>
+    <select id="yardSel" onchange="onYardChange()"><option value="">Loading yards...</option></select>
   </div>
 
   <div class="card" id="summaryCard" style="display:none">
@@ -85,7 +114,7 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Parts</div>
+    <div class="card-title">Parts at Register</div>
     <div id="partsList"></div>
     <button class="add-btn" onclick="addPart()">+ Add Part</button>
   </div>
@@ -102,17 +131,21 @@ let yardProfile = null;
 let partIdCounter = 0;
 
 async function loadYards() {
-  const r = await fetch('/cogs/yards');
-  const d = await r.json();
-  yards = d.yards || [];
-  const sel = document.getElementById('yardSel');
-  sel.innerHTML = '<option value="">Select a yard...</option>' +
-    yards.map(y => '<option value="' + y.id + '">' + y.name + ' (' + y.distance_from_base + 'mi - $' + y.entry_fee + ' gate)</option>').join('');
+  try {
+    const r = await fetch('/cogs/yards');
+    const d = await r.json();
+    yards = d.yards || [];
+    const sel = document.getElementById('yardSel');
+    sel.innerHTML = '<option value="">Select a yard...</option>' +
+      yards.map(y => '<option value="' + y.id + '">' + y.name + ' (' + y.distance_from_base + 'mi - $' + y.entry_fee + ' gate)</option>').join('');
+  } catch(e) {
+    document.getElementById('yardSel').innerHTML = '<option value="">Error loading yards</option>';
+  }
 }
 
 async function onYardChange() {
   const id = document.getElementById('yardSel').value;
-  if (!id) { yardProfile = null; document.getElementById('summaryCard').style.display = 'none'; return; }
+  if (!id) { yardProfile = null; document.getElementById('summaryCard').style.display = 'none'; document.getElementById('breakdownCard').style.display = 'none'; return; }
 
   const r = await fetch('/cogs/yard-profile/' + id);
   const d = await r.json();
@@ -122,7 +155,6 @@ async function onYardChange() {
   document.getElementById('summaryCard').style.display = 'block';
   document.getElementById('breakdownCard').style.display = 'block';
 
-  // Reset parts with this yard's COGS reference
   document.getElementById('partsList').innerHTML = '';
   partIdCounter = 0;
   addPart('ECM');
@@ -141,31 +173,34 @@ function addPart(defaultType) {
   partIdCounter++;
   const id = partIdCounter;
   const types = getPartTypes();
-  const selected = defaultType ? types.find(t => t.type === defaultType) : types[0];
-  if (!selected) return;
+  const sel = defaultType ? types.find(t => t.type === defaultType) : types[0];
+  if (!sel) return;
 
   const div = document.createElement('div');
   div.className = 'part';
   div.id = 'p' + id;
   div.innerHTML =
-    '<div class="part-dot green" id="dot' + id + '"></div>' +
-    '<div class="part-info">' +
-      '<select id="type' + id + '" onchange="onTypeChange(' + id + ')" style="font-size:13px;padding:6px 8px;margin-bottom:2px;width:100%">' +
-        types.map(t => '<option value="' + t.type + '" ' + (t.type === selected.type ? 'selected' : '') + ' data-cogs="' + t.cogs + '" data-mv="' + t.marketValue + '">' + t.label + '</option>').join('') +
+    '<div class="part-top">' +
+      '<div class="part-dot green" id="dot' + id + '"></div>' +
+      '<select class="part-select" id="type' + id + '" onchange="onTypeChange(' + id + ')">' +
+        types.map(t => '<option value="' + t.type + '"' + (t.type === sel.type ? ' selected' : '') + ' data-cogs="' + t.cogs + '" data-mv="' + t.marketValue + '">' + t.label + '</option>').join('') +
       '</select>' +
-      '<div class="part-meta">Market: $<span id="mv' + id + '">' + selected.marketValue + '</span></div>' +
+      '<span class="part-mv">Market: $<span id="mv' + id + '">' + sel.marketValue + '</span></span>' +
+      '<button class="part-rm" onclick="rmPart(' + id + ')">x</button>' +
     '</div>' +
-    '<input type="number" class="part-cogs" id="cogs' + id + '" value="' + selected.cogs + '" min="0" step="1" oninput="recalc()" />' +
-    '<div class="part-pct green" id="pct' + id + '">0%</div>' +
-    '<button class="part-rm" onclick="rmPart(' + id + ')">x</button>';
+    '<div class="part-bottom">' +
+      '<span class="cogs-label">COGS $</span>' +
+      '<input type="number" class="cogs-input" id="cogs' + id + '" value="' + sel.cogs + '" min="0" step="1" inputmode="numeric" oninput="recalc()" />' +
+      '<span class="part-pct green" id="pct' + id + '">0%</span>' +
+    '</div>';
 
   document.getElementById('partsList').appendChild(div);
   recalc();
 }
 
 function onTypeChange(id) {
-  const sel = document.getElementById('type' + id);
-  const opt = sel.options[sel.selectedIndex];
+  const s = document.getElementById('type' + id);
+  const opt = s.options[s.selectedIndex];
   document.getElementById('cogs' + id).value = opt.dataset.cogs;
   document.getElementById('mv' + id).textContent = opt.dataset.mv;
   recalc();
@@ -180,9 +215,7 @@ function recalc() {
   if (!yardProfile) return;
 
   let totalMV = 0, totalCogs = 0;
-  const parts = document.querySelectorAll('[id^="p"]');
-
-  parts.forEach(p => {
+  document.querySelectorAll('.part').forEach(p => {
     const id = p.id.replace('p', '');
     const mvEl = document.getElementById('mv' + id);
     const cogsEl = document.getElementById('cogs' + id);
@@ -195,12 +228,11 @@ function recalc() {
     totalMV += mv;
     totalCogs += cogs;
 
-    // Per-part COGS %
     const pct = mv > 0 ? (cogs / mv) * 100 : 0;
     pctEl.textContent = Math.round(pct) + '%';
-    const color = pct <= 25 ? 'green' : pct <= 35 ? 'yellow' : 'red';
-    pctEl.className = 'part-pct ' + color;
-    dotEl.className = 'part-dot ' + color;
+    const c = pct <= 25 ? 'green' : pct <= 35 ? 'yellow' : 'red';
+    pctEl.className = 'part-pct ' + c;
+    dotEl.className = 'part-dot ' + c;
   });
 
   const overhead = yardProfile.fixedOverhead;
@@ -208,32 +240,24 @@ function recalc() {
   const blended = totalMV > 0 ? (currentTotal / totalMV) * 100 : 0;
   const target = Math.max(0, Math.round(totalMV * 0.30 - overhead));
   const ceiling = Math.max(0, Math.round(totalMV * 0.35 - overhead));
-
-  // Color
   const color = blended <= 25 ? 'green' : blended <= 35 ? 'yellow' : 'red';
 
-  // Hero
   document.getElementById('totalMV').textContent = '$' + Math.round(totalMV);
   document.getElementById('targetAmt').textContent = ceiling <= 0 ? 'SKIP' : '$' + target;
   document.getElementById('ceilingAmt').textContent = '$' + ceiling;
   document.getElementById('blendedPct').textContent = blended.toFixed(1) + '% COGS';
   document.getElementById('blendedPct').style.color = color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)';
+  document.getElementById('hero').className = 'hero ' + color;
 
-  const hero = document.getElementById('hero');
-  hero.className = 'hero ' + color;
-
-  // Bar
-  const barPct = Math.min(100, blended);
   const fill = document.getElementById('barFill');
-  fill.style.width = barPct + '%';
+  fill.style.width = Math.min(100, blended) + '%';
   fill.style.background = color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)';
 
-  // Breakdown
   document.getElementById('breakdown').innerHTML =
     '<div class="brow"><span class="bl">Gate fee</span><span class="bv">$' + yardProfile.entryFee + '</span></div>' +
     '<div class="brow"><span class="bl">Mileage (' + yardProfile.name + ')</span><span class="bv">$' + yardProfile.mileageCost + '</span></div>' +
     '<div class="brow"><span class="bl">Fixed overhead</span><span class="bv">$' + overhead + '</span></div>' +
-    '<div class="brow"><span class="bl">Current parts total</span><span class="bv">$' + Math.round(totalCogs) + '</span></div>' +
+    '<div class="brow"><span class="bl">Parts at register</span><span class="bv">$' + Math.round(totalCogs) + '</span></div>' +
     '<div class="brow" style="border-top:1px solid var(--b);padding-top:8px;margin-top:2px"><span class="bl" style="font-weight:600">Target (30%)</span><span class="bv" style="color:var(--g)">$' + target + '</span></div>' +
     '<div class="brow"><span class="bl" style="font-weight:600">Absolute max (35%)</span><span class="bv" style="color:var(--y)">$' + ceiling + '</span></div>' +
     '<div class="brow"><span class="bl" style="font-weight:600">Blended COGS</span><span class="bv" style="color:' + (color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)') + '">' + blended.toFixed(1) + '%</span></div>';
