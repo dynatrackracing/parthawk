@@ -128,8 +128,8 @@ router.get('/gap-intel', async (req, res) => {
         : sorted[Math.floor(sorted.length / 2)];
 
       // Score: weighted by volume (40%), median price (35%), seller count (25%)
-      const volumeScore = Math.min(100, (group.count / 5) * 100);
-      const priceScore = Math.min(100, (median / 300) * 100);
+      const volumeScore = Math.min(100, (group.count / 30) * 100);
+      const priceScore = Math.min(100, (median / 500) * 100);
       const sellerScore = Math.min(100, (group.sellers.size / 3) * 100);
       const score = Math.round(volumeScore * 0.4 + priceScore * 0.35 + sellerScore * 0.25);
 
