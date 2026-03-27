@@ -147,6 +147,7 @@ function loadEmerging() {
         h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + signalBadge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(item.title || '') + '</a></div>';
         h += '<div class="item-meta">' + ptBadge + pn + item.totalCount + 'x sold by ' + esc(sellerList) + ' · $' + item.medianPrice + ' median · $' + item.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div style="text-align:right"><div class="item-price">$' + item.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
+        h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#22c55e;border-color:#22c55e" onclick="markItem(\'' + esc(item.title).replace(/\'/g, "\\'") + '\',\'' + esc(item.partNumber || '').replace(/\'/g, "\\'") + '\',\'' + esc(item.partType || '').replace(/\'/g, "\\'") + '\',' + (item.medianPrice || 0) + ',\'emerging\',' + JSON.stringify(item.sellers) + ',' + item.signalStrength + ',this)">+ Mark</button>';
         h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#6B7280" onclick="dismissIntel(\'' + esc(item.title).replace(/\'/g, "\\'") + '\',this)">✕</button></div>';
         h += '</div>';
       });
@@ -194,6 +195,7 @@ function loadGapIntel() {
         var yardIcon = gap.yardMatch ? '<span title="Vehicle make in local yard" style="margin-right:4px">📍</span>' : '';
         h += '<div class="item-meta">' + yardIcon + ptBadge + pn + gap.soldCount + 'x sold by ' + esc(sellerList) + ' · $' + gap.medianPrice + ' median · $' + gap.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div style="text-align:right"><div class="item-price">$' + gap.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
+        h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#22c55e;border-color:#22c55e" onclick="markItem(\'' + esc(gap.title).replace(/\'/g, "\\'") + '\',\'' + esc(gap.partNumber || '').replace(/\'/g, "\\'") + '\',\'' + esc(gap.partType || '').replace(/\'/g, "\\'") + '\',' + (gap.medianPrice || 0) + ',\'gap-intel\',' + JSON.stringify(gap.sellers) + ',' + gap.score + ',this)">+ Mark</button>';
         h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#6B7280" onclick="dismissIntel(\'' + esc(gap.title).replace(/\'/g, "\\'") + '\',this)">✕</button></div>';
         h += '</div>';
       });
@@ -367,6 +369,34 @@ function addSeller() {
 }
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function markItem(title, partNumber, partType, medianPrice, sourceSignal, sellers, score, btn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  fetch('/competitors/mark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: title,
+      partNumber: partNumber || null,
+      partType: partType || null,
+      medianPrice: medianPrice || null,
+      sourceSignal: sourceSignal || 'gap-intel',
+      sourceSellers: sellers || null,
+      score: score || null,
+    }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        btn.textContent = '✓';
+        btn.style.color = '#22c55e';
+        btn.style.borderColor = '#22c55e';
+        btn.disabled = true;
+      } else { btn.disabled = false; btn.textContent = '+ Mark'; }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '+ Mark'; });
+}
 
 function dismissIntel(title, btn) {
   btn.disabled = true;

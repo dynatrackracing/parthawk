@@ -512,6 +512,193 @@ router.post('/undismiss', async (req, res) => {
 });
 
 /**
+ * POST /competitors/mark
+ * Add an item to The Mark (want list).
+ * Body: { title, partNumber, partType, medianPrice, sourceSignal, sourceSellers, score }
+ */
+router.post('/mark', async (req, res) => {
+  const { title, partNumber, partType, medianPrice, sourceSignal, sourceSellers, score } = req.body;
+  if (!title) return res.status(400).json({ success: false, error: 'title required' });
+
+  try {
+    const key = normalizeTitle(title);
+    const exists = await database('the_mark').where('normalizedTitle', key).first();
+    if (exists) {
+      // Reactivate if previously graduated
+      if (!exists.active) {
+        await database('the_mark').where('normalizedTitle', key).update({
+          active: true,
+          graduatedAt: null,
+          graduatedReason: null,
+          updatedAt: new Date(),
+        });
+      }
+      return res.json({ success: true, exists: true, id: exists.id });
+    }
+
+    const inserted = await database('the_mark').insert({
+      normalizedTitle: key,
+      originalTitle: title,
+      partNumber: partNumber || null,
+      partType: partType || null,
+      medianPrice: medianPrice || null,
+      sourceSignal: sourceSignal || 'gap-intel',
+      sourceSellers: sourceSellers || null,
+      scoreAtMark: score || null,
+      active: true,
+      markedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning('id');
+
+    res.json({ success: true, id: inserted[0]?.id || inserted[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /competitors/marks
+ * Get all active marks. Query: all=true to include graduated.
+ */
+router.get('/marks', async (req, res) => {
+  try {
+    const showAll = req.query.all === 'true';
+    let query = database('the_mark').orderBy('markedAt', 'desc');
+    if (!showAll) {
+      query = query.where('active', true);
+    }
+    const marks = await query.limit(200);
+
+    // Check which marks have matching vehicles in yards right now
+    let yardMakes = new Set();
+    try {
+      const yardVehicles = await database('yard_vehicle').select('make').limit(5000);
+      for (const v of yardVehicles) {
+        if (v.make) yardMakes.add(v.make.toUpperCase());
+      }
+    } catch (e) {}
+
+    // Check which marks have been listed/sold (candidates for auto-graduation)
+    const yourSales = await database('YourSale').select('title').limit(25000);
+    const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
+    const yourListingTitles = new Set(yourListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
+
+    const enriched = marks.map(function(m) {
+      var yardMatch = titleMatchesYard(m.originalTitle, yardMakes);
+      var inYourInventory = matchesAny(m.normalizedTitle, yourListingTitles);
+      var youSoldIt = matchesAny(m.normalizedTitle, yourSoldTitles);
+
+      return {
+        ...m,
+        yardMatch: yardMatch,
+        inYourInventory: inYourInventory,
+        youSoldIt: youSoldIt,
+        status: !m.active ? 'graduated' : youSoldIt ? 'sold' : inYourInventory ? 'listed' : yardMatch ? 'in-yard' : 'hunting',
+      };
+    });
+
+    res.json({ success: true, marks: enriched, total: enriched.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /competitors/mark/:id
+ * Remove an item from The Mark.
+ */
+router.delete('/mark/:id', async (req, res) => {
+  try {
+    await database('the_mark').where('id', req.params.id).del();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PATCH /competitors/mark/:id
+ * Update notes on a mark.
+ */
+router.patch('/mark/:id', async (req, res) => {
+  try {
+    const { notes } = req.body;
+    await database('the_mark').where('id', req.params.id).update({ notes, updatedAt: new Date() });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /competitors/mark/graduate
+ * Auto-graduate marks that you've now sold. Called periodically.
+ */
+router.post('/mark/graduate', async (req, res) => {
+  try {
+    const activeMarks = await database('the_mark').where('active', true);
+    const yourSales = await database('YourSale').select('title').limit(25000);
+    const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+
+    let graduated = 0;
+    for (const mark of activeMarks) {
+      if (matchesAny(mark.normalizedTitle, yourSoldTitles)) {
+        await database('the_mark').where('id', mark.id).update({
+          active: false,
+          graduatedAt: new Date(),
+          graduatedReason: 'Sold - entered normal restock cycle',
+          updatedAt: new Date(),
+        });
+        graduated++;
+      }
+    }
+
+    res.json({ success: true, graduated, checked: activeMarks.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /competitors/mark/check-vehicle
+ * Check if a make/model matches any active marks. Used by attack list.
+ * Query: make, model, year (all optional)
+ */
+router.get('/mark/check-vehicle', async (req, res) => {
+  const { make, model, year } = req.query;
+  if (!make) return res.json({ success: true, matches: [] });
+
+  try {
+    const activeMarks = await database('the_mark').where('active', true);
+    const makeUpper = make.toUpperCase();
+    const modelUpper = model ? model.toUpperCase() : null;
+
+    const matches = activeMarks.filter(function(m) {
+      var title = m.originalTitle.toUpperCase();
+      if (!title.includes(makeUpper)) return false;
+      if (modelUpper && !title.includes(modelUpper)) return false;
+      if (year && !title.includes(String(year))) return false;
+      return true;
+    }).map(function(m) {
+      return {
+        id: m.id,
+        title: m.originalTitle,
+        partType: m.partType,
+        partNumber: m.partNumber,
+        medianPrice: m.medianPrice,
+        markedAt: m.markedAt,
+      };
+    });
+
+    res.json({ success: true, matches });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /competitors/seed-defaults
  * Add default competitors if not already tracked.
  */
@@ -724,6 +911,27 @@ try {
       }
     } catch (err) {
       log.error({ err: err.message }, 'Auto-scrape cron error');
+    }
+
+    // Auto-graduate marks that have been sold
+    try {
+      const activeMarks = await database('the_mark').where('active', true);
+      const ySales = await database('YourSale').select('title').limit(25000);
+      const ySoldTitles = new Set(ySales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+
+      for (const mark of activeMarks) {
+        if (matchesAny(mark.normalizedTitle, ySoldTitles)) {
+          await database('the_mark').where('id', mark.id).update({
+            active: false,
+            graduatedAt: new Date(),
+            graduatedReason: 'Sold - entered normal restock cycle',
+            updatedAt: new Date(),
+          });
+          log.info({ mark: mark.originalTitle }, 'Auto-graduated mark - sold');
+        }
+      }
+    } catch (gradErr) {
+      log.error({ err: gradErr.message }, 'Auto-graduation check failed');
     }
   });
   log.info('Competitor auto-scrape cron scheduled for 6AM Eastern daily');

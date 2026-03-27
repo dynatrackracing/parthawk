@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — THE MARK</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:800px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.btn-sm{padding:6px 10px;font-size:11px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;cursor:pointer}
+.btn-sm:disabled{opacity:.3}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase}
+.item-row{padding:10px 14px;border-bottom:1px solid #1f1f1f;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.item-row:last-child{border-bottom:none}
+.item-title{font-size:12px;font-weight:600;flex:1;line-height:1.3}
+.item-price{font-size:13px;font-weight:700;color:#22c55e;white-space:nowrap}
+.item-meta{font-size:10px;color:#6B7280;margin-top:2px}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#22c55e;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:30px;font-size:13px}
+.status-hunting{color:#f59e0b}
+.status-in-yard{color:#3b82f6}
+.status-listed{color:#a78bfa}
+.status-sold{color:#22c55e}
+.status-graduated{color:#6B7280}
+.filter-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.filter-btn{padding:4px 10px;font-size:10px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#6B7280;cursor:pointer}
+.filter-btn.active{color:#22c55e;border-color:#22c55e}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('mark')</script>
+<div class="container">
+  <div class="card" style="border-color:#22c55e">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#22c55e;text-transform:uppercase;letter-spacing:0.06em">THE MARK — Target List</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px">Parts you're hunting. Marked from Hunter's Perch intel.</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" onclick="graduateCheck()">Auto-Graduate</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="filterMarks('all',this)">All</button>
+      <button class="filter-btn" onclick="filterMarks('hunting',this)">🔍 Hunting</button>
+      <button class="filter-btn" onclick="filterMarks('in-yard',this)">📍 In Yard</button>
+      <button class="filter-btn" onclick="filterMarks('listed',this)">📦 Listed</button>
+      <button class="filter-btn" onclick="filterMarks('sold',this)">✅ Sold</button>
+      <button class="filter-btn" onclick="filterMarks('graduated',this)">🎓 Graduated</button>
+    </div>
+    <div id="markLoading" style="text-align:center;padding:16px"><div class="spinner"></div></div>
+    <div id="markResults" style="display:none"></div>
+  </div>
+  <div id="markStats" class="card" style="display:none"></div>
+</div>
+<script>
+var allMarks = [];
+var currentFilter = 'all';
+
+function loadMarks() {
+  var results = document.getElementById('markResults');
+  var loading = document.getElementById('markLoading');
+  loading.style.display = 'block';
+  results.style.display = 'none';
+
+  fetch('/competitors/marks?all=true')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      loading.style.display = 'none';
+      results.style.display = 'block';
+
+      if (!d.success || !d.marks || d.marks.length === 0) {
+        results.innerHTML = '<div class="empty">No marks yet. Go to Hunter\'s Perch and mark parts you want to pull.</div>';
+        return;
+      }
+
+      allMarks = d.marks;
+      showStats();
+      renderMarks();
+    })
+    .catch(function(err) {
+      loading.style.display = 'none';
+      results.style.display = 'block';
+      results.innerHTML = '<div class="empty" style="color:#dc2626">Error: ' + err.message + '</div>';
+    });
+}
+
+function showStats() {
+  var stats = document.getElementById('markStats');
+  var hunting = allMarks.filter(function(m) { return m.status === 'hunting'; }).length;
+  var inYard = allMarks.filter(function(m) { return m.status === 'in-yard'; }).length;
+  var listed = allMarks.filter(function(m) { return m.status === 'listed'; }).length;
+  var sold = allMarks.filter(function(m) { return m.status === 'sold'; }).length;
+  var graduated = allMarks.filter(function(m) { return m.status === 'graduated'; }).length;
+
+  stats.style.display = 'block';
+  stats.innerHTML = '<div style="display:flex;gap:16px;font-size:11px;flex-wrap:wrap">' +
+    '<div><span class="status-hunting">🔍 ' + hunting + '</span> hunting</div>' +
+    '<div><span class="status-in-yard">📍 ' + inYard + '</span> in yard</div>' +
+    '<div><span class="status-listed">📦 ' + listed + '</span> listed</div>' +
+    '<div><span class="status-sold">✅ ' + sold + '</span> sold</div>' +
+    '<div><span class="status-graduated">🎓 ' + graduated + '</span> graduated</div>' +
+    '</div>';
+}
+
+function renderMarks() {
+  var filtered = currentFilter === 'all' ? allMarks : allMarks.filter(function(m) { return m.status === currentFilter; });
+  var results = document.getElementById('markResults');
+
+  if (filtered.length === 0) {
+    results.innerHTML = '<div class="empty">No marks in this category.</div>';
+    return;
+  }
+
+  var h = '';
+  filtered.forEach(function(mark) {
+    var statusBadge = '';
+    if (mark.status === 'in-yard') statusBadge = '<span class="badge" style="background:#1e3a5f;color:#3b82f6">📍 IN YARD</span> ';
+    else if (mark.status === 'listed') statusBadge = '<span class="badge" style="background:#2e1065;color:#a78bfa">LISTED</span> ';
+    else if (mark.status === 'sold') statusBadge = '<span class="badge" style="background:#064e3b;color:#22c55e">SOLD</span> ';
+    else if (mark.status === 'graduated') statusBadge = '<span class="badge" style="background:#1a1a1a;color:#6B7280">GRADUATED</span> ';
+    else statusBadge = '<span class="badge" style="background:#422006;color:#f59e0b">HUNTING</span> ';
+
+    var pn = mark.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(mark.partNumber) + '</span>' : '';
+    var ptBadge = mark.partType ? '<span style="font-size:9px;font-weight:700;color:#a78bfa;background:#2e1065;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(mark.partType) + '</span>' : '';
+    var searchUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent((mark.originalTitle || '').substring(0, 60)) + '&_sacat=6030&LH_Sold=1&LH_Complete=1';
+    var daysAgo = Math.floor((Date.now() - new Date(mark.markedAt).getTime()) / 86400000);
+    var sellers = mark.sourceSellers ? (Array.isArray(mark.sourceSellers) ? mark.sourceSellers : []).slice(0, 3).join(', ') : '';
+
+    h += '<div class="item-row" style="' + (mark.status === 'graduated' ? 'opacity:0.5' : '') + '">';
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div class="item-title">' + statusBadge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(mark.originalTitle || '') + '</a></div>';
+    h += '<div class="item-meta">' + ptBadge + pn + (sellers ? 'from ' + esc(sellers) + ' · ' : '') + 'marked ' + daysAgo + 'd ago · score ' + (mark.scoreAtMark || '?') + ' · source: ' + esc(mark.sourceSignal || '?') + '</div>';
+    if (mark.notes) h += '<div class="item-meta" style="color:#f59e0b;margin-top:2px">📝 ' + esc(mark.notes) + '</div>';
+    if (mark.graduatedReason) h += '<div class="item-meta" style="color:#22c55e;margin-top:2px">🎓 ' + esc(mark.graduatedReason) + '</div>';
+    h += '</div>';
+    h += '<div style="text-align:right">';
+    if (mark.medianPrice) h += '<div class="item-price">$' + mark.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">target</div></div>';
+    h += '<div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">';
+    h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;color:#6B7280" onclick="addNote(\'' + mark.id + '\',this)">📝</button>';
+    h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;color:#dc2626" onclick="removeMark(\'' + mark.id + '\',this)">✕</button>';
+    h += '</div></div>';
+    h += '</div>';
+  });
+
+  results.innerHTML = h;
+}
+
+function filterMarks(status, btn) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderMarks();
+}
+
+function removeMark(id, btn) {
+  if (!confirm('Remove this from The Mark?')) return;
+  btn.disabled = true;
+  fetch('/competitors/mark/' + id, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        allMarks = allMarks.filter(function(m) { return m.id !== id; });
+        showStats();
+        renderMarks();
+      }
+    })
+    .catch(function() { btn.disabled = false; });
+}
+
+function addNote(id, btn) {
+  var note = prompt('Add a note for this mark:');
+  if (note === null) return;
+  btn.disabled = true;
+  fetch('/competitors/mark/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes: note }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() { loadMarks(); })
+    .catch(function() { btn.disabled = false; });
+}
+
+function graduateCheck() {
+  fetch('/competitors/mark/graduate', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.graduated > 0) {
+        alert(d.graduated + ' mark(s) graduated - you sold them!');
+        loadMarks();
+      } else {
+        alert('No marks ready to graduate yet.');
+      }
+    });
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadMarks();
+</script>
+</body>
+</html>
