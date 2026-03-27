@@ -30,11 +30,36 @@ const LOCATIONS = [
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── SCRAPE ──────────────────────────────────────────────
+// ── SCRAPE (with early termination on duplicates) ──────
 
-async function scrapePages(slug) {
-  const all = [];
+function parsePage(html) {
+  const $ = cheerio.load(html);
+  const vehicles = [];
+  $('div.pypvi_resultRow[id]').each((i, el) => {
+    const $r = $(el);
+    const ymm = $r.find('.pypvi_ymm').text().replace(/\s+/g,' ').trim();
+    const m = ymm.match(/^(\d{4})\s+(.+?)\s+(.+)$/);
+    if (!m) return;
+    let color=null,vin=null,row=null,stock=null,dateAdded=null;
+    $r.find('.pypvi_detailItem').each((j,d)=>{
+      const t=$(d).text().replace(/\s+/g,' ').trim();
+      if(t.startsWith('Color:'))color=t.replace('Color:','').trim();
+      else if(t.startsWith('VIN:'))vin=t.replace('VIN:','').trim();
+      else if(t.includes('Row:')){const rm=t.match(/Row:\s*(\S+)/);if(rm)row=rm[1];}
+      else if(t.includes('Stock #:')||t.includes('Stock#:'))stock=t.replace(/Stock\s*#:\s*/,'').trim();
+      else if(t.includes('Available:')){const te=$(d).find('time');dateAdded=te.length?(te.attr('datetime')||te.text().trim()):t.replace('Available:','').trim();}
+    });
+    vehicles.push({year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded});
+  });
+  return { vehicles, hasNext: html.includes('Next Page') };
+}
+
+async function scrapePages(slug, yardId) {
+  const allNew = [];
   let page = 1;
+  let consecutiveDupes = 0;
+  const DUPE_THRESHOLD = 5; // stop after 5 consecutive duplicates on a page
+
   while (page <= 100) {
     const url = page === 1
       ? `https://www.pyp.com/inventory/${slug}/`
@@ -43,120 +68,95 @@ async function scrapePages(slug) {
       const { execSync } = require('child_process');
       const html = execSync(`curl -s -L --max-time 30 -H "User-Agent: ${UA}" -H "Accept: text/html,application/xhtml+xml" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
       if (html.includes('Just a moment')) { console.log('  CloudFlare blocked'); break; }
-      const $ = cheerio.load(html);
-      let n = 0;
-      $('div.pypvi_resultRow[id]').each((i, el) => {
-        const $r = $(el);
-        const ymm = $r.find('.pypvi_ymm').text().replace(/\s+/g,' ').trim();
-        const m = ymm.match(/^(\d{4})\s+(.+?)\s+(.+)$/);
-        if (!m) return;
-        let color=null,vin=null,row=null,stock=null,dateAdded=null;
-        $r.find('.pypvi_detailItem').each((j,d)=>{
-          const t=$(d).text().replace(/\s+/g,' ').trim();
-          if(t.startsWith('Color:'))color=t.replace('Color:','').trim();
-          else if(t.startsWith('VIN:'))vin=t.replace('VIN:','').trim();
-          else if(t.includes('Row:')){const rm=t.match(/Row:\s*(\S+)/);if(rm)row=rm[1];}
-          else if(t.includes('Stock #:')||t.includes('Stock#:'))stock=t.replace(/Stock\s*#:\s*/,'').trim();
-          else if(t.includes('Available:')){const te=$(d).find('time');dateAdded=te.length?(te.attr('datetime')||te.text().trim()):t.replace('Available:','').trim();}
-        });
-        all.push({year:m[1],make:m[2].trim(),model:m[3].trim(),color,vin,row,stock,dateAdded});
-        n++;
-      });
-      if(n===0)break;
-      process.stdout.write(`  Page ${page}: ${n} (total ${all.length})\n`);
-      if(!html.includes('Next Page'))break;
+
+      const { vehicles, hasNext } = parsePage(html);
+      if (vehicles.length === 0) break;
+
+      // Check each vehicle against DB — newest are first on pyp.com
+      let pageNew = 0, pageDupes = 0;
+      for (const v of vehicles) {
+        let exists = false;
+
+        // Check by stock number (most reliable dedup key)
+        if (v.stock && yardId) {
+          const hit = await knex('yard_vehicle').where('yard_id', yardId).where('stock_number', v.stock).first('id');
+          if (hit) exists = true;
+        }
+        // Fallback: check by VIN
+        if (!exists && v.vin && v.vin.length >= 11 && yardId) {
+          const hit = await knex('yard_vehicle').where('yard_id', yardId).where('vin', v.vin).first('id');
+          if (hit) exists = true;
+        }
+
+        if (exists) {
+          pageDupes++;
+          consecutiveDupes++;
+        } else {
+          consecutiveDupes = 0;
+          allNew.push(v);
+          pageNew++;
+        }
+      }
+
+      process.stdout.write(`  Page ${page}: ${pageNew} new, ${pageDupes} existing (total new: ${allNew.length})\n`);
+
+      // Early termination: if entire page was duplicates, we've caught up
+      if (pageNew === 0) {
+        console.log(`  Hit all-duplicate page — caught up. Stopping.`);
+        break;
+      }
+      // Or if we've seen many consecutive dupes (mixed page near the boundary)
+      if (consecutiveDupes >= DUPE_THRESHOLD) {
+        console.log(`  ${consecutiveDupes} consecutive dupes — caught up. Stopping.`);
+        break;
+      }
+
+      if (!hasNext) break;
       page++;
       await sleep(500);
     } catch(e) { console.log(`  Page ${page} error: ${e.message.substring(0,80)}`); break; }
   }
-  return all;
+  return allNew;
 }
 
-// ── SAVE (all vehicles) ──────────────────────────────────
+// ── SAVE (new vehicles only — dupes already filtered during scraping) ──
 
-async function saveYard(loc, allVehicles) {
-  const yard = await knex('yard').where('name', loc.name).first();
-  if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB`); return {}; }
-
+async function saveYard(loc, newVehicles, yardId) {
   const now = new Date();
-  let skipped = 0;
 
-  // Save ALL vehicles — let the display layer filter by date
-  const recent = allVehicles.map(v => {
-    v._date = v.dateAdded ? new Date(v.dateAdded) : null;
-    return v;
-  });
-  console.log(`  Saving all ${recent.length} vehicles`);
-
-  if (recent.length === 0) {
-    // Still mark inactive vehicles not seen in full scrape
-    const allStocks = new Set(allVehicles.filter(v => v.stock).map(v => v.stock));
-    const deact = await knex('yard_vehicle')
-      .where('yard_id', yard.id).where('active', true)
-      .whereNotNull('stock_number')
-      .whereNotIn('stock_number', [...allStocks])
-      .update({ active: false, updatedAt: now });
-    if (deact > 0) console.log(`  Deactivated ${deact} (not in scrape)`);
-    await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
+  if (newVehicles.length === 0) {
+    await knex('yard').where('id', yardId).update({ last_scraped: now, updatedAt: now });
     console.log(`  No new vehicles to save`);
-    return { inserted: 0, updated: 0, skipped };
+    return { inserted: 0, errors: 0 };
   }
 
-  // Bulk deactivate vehicles not in full scrape (single query, not per-row)
-  const allStocks = new Set(allVehicles.filter(v => v.stock).map(v => v.stock));
-  if (allStocks.size > 0) {
-    const deact = await knex('yard_vehicle')
-      .where('yard_id', yard.id).where('active', true)
-      .whereNotNull('stock_number')
-      .whereNotIn('stock_number', [...allStocks])
-      .update({ active: false, updatedAt: now });
-    if (deact > 0) console.log(`  Deactivated ${deact} (not in scrape — pulled)`);
-  }
+  console.log(`  Saving ${newVehicles.length} new vehicles`);
 
-  // INSERT/UPDATE only recent vehicles
-  let inserted = 0, updated = 0, errors = 0, vins = 0;
-  for (const v of recent) {
+  let inserted = 0, errors = 0, vins = 0;
+  for (const v of newVehicles) {
     const hasVin = v.vin && v.vin.length >= 11;
     if (hasVin) vins++;
+    const dateAdded = v.dateAdded ? new Date(v.dateAdded) : null;
     try {
-      let existing = null;
-      if (v.stock) {
-        existing = await knex('yard_vehicle').where('yard_id', yard.id).where('stock_number', v.stock).first();
-      }
-      if (!existing) {
-        existing = await knex('yard_vehicle').where('yard_id', yard.id).where('year', v.year).where('make', v.make).where('model', v.model).first();
-      }
-      if (existing) {
-        await knex('yard_vehicle').where('id', existing.id).update({
-          vin: hasVin ? v.vin : (existing.vin || null),
-          color: v.color || existing.color,
-          row_number: v.row || existing.row_number,
-          stock_number: v.stock || existing.stock_number,
-          date_added: v._date || existing.date_added,
-          active: true, last_seen: now, scraped_at: now, updatedAt: now,
-        });
-        updated++;
-      } else {
-        await knex('yard_vehicle').insert({
-          id: uuidv4(), yard_id: yard.id,
-          year: v.year, make: v.make, model: v.model, trim: null,
-          color: v.color || null, row_number: v.row || null,
-          vin: hasVin ? v.vin : null, stock_number: v.stock || null,
-          date_added: v._date || null,
-          active: true, first_seen: now, last_seen: now,
-          scraped_at: now, createdAt: now, updatedAt: now,
-        });
-        inserted++;
-      }
+      await knex('yard_vehicle').insert({
+        id: uuidv4(), yard_id: yardId,
+        year: v.year, make: v.make, model: v.model, trim: null,
+        color: v.color || null, row_number: v.row || null,
+        vin: hasVin ? v.vin : null, stock_number: v.stock || null,
+        date_added: dateAdded,
+        active: true, first_seen: now, last_seen: now,
+        scraped_at: now, createdAt: now, updatedAt: now,
+      });
+      inserted++;
     } catch (e) {
       errors++;
-      if (errors <= 3) console.log(`  DB ERROR [${v.year} ${v.make} ${v.model}]: ${e.message}`);
+      if (errors <= 3) console.log(`  DB ERROR [${v.year} ${v.make} ${v.model}]: ${e.message.substring(0,60)}`);
     }
   }
 
-  await knex('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
-  console.log(`  SAVED: ${inserted} new, ${updated} updated, ${errors} errors, ${vins} VINs`);
-  return { inserted, updated, errors, vins, skipped };
+  await knex('yard').where('id', yardId).update({ last_scraped: now, updatedAt: now });
+  console.log(`  SAVED: ${inserted} new, ${errors} errors, ${vins} VINs`);
+  return { inserted, errors, vins };
 }
 
 // ── VIN DECODE (recent only) ────────────────────────────
@@ -256,12 +256,18 @@ async function main() {
   for (const loc of LOCATIONS) {
     console.log(`\n━━━ ${loc.name} ━━━`);
     try {
-      const vehicles = await scrapePages(loc.slug);
-      if (vehicles.length > 0) await saveYard(loc, vehicles);
-      else console.log('  0 vehicles found — site may be down or blocked');
+      // Look up yard ID first (needed for duplicate check during scraping)
+      const yard = await knex('yard').where('name', loc.name).first();
+      if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB — skipping`); continue; }
+
+      const newVehicles = await scrapePages(loc.slug, yard.id);
+      await saveYard(loc, newVehicles, yard.id);
+
+      // Update last_seen for ALL active vehicles in this yard (proves scrape ran)
+      await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
+        .update({ last_seen: new Date(), updatedAt: new Date() });
     } catch (e) {
       console.error(`  YARD ERROR [${loc.name}]: ${e.message.substring(0, 100)}`);
-      // Continue to next yard — don't kill the whole run
     }
   }
 
