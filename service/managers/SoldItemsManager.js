@@ -110,9 +110,12 @@ class SoldItemsManager {
       let items = [];
 
       // Try Finding API first (official method), fall back to scraper
-      if (!useScraper && process.env.FINDINGS_APP_NAME) {
+      if (!useScraper && (process.env.FINDINGS_APP_NAME || process.env.TRADING_API_APP_NAME)) {
         try {
           this.log.info({ seller }, 'Using Finding API to fetch sold items');
+          if (!process.env.FINDINGS_APP_NAME && process.env.TRADING_API_APP_NAME) {
+            process.env.FINDINGS_APP_NAME = process.env.TRADING_API_APP_NAME;
+          }
           items = await this.findingsAPI.fetchAllCompletedItems({
             sellerName: seller,
             categoryId,

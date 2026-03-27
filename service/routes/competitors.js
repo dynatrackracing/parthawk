@@ -75,11 +75,10 @@ router.post('/:sellerId/scrape', async (req, res) => {
     const manager = new SoldItemsManager();
     const result = await manager.scrapeCompetitor({
       seller: sellerId,
-      categoryId: '0', // all categories — don't limit to ECU/Computers
+      categoryId: '6030',
       maxPages: parseInt(pages),
-      useScraper: true, // force Playwright scraper
+      useScraper: false,
     });
-    await manager.scraper.closeBrowser();
     log.info({ seller: sellerId, result }, 'Manual competitor scrape complete');
   } catch (err) {
     log.error({ err: err.message, seller: sellerId }, 'Manual competitor scrape failed');
