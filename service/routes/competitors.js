@@ -169,6 +169,99 @@ router.get('/gap-intel', async (req, res) => {
   }
 });
 
+/**
+ * GET /competitors/emerging
+ * Detect NEW (first-ever appearance) and ACCELERATING parts from competitor data.
+ * Query: days (default 90), limit (default 40)
+ */
+router.get('/emerging', async (req, res) => {
+  const days = parseInt(req.query.days) || 90;
+  const limit = parseInt(req.query.limit) || 40;
+
+  try {
+    const now = new Date();
+    const cutoff = new Date(now - days * 24 * 60 * 60 * 1000);
+    const midpoint = new Date(now - (days / 2) * 24 * 60 * 60 * 1000);
+    const recentWindow = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const items = await database('SoldItem')
+      .where('soldDate', '>=', cutoff)
+      .where('soldPrice', '>=', 100)
+      .whereNot('seller', 'dynatrack')
+      .whereNot('seller', 'dynatrackracing')
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId');
+
+    const groups = {};
+    for (const item of items) {
+      const key = normalizeTitle(item.title);
+      if (!key || key.length < 10) continue;
+      if (!groups[key]) {
+        groups[key] = { title: item.title, sellers: new Set(), firstSeen: new Date(item.soldDate), recentCount: 0, olderCount: 0, totalCount: 0, prices: [], ebayItemId: item.ebayItemId };
+      }
+      const g = groups[key];
+      g.sellers.add(item.seller);
+      g.totalCount++;
+      g.prices.push(parseFloat(item.soldPrice) || 0);
+      const soldDate = new Date(item.soldDate);
+      if (soldDate < g.firstSeen) g.firstSeen = soldDate;
+      if (soldDate >= midpoint) { g.recentCount++; } else { g.olderCount++; }
+    }
+
+    const olderItems = await database('SoldItem').where('soldDate', '<', cutoff).select('title');
+    const previouslySeenTitles = new Set(olderItems.map(function(i) { return normalizeTitle(i.title); }).filter(Boolean));
+
+    const yourSales = await database('YourSale').select('title');
+    const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title');
+    const yourListingTitles = new Set(yourListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
+
+    const emerging = [];
+    for (const [key, group] of Object.entries(groups)) {
+      if (matchesAny(key, yourSoldTitles) || matchesAny(key, yourListingTitles)) continue;
+
+      const sorted = group.prices.sort(function(a, b) { return a - b; });
+      const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+      const partNumber = extractPartNumber(group.title);
+
+      let signal = null;
+      let signalStrength = 0;
+
+      if (group.firstSeen >= recentWindow && group.totalCount <= 5 && !previouslySeenTitles.has(key)) {
+        signal = 'NEW';
+        const rarityScore = Math.max(0, 100 - (group.totalCount - 1) * 20);
+        const priceWeight = Math.min(100, (median / 400) * 100);
+        const pnBonus = partNumber ? 20 : 0;
+        signalStrength = Math.min(100, rarityScore * 0.45 + priceWeight * 0.35 + pnBonus);
+      } else if (group.recentCount >= 4 && group.olderCount > 0 && group.recentCount >= group.olderCount * 3) {
+        signal = 'ACCEL';
+        const acceleration = group.recentCount / Math.max(1, group.olderCount);
+        signalStrength = Math.min(100, (acceleration / 6) * 40 + (median / 400) * 30 + (group.recentCount / 20) * 20 + (partNumber ? 10 : 0));
+      }
+
+      if (!signal) continue;
+
+      emerging.push({
+        title: group.title, partNumber, signal, signalStrength: Math.round(signalStrength),
+        sellers: Array.from(group.sellers), totalCount: group.totalCount, recentCount: group.recentCount,
+        olderCount: group.olderCount, medianPrice: Math.round(median),
+        totalRevenue: Math.round(group.prices.reduce(function(a, b) { return a + b; }, 0)),
+        firstSeen: group.firstSeen.toISOString(), ebayItemId: group.ebayItemId,
+      });
+    }
+
+    emerging.sort(function(a, b) {
+      if (a.signal === 'NEW' && b.signal !== 'NEW') return -1;
+      if (b.signal === 'NEW' && a.signal !== 'NEW') return 1;
+      return b.signalStrength - a.signalStrength;
+    });
+
+    res.json({ success: true, days, totalEmerging: emerging.length, newCount: emerging.filter(function(e) { return e.signal === 'NEW'; }).length, accelCount: emerging.filter(function(e) { return e.signal === 'ACCEL'; }).length, emerging: emerging.slice(0, limit) });
+  } catch (err) {
+    log.error({ err }, 'Emerging parts error');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Helper: normalize a title for fuzzy matching
 function normalizeTitle(title) {
   if (!title) return '';
