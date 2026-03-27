@@ -185,10 +185,11 @@ function addPart(defaultType) {
       '<select class="part-select" id="type' + id + '" onchange="onTypeChange(' + id + ')">' +
         types.map(t => '<option value="' + t.type + '"' + (t.type === sel.type ? ' selected' : '') + ' data-cogs="' + t.cogs + '" data-mv="' + t.marketValue + '">' + t.label + '</option>').join('') +
       '</select>' +
-      '<span class="part-mv">Market: $<span id="mv' + id + '">' + sel.marketValue + '</span></span>' +
       '<button class="part-rm" onclick="rmPart(' + id + ')">x</button>' +
     '</div>' +
     '<div class="part-bottom">' +
+      '<span class="cogs-label">Market $</span>' +
+      '<input type="number" class="cogs-input" id="mv' + id + '" value="' + sel.marketValue + '" min="0" step="5" inputmode="numeric" oninput="recalc()" />' +
       '<span class="cogs-label">COGS $</span>' +
       '<input type="number" class="cogs-input" id="cogs' + id + '" value="' + sel.cogs + '" min="0" step="1" inputmode="numeric" oninput="recalc()" />' +
       '<span class="part-pct green" id="pct' + id + '">0%</span>' +
@@ -202,7 +203,7 @@ function onTypeChange(id) {
   const s = document.getElementById('type' + id);
   const opt = s.options[s.selectedIndex];
   document.getElementById('cogs' + id).value = opt.dataset.cogs;
-  document.getElementById('mv' + id).textContent = opt.dataset.mv;
+  document.getElementById('mv' + id).value = opt.dataset.mv;
   recalc();
 }
 
@@ -223,7 +224,7 @@ function recalc() {
     const dotEl = document.getElementById('dot' + id);
     if (!mvEl || !cogsEl) return;
 
-    const mv = parseFloat(mvEl.textContent) || 0;
+    const mv = parseFloat(mvEl.value) || 0;
     const cogs = parseFloat(cogsEl.value) || 0;
     totalMV += mv;
     totalCogs += cogs;
