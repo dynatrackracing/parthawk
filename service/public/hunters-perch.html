@@ -42,26 +42,8 @@ nav a.active{color:#DC2626;font-weight:700}
 </style>
 </head>
 <body>
-<header>
-  <div style="display:flex;align-items:center;gap:10px">
-    <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
-    <div>
-      <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
-      <div style="font-size:10px;color:#6B7280;margin-top:1px">HUNTERS PERCH <span id="sellerCount" style="color:#dc2626;font-weight:700"></span></div>
-    </div>
-  </div>
-</header>
-<nav>
-  <a href="/">THE NEST</a>
-  <a href="/admin/pull">DAILY FEED</a>
-  <a href="/admin/vin">HAWK EYE</a>
-  <a href="/admin/gate">NEST PROTECTOR</a>
-  <a href="/admin/restock">THE QUARRY</a>
-  <a href="/admin/restock-list">SCOUR STREAM</a>
-  <a href="/admin/opportunities">SKY WATCH</a>
-  <a href="/admin/hunters-perch" class="active">HUNTERS PERCH</a>
-  <a href="/admin/scout-alerts">SCOUT ALERTS</a>
-</nav>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('perch')</script>
 <div class="container">
   <div class="card">
     <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Track a Competitor</div>

@@ -37,21 +37,8 @@ td{padding:6px;border-bottom:1px solid #1f1f1f}
 </style>
 </head>
 <body>
-<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;gap:10px">
-  <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:45px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
-  <div><span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span><div style="font-size:10px;color:#6B7280;margin-top:1px">HAWK EYE</div></div>
-</header>
-<nav style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px">
-  <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">THE NEST</a>
-  <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">DAILY FEED</a>
-  <a href="/admin/vin" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a;font-weight:700">HAWK EYE</a>
-  <a href="/admin/gate" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">NEST PROTECTOR</a>
-  <a href="/admin/restock" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">THE QUARRY</a>
-  <a href="/admin/restock-list" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">SCOUR STREAM</a>
-  <a href="/admin/opportunities" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">SKY WATCH</a>
-  <a href="/admin/hunters-perch" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">HUNTERS PERCH</a>
-  <a href="/admin/scout-alerts" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;background:#1a1a1a">SCOUT ALERTS</a>
-</nav>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('vin')</script>
 <div class="container">
   <div class="card">
     <div class="card-title">Enter or Scan VIN</div>

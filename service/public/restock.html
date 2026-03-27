@@ -35,27 +35,10 @@
 </style>
 </head>
 <body>
-<header style="background:#0a0a0a;border-bottom:1px solid #1a1a1a;">
-  <div class="header-left" style="display:flex;align-items:center;gap:10px;padding:8px 16px;">
-    <div style="display:flex;align-items:center;gap:8px">
-      <img src="/admin/darkhawk-logo-sm.png" style="height:55px;background:none !important;border-radius:6px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DarkHawk">
-      <div>
-        <span style="font-size:18px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
-        <p id="sub" style="font-size:11px;color:#6B7280;margin-top:1px">Loading...</p>
-      </div>
-    </div>
-  </div>
-</header>
-<nav style="display:flex;gap:6px;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;font-size:11px;">
-  <a href="/" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">THE NEST</a>
-  <a href="/admin/pull" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">DAILY FEED</a>
-  <a href="/admin/vin" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">HAWK EYE</a>
-  <a href="/admin/gate" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">NEST PROTECTOR</a>
-  <a href="/admin/restock" style="color:#DC2626;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;font-weight:700;">THE QUARRY</a>
-  <a href="/admin/restock-list" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">SCOUR STREAM</a>
-  <a href="/admin/opportunities" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">SKY WATCH</a>
-  <a href="/admin/hunters-perch" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">HUNTERS PERCH</a>
-  <a href="/admin/scout-alerts" style="color:#9CA3AF;text-decoration:none;padding:4px 8px;border-radius:4px;white-space:nowrap;background:#1a1a1a;">SCOUT ALERTS</a>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('quarry')</script>
+<div style="padding:6px 16px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;">
+  <p id="sub" style="font-size:11px;color:#6B7280;">Loading...</p>
 </nav>
 <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;font-size:12px;color:#6B7280;">
   <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Period:</span>

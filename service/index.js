@@ -199,6 +199,15 @@ app.get('/admin/hunters-perch', (req, res) => {
 app.get('/admin/scout-alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
 });
+app.get('/admin/alerts', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'alerts.html'));
+});
+app.get('/admin/sales', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'sales.html'));
+});
+app.get('/admin/competitors', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'competitors.html'));
+});
 app.get('/admin/test', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'test.html'));
 });

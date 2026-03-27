@@ -62,29 +62,15 @@ nav a.active{color:#DC2626;font-weight:700}
 </style>
 </head>
 <body>
-<header>
-  <div style="display:flex;align-items:center;gap:10px">
-    <a href="/"><img src="/admin/darkhawk-logo-sm.png" style="height:40px;border-radius:6px;filter:drop-shadow(0 0 6px rgba(220,38,38,0.4))" alt="DH"></a>
-    <div>
-      <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
-      <div style="font-size:10px;color:#6B7280;margin-top:1px">SCOUT ALERTS <span id="alertCount" style="color:#dc2626;font-weight:700"></span></div>
-    </div>
-  </div>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('alerts')</script>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;">
+  <div style="font-size:10px;color:#6B7280">SCOUT ALERTS <span id="alertCount" style="color:#dc2626;font-weight:700"></span></div>
   <div style="display:flex;align-items:center;gap:8px">
     <div id="lastUpdated" style="font-size:9px;color:#6B7280;text-align:right"></div>
     <button class="btn-refresh" id="refreshBtn" onclick="refreshAlerts()">Refresh</button>
   </div>
-</header>
-<nav>
-  <a href="/">THE NEST</a>
-  <a href="/admin/pull">DAILY FEED</a>
-  <a href="/admin/vin">HAWK EYE</a>
-  <a href="/admin/gate">NEST PROTECTOR</a>
-  <a href="/admin/restock">THE QUARRY</a>
-  <a href="/admin/restock-list">SCOUR STREAM</a>
-  <a href="/admin/opportunities">SKY WATCH</a>
-  <a href="/admin/hunters-perch">HUNTERS PERCH</a>
-  <a href="/admin/scout-alerts" class="active">SCOUT ALERTS</a>
+</div>
 </nav>
 <!-- Yard Tabs -->
 <div class="tabs" id="yardTabs">
