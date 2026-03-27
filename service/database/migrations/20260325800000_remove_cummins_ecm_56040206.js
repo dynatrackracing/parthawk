@@ -12,8 +12,7 @@ module.exports = {
     // 1. Find Item IDs referencing this part number (for cascade cleanup)
     const items = await knex('Item')
       .where('title', 'ilike', '%56040206%')
-      .orWhere('sku', 'ilike', '%56040206%')
-      .select('id', 'title', 'sku');
+      .select('id', 'title');
     results.itemsFound = items.length;
 
     if (items.length > 0) {
@@ -69,7 +68,6 @@ module.exports = {
     // 8. Verify
     const remaining = await knex('Item')
       .where('title', 'ilike', '%56040206%')
-      .orWhere('sku', 'ilike', '%56040206%')
       .count('* as count')
       .first();
     results.remainingItems = parseInt(remaining?.count || 0);

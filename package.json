@@ -38,6 +38,7 @@
     "lodash": "^4.17.21",
     "moment": "^2.29.1",
     "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
     "node-schedule": "^2.0.0",
     "objection": "^2.2.15",
     "pg": "^8.6.0",

@@ -82,8 +82,8 @@ class SoldItemsManager {
         }
       }
     } finally {
-      // Always close the browser
-      await this.scraper.closeBrowser();
+      // Browser cleanup only needed if scraper was used
+      try { await this.scraper.closeBrowser(); } catch (e) {}
     }
 
     this.log.info({ results }, 'Completed scraping all competitors');
@@ -123,12 +123,8 @@ class SoldItemsManager {
           });
           this.log.info({ seller, itemCount: items.length }, 'Fetched items via Finding API');
         } catch (apiErr) {
-          this.log.warn({ err: apiErr, seller }, 'Finding API failed, falling back to scraper');
-          items = await this.scraper.scrapeSoldItems({
-            seller,
-            categoryId,
-            maxPages,
-          });
+          this.log.error({ err: apiErr, seller }, 'Finding API failed - not falling back to scraper on Railway');
+          items = [];
         }
       } else {
         // Use scraper (may be blocked by bot detection)
@@ -142,9 +138,12 @@ class SoldItemsManager {
       scraped = items.length;
       this.log.info({ seller, itemCount: items.length }, 'Fetched sold items from seller');
 
-      // Store items in database
+      // Store items in database, stop early if we hit items we already have
+      let consecutiveDupes = 0;
       await Promise.mapSeries(items, async (item) => {
         try {
+          if (consecutiveDupes >= 10) return;
+
           // Skip items without valid ebayItemId
           if (!item.ebayItemId) {
             this.log.warn({ item }, 'Skipping item without ebayItemId');
@@ -188,6 +187,14 @@ class SoldItemsManager {
             }
           }
 
+          // Check if we already have this item - track consecutive dupes
+          const existing = await SoldItem.query().where('ebayItemId', item.ebayItemId).first();
+          if (existing) {
+            consecutiveDupes++;
+            return;
+          }
+          consecutiveDupes = 0;
+
           // Upsert on conflict
           await SoldItem.query()
             .insert(toInsert)
@@ -200,6 +207,8 @@ class SoldItemsManager {
           errors++;
         }
       });
+
+      this.log.info({ seller, consecutiveDupes, scraped, stored }, 'Scrape complete, dupes detected');
 
     } catch (err) {
       this.log.error({ err, seller }, 'Error scraping competitor');

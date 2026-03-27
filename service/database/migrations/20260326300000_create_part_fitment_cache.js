@@ -1,4 +1,6 @@
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  const exists = await knex.schema.hasTable('part_fitment_cache');
+  if (exists) return;
   return knex.schema.createTable('part_fitment_cache', (table) => {
     table.increments('id').primary();
     table.string('part_number_exact', 50).notNullable();

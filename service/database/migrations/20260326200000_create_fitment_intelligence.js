@@ -1,4 +1,6 @@
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  const exists = await knex.schema.hasTable('fitment_intelligence');
+  if (exists) return;
   return knex.schema.createTable('fitment_intelligence', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.text('part_type').notNullable();

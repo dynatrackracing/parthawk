@@ -124,6 +124,12 @@ router.get('/gap-intel', async (req, res) => {
       .limit(5000);
     const yourItemTitles = new Set(yourItems.map(i => normalizeTitle(i.title)).filter(Boolean));
 
+    let dismissedTitles = new Set();
+    try {
+      const dismissed = await database('dismissed_intel').select('normalizedTitle');
+      dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
+    } catch (e) { /* table may not exist yet */ }
+
     // Find gaps: competitor parts that we have never sold, listed, or stocked
     const gaps = [];
     for (const [key, group] of Object.entries(compGroups)) {
@@ -133,6 +139,7 @@ router.get('/gap-intel', async (req, res) => {
       const inYourItems = matchesAny(key, yourItemTitles);
 
       if (inYourSales || inYourListings || inYourItems) continue;
+      if (dismissedTitles.has(key)) continue;
 
       // Calculate median price
       const sorted = group.prices.sort((a, b) => a - b);
@@ -177,8 +184,18 @@ router.get('/gap-intel', async (req, res) => {
         partType: extractPartType(group.title),
         confluence: isConfluence,
         sellerCount: sellerCount,
+        yardMatch: titleMatchesYard(group.title, yardMakes),
       });
     }
+
+    // Check yard_vehicle for local matches
+    let yardMakes = new Set();
+    try {
+      const yardVehicles = await database('yard_vehicle').select('make').limit(5000);
+      for (const v of yardVehicles) {
+        if (v.make) yardMakes.add(v.make.toUpperCase());
+      }
+    } catch (e) { /* yard_vehicle may not have data */ }
 
     // Sort by score descending
     gaps.sort((a, b) => b.score - a.score);
@@ -250,9 +267,16 @@ router.get('/emerging', async (req, res) => {
     const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
     const yourListingTitles = new Set(yourListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
 
+    let dismissedTitles = new Set();
+    try {
+      const dismissed = await database('dismissed_intel').select('normalizedTitle');
+      dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
+    } catch (e) { /* table may not exist yet */ }
+
     const emerging = [];
     for (const [key, group] of Object.entries(groups)) {
       if (matchesAny(key, yourSoldTitles) || matchesAny(key, yourListingTitles)) continue;
+      if (dismissedTitles.has(key)) continue;
 
       const sorted = group.prices.sort(function(a, b) { return a - b; });
       const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
@@ -416,6 +440,78 @@ router.post('/cleanup', async (req, res) => {
 });
 
 /**
+ * POST /competitors/auto-scrape
+ * Auto-scrape all enabled sellers. Called by daily cron.
+ * Skips sellers scraped in the last 20 hours.
+ */
+router.post('/auto-scrape', async (req, res) => {
+  try {
+    const sellers = await database('SoldItemSeller').where('enabled', true);
+    const results = [];
+    const skipWindow = new Date(Date.now() - 20 * 60 * 60 * 1000);
+
+    for (const seller of sellers) {
+      if (seller.lastScrapedAt && new Date(seller.lastScrapedAt) > skipWindow) {
+        results.push({ seller: seller.name, skipped: true, reason: 'scraped recently' });
+        continue;
+      }
+
+      try {
+        const manager = new SoldItemsManager();
+        const result = await manager.scrapeCompetitor({
+          seller: seller.name,
+          categoryId: '6030',
+          maxPages: 3,
+          useScraper: false,
+        });
+
+        await database('SoldItemSeller').where('name', seller.name).update({
+          lastScrapedAt: new Date(),
+          itemsScraped: (seller.itemsScraped || 0) + result.stored,
+          updatedAt: new Date(),
+        });
+
+        results.push({ seller: seller.name, ...result });
+      } catch (err) {
+        log.error({ err: err.message, seller: seller.name }, 'Auto-scrape failed for seller');
+        results.push({ seller: seller.name, error: err.message });
+      }
+    }
+
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/dismiss', async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ success: false, error: 'title required' });
+  try {
+    const key = normalizeTitle(title);
+    const exists = await database('dismissed_intel').where('normalizedTitle', key).first();
+    if (!exists) {
+      await database('dismissed_intel').insert({ normalizedTitle: key, originalTitle: title, dismissedAt: new Date() });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/undismiss', async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ success: false, error: 'title required' });
+  try {
+    const key = normalizeTitle(title);
+    await database('dismissed_intel').where('normalizedTitle', key).del();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /competitors/seed-defaults
  * Add default competitors if not already tracked.
  */
@@ -508,7 +604,7 @@ router.post('/:sellerId/scrape', async (req, res) => {
  * Best sellers report from scraped sold items.
  */
 router.get('/:sellerId/best-sellers', async (req, res) => {
-  const { sellerId } = req.params;
+  const sellerId = req.params.sellerId.toLowerCase().trim();
   const days = parseInt(req.query.days) || 90;
 
   try {
@@ -570,18 +666,26 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
 router.get('/sellers', async (req, res) => {
   try {
     const sellers = await database('SoldItemSeller').orderBy('name');
-    var withCounts = [];
-    for (var s of sellers) {
-      var countResult = await database('SoldItem').where('seller', s.name).count('* as count').first();
+
+    // Single grouped query instead of N+1
+    const counts = await database('SoldItem')
+      .select('seller')
+      .count('* as count')
+      .groupBy('seller');
+    const countMap = {};
+    for (const c of counts) {
+      countMap[c.seller] = parseInt(c.count || 0);
+    }
+
+    var withCounts = sellers.map(function(s) {
       var hoursAgo = s.lastScrapedAt ? Math.floor((Date.now() - new Date(s.lastScrapedAt).getTime()) / 3600000) : null;
       var scrapeAlert = null;
       if (s.enabled && (!s.lastScrapedAt || hoursAgo > 48)) {
         scrapeAlert = !s.lastScrapedAt ? 'Never scraped' : 'Last scrape ' + Math.floor(hoursAgo / 24) + 'd ago - may be failing';
       }
-      withCounts.push({ ...s, soldItemCount: parseInt(countResult?.count || 0), scrapeAlert: scrapeAlert });
-    }
+      return { ...s, soldItemCount: countMap[s.name] || 0, scrapeAlert: scrapeAlert };
+    });
 
-    // Build top-level alerts for any sellers with issues
     var alerts = withCounts.filter(function(s) { return s.scrapeAlert; }).map(function(s) { return { seller: s.name, message: s.scrapeAlert }; });
 
     res.json({ success: true, sellers: withCounts, scrapeAlerts: alerts });
@@ -589,5 +693,42 @@ router.get('/sellers', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+function titleMatchesYard(title, yardMakes) {
+  if (!title || yardMakes.size === 0) return false;
+  var upper = title.toUpperCase();
+  for (var make of yardMakes) {
+    if (make.length >= 3 && upper.includes(make)) return true;
+  }
+  return false;
+}
+
+// Daily auto-scrape cron - 6AM Eastern (11:00 UTC)
+try {
+  const cron = require('node-cron');
+  cron.schedule('0 11 * * *', async () => {
+    log.info('Daily competitor auto-scrape starting');
+    try {
+      const sellers = await database('SoldItemSeller').where('enabled', true);
+      for (const seller of sellers) {
+        const skipWindow = new Date(Date.now() - 20 * 60 * 60 * 1000);
+        if (seller.lastScrapedAt && new Date(seller.lastScrapedAt) > skipWindow) continue;
+        try {
+          const manager = new SoldItemsManager();
+          await manager.scrapeCompetitor({ seller: seller.name, categoryId: '6030', maxPages: 3, useScraper: false });
+          await database('SoldItemSeller').where('name', seller.name).update({ lastScrapedAt: new Date(), updatedAt: new Date() });
+          log.info({ seller: seller.name }, 'Auto-scraped seller');
+        } catch (err) {
+          log.error({ err: err.message, seller: seller.name }, 'Auto-scrape failed for seller');
+        }
+      }
+    } catch (err) {
+      log.error({ err: err.message }, 'Auto-scrape cron error');
+    }
+  });
+  log.info('Competitor auto-scrape cron scheduled for 6AM Eastern daily');
+} catch (e) {
+  log.warn('node-cron not available, competitor auto-scrape cron not scheduled');
+}
 
 module.exports = router;
