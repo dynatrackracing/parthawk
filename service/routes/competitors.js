@@ -127,11 +127,15 @@ router.get('/gap-intel', async (req, res) => {
         ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
         : sorted[Math.floor(sorted.length / 2)];
 
-      // Score: weighted by volume (40%), median price (35%), seller count (25%)
+      // Extract part number from title - common OEM patterns
+      const partNumber = extractPartNumber(group.title);
+
+      // Score: volume 35%, price 30%, seller breadth 15%, part number bonus 20%
       const volumeScore = Math.min(100, (group.count / 30) * 100);
       const priceScore = Math.min(100, (median / 500) * 100);
       const sellerScore = Math.min(100, (group.sellers.size / 3) * 100);
-      const score = Math.round(volumeScore * 0.4 + priceScore * 0.35 + sellerScore * 0.25);
+      const partNumberScore = partNumber ? 100 : 0;
+      const score = Math.round(volumeScore * 0.35 + priceScore * 0.30 + sellerScore * 0.15 + partNumberScore * 0.20);
 
       gaps.push({
         title: group.title,
@@ -146,6 +150,7 @@ router.get('/gap-intel', async (req, res) => {
         lastSold: group.lastSold,
         score,
         ebayItemId: group.ebayItemId,
+        partNumber: partNumber,
       });
     }
 
@@ -188,6 +193,32 @@ function matchesAny(key, titleSet) {
     if (matches / words.length >= 0.7) return true;
   }
   return false;
+}
+
+// Extract OEM part number from title
+// Matches patterns like: CT43-2C405-AB, 39132-26BL0, 8T0-035-223AN, 68059524AI, BBM466A20
+function extractPartNumber(title) {
+  if (!title) return null;
+
+  // Common OEM part number patterns (alphanumeric with dashes/spaces, 6+ chars)
+  const patterns = [
+    /\b([A-Z]{1,4}\d{1,4}[-\s]?\d{2,5}[-\s]?[A-Z0-9]{1,5})\b/i,    // CT43-2C405-AB, 8T0 035 223AN
+    /\b(\d{4,6}[-]?[A-Z0-9]{2,6}[-]?[A-Z0-9]{0,4})\b/i,             // 39132-26BL0, 68059524AI
+    /\b([A-Z]{2,4}\d{3,6}[A-Z]?\d{0,2})\b/i,                         // BBM466A20, MR578042
+    /\b(\d{2,3}[-]\d{4,5}[-]\d{3,5}[-]?[A-Z]{0,2})\b/,               // 84010-48180, 99211-F1000
+  ];
+
+  for (const pattern of patterns) {
+    const match = title.match(pattern);
+    if (match && match[1] && match[1].length >= 6) {
+      // Filter out obvious non-part-numbers (years, mileage)
+      const candidate = match[1].replace(/\s+/g, '-');
+      if (/^(19|20)\d{2}$/.test(candidate)) continue; // skip years
+      if (/^\d{1,3},?\d{3}$/.test(candidate)) continue; // skip mileage
+      return candidate.toUpperCase();
+    }
+  }
+  return null;
 }
 
 /**

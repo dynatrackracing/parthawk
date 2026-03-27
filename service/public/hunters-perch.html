@@ -99,7 +99,8 @@ function loadGapIntel() {
         h += '<div class="item-row" style="align-items:center">';
         h += '<div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:800;color:' + scoreColor + ';background:' + scoreBg + ';border-radius:6px;padding:4px 6px;font-variant-numeric:tabular-nums">' + gap.score + '</div></div>';
         h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + badge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(gap.title || '') + '</a></div>';
-        h += '<div class="item-meta">' + gap.soldCount + 'x sold by ' + esc(sellerList) + ' · $' + gap.medianPrice + ' median · $' + gap.totalRevenue.toLocaleString() + ' rev</div></div>';
+        var pn = gap.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(gap.partNumber) + '</span>' : '';
+        h += '<div class="item-meta">' + pn + gap.soldCount + 'x sold by ' + esc(sellerList) + ' · $' + gap.medianPrice + ' median · $' + gap.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div class="item-price">$' + gap.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
         h += '</div>';
       });
