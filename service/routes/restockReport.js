@@ -215,11 +215,12 @@ router.get('/report', async (req, res) => {
       }
     }
 
-    // Fallback stock lookup: match by make + partType keywords in listing titles
-    // Now with year filtering to prevent cross-year false positives
-    function titleStockFallback(make, partType, yearStart) {
+    // Fallback stock lookup: match by make + MODEL + partType keywords in listing titles
+    // Model is required to prevent cross-model inflation (Transit != F150)
+    function titleStockFallback(make, model, partType, yearStart) {
       if (!make || make === '?' || !partType) return 0;
       const makeUp = make.toUpperCase();
+      const modelUp = model ? model.toUpperCase() : null;
       const ptPatterns = {
         'ECM': ['ECM','ECU','PCM','ENGINE CONTROL','ENGINE COMPUTER'],
         'BCM': ['BCM','BODY CONTROL'],
@@ -231,14 +232,16 @@ router.get('/report', async (req, res) => {
         'Radio': ['RADIO','STEREO','RECEIVER','INFOTAINMENT'],
         'Cluster': ['CLUSTER','SPEEDOMETER','INSTRUMENT','GAUGE'],
         'Throttle': ['THROTTLE BODY'],
+        'Ignition': ['IGNITION','IMMOBILIZER'],
       };
       const patterns = ptPatterns[partType];
       if (!patterns) return 0;
       let count = 0;
       for (const lt of listingTitles) {
         if (!lt.title.includes(makeUp)) continue;
+        // Model match required when available
+        if (modelUp && !lt.title.includes(modelUp)) continue;
         if (!patterns.some(p => lt.title.includes(p))) continue;
-        // Year filter: if listing has a year and we have a year, check match
         if (yearStart) {
           const yearCheck = vehicleYearMatchesPart(yearStart, lt.title);
           if (yearCheck.confirmed && !yearCheck.matches) continue;
@@ -254,7 +257,7 @@ router.get('/report', async (req, res) => {
       // Fallback: if no PN match, try title-based matching
       if (stock === 0 && g.make && g.make !== '?') {
         const yr = g.sampleTitle ? g.sampleTitle.match(/\b((?:19|20)\d{2})\b/) : null;
-        stock = titleStockFallback(g.make, g.partType, yr ? parseInt(yr[1]) : null);
+        stock = titleStockFallback(g.make, g.model, g.partType, yr ? parseInt(yr[1]) : null);
       }
       const avgPrice = g.sold > 0 ? Math.round(g.totalPrice / g.sold * 100) / 100 : 0;
       const years = g.sampleTitle.match(/\b((?:19|20)\d{2})\b/g);

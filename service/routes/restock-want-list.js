@@ -113,10 +113,15 @@ router.get('/debug/:id', async (req, res) => {
   res.json({ wantTitle: item.title, extractedPNs: pns, parsed, listings, sales });
 });
 
-// Get all active want list items with stock counts and sale data
+// Get active want list items with stock counts and sale data
+// ?manual_only=true to exclude auto-generated entries
 router.get('/items', async (req, res) => {
-  await loadModelsFromDB(); // ensure DB models are cached
-  const items = await database('restock_want_list').where({ active: true }).orderBy('created_at', 'asc');
+  await loadModelsFromDB();
+  let q = database('restock_want_list').where({ active: true }).orderBy('created_at', 'asc');
+  if (req.query.manual_only === 'true') {
+    q = q.where(function() { this.where('auto_generated', false).orWhereNull('auto_generated'); });
+  }
+  const items = await q;
 
   const knex = database;
   const results = [];
@@ -306,6 +311,151 @@ router.post('/delete', async (req, res) => {
   if (!id) return res.status(400).json({ error: 'ID required' });
 
   await database('restock_want_list').where({ id }).update({ active: false });
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════
+// WATCHLIST — curated manual list for SCOUR STREAM pullers
+// ══════════════════════════════════════════════════════════════
+
+// Ensure table exists
+async function ensureWatchlistTable() {
+  try { await database.raw('SELECT 1 FROM restock_watchlist LIMIT 0'); }
+  catch (e) {
+    await database.raw(`
+      CREATE TABLE IF NOT EXISTS restock_watchlist (
+        id SERIAL PRIMARY KEY, part_number_base VARCHAR(50) NOT NULL UNIQUE,
+        part_description TEXT, target_stock INTEGER DEFAULT 1,
+        priority VARCHAR(20) DEFAULT 'normal', notes TEXT,
+        added_at TIMESTAMP DEFAULT NOW(), active BOOLEAN DEFAULT TRUE
+      )
+    `);
+  }
+}
+
+/**
+ * GET /restock-want-list/watchlist
+ * Returns curated watchlist with live stock counts + market data.
+ */
+router.get('/watchlist', async (req, res) => {
+  await ensureWatchlistTable();
+  const items = await database('restock_watchlist').where('active', true).orderBy('priority', 'desc').orderBy('added_at', 'asc');
+
+  const results = [];
+  for (const item of items) {
+    const pn = item.part_number_base;
+
+    // Stock count: YourListing ONLY
+    let stock = 0;
+    try {
+      const listings = await database('YourListing')
+        .where('listingStatus', 'Active')
+        .where(function() {
+          this.where('title', 'ilike', `%${pn}%`).orWhere('sku', 'ilike', `%${pn}%`);
+        })
+        .select(database.raw('SUM(COALESCE("quantityAvailable"::int, 1)) as qty'));
+      stock = parseInt(listings[0]?.qty) || 0;
+    } catch (e) {}
+
+    // Last sold from YourSale
+    let lastSold = null, lastSoldPrice = null;
+    try {
+      const sale = await database('YourSale')
+        .where('title', 'ilike', `%${pn}%`)
+        .orderBy('soldDate', 'desc').first();
+      if (sale) { lastSold = sale.soldDate; lastSoldPrice = parseFloat(sale.salePrice) || null; }
+    } catch (e) {}
+
+    // Market data from cache
+    let marketMedian = null, marketSold = null, marketVelocity = null;
+    try {
+      const cached = await database('market_demand_cache')
+        .where('part_number_base', pn)
+        .where('ebay_avg_price', '>', 0).first();
+      if (cached) {
+        marketMedian = parseFloat(cached.ebay_avg_price) || null;
+        marketSold = parseInt(cached.ebay_sold_90d) || null;
+        marketVelocity = cached.market_velocity || null;
+      }
+    } catch (e) {}
+
+    // Days since last in stock
+    let daysSinceStocked = null;
+    try {
+      const lastListing = await database('YourSale')
+        .where('title', 'ilike', `%${pn}%`)
+        .orderBy('soldDate', 'desc').first();
+      if (lastListing) {
+        daysSinceStocked = Math.floor((Date.now() - new Date(lastListing.soldDate).getTime()) / 86400000);
+      }
+    } catch (e) {}
+
+    results.push({
+      id: item.id,
+      partNumberBase: item.part_number_base,
+      description: item.part_description,
+      targetStock: item.target_stock,
+      priority: item.priority,
+      notes: item.notes,
+      stock,
+      lastSold,
+      lastSoldPrice,
+      marketMedian,
+      marketSold,
+      marketVelocity,
+      daysSinceStocked,
+      needsRestock: stock < (item.target_stock || 1),
+    });
+  }
+
+  // Sort: out of stock + high market demand first
+  results.sort((a, b) => {
+    if (a.needsRestock !== b.needsRestock) return a.needsRestock ? -1 : 1;
+    const prioRank = { high: 0, normal: 1, low: 2 };
+    if ((prioRank[a.priority] || 1) !== (prioRank[b.priority] || 1)) return (prioRank[a.priority] || 1) - (prioRank[b.priority] || 1);
+    return (b.marketMedian || 0) - (a.marketMedian || 0);
+  });
+
+  res.json({ success: true, items: results, total: results.length });
+});
+
+// POST /restock-want-list/watchlist/add
+router.post('/watchlist/add', async (req, res) => {
+  await ensureWatchlistTable();
+  const { partNumberBase, description, targetStock, priority, notes } = req.body;
+  if (!partNumberBase) return res.status(400).json({ error: 'partNumberBase required' });
+  try {
+    await database('restock_watchlist').insert({
+      part_number_base: partNumberBase.trim().toUpperCase(),
+      part_description: description || null,
+      target_stock: targetStock || 1,
+      priority: priority || 'normal',
+      notes: notes || null,
+    });
+    res.json({ success: true });
+  } catch (e) {
+    if (e.message.includes('unique')) return res.json({ success: true, message: 'Already on watchlist' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /restock-want-list/watchlist/remove
+router.post('/watchlist/remove', async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  await database('restock_watchlist').where({ id }).update({ active: false });
+  res.json({ success: true });
+});
+
+// POST /restock-want-list/watchlist/update
+router.post('/watchlist/update', async (req, res) => {
+  const { id, targetStock, priority, notes } = req.body;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  const update = {};
+  if (targetStock !== undefined) update.target_stock = targetStock;
+  if (priority) update.priority = priority;
+  if (notes !== undefined) update.notes = notes;
+  await database('restock_watchlist').where({ id }).update(update);
   res.json({ success: true });
 });
 
