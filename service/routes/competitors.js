@@ -61,14 +61,24 @@ router.post('/alerts/:id/dismiss', async (req, res) => {
 router.get('/gap-intel', async (req, res) => {
   const days = parseInt(req.query.days) || 90;
   const limit = parseInt(req.query.limit) || 50;
+  const sellerFilter = req.query.seller || null;
 
   try {
-    // Get all competitor sold items grouped by normalized title (first 50 chars uppercase)
-    const competitorItems = await database('SoldItem')
+    // Get competitor sold items (capped at 5000, $100+ only)
+    let competitorQuery = database('SoldItem')
       .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${days} days'`))
+      .where('soldPrice', '>=', 100)
       .whereNot('seller', 'dynatrack')
-      .whereNot('seller', 'dynatrackracing')
-      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId', 'condition');
+      .whereNot('seller', 'dynatrackracing');
+
+    if (sellerFilter) {
+      competitorQuery = competitorQuery.where('seller', sellerFilter);
+    }
+
+    const competitorItems = await competitorQuery
+      .orderBy('soldDate', 'desc')
+      .limit(5000)
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId');
 
     // Group competitor items by normalized title
     const compGroups = {};
@@ -96,19 +106,22 @@ router.get('/gap-intel', async (req, res) => {
 
     // Get all YOUR sold titles (from YourSale) - normalized
     const yourSales = await database('YourSale')
-      .select('title');
+      .select('title')
+      .limit(25000);
     const yourSoldTitles = new Set(yourSales.map(s => normalizeTitle(s.title)).filter(Boolean));
 
     // Get all YOUR active listing titles (from YourListing) - normalized
     const yourListings = await database('YourListing')
       .where('listingStatus', 'Active')
-      .select('title');
+      .select('title')
+      .limit(10000);
     const yourListingTitles = new Set(yourListings.map(l => normalizeTitle(l.title)).filter(Boolean));
 
     // Get all Item table titles for your seller - normalized
     const yourItems = await database('Item')
       .whereRaw("LOWER(seller) LIKE '%dynatrack%'")
-      .select('title');
+      .select('title')
+      .limit(5000);
     const yourItemTitles = new Set(yourItems.map(i => normalizeTitle(i.title)).filter(Boolean));
 
     // Find gaps: competitor parts that we have never sold, listed, or stocked
@@ -190,6 +203,7 @@ router.get('/gap-intel', async (req, res) => {
 router.get('/emerging', async (req, res) => {
   const days = parseInt(req.query.days) || 90;
   const limit = parseInt(req.query.limit) || 40;
+  const sellerFilter = req.query.seller || null;
 
   try {
     const now = new Date();
@@ -197,11 +211,19 @@ router.get('/emerging', async (req, res) => {
     const midpoint = new Date(now - (days / 2) * 24 * 60 * 60 * 1000);
     const recentWindow = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-    const items = await database('SoldItem')
+    let emergingQuery = database('SoldItem')
       .where('soldDate', '>=', cutoff)
       .where('soldPrice', '>=', 100)
       .whereNot('seller', 'dynatrack')
-      .whereNot('seller', 'dynatrackracing')
+      .whereNot('seller', 'dynatrackracing');
+
+    if (sellerFilter) {
+      emergingQuery = emergingQuery.where('seller', sellerFilter);
+    }
+
+    const items = await emergingQuery
+      .orderBy('soldDate', 'desc')
+      .limit(5000)
       .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId');
 
     const groups = {};
@@ -220,12 +242,12 @@ router.get('/emerging', async (req, res) => {
       if (soldDate >= midpoint) { g.recentCount++; } else { g.olderCount++; }
     }
 
-    const olderItems = await database('SoldItem').where('soldDate', '<', cutoff).select('title');
+    const olderItems = await database('SoldItem').where('soldDate', '<', cutoff).select('title').limit(10000);
     const previouslySeenTitles = new Set(olderItems.map(function(i) { return normalizeTitle(i.title); }).filter(Boolean));
 
-    const yourSales = await database('YourSale').select('title');
+    const yourSales = await database('YourSale').select('title').limit(25000);
     const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
-    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title');
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
     const yourListingTitles = new Set(yourListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
 
     const emerging = [];
@@ -548,12 +570,21 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
 router.get('/sellers', async (req, res) => {
   try {
     const sellers = await database('SoldItemSeller').orderBy('name');
-    const withCounts = [];
-    for (const s of sellers) {
-      const countResult = await database('SoldItem').where('seller', s.name).count('* as count').first();
-      withCounts.push({ ...s, soldItemCount: parseInt(countResult?.count || 0) });
+    var withCounts = [];
+    for (var s of sellers) {
+      var countResult = await database('SoldItem').where('seller', s.name).count('* as count').first();
+      var hoursAgo = s.lastScrapedAt ? Math.floor((Date.now() - new Date(s.lastScrapedAt).getTime()) / 3600000) : null;
+      var scrapeAlert = null;
+      if (s.enabled && (!s.lastScrapedAt || hoursAgo > 48)) {
+        scrapeAlert = !s.lastScrapedAt ? 'Never scraped' : 'Last scrape ' + Math.floor(hoursAgo / 24) + 'd ago - may be failing';
+      }
+      withCounts.push({ ...s, soldItemCount: parseInt(countResult?.count || 0), scrapeAlert: scrapeAlert });
     }
-    res.json({ success: true, sellers: withCounts });
+
+    // Build top-level alerts for any sellers with issues
+    var alerts = withCounts.filter(function(s) { return s.scrapeAlert; }).map(function(s) { return { seller: s.name, message: s.scrapeAlert }; });
+
+    res.json({ success: true, sellers: withCounts, scrapeAlerts: alerts });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

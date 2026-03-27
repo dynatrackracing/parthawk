@@ -45,6 +45,7 @@ nav a.active{color:#DC2626;font-weight:700}
 <div id="dh-nav"></div>
 <script src="/admin/dh-nav.js"></script><script>dhNav('perch')</script>
 <div class="container">
+  <div id="scrapeAlerts" style="display:none"></div>
   <div class="card" id="gapCard" style="border-color:#dc2626;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div>
@@ -52,6 +53,11 @@ nav a.active{color:#DC2626;font-weight:700}
         <div style="font-size:11px;color:#6B7280;margin-top:2px">Parts competitors sell that are not in our database</div>
       </div>
       <button class="btn-sm" onclick="loadGapIntel()" id="gapRefresh">Refresh</button>
+    </div>
+    <div id="sellerFilterRow" style="display:flex;gap:6px;margin-bottom:8px">
+      <select id="sellerFilter" onchange="applySellerFilter()" style="flex:1;padding:6px 8px;border:1px solid #333;border-radius:6px;font-size:11px;background:#1a1a1a;color:#F0F0F0;outline:none">
+        <option value="">All sellers</option>
+      </select>
     </div>
     <div id="gapLoading" style="text-align:center;padding:16px"><div class="spinner"></div></div>
     <div id="gapResults" style="display:none"></div>
@@ -79,13 +85,48 @@ nav a.active{color:#DC2626;font-weight:700}
 </div>
 <script>
 var sellersData = [];
+var currentSellerFilter = '';
+
+function populateSellerFilter(sellers) {
+  var sel = document.getElementById('sellerFilter');
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  sellers.forEach(function(s) {
+    if (s.soldItemCount > 0) {
+      var opt = document.createElement('option');
+      opt.value = s.name;
+      opt.textContent = s.name + ' (' + s.soldItemCount + ')';
+      sel.appendChild(opt);
+    }
+  });
+}
+
+function applySellerFilter() {
+  currentSellerFilter = document.getElementById('sellerFilter').value;
+  loadGapIntel();
+  loadEmerging();
+}
+
+function showScrapeAlerts(alerts) {
+  var el = document.getElementById('scrapeAlerts');
+  if (!alerts || alerts.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  var h = '';
+  alerts.forEach(function(a) {
+    h += '<div class="card" style="border-color:#dc2626;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">';
+    h += '<div style="font-size:12px;color:#dc2626"><strong>' + esc(a.seller) + '</strong>: ' + esc(a.message) + '</div>';
+    h += '<button class="btn-sm" style="font-size:9px;color:#6B7280" onclick="this.closest(\'.card\').remove()">✕</button>';
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
 
 function loadEmerging() {
   var results = document.getElementById('emergingResults');
   var loading = document.getElementById('emergingLoading');
   loading.style.display = 'block';
   results.style.display = 'none';
-  fetch('/competitors/emerging?days=90&limit=30')
+  fetch('/competitors/emerging?days=90&limit=30' + (currentSellerFilter ? '&seller=' + encodeURIComponent(currentSellerFilter) : ''))
     .then(function(r) { return r.json(); })
     .then(function(d) {
       loading.style.display = 'none';
@@ -123,7 +164,7 @@ function loadGapIntel() {
   gapLoading.style.display = 'block';
   gapResults.style.display = 'none';
 
-  fetch('/competitors/gap-intel?days=90&limit=30')
+  fetch('/competitors/gap-intel?days=90&limit=30' + (currentSellerFilter ? '&seller=' + encodeURIComponent(currentSellerFilter) : ''))
     .then(function(r) { return r.json(); })
     .then(function(d) {
       gapLoading.style.display = 'none';
@@ -170,6 +211,8 @@ function load() {
       document.getElementById('loading').style.display = 'none';
       if (!d.success || !d.sellers) { document.getElementById('sellers').innerHTML = '<div class="empty">Could not load sellers</div>'; return; }
       sellersData = d.sellers;
+      populateSellerFilter(d.sellers);
+      if (d.scrapeAlerts) showScrapeAlerts(d.scrapeAlerts);
       renderSellers();
     })
     .catch(function(err) {
