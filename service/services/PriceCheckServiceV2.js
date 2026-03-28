@@ -152,7 +152,10 @@ async function check(title, currentPrice) {
   }
 
   let filtered;
-  if (queryResult.structured && queryResult.parts.partType) {
+  if (queryResult.pnSearch) {
+    // PN search results are already relevant by definition
+    filtered = scraped;
+  } else if (queryResult.structured && queryResult.parts.partType) {
     const result = filterRelevantItems(queryResult.parts, scraped);
     filtered = result.items;
   } else {

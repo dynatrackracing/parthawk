@@ -192,26 +192,146 @@ function extractDescriptiveWords(title, make, model) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  PART NUMBER EXTRACTION
+// ═══════════════════════════════════════════════════════════════
+
+const KNOWN_ABBREVIATIONS = new Set([
+  'ecu', 'ecm', 'pcm', 'tcm', 'bcm', 'tipm', 'gem', 'sam', 'abs', 'eps',
+  'oem', 'rh', 'lh', 'hvac', 'hifi', 'mod', 'a/t', 'a/c', '2wd', '4wd',
+  'awd', 'fwd', 'rwd',
+]);
+
+const KNOWN_DIGIT_MODELS = new Set([
+  '1500', '2500', '3500', '300', '200',
+  'xg300', 'xg350', 'gs300', 'gs350', 'gs430', 'gs460',
+  'is250', 'is300', 'is350', 'ls400', 'ls430', 'ls460',
+  'rx300', 'rx330', 'rx350', 'rx400h', 'rx450h',
+  'es300', 'es330', 'es350', 'gx460', 'gx470', 'lx470', 'lx570',
+  'f10', 'f30', 'e46', 'e90', 'e60', 'e39', 'e36',
+  '535xi', '328i', '323i', '325i', '330i', '335i', '525i', '528i', '530i', '540i',
+  'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 's3', 's4', 's5', 's6', 's7', 's8',
+  'q3', 'q5', 'q7', 'rs3', 'rs5', 'rs7', 'r8', 'tt',
+  'b8', '8t',
+  'crv', 'cr-v', 'hrv', 'hr-v', 'rav4',
+  'cx3', 'cx5', 'cx7', 'cx9', 'cx30', 'cx50', 'cx90', 'rx7', 'rx8',
+  'g35', 'g37', 'q50', 'q60', 'qx50', 'qx60', 'qx80', 'fx35', 'fx45',
+  'c300', 'c350', 'e350', 'e550', 's550', 'gl450', 'gl550', 'ml350', 'ml550',
+  'sl500', 'sl550', 'cls550', 'cls63', 'glk350',
+  '370z', '350z', 'gt-r',
+  'mx5', 'mx-5',
+  'brz', 'wrx',
+]);
+
+/**
+ * Extract OEM part number from a listing title.
+ * Returns the part number string if found, null if not.
+ */
+function extractPartNumber(title) {
+  // First: hyphenated compound part numbers
+  // CT43-2C405-AB, 39980-T0G-A0, 84010-48180, C513-437AZ-B, 99211-F1000
+  const hyphenated = title.match(/\b([A-Z0-9]{2,}(?:-[A-Z0-9]{1,}){1,3})\b/gi) || [];
+
+  const validHyphenated = hyphenated.filter(pn => {
+    if (!/\d/.test(pn)) return false;
+    if (pn.length < 7) return false;
+    if (/^(19|20)\d{2}-(19|20)?\d{2,4}$/.test(pn)) return false;
+    if (KNOWN_DIGIT_MODELS.has(pn.toLowerCase())) return false;
+    return true;
+  });
+
+  if (validHyphenated.length > 0) return validHyphenated[0];
+
+  // Second: spaced compound (Audi/VW style: 8T0 035 223AN)
+  const spaced = title.match(/\b(\d[A-Z]\d\s+\d{3}\s+\d{3}[A-Z]{0,2})\b/i);
+  if (spaced) return spaced[1].replace(/\s+/g, ' ');
+
+  // Third: single-token part numbers
+  const tokens = title.replace(/[\[\]()]/g, ' ').split(/\s+/);
+
+  for (const token of tokens) {
+    const clean = token.replace(/[,;]/g, '');
+    if (clean.length < 5) continue;
+
+    const lower = clean.toLowerCase();
+    if (KNOWN_ABBREVIATIONS.has(lower)) continue;
+    if (KNOWN_DIGIT_MODELS.has(lower)) continue;
+    if (/^(19|20)\d{2}$/.test(clean)) continue;
+    if (/^\d+\.\d+l?$/i.test(clean)) continue;
+    if (/^\d{4}$/.test(clean)) continue;
+    if (/^\d+$/.test(clean) && clean.length < 7) continue;
+
+    // MATCH: alphanumeric with both letters and digits, 5+ chars
+    if (/\d/.test(clean) && /[a-zA-Z]/.test(clean) && clean.length >= 5) {
+      return clean;
+    }
+
+    // MATCH: pure digits 7+ chars (GM style: 15092625, BMW: 9243496)
+    if (/^\d{7,}$/.test(clean)) {
+      return clean;
+    }
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  BUILD SEARCH QUERY
 // ═══════════════════════════════════════════════════════════════
 
 function buildSearchQuery(title) {
+  // STEP 1: Try to extract OEM part number — this is the primary path
+  const partNumber = extractPartNumber(title);
+
+  if (partNumber) {
+    return {
+      query: `"${partNumber}"`,
+      structured: true,
+      pnSearch: true,
+      partNumber: partNumber,
+      parts: {
+        make: extractMake(title),
+        model: extractModel(title, extractMake(title)),
+        years: extractYears(title),
+        partType: extractPartType(title),
+      },
+    };
+  }
+
+  // STEP 2: No PN found — fall back to keyword search
   const partType = extractPartType(title);
   const make = extractMake(title);
   const model = extractModel(title, make);
   const years = extractYears(title);
+
   const parts = [];
   if (make) parts.push(make);
   if (model) parts.push(model);
   if (years) parts.push(years);
+
   let descriptiveWords = null;
-  if (partType) { parts.push(partType); }
-  else if (make || model) { descriptiveWords = extractDescriptiveWords(title, make, model); if (descriptiveWords) parts.push(descriptiveWords); }
+  if (partType) {
+    parts.push(partType);
+  } else if (make || model) {
+    descriptiveWords = extractDescriptiveWords(title, make, model);
+    if (descriptiveWords) parts.push(descriptiveWords);
+  }
+
   if (parts.length < 2) {
     const fallback = title.replace(/[,()]/g, ' ').replace(/\s+/g, ' ').toLowerCase().split(' ').filter(w => w.length > 2 && !NOISE_WORDS.includes(w)).slice(0, 6).join(' ');
-    return { query: fallback, structured: false, parts: {} };
+    return { query: fallback, structured: false, pnSearch: false, partNumber: null, parts: {} };
   }
-  return { query: parts.join(' ').toLowerCase(), structured: true, parts: { make, model, years, partType: partType || descriptiveWords, isInferredPartType: !partType && !!descriptiveWords } };
+
+  return {
+    query: parts.join(' ').toLowerCase(),
+    structured: true,
+    pnSearch: false,
+    partNumber: null,
+    parts: {
+      make, model, years,
+      partType: partType || descriptiveWords,
+      isInferredPartType: !partType && !!descriptiveWords,
+    },
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -264,4 +384,4 @@ function filterRelevantItems(ourItem, scrapedItems) {
   return { total: scrapedItems.length, relevant: relevant.length, filtered: scrapedItems.length - relevant.length, items: relevant, avgScore: relevant.length > 0 ? relevant.reduce((sum, i) => sum + i.relevance.score, 0) / relevant.length : 0 };
 }
 
-module.exports = { buildSearchQuery, extractPartType, extractMake, extractModel, extractYears, scoreRelevance, filterRelevantItems };
+module.exports = { buildSearchQuery, extractPartNumber, extractPartType, extractMake, extractModel, extractYears, scoreRelevance, filterRelevantItems };

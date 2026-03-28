@@ -82,15 +82,20 @@ class PriceCheckService {
     // 2. Scrape sold items
     const scrapedItems = await this.scrapeSoldItems(searchQuery);
 
-    // 3. Filter for relevance
-    const ourItem = {
-      title,
-      make: parts.make,
-      model: parts.model,
-      years: parts.years,
-      partType: parts.partType,
-    };
-    const filtered = filterRelevantItems(ourItem, scrapedItems);
+    // 3. Filter for relevance — SKIP if this was a PN search
+    let filtered;
+    if (queryResult.pnSearch) {
+      filtered = { items: scrapedItems, total: scrapedItems.length, relevant: scrapedItems.length, filtered: 0 };
+    } else {
+      const ourItem = {
+        title,
+        make: parts.make,
+        model: parts.model,
+        years: parts.years,
+        partType: parts.partType,
+      };
+      filtered = filterRelevantItems(ourItem, scrapedItems);
+    }
 
     // 4. Calculate metrics
     const metrics = this.calculateMetrics(filtered.items, yourPrice);
