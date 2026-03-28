@@ -44,12 +44,22 @@ function getBadge(price) {
   return 'POOR';
 }
 
+/**
+ * Extract displacement number from messy engine strings.
+ * "5.7L V8 HEMI" → "5.7", "3.5L V6 DOHC 24V" → "3.5", "2.0L Turbo" → "2.0"
+ */
+function normalizeEngine(eng) {
+  if (!eng) return null;
+  const m = eng.match(/(\d+\.\d)/);
+  return m ? m[1] : null;
+}
+
 class InstantResearchService {
   constructor() {
     this.log = log.child({ class: 'InstantResearchService' }, true);
   }
 
-  async researchVehicle({ year, make, model, engine, refresh = false }) {
+  async researchVehicle({ year, make, model, engine, drivetrain, refresh = false }) {
     const cacheKey = `${year}|${make}|${model}|${engine || 'any'}`.toLowerCase();
 
     // Check cache (24h) unless refresh requested
@@ -83,10 +93,11 @@ class InstantResearchService {
       [model]
     );
 
-    // Engine filter — include parts with matching engine, N/A engine, or null engine
-    if (engine) {
+    // Engine filter — normalize displacement for fuzzy matching
+    const engineDisp = normalizeEngine(engine);
+    if (engineDisp) {
       query = query.where(function() {
-        this.whereRaw('UPPER("Auto"."engine") LIKE UPPER(?)', [`%${engine.replace(/L$/i, '')}%`])
+        this.whereRaw('"Auto"."engine" LIKE ?', [`%${engineDisp}%`])
           .orWhereNull('Auto.engine')
           .orWhere('Auto.engine', '')
           .orWhere('Auto.engine', 'N/A');
@@ -119,7 +130,27 @@ class InstantResearchService {
       }
     }
 
-    // Step 3: Enrich each part with demand, stock, market, mark status
+    // Step 3: Get year ranges per part number (batch)
+    let yearRangeMap = new Map();
+    const pnBases = [...partMap.values()].map(p => p.partNumberBase).filter(Boolean);
+    if (pnBases.length > 0) {
+      try {
+        const yearRanges = await database('Auto')
+          .join('AutoItemCompatibility', 'Auto.id', 'AutoItemCompatibility.autoId')
+          .join('Item', 'AutoItemCompatibility.itemId', 'Item.id')
+          .whereRaw('UPPER("Auto"."make") = UPPER(?)', [make])
+          .whereIn('Item.partNumberBase', pnBases)
+          .select('Item.partNumberBase')
+          .min('Auto.year as minYear')
+          .max('Auto.year as maxYear')
+          .groupBy('Item.partNumberBase');
+        for (const r of yearRanges) {
+          yearRangeMap.set(r.partNumberBase, { min: r.minYear, max: r.maxYear });
+        }
+      } catch (e) {}
+    }
+
+    // Step 4: Enrich each part with demand, stock, market, mark status
     // Load all enrichment data in batch
     const allPNs = [...partMap.values()].map(p => p.partNumberBase).filter(Boolean);
 
@@ -229,6 +260,9 @@ class InstantResearchService {
       if (isMarked) score += 15;
       score = Math.max(0, Math.min(100, score));
 
+      // Year range for this part
+      const yr = part.partNumberBase ? yearRangeMap.get(part.partNumberBase) : null;
+
       enrichedParts.push({
         partType: part.partType,
         partNumberBase: part.partNumberBase,
@@ -241,6 +275,7 @@ class InstantResearchService {
         yourStock,
         market,
         referencePrice: part.itemPrice > 0 ? part.itemPrice : null,
+        yearRange: yr || null,
       });
     }
 
@@ -248,7 +283,7 @@ class InstantResearchService {
     enrichedParts.sort((a, b) => b.score - a.score);
 
     const result = {
-      vehicle: { year, make, model, engine },
+      vehicle: { year, make, model, engine, drivetrain: drivetrain || null },
       totalParts: enrichedParts.length,
       totalEstimatedValue: enrichedParts.reduce((s, p) => {
         const price = p.market.source === 'cache' ? p.market.avgPrice : p.yourDemand.avgPrice || p.referencePrice || 0;

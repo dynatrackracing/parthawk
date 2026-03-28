@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
     const service = new InstantResearchService();
     const result = await service.researchVehicle({
       year, make, model, engine,
+      drivetrain: req.query.drivetrain || null,
       refresh: req.query.refresh === 'true',
     });
 
