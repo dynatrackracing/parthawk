@@ -20,8 +20,6 @@ const { getTrimTier } = require('./service/config/trim-tier-config');
 // Load .env if present
 try { require('dotenv').config({ path: path.resolve(__dirname, '.env') }); } catch (e) {}
 
-const LIMIT = parseInt(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] || '25', 10);
-
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error('DATABASE_URL is required');
@@ -128,7 +126,7 @@ async function fetchTrimsFromEbay(token, year, make, model) {
   const params = {
     compatibility_property: 'Trim',
     category_id: '33563',
-    filter: `Year:{${year}},Make:{${make}},Model:{${model}}`,
+    filter: `Year:${year},Make:${make},Model:${model}`,
   };
 
   try {
@@ -175,6 +173,16 @@ async function main() {
 
   await ensureTables();
 
+  // Debug: show raw yard_vehicle data format
+  try {
+    const cols = await db.raw("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'yard_vehicle' AND column_name IN ('year','make','model') ORDER BY ordinal_position");
+    console.log('yard_vehicle columns:', cols.rows.map(c => `${c.column_name} (${c.data_type})`).join(', '));
+    const sample = await db('yard_vehicle').select('year', 'make', 'model').whereNotNull('make').limit(5);
+    console.log('Raw sample rows:');
+    sample.forEach(r => console.log(`  year=${r.year} make="${r.make}" model="${r.model}"`));
+    console.log('');
+  } catch (e) { console.log('Could not fetch sample rows:', e.message); }
+
   // Get unique year/make/model from yard_vehicle
   let yardCombos;
   try {
@@ -202,9 +210,8 @@ async function main() {
   const trackedSet = new Set(tracked.map(t => `${t.year}|${t.make}|${t.model}`));
 
   // Filter to only new combos (compare with title case since tracked entries are stored in title case)
-  const allNewCombos = yardCombos.filter(c => !trackedSet.has(`${c.year}|${c.make}|${c.model}`));
-  const newCombos = allNewCombos.slice(0, LIMIT);
-  console.log(`${allNewCombos.length} new combos to catalog (${trackedSet.size} already tracked), processing ${newCombos.length} (limit ${LIMIT})`);
+  const newCombos = yardCombos.filter(c => !trackedSet.has(`${c.year}|${c.make}|${c.model}`));
+  console.log(`${newCombos.length} new combos to catalog (${trackedSet.size} already tracked)`);
 
   if (newCombos.length === 0) {
     console.log('Nothing new to catalog. Done.');
@@ -227,8 +234,14 @@ async function main() {
   let totalCombos = 0;
   let errors = 0;
 
+  let comboIndex = 0;
   for (const combo of newCombos) {
     const { year, make, model } = combo;
+    if (comboIndex < 3) {
+      const debugFilter = `Year:${year},Make:${make},Model:${model}`;
+      console.log(`  [DEBUG] API call #${comboIndex + 1}: filter="${debugFilter}"`);
+    }
+    comboIndex++;
     try {
       const trimValues = await fetchTrimsFromEbay(token, year, make, model);
 
@@ -237,7 +250,7 @@ async function main() {
         console.log(`  ${year} ${make} ${model}: eBay 500 - marking as unrecognized`);
         await db('trim_catalog_tracked').insert({
           year, make, model, trim_count: -1, cataloged_at: new Date(),
-        }).onConflict(db.raw('(year, make, model)')).ignore();
+        }).onConflict(['year', 'make', 'model']).ignore();
         totalCombos++;
         await sleep(500);
         continue;
@@ -257,7 +270,7 @@ async function main() {
             trim_name: trimName,
             body_style: bodyStyle,
             tier,
-          }).onConflict(db.raw('(year, make, model, trim_raw)')).ignore();
+          }).onConflict(['year', 'make', 'model', 'trim_raw']).ignore();
           insertedForCombo++;
         } catch (insertErr) {
           // Duplicate - skip
@@ -271,7 +284,7 @@ async function main() {
         model,
         trim_count: trimValues.length,
         cataloged_at: new Date(),
-      }).onConflict(db.raw('(year, make, model)')).ignore();
+      }).onConflict(['year', 'make', 'model']).ignore();
 
       totalInserted += insertedForCombo;
       totalCombos++;
