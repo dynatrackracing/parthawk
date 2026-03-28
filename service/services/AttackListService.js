@@ -5,6 +5,7 @@ const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
 const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
 const { getPartScoreMultiplier } = require('../config/trim-tier-config');
+const { resolvePricesBatch } = require('../lib/priceResolver');
 
 // Part types that require EXACT year matching (no ±1 tolerance)
 // These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
@@ -249,6 +250,12 @@ class AttackListService {
           'Item.quantity', 'Item.seller', 'Item.isRepair'
         );
 
+      // Pre-load cache prices to overlay on frozen Item.price
+      const allPNs = rows.map(r => r.manufacturerPartNumber).filter(Boolean);
+      const itemPriceMap = new Map();
+      for (const r of rows) { if (r.manufacturerPartNumber) itemPriceMap.set(r.manufacturerPartNumber, parseFloat(r.price) || 0); }
+      const cacheIndex = await resolvePricesBatch(allPNs, { itemPrices: itemPriceMap });
+
       for (const row of rows) {
         const key = `${row.make}|${row.model}|${row.year}`;
         if (!index[key]) {
@@ -257,21 +264,26 @@ class AttackListService {
         const entry = index[key];
         if (!entry.items.some(i => i.itemId === row.itemId)) {
           const isRebuild = row.seller === 'pro-rebuild' || row.isRepair === true;
+          // Use cache price when available, fall back to frozen Item.price
+          const resolved = row.manufacturerPartNumber ? cacheIndex.get(row.manufacturerPartNumber) : null;
+          const effectivePrice = (resolved && resolved.price > 0 && resolved.source !== 'none') ? resolved.price : (parseFloat(row.price) || 0);
+          const priceSource = resolved ? resolved.source : 'item_reference';
           entry.items.push({
             itemId: row.itemId,
             title: row.title,
-            price: parseFloat(row.price) || 0,
+            price: effectivePrice,
+            priceSource,
             category: row.categoryTitle,
             partNumber: row.manufacturerPartNumber,
+            partNumberBase: row.manufacturerPartNumber,
             quantity: parseInt(row.quantity) || 1,
             partType: detectPartType(row.title + ' ' + (row.categoryTitle || '')),
             seller: row.seller || null,
             isRebuild,
           });
           entry.count++;
-          // Only count non-rebuild parts in value/avg
           if (!isRebuild) {
-            entry.totalValue += parseFloat(row.price) || 0;
+            entry.totalValue += effectivePrice;
             entry.avgPrice = entry.count > 0 ? entry.totalValue / entry.count : 0;
           }
         }

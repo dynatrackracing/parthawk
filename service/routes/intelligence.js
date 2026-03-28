@@ -26,6 +26,57 @@ router.get('/learnings', async (req, res) => {
 });
 
 /**
+ * GET /intelligence/data-health
+ * Cache rebuild monitoring — shows pricing data coverage
+ */
+router.get('/data-health', async (req, res) => {
+  try {
+    const { database } = require('../database/database');
+
+    const [cacheTotal, cacheFresh, cacheAging, cacheStale] = await Promise.all([
+      database('market_demand_cache').count('* as c').first(),
+      database('market_demand_cache').whereRaw("last_updated > NOW() - INTERVAL '30 days'").count('* as c').first(),
+      database('market_demand_cache').whereRaw("last_updated > NOW() - INTERVAL '60 days' AND last_updated <= NOW() - INTERVAL '30 days'").count('* as c').first(),
+      database('market_demand_cache').whereRaw("last_updated > NOW() - INTERVAL '90 days' AND last_updated <= NOW() - INTERVAL '60 days'").count('* as c').first(),
+    ]);
+
+    const [pcTotal, pcRecent, itemTotal, salesRecent, listingsActive] = await Promise.all([
+      database('YourListing').where('listingStatus', 'Active').count('* as c').first(),
+      database('PriceCheck').whereRaw("\"checkedAt\" > NOW() - INTERVAL '30 days'").count('* as c').first(),
+      database('Item').count('* as c').first(),
+      database('YourSale').whereRaw("\"soldDate\" > NOW() - INTERVAL '30 days'").count('* as c').first(),
+      database('YourListing').where('listingStatus', 'Active').count('* as c').first(),
+    ]);
+
+    const total = parseInt(cacheTotal.c);
+    const fresh = parseInt(cacheFresh.c);
+    const aging = parseInt(cacheAging.c);
+    const stale = parseInt(cacheStale.c);
+
+    res.json({
+      success: true,
+      marketCache: { total, fresh, aging, stale, expired: total - fresh - aging - stale },
+      priceChecks: {
+        totalListings: parseInt(pcTotal.c),
+        checkedLast30d: parseInt(pcRecent.c),
+      },
+      itemTable: {
+        total: parseInt(itemTotal.c),
+        status: 'frozen',
+        warning: 'CronWorkRunner disabled — Item prices not updating',
+      },
+      yourData: {
+        salesLast30d: parseInt(salesRecent.c),
+        activeListings: parseInt(listingsActive.c),
+      },
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /intelligence/lifecycle
  * Part type lifecycle: time-to-sell, price decay, return rate, revenue
  */
