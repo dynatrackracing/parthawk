@@ -25,10 +25,22 @@ const { extractPartNumbers } = require('../utils/partIntelligence');
 
 // ── Hard exclude / allow filters ────────────────────────────────
 
+// Engine bolt-on accessories we sell (unbolt from outside without opening engine)
 const ENGINE_ALLOW_WORDS = [
-  'MODULE', 'COMPUTER', 'CONTROL', 'SENSOR', 'MOUNT', 'HARNESS', 'COVER',
-  'VALVE', 'COIL', 'INJECTOR', 'PUMP', 'THROTTLE', 'INTAKE', 'BELT',
-  'PULLEY', 'TENSIONER', 'SOLENOID', 'ALTERNATOR', 'STARTER', 'TURBO',
+  'MODULE', 'COMPUTER', 'CONTROL', 'SENSOR', 'MOUNT', 'HARNESS',
+  'COIL', 'INJECTOR', 'FUEL RAIL', 'PUMP', 'THROTTLE', 'INTAKE MANIFOLD',
+  'EXHAUST MANIFOLD', 'PULLEY', 'TENSIONER', 'SOLENOID', 'ALTERNATOR',
+  'STARTER', 'TURBO', 'SUPERCHARGER', 'COMPRESSOR', 'WATER PUMP',
+  'THERMOSTAT', 'EGR', 'FILTER HOUSING', 'VALVE COVER', 'IGNITION',
+];
+// Engine internals we do NOT sell (require opening the engine)
+const ENGINE_SKIP_WORDS = [
+  'LONG BLOCK', 'SHORT BLOCK', 'ENGINE ASSEMBLY', 'ENGINE MOTOR',
+  'COMPLETE ENGINE', 'BARE ENGINE', 'REMANUFACTURED ENGINE',
+  'PISTON', 'CONNECTING ROD', 'CRANKSHAFT', 'CAMSHAFT',
+  'TIMING CHAIN', 'TIMING BELT', 'TIMING COVER',
+  'CYLINDER HEAD', 'HEAD GASKET', 'VALVE SPRING',
+  'OIL PAN', 'OIL PUMP', 'ENGINE BLOCK',
 ];
 
 const TRANS_ALLOW_WORDS = [
@@ -56,7 +68,11 @@ function shouldExclude(title) {
     if (t.includes(type)) return false;
   }
 
-  if (t.includes('ENGINE') && !ENGINE_ALLOW_WORDS.some(w => t.includes(w))) return true;
+  // Engine: skip internals first, then check if it's a bolt-on accessory
+  if (t.includes('ENGINE')) {
+    if (ENGINE_SKIP_WORDS.some(w => t.includes(w))) return true;
+    if (!ENGINE_ALLOW_WORDS.some(w => t.includes(w))) return true;
+  }
   if (t.includes('TRANSMISSION') && !TRANS_ALLOW_WORDS.some(w => t.includes(w))) return true;
 
   const tLower = title.toLowerCase();
