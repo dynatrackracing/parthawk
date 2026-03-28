@@ -208,6 +208,9 @@ app.get('/admin/learnings', (req, res) => {
 app.get('/admin/lifecycle', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'lifecycle.html'));
 });
+app.get('/admin/stale', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'stale-inventory.html'));
+});
 app.get('/admin/scout-alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
 });

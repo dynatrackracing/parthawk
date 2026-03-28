@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — STALE INVENTORY</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:800px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.tabs{display:flex;gap:4px;margin-bottom:10px}
+.tab{padding:8px 14px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:12px;font-weight:700;cursor:pointer}
+.tab.active{color:#ef4444;border-color:#ef4444}
+.btn-sm{padding:5px 10px;font-size:10px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;cursor:pointer}
+.btn-sm:disabled{opacity:.3}
+.btn-danger{border-color:#ef4444;color:#ef4444}
+.btn-warn{border-color:#f59e0b;color:#f59e0b}
+.btn-green{border-color:#22c55e;color:#22c55e}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#ef4444;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:20px;font-size:13px}
+.item-card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px;margin-bottom:8px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:6px;color:#6B7280;font-size:9px;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
+td{padding:6px;border-bottom:1px solid #1f1f1f}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('stale')</script>
+<div class="container">
+  <div class="card" style="border-color:#ef4444">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.06em">STALE INVENTORY</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px">End, relist, or reduce stale listings</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" onclick="runAutomation(this)">Run Auto</button>
+        <button class="btn-sm btn-danger" id="bulkEndBtn" onclick="bulkEnd()" style="display:none">End Selected</button>
+      </div>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('candidates',this)">CANDIDATES</div>
+    <div class="tab" onclick="showTab('history',this)">HISTORY</div>
+  </div>
+  <div id="candidatesTab">
+    <div id="candLoading" style="text-align:center;padding:20px"><div class="spinner"></div></div>
+    <div id="candContent" style="display:none"></div>
+  </div>
+  <div id="historyTab" style="display:none">
+    <div id="histLoading" style="text-align:center;padding:20px"><div class="spinner"></div></div>
+    <div id="histContent" style="display:none"></div>
+  </div>
+</div>
+<script>
+var selectedIds=new Set();
+
+function showTab(t,el){
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active')});
+  el.classList.add('active');
+  document.getElementById('candidatesTab').style.display=t==='candidates'?'block':'none';
+  document.getElementById('historyTab').style.display=t==='history'?'block':'none';
+  if(t==='history')loadHistory();
+}
+
+function loadCandidates(){
+  document.getElementById('candLoading').style.display='block';
+  document.getElementById('candContent').style.display='none';
+  fetch('/stale-inventory/candidates').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('candLoading').style.display='none';
+    document.getElementById('candContent').style.display='block';
+    if(!d.success||!d.candidates||d.candidates.length===0){
+      document.getElementById('candContent').innerHTML='<div class="empty">No stale candidates. All listings are healthy.</div>';
+      return;
+    }
+    var h='<div style="font-size:11px;color:#6B7280;margin-bottom:8px">'+d.total+' listings need attention</div>';
+    d.candidates.forEach(function(c){
+      var recColor=c.recommendation==='end'?'#ef4444':c.recommendation==='deep_discount'?'#f59e0b':'#6B7280';
+      var recLabel=c.recommendation==='end'?'END':c.recommendation==='deep_discount'?'DEEP DISCOUNT':c.recommendation==='reduce'?'REDUCE':'MONITOR';
+      h+='<div class="item-card">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">';
+      h+='<div style="flex:1;min-width:0"><input type="checkbox" style="margin-right:6px" onchange="toggleSelect(\''+c.ebayItemId+'\')">';
+      h+='<span style="font-size:12px;font-weight:600">'+esc(c.title||'').substring(0,70)+'</span>';
+      h+='<div style="font-size:10px;color:#6B7280;margin-top:2px">$'+c.currentPrice.toFixed(2)+' · '+c.daysListed+'d listed · '+c.reductionCount+' reductions'+(c.isProgrammed?' · <span style="color:#a78bfa">PROGRAMMED</span>':'')+'</div>';
+      h+='</div>';
+      h+='<span class="badge" style="color:'+recColor+';border:1px solid '+recColor+';background:transparent">'+recLabel+'</span>';
+      h+='</div>';
+      h+='<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">';
+      h+='<button class="btn-sm btn-warn" onclick="revise(\''+c.ebayItemId+'\','+c.currentPrice+',0.9,this)">-10%</button>';
+      h+='<button class="btn-sm btn-warn" onclick="revise(\''+c.ebayItemId+'\','+c.currentPrice+',0.8,this)">-20%</button>';
+      h+='<button class="btn-sm btn-danger" onclick="endItem(\''+c.ebayItemId+'\',this)">End</button>';
+      h+='<button class="btn-sm btn-green" onclick="relistItem(\''+c.ebayItemId+'\',this)">Relist</button>';
+      h+='</div></div>';
+    });
+    document.getElementById('candContent').innerHTML=h;
+    document.getElementById('bulkEndBtn').style.display='inline-block';
+  }).catch(function(e){
+    document.getElementById('candLoading').style.display='none';
+    document.getElementById('candContent').innerHTML='<div class="empty" style="color:#ef4444">Error: '+e.message+'</div>';
+  });
+}
+
+function loadHistory(){
+  document.getElementById('histLoading').style.display='block';
+  document.getElementById('histContent').style.display='none';
+  fetch('/stale-inventory/actions?limit=50').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('histLoading').style.display='none';
+    document.getElementById('histContent').style.display='block';
+    if(!d.success||!d.actions||d.actions.length===0){
+      document.getElementById('histContent').innerHTML='<div class="empty">No actions taken yet.</div>';return;
+    }
+    var h='<table><thead><tr><th>Date</th><th>Item</th><th>Action</th><th>Old $</th><th>New $</th></tr></thead><tbody>';
+    d.actions.forEach(function(a){
+      var date=a.createdAt?new Date(a.createdAt).toLocaleDateString():'—';
+      h+='<tr><td>'+date+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(a.title||a.ebay_item_id||'')+'</td>';
+      h+='<td><span class="badge" style="background:#1a1a1a;color:'+(a.action_type==='end'?'#ef4444':'#f59e0b')+'">'+esc(a.action_type||'')+'</span></td>';
+      h+='<td>'+(a.old_price?'$'+parseFloat(a.old_price).toFixed(2):'—')+'</td>';
+      h+='<td>'+(a.new_price?'$'+parseFloat(a.new_price).toFixed(2):'—')+'</td></tr>';
+    });
+    h+='</tbody></table>';
+    document.getElementById('histContent').innerHTML=h;
+  }).catch(function(e){document.getElementById('histContent').innerHTML='<div class="empty">Error</div>';});
+}
+
+function revise(id,price,mult,btn){
+  var newP=Math.round(price*mult*100)/100;
+  if(!confirm('Reduce to $'+newP.toFixed(2)+'?'))return;
+  btn.disabled=true;btn.textContent='...';
+  fetch('/stale-inventory/revise-price',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ebayItemId:id,newPrice:newP})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){btn.textContent='Done';btn.style.color='#22c55e';setTimeout(loadCandidates,1000);}
+      else{btn.disabled=false;btn.textContent='Err';alert(d.error);}
+    }).catch(function(){btn.disabled=false;btn.textContent='Err';});
+}
+
+function endItem(id,btn){
+  if(!confirm('End this listing on eBay? This removes it from search.'))return;
+  btn.disabled=true;btn.textContent='...';
+  fetch('/stale-inventory/end-item',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ebayItemId:id})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){btn.textContent='Ended';btn.style.color='#22c55e';setTimeout(loadCandidates,1000);}
+      else{btn.disabled=false;btn.textContent='End';alert(d.error);}
+    }).catch(function(){btn.disabled=false;btn.textContent='End';});
+}
+
+function relistItem(id,btn){
+  if(!confirm('Relist this item? Creates a fresh listing with same details.'))return;
+  btn.disabled=true;btn.textContent='...';
+  fetch('/stale-inventory/relist-item',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ebayItemId:id})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){btn.textContent='Relisted';btn.style.color='#22c55e';setTimeout(loadCandidates,1000);}
+      else{btn.disabled=false;btn.textContent='Relist';alert(d.error);}
+    }).catch(function(){btn.disabled=false;btn.textContent='Relist';});
+}
+
+function toggleSelect(id){if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);}
+
+function bulkEnd(){
+  if(selectedIds.size===0){alert('No items selected');return;}
+  if(selectedIds.size>25){alert('Max 25 items per bulk end');return;}
+  if(!confirm('End '+selectedIds.size+' listings on eBay?'))return;
+  var btn=document.getElementById('bulkEndBtn');
+  btn.disabled=true;btn.textContent='Ending...';
+  fetch('/stale-inventory/bulk-end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ebayItemIds:Array.from(selectedIds)})})
+    .then(function(r){return r.json()}).then(function(d){
+      btn.disabled=false;btn.textContent='End Selected';
+      alert('Ended: '+d.totalEnded+', Failed: '+d.totalFailed);
+      selectedIds.clear();loadCandidates();
+    }).catch(function(){btn.disabled=false;btn.textContent='End Selected';});
+}
+
+function runAutomation(btn){
+  btn.disabled=true;btn.textContent='Running...';
+  fetch('/stale-inventory/run',{method:'POST'}).then(function(r){return r.json()}).then(function(){
+    btn.disabled=false;btn.textContent='Run Auto';alert('Automation started in background');
+  }).catch(function(){btn.disabled=false;btn.textContent='Run Auto';});
+}
+
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+loadCandidates();
+</script>
+</body>
+</html>

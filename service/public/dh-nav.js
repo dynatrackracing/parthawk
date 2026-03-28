@@ -19,6 +19,7 @@ function dhNav(activePage) {
     { key: 'velocity', label: 'VELOCITY',       href: '/admin/velocity' },
     { key: 'learnings', label: 'LEARNINGS',     href: '/admin/learnings' },
     { key: 'lifecycle', label: 'LIFECYCLE',     href: '/admin/lifecycle' },
+    { key: 'stale',     label: 'STALE',          href: '/admin/stale' },
   ];
 
   function linkHTML(item, isField) {
