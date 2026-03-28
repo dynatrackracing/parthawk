@@ -100,28 +100,39 @@ function getTrimTier(make, trim) {
   }
   const makeLower = (make || '').toLowerCase().trim();
   const trimLower = trim.toLowerCase().trim();
+  const isPremiumBrand = PREMIUM_BRANDS.includes(makeLower);
+
+  let result = null;
 
   if (makeLower && MAKE_TRIM_OVERRIDES[makeLower]) {
     const override = MAKE_TRIM_OVERRIDES[makeLower][trimLower];
-    if (override !== undefined) return tierToResult(override);
+    if (override !== undefined) result = tierToResult(override);
   }
-  if (TRIM_TIERS[trimLower] !== undefined) return tierToResult(TRIM_TIERS[trimLower]);
+  if (!result && TRIM_TIERS[trimLower] !== undefined) result = tierToResult(TRIM_TIERS[trimLower]);
 
-  const sortedKeys = Object.keys(TRIM_TIERS).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
-    const pattern = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-    if (pattern.test(trimLower)) {
-      if (makeLower && MAKE_TRIM_OVERRIDES[makeLower]?.[key] !== undefined) {
-        return tierToResult(MAKE_TRIM_OVERRIDES[makeLower][key]);
+  if (!result) {
+    const sortedKeys = Object.keys(TRIM_TIERS).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      const pattern = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (pattern.test(trimLower)) {
+        if (makeLower && MAKE_TRIM_OVERRIDES[makeLower]?.[key] !== undefined) {
+          result = tierToResult(MAKE_TRIM_OVERRIDES[makeLower][key]);
+        } else {
+          result = tierToResult(TRIM_TIERS[key]);
+        }
+        break;
       }
-      return tierToResult(TRIM_TIERS[key]);
     }
   }
 
-  if (PREMIUM_BRANDS.includes(makeLower)) {
-    return { tier: 'CHECK', multiplier: TIER.CHECK, badge: 'CHECK TRIM', color: 'yellow' };
+  if (!result) result = { tier: 'CHECK', multiplier: TIER.CHECK, badge: 'CHECK TRIM', color: 'yellow' };
+
+  // Premium brand floor: never fully suppress trim-dependent parts
+  if (isPremiumBrand && result.tier === 'BASE') {
+    result = { tier: 'CHECK', multiplier: TIER.CHECK, badge: 'CHECK TRIM', color: 'yellow' };
   }
-  return { tier: 'CHECK', multiplier: TIER.CHECK, badge: 'CHECK TRIM', color: 'yellow' };
+
+  return result;
 }
 
 function isTrimDependent(partType) {
