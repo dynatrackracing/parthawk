@@ -1,7 +1,7 @@
 /**
  * DarkHawk shared navigation - two-bar layout
  * Usage: <div id="dh-nav"></div><script src="/admin/dh-nav.js"></script><script>dhNav('feed')</script>
- * Active page keys: feed, alerts, vin, gate, nest, scour, quarry, sky, perch, mark
+ * Active page keys: feed, alerts, vin, gate, scour, quarry, sky, perch, mark
  */
 function dhNav(activePage) {
   const field = [
@@ -11,7 +11,6 @@ function dhNav(activePage) {
     { key: 'gate',   label: 'NEST PROTECTOR',   href: '/admin/gate' },
   ];
   const intel = [
-    { key: 'nest',   label: 'THE NEST',         href: '/' },
     { key: 'scour',  label: 'SCOUR STREAM',     href: '/admin/restock-list' },
     { key: 'quarry', label: 'THE QUARRY',        href: '/admin/restock' },
     { key: 'sky',    label: 'SKY WATCH',         href: '/admin/opportunities' },
