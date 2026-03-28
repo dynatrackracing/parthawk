@@ -383,17 +383,21 @@
     return '';
   }
 
-  // Strip LKQ body codes from display (DS1, DS6, WK, WK2, MK, KL, etc.)
+  // Strip LKQ platform/body codes from display
+  // Strips letter+digit codes (DS1, DS6, WK2, LA1, RT1) and known platform-only letter codes (JK, JL, JT, WK, XK, MK, KJ, KL, DJ, DT, DH, BK, WJ, ZJ, TJ, ND, WD, PF, UF, FK)
+  // Preserves real trims: LX, SXT, SRT, GT, SE, LE, XLE, LTZ, etc.
+  const LKQ_PLATFORM_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH']);
   function stripLKQCodes(text) {
     if (!text) return text;
-    // Remove 2-3 char alphanumeric codes that aren't real words
-    // Pattern: comma-separated codes like "DS1, DS6" or standalone codes after model
     return text
-      .replace(/[, ]+\b[A-Z]{1,2}\d{1,2}\b/g, '') // DS1, DS6, WK2, etc.
-      .replace(/\b(DS\d|WK\d?|WH|XK|MK|KL|KJ|BK|LX|LA|LD|DJ|DT|DH|DR|RT|JK|JL|JT|WD|ND|PF|UF|RU|AN|EN|GS|JS|KA|TJ|ZJ|ZH|WJ|FK|DX|FF)\b[, ]*/gi, '')
+      .replace(/\b[A-Z]{1,2}\d{1,2}\b/g, '')  // letter(s)+digit(s): DS1, DS6, WK2, LA1
+      .replace(/\b([A-Z]{2})\b/g, (m, code) => LKQ_PLATFORM_CODES.has(code) ? '' : m) // known 2-letter platform codes
       .replace(/,\s*,/g, ',')
+      .replace(/[, ]+,/g, ',')
       .replace(/,\s*$/, '')
-      .replace(/\s+/g, ' ')
+      .replace(/^\s*,\s*/, '')
+      .replace(/\s*,\s*(\d+\.\d+L)/g, ' $1') // comma before engine size
+      .replace(/\s{2,}/g, ' ')
       .trim();
   }
 

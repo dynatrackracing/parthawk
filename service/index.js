@@ -196,6 +196,9 @@ app.get('/admin/vin', (req, res) => {
 app.get('/admin/hunters-perch', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'hunters-perch.html'));
 });
+app.get('/admin/the-mark', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'the-mark.html'));
+});
 app.get('/admin/scout-alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
 });
