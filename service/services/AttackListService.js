@@ -1109,6 +1109,11 @@ class AttackListService {
         });
       }
 
+      // Server-side last_seen filter for lazy-load time ranges
+      if (options.lastSeenSince) {
+        vQuery = vQuery.where('last_seen', '>=', new Date(options.lastSeenSince));
+      }
+
       const vehicles = await vQuery;
 
       if (vehicles.length === 0) continue;

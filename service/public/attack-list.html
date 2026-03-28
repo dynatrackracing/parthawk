@@ -256,9 +256,9 @@
 </div>
 
 <div class="toggle-bar">
-  <button class="toggle-btn" id="filt-today" onclick="setDateFilter('today')">Today</button>
+  <button class="toggle-btn active" id="filt-today" onclick="setDateFilter('today')">Today</button>
   <button class="toggle-btn" id="filt-3d" onclick="setDateFilter('3d')">3 Days</button>
-  <button class="toggle-btn active" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
+  <button class="toggle-btn" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
   <button class="toggle-btn" id="filt-30d" onclick="setDateFilter('30d')">30 Days</button>
   <button class="toggle-btn" id="filt-all" onclick="setDateFilter('all')">All</button>
 </div>
@@ -301,25 +301,66 @@
 <script>
   let allData = null;
   let currentTab = 'all';
-  let dateFilter = '7d'; // 'today', '3d', '7d', '30d', 'all'
+  let dateFilter = 'today'; // 'today', '3d', '7d', '30d', 'all'
   const activeSessions = {};
+  const dataCache = {}; // keyed by filter mode
 
-  function setDateFilter(mode) {
+  // Eastern time helpers
+  function easternDateStr(d) {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+
+  function easternSinceDateISO(daysAgo) {
+    // Returns ISO string for midnight Eastern N days ago, for use as server-side `since` param
+    const fmt = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const now = new Date();
+    const target = new Date(now.getTime() - daysAgo * 86400000);
+    const dateStr = target.toLocaleDateString('en-CA', fmt); // YYYY-MM-DD in ET
+    // Convert back to UTC: create date at midnight ET
+    const etDate = new Date(dateStr + 'T00:00:00-04:00'); // EDT approximation
+    return etDate.toISOString();
+  }
+
+  function filterSinceParam() {
+    if (dateFilter === 'today') return easternSinceDateISO(0);
+    if (dateFilter === '3d') return easternSinceDateISO(3);
+    if (dateFilter === '7d') return easternSinceDateISO(7);
+    if (dateFilter === '30d') return easternSinceDateISO(30);
+    return null; // 'all' = no filter
+  }
+
+  async function setDateFilter(mode) {
     dateFilter = mode;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('filt-' + mode).classList.add('active');
-    renderData();
+    if (dataCache[mode]) {
+      allData = dataCache[mode];
+      renderData();
+    } else {
+      await loadData();
+    }
+  }
+
+  function getLastSeenDaysAgo(v) {
+    // How many calendar days ago (Eastern) was this vehicle last confirmed on the yard
+    const d = v.last_seen || v.scraped_at;
+    if (!d) return 999;
+    const todayET = easternDateStr(new Date());
+    const seenET = easternDateStr(d);
+    if (!todayET || !seenET) return 999;
+    const todayMs = new Date(todayET + 'T00:00:00').getTime();
+    const seenMs = new Date(seenET + 'T00:00:00').getTime();
+    return Math.round((todayMs - seenMs) / 86400000);
   }
 
   function getSetDaysAgo(v) {
-    // Use date_added (LKQ set date), NOT scraped_at
-    // Compare calendar dates in Eastern time (not raw UTC ms diff)
-    // This prevents timezone skew where "today" disappears by morning
+    // How many calendar days ago (Eastern) was this vehicle set at the yard (LKQ date)
     const d = v.date_added;
     if (!d) return 999;
-    const fmt = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
-    const todayET = new Date().toLocaleDateString('en-CA', fmt); // YYYY-MM-DD
-    const addedET = new Date(d).toLocaleDateString('en-CA', fmt);
+    const todayET = easternDateStr(new Date());
+    const addedET = easternDateStr(d);
+    if (!todayET || !addedET) return 999;
     const todayMs = new Date(todayET + 'T00:00:00').getTime();
     const addedMs = new Date(addedET + 'T00:00:00').getTime();
     return Math.round((todayMs - addedMs) / 86400000);
@@ -342,25 +383,43 @@
     return '';
   }
 
-  function filterMaxDays() {
-    if (dateFilter === 'today') return 0;
-    if (dateFilter === '3d') return 3;
-    if (dateFilter === '7d') return 7;
-    if (dateFilter === '30d') return 30;
-    return 9999;
+  // Strip LKQ body codes from display (DS1, DS6, WK, WK2, MK, KL, etc.)
+  function stripLKQCodes(text) {
+    if (!text) return text;
+    // Remove 2-3 char alphanumeric codes that aren't real words
+    // Pattern: comma-separated codes like "DS1, DS6" or standalone codes after model
+    return text
+      .replace(/[, ]+\b[A-Z]{1,2}\d{1,2}\b/g, '') // DS1, DS6, WK2, etc.
+      .replace(/\b(DS\d|WK\d?|WH|XK|MK|KL|KJ|BK|LX|LA|LD|DJ|DT|DH|DR|RT|JK|JL|JT|WD|ND|PF|UF|RU|AN|EN|GS|JS|KA|TJ|ZJ|ZH|WJ|FK|DX|FF)\b[, ]*/gi, '')
+      .replace(/,\s*,/g, ',')
+      .replace(/,\s*$/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   async function loadData() {
     document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
-      const res = await fetch('/attack-list');
+      const since = filterSinceParam();
+      const url = since ? '/attack-list?since=' + encodeURIComponent(since) : '/attack-list';
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       allData = data;
+      dataCache[dateFilter] = data;
       renderData();
       const ts = new Date(data.generated_at);
       document.getElementById('statusLeft').textContent = 'Updated ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
       document.getElementById('headerSub').textContent = data.yards.length + ' yards scored';
+
+      // Pre-fetch 3d in background after today renders
+      if (dateFilter === 'today' && !dataCache['3d']) {
+        const since3d = easternSinceDateISO(3);
+        fetch('/attack-list?since=' + encodeURIComponent(since3d))
+          .then(r => r.json())
+          .then(d => { if (d.success) dataCache['3d'] = d; })
+          .catch(() => {});
+      }
     } catch (err) {
       document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>Could not load</h3><p>${err.message}</p><button class="btn-primary" onclick="loadData()">Retry</button></div>`;
     }
@@ -401,11 +460,10 @@
       return;
     }
 
-    // Count totals for status bar (filtered)
-    const maxDaysGlobal = filterMaxDays();
+    // Count totals for status bar (server already filtered by last_seen)
     let totalV = 0, hotV = 0;
     yards.forEach(y => {
-      const fv = (y.vehicles||[]).filter(v => getSetDaysAgo(v) <= maxDaysGlobal);
+      const fv = y.vehicles || [];
       totalV += fv.length;
       hotV += fv.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length;
     });
@@ -422,9 +480,8 @@
       const prioClass = topValue >= 800 ? 'chip-green' : topValue >= 500 ? 'chip-yellow' : topValue >= 250 ? 'chip-orange' : 'chip-gray';
       const lastScraped = yd.yard.last_scraped ? timeAgo(yd.yard.last_scraped) : 'never';
 
-      // Filter vehicles by date
-      const maxDays = filterMaxDays();
-      const filtered = vehicles.filter(v => getSetDaysAgo(v) <= maxDays);
+      // Vehicles already filtered server-side by last_seen
+      const filtered = vehicles;
       if (filtered.length === 0) continue;
 
       html += `<div class="yard-group">
@@ -529,7 +586,7 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${stripLKQCodes(v.model)}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + stripLKQCodes(v.trim) : '')}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}

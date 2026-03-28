@@ -16,11 +16,12 @@ const { v4: uuidv4 } = require('uuid');
  */
 router.get('/', async (req, res) => {
   try {
-    const { days = 90, activeOnly, full } = req.query;
+    const { days = 90, activeOnly, full, since } = req.query;
     const service = new AttackListService();
     const results = await service.getAllYardsAttackList({
       daysBack: parseInt(days),
       activeOnly: activeOnly === 'true',
+      lastSeenSince: since || null,
     });
 
     // Strip parts arrays for slim mode (default) — huge memory savings on mobile
