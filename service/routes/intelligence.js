@@ -8,6 +8,7 @@ const PricingService = require('../services/PricingService');
 const DeadInventoryService = require('../services/DeadInventoryService');
 const OpportunityService = require('../services/OpportunityService');
 const LearningsService = require('../services/LearningsService');
+const LifecycleService = require('../services/LifecycleService');
 
 /**
  * GET /intelligence/learnings
@@ -20,6 +21,36 @@ router.get('/learnings', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (err) {
     log.error({ err }, 'Error getting learnings');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /intelligence/lifecycle
+ * Part type lifecycle: time-to-sell, price decay, return rate, revenue
+ */
+router.get('/lifecycle', async (req, res) => {
+  try {
+    const service = new LifecycleService();
+    const result = await service.getLifecycleMetrics({ daysBack: parseInt(req.query.days) || 365 });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    log.error({ err }, 'Error getting lifecycle metrics');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /intelligence/seasonal
+ * Monthly, day-of-week, and quarterly sales patterns
+ */
+router.get('/seasonal', async (req, res) => {
+  try {
+    const service = new LifecycleService();
+    const result = await service.getSeasonalPatterns({ yearsBack: parseInt(req.query.years) || 2 });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    log.error({ err }, 'Error getting seasonal patterns');
     res.status(500).json({ success: false, error: err.message });
   }
 });

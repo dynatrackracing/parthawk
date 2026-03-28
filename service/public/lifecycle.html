@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — LIFECYCLE</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:900px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.stat-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:80px;background:#1a1a1a;border-radius:8px;padding:10px;text-align:center}
+.stat-value{font-size:20px;font-weight:800}
+.stat-label{font-size:9px;color:#6B7280;margin-top:2px;text-transform:uppercase}
+.tabs{display:flex;gap:4px;margin-bottom:10px}
+.tab{padding:8px 16px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:12px;font-weight:700;cursor:pointer}
+.tab.active{color:#a78bfa;border-color:#a78bfa}
+.toggle-bar{display:flex;gap:4px;margin-bottom:10px}
+.toggle-btn{padding:5px 10px;border:1px solid #333;border-radius:4px;background:#1a1a1a;color:#6B7280;font-size:11px;cursor:pointer}
+.toggle-btn.active{color:#a78bfa;border-color:#a78bfa}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#a78bfa;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:20px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:6px 8px;color:#6B7280;font-size:9px;text-transform:uppercase;border-bottom:1px solid #2a2a2a;cursor:pointer}
+th:hover{color:#a78bfa}
+td{padding:6px 8px;border-bottom:1px solid #1f1f1f}
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:100px;padding:8px 0}
+.bar{background:#a78bfa;border-radius:3px 3px 0 0;min-width:14px;flex:1;position:relative}
+.bar-label{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:7px;color:#6B7280;white-space:nowrap}
+.insight{padding:6px 10px;background:#1a1a1a;border-radius:6px;font-size:11px;margin-bottom:6px;border-left:3px solid #a78bfa}
+.vel-fast{color:#22c55e}.vel-normal{color:#eab308}.vel-slow{color:#ef4444}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('lifecycle')</script>
+<div class="container">
+  <div class="card" style="border-color:#a78bfa">
+    <div style="font-size:10px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:0.06em">LIFECYCLE & SEASONAL</div>
+    <div style="font-size:11px;color:#6B7280;margin-top:2px">Part performance, timing patterns, and sales intelligence</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('lifecycle')">LIFECYCLE</div>
+    <div class="tab" onclick="showTab('seasonal')">SEASONAL</div>
+  </div>
+  <div id="lifecycleTab">
+    <div class="toggle-bar">
+      <button class="toggle-btn" onclick="loadLifecycle(90)">90d</button>
+      <button class="toggle-btn" onclick="loadLifecycle(180)">180d</button>
+      <button class="toggle-btn active" onclick="loadLifecycle(365)">1 Year</button>
+      <button class="toggle-btn" onclick="loadLifecycle(9999)">All</button>
+    </div>
+    <div id="lcLoading" style="text-align:center;padding:20px"><div class="spinner"></div></div>
+    <div id="lcContent" style="display:none"></div>
+  </div>
+  <div id="seasonalTab" style="display:none">
+    <div id="snLoading" style="text-align:center;padding:20px"><div class="spinner"></div></div>
+    <div id="snContent" style="display:none"></div>
+  </div>
+</div>
+<script>
+var lcData=null,snData=null,sortCol='totalRevenue',sortDir=-1;
+
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('active')});
+  event.target.classList.add('active');
+  document.getElementById('lifecycleTab').style.display=t==='lifecycle'?'block':'none';
+  document.getElementById('seasonalTab').style.display=t==='seasonal'?'block':'none';
+  if(t==='seasonal'&&!snData)loadSeasonal();
+}
+
+function loadLifecycle(days){
+  document.querySelectorAll('.toggle-btn').forEach(function(b){b.classList.remove('active')});
+  if(event&&event.target)event.target.classList.add('active');
+  document.getElementById('lcLoading').style.display='block';
+  document.getElementById('lcContent').style.display='none';
+  fetch('/intelligence/lifecycle?days='+days).then(function(r){return r.json()}).then(function(d){
+    document.getElementById('lcLoading').style.display='none';
+    document.getElementById('lcContent').style.display='block';
+    if(!d.success){document.getElementById('lcContent').innerHTML='<div class="empty">Error</div>';return;}
+    lcData=d;renderLifecycle();
+  }).catch(function(e){document.getElementById('lcLoading').style.display='none';document.getElementById('lcContent').innerHTML='<div class="empty">Error: '+e.message+'</div>';});
+}
+
+function renderLifecycle(){
+  if(!lcData)return;
+  var t=lcData.totals||{},pts=lcData.partTypes||[];
+  var h='';
+  // Summary
+  h+='<div class="stat-row"><div class="stat-box"><div class="stat-value" style="color:#22c55e">$'+((t.totalRevenue||0)/1000).toFixed(1)+'k</div><div class="stat-label">Revenue</div></div>';
+  h+='<div class="stat-box"><div class="stat-value">'+(t.totalSales||0)+'</div><div class="stat-label">Sales</div></div>';
+  h+='<div class="stat-box"><div class="stat-value">'+(t.avgDaysToSell||'—')+'d</div><div class="stat-label">Avg Days to Sell</div></div></div>';
+  // Insights
+  var fast=pts.filter(function(p){return p.velocity==='fast'}).slice(0,3);
+  var highRet=pts.filter(function(p){return p.returnRate>5}).slice(0,2);
+  if(fast.length>0)h+='<div class="insight">Fastest sellers: '+fast.map(function(p){return'<strong>'+p.partType+'</strong> ('+p.medianDaysToSell+'d median)'}).join(', ')+'</div>';
+  if(highRet.length>0)h+='<div class="insight" style="border-color:#ef4444">High return rate: '+highRet.map(function(p){return'<strong>'+p.partType+'</strong> ('+p.returnRate+'%)'}).join(', ')+' — check condition grading</div>';
+  if(pts.length>0)h+='<div class="insight" style="border-color:#22c55e">Top revenue: '+pts.slice(0,3).map(function(p){return'<strong>'+p.partType+'</strong> ($'+p.totalRevenue.toLocaleString()+')'}).join(', ')+'</div>';
+  // Table
+  h+='<div class="card"><table><thead><tr>';
+  var cols=[['partType','Part'],['salesCount','Sales'],['totalRevenue','Revenue'],['avgPrice','Avg $'],['medianDaysToSell','Days'],['avgDecayPercent','Decay %'],['returnRate','Return %']];
+  cols.forEach(function(c){h+='<th onclick="sortLC(\''+c[0]+'\')">'+c[1]+(sortCol===c[0]?(sortDir>0?' ▲':' ▼'):'')+'</th>'});
+  h+='</tr></thead><tbody>';
+  pts.sort(function(a,b){var va=a[sortCol],vb=b[sortCol];if(va==null)va=-999;if(vb==null)vb=-999;return(va-vb)*sortDir});
+  pts.forEach(function(p){
+    var vc=p.velocity==='fast'?'vel-fast':p.velocity==='slow'?'vel-slow':'vel-normal';
+    h+='<tr><td><strong>'+p.partType+'</strong> <span class="'+vc+'" style="font-size:9px">'+(p.velocity||'')+'</span></td>';
+    h+='<td>'+p.salesCount+'</td><td style="color:#22c55e">$'+p.totalRevenue.toLocaleString()+'</td>';
+    h+='<td>$'+p.avgPrice+'</td><td>'+(p.medianDaysToSell!=null?p.medianDaysToSell+'d':'—')+'</td>';
+    h+='<td>'+(p.avgDecayPercent||0)+'%</td>';
+    h+='<td style="color:'+(p.returnRate>5?'#ef4444':'inherit')+'">'+(p.returnRate||0)+'%'+(p.returnRate>5?' ⚠':'')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('lcContent').innerHTML=h;
+}
+
+function sortLC(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1;}renderLifecycle();}
+
+function loadSeasonal(){
+  document.getElementById('snLoading').style.display='block';
+  document.getElementById('snContent').style.display='none';
+  fetch('/intelligence/seasonal').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('snLoading').style.display='none';
+    document.getElementById('snContent').style.display='block';
+    if(!d.success){document.getElementById('snContent').innerHTML='<div class="empty">Error</div>';return;}
+    snData=d;renderSeasonal();
+  }).catch(function(e){document.getElementById('snLoading').style.display='none';document.getElementById('snContent').innerHTML='<div class="empty">Error: '+e.message+'</div>';});
+}
+
+function renderSeasonal(){
+  if(!snData)return;
+  var h='';
+  // Monthly chart
+  var months=snData.monthly||[];
+  var maxS=Math.max.apply(null,months.map(function(m){return m.avgSales}))||1;
+  h+='<div class="card"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:4px">Monthly Sales Volume</div>';
+  h+='<div class="bar-chart">';
+  months.forEach(function(m){
+    var pct=Math.max(4,(m.avgSales/maxS)*100);
+    var op=0.4+0.6*(m.avgSales/maxS);
+    h+='<div class="bar" style="height:'+pct+'%;opacity:'+op+'" title="'+m.name+': '+m.avgSales+' avg sales, $'+m.avgRevenue+' rev"><div class="bar-label">'+m.name.substring(0,3)+'</div></div>';
+  });
+  h+='</div></div>';
+  // Part type seasons
+  var pts=snData.partTypeSeasons||[];
+  if(pts.length>0){
+    h+='<div class="card"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:6px">Part Type Seasons</div>';
+    pts.forEach(function(p){
+      h+='<div style="padding:4px 0;border-bottom:1px solid #1f1f1f;font-size:11px"><strong>'+p.partType+'</strong> peaks in <span style="color:#22c55e">'+p.peakMonth+' ('+p.peakVsAvg+')</span>, slows in <span style="color:#ef4444">'+p.slowMonth+' ('+p.slowVsAvg+')</span></div>';
+    });
+    h+='</div>';
+  }
+  // Day of week
+  var days=snData.dayOfWeek||[];
+  var maxD=Math.max.apply(null,days.map(function(d){return d.avgSales}))||1;
+  h+='<div class="card"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:4px">Sales by Day of Week</div>';
+  h+='<div class="bar-chart" style="height:80px">';
+  days.forEach(function(d){
+    var pct=Math.max(4,(d.avgSales/maxD)*100);
+    h+='<div class="bar" style="height:'+pct+'%;background:#3b82f6" title="'+d.name+': '+d.avgSales+' avg/week"><div class="bar-label">'+d.name.substring(0,3)+'</div></div>';
+  });
+  h+='</div></div>';
+  // Quarterly
+  var qtrs=snData.quarterly||[];
+  if(qtrs.length>0){
+    h+='<div class="card"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:6px">Quarterly Trends</div>';
+    h+='<table><thead><tr><th>Quarter</th><th>Sales</th><th>Revenue</th><th>vs Last Q</th><th>vs Last Y</th></tr></thead><tbody>';
+    qtrs.forEach(function(q){
+      var qc=q.vsLastQuarter.startsWith('+')?'color:#22c55e':q.vsLastQuarter.startsWith('-')?'color:#ef4444':'';
+      var yc=q.vsLastYear.startsWith('+')?'color:#22c55e':q.vsLastYear.startsWith('-')?'color:#ef4444':'';
+      h+='<tr><td><strong>'+q.quarter+'</strong></td><td>'+q.sales+'</td><td style="color:#22c55e">$'+q.revenue.toLocaleString()+'</td>';
+      h+='<td style="'+qc+'">'+q.vsLastQuarter+'</td><td style="'+yc+'">'+q.vsLastYear+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  document.getElementById('snContent').innerHTML=h;
+}
+
+loadLifecycle(365);
+</script>
+</body>
+</html>

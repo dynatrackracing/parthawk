@@ -205,6 +205,9 @@ app.get('/admin/velocity', (req, res) => {
 app.get('/admin/learnings', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'learnings.html'));
 });
+app.get('/admin/lifecycle', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'lifecycle.html'));
+});
 app.get('/admin/scout-alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
 });
