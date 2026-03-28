@@ -623,15 +623,15 @@
       </div>`;
     }
 
-    // Sort parts: fresh market data + high price on top, no data on bottom
+    // Sort parts: our sold data first, then market data, then price descending
     parts.sort((a, b) => {
-      // Freshness rank: 1=fresh ✅, 2=stale ⚠️, 3=old ❌, 4=none ❓
-      const fA = a.marketCheckedAt ? (Math.floor((Date.now() - new Date(a.marketCheckedAt).getTime()) / 86400000) <= 60 ? 1 : 2) : (a.marketMedian > 0 ? 1 : 4);
-      const fB = b.marketCheckedAt ? (Math.floor((Date.now() - new Date(b.marketCheckedAt).getTime()) / 86400000) <= 60 ? 1 : 2) : (b.marketMedian > 0 ? 1 : 4);
-      if (fA !== fB) return fA - fB;
-      // Then by display price descending
-      const pA = (a.marketMedian > 0 ? a.marketMedian : a.price) || 0;
-      const pB = (b.marketMedian > 0 ? b.marketMedian : b.price) || 0;
+      // Parts we've sold are always most trustworthy
+      const soldA = (a.sold_90d || 0) > 0 ? 1 : (a.marketMedian > 0 ? 2 : 3);
+      const soldB = (b.sold_90d || 0) > 0 ? 1 : (b.marketMedian > 0 ? 2 : 3);
+      if (soldA !== soldB) return soldA - soldB;
+      // Then by primary price descending (our price if we've sold, market otherwise)
+      const pA = (a.sold_90d > 0 && a.price > 0) ? a.price : (a.marketMedian > 0 ? a.marketMedian : a.price || 0);
+      const pB = (b.sold_90d > 0 && b.price > 0) ? b.price : (b.marketMedian > 0 ? b.marketMedian : b.price || 0);
       return pB - pA;
     });
 
@@ -639,24 +639,29 @@
     for (const p of parts) {
       if (!p) continue;
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
-      // Use market median for badge when available, fall back to our historical avg
-      const displayPrice = (p.marketMedian > 0) ? p.marketMedian : (p.price != null ? p.price : 0);
+      // OUR sold price is primary when we have recent sales; market data fills gaps
+      const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
+      const displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
       const badgeVerdict = displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
       const vc = badgeVerdict === 'GREAT' ? 'verdict-great' : badgeVerdict === 'GOOD' ? 'verdict-good' : badgeVerdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
       const price = displayPrice;
       const inStock = p.in_stock != null ? p.in_stock : 0;
       const sold90d = p.sold_90d != null ? p.sold_90d : 0;
-      // Price freshness indicator — based on market_demand_cache.last_updated, NOT lastSoldDate
+      // Price freshness indicator
       let freshness = '❓';
-      let freshnessRank = 4; // for sorting: 1=fresh, 2=stale, 3=old, 4=none
-      if (p.marketCheckedAt) {
+      if (hasOurSales) {
+        // Our own sales — freshness based on last sold date
+        if (p.lastSoldDate) {
+          const daysAgo = Math.floor((Date.now() - new Date(p.lastSoldDate).getTime()) / 86400000);
+          freshness = daysAgo <= 30 ? '✅' : daysAgo <= 60 ? '⚠️' : '❌';
+        } else {
+          freshness = '✅'; // We have sold_90d > 0 so it's recent
+        }
+      } else if (p.marketCheckedAt) {
         const daysAgo = Math.floor((Date.now() - new Date(p.marketCheckedAt).getTime()) / 86400000);
-        if (daysAgo <= 60) { freshness = '✅'; freshnessRank = 1; }
-        else if (daysAgo <= 90) { freshness = '⚠️'; freshnessRank = 2; }
-        else { freshness = '❌'; freshnessRank = 3; }
+        freshness = daysAgo <= 60 ? '✅' : daysAgo <= 90 ? '⚠️' : '❌';
       } else if (p.marketMedian > 0) {
-        // Has market data but no checkedAt — treat as fresh (from current enrichment)
-        freshness = '✅'; freshnessRank = 1;
+        freshness = '✅';
       }
       html += `<div class="part-detail" id="pd-${v.id}-${pid}">
         <div class="pd-header">
@@ -670,8 +675,8 @@
         </div>
         <div class="pd-reason">${p.reason || ''}${p.trimMultiplier !== undefined && p.trimMultiplier < 1.0 ? (p.trimMultiplier === 0 ? ' <span style="color:#ef4444;font-weight:600">· Not expected on this trim</span>' : ' <span style="color:#f59e0b;font-weight:600">· ⚠️ Verify on vehicle</span>') : ''}</div>
         ${p.marketMedian > 0 ? `<div style="font-size:11px;margin-top:2px;display:flex;gap:8px;align-items:center">
-          <span style="color:#9CA3AF">Market</span>
-          <span style="color:${Math.abs(price - p.marketMedian) / p.marketMedian > 0.2 ? (price > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981'};font-weight:600">$${p.marketMedian} med</span>
+          <span style="color:#9CA3AF">${hasOurSales ? 'Market ref' : 'Market'}</span>
+          <span style="color:${hasOurSales ? '#6B7280' : (Math.abs(displayPrice - p.marketMedian) / p.marketMedian > 0.2 ? (displayPrice > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981')};font-weight:600">$${p.marketMedian} med</span>
           <span style="color:#6B7280">${p.marketCount || 0} sold</span>
           ${p.marketVelocity ? `<span style="color:#6B7280">${p.marketVelocity.toFixed(1)}/wk</span>` : ''}
         </div>` : ''}
