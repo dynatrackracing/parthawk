@@ -9,6 +9,8 @@ chromium.use(stealth());
 const { buildSearchQuery } = require('../scripts/smart-query-builder');
 const { filterRelevantItems } = require('../scripts/relevance-scorer');
 const PriceCheck = require('../models/PriceCheck');
+const { extractPartNumbers } = require('../utils/partIntelligence');
+const { database } = require('../database/database');
 
 // Persistent browser + page — launch once, reuse across all requests
 let _browser = null;
@@ -58,9 +60,54 @@ class PriceCheckService {
     // Run the pipeline
     const result = await this.runPipeline(title, currentPrice);
 
-    // Save to cache
+    // Save to PriceCheck table
     if (listingId) {
       await PriceCheck.saveCheck(listingId, title, currentPrice, result);
+    }
+
+    // Also update market_demand_cache if we have a part number and valid metrics
+    if (result.metrics && result.metrics.count > 0) {
+      try {
+        const pns = extractPartNumbers(title);
+        if (pns.length > 0) {
+          const basePn = pns[0].base;
+          const m = result.metrics;
+          // UPSERT — only overwrite if existing data is >3 days stale (fresher data wins)
+          await database.raw(`
+            INSERT INTO market_demand_cache
+              (id, part_number_base, ebay_avg_price, ebay_sold_90d, ebay_median_price,
+               ebay_min_price, ebay_max_price, sales_per_week, source, search_query, last_updated, "createdAt")
+            VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, ?, 'price_check', ?, NOW(), NOW())
+            ON CONFLICT (part_number_base) DO UPDATE SET
+              ebay_avg_price = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_avg_price ELSE market_demand_cache.ebay_avg_price END,
+              ebay_sold_90d = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_sold_90d ELSE market_demand_cache.ebay_sold_90d END,
+              ebay_median_price = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_median_price ELSE market_demand_cache.ebay_median_price END,
+              ebay_min_price = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_min_price ELSE market_demand_cache.ebay_min_price END,
+              ebay_max_price = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_max_price ELSE market_demand_cache.ebay_max_price END,
+              sales_per_week = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.sales_per_week ELSE market_demand_cache.sales_per_week END,
+              source = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN 'price_check' ELSE market_demand_cache.source END,
+              search_query = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.search_query ELSE market_demand_cache.search_query END,
+              last_updated = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN NOW() ELSE market_demand_cache.last_updated END
+          `, [basePn, m.avg, m.count, m.median, m.min, m.max, m.salesPerWeek, result.searchQuery]);
+          // Snapshot for price history
+          try {
+            await database('PriceSnapshot').insert({
+              id: database.raw('gen_random_uuid()'),
+              part_number_base: basePn,
+              soldCount: m.count,
+              soldPriceAvg: m.avg,
+              soldPriceMedian: m.median,
+              ebay_median_price: m.median,
+              ebay_min_price: m.min,
+              ebay_max_price: m.max,
+              source: 'price_check',
+              snapshot_date: new Date(),
+            });
+          } catch (snapErr) { /* snapshot is supplementary */ }
+        }
+      } catch (cacheErr) {
+        // Don't fail the price check for a cache write error
+      }
     }
 
     return {

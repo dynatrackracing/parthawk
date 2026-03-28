@@ -217,14 +217,35 @@ async function main() {
         await knex.raw(`
           INSERT INTO market_demand_cache
             (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+             ebay_median_price, ebay_min_price, ebay_max_price, sales_per_week,
              source, last_updated, "createdAt")
-          VALUES (gen_random_uuid(), ?, ?, ?, 'yard_sniper', NOW(), NOW())
+          VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, ?, 'yard_sniper', NOW(), NOW())
           ON CONFLICT (part_number_base) DO UPDATE SET
             ebay_avg_price = EXCLUDED.ebay_avg_price,
             ebay_sold_90d = EXCLUDED.ebay_sold_90d,
+            ebay_median_price = EXCLUDED.ebay_median_price,
+            ebay_min_price = EXCLUDED.ebay_min_price,
+            ebay_max_price = EXCLUDED.ebay_max_price,
+            sales_per_week = EXCLUDED.sales_per_week,
             source = 'yard_sniper',
             last_updated = NOW()
-        `, [entry.base, result.median, result.count]);
+        `, [entry.base, result.median, result.count, result.median, result.min, result.max, result.salesPerWeek]);
+
+        // Snapshot for price history
+        try {
+          await knex('PriceSnapshot').insert({
+            id: knex.raw('gen_random_uuid()'),
+            part_number_base: entry.base,
+            soldCount: result.count,
+            soldPriceAvg: result.avg,
+            soldPriceMedian: result.median,
+            ebay_median_price: result.median,
+            ebay_min_price: result.min,
+            ebay_max_price: result.max,
+            source: 'yard_sniper',
+            snapshot_date: new Date(),
+          });
+        } catch (snapErr) { /* snapshot is supplementary */ }
 
         cached++;
         console.log(`  ${result.count} sold, $${result.median} med`);

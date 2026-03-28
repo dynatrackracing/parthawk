@@ -243,6 +243,21 @@ async function main() {
           entry.pnRaw, metrics.median, metrics.min, metrics.max,
           metrics.velocity, metrics.spw, JSON.stringify(metrics.topComps),
         ]);
+        // Snapshot for price history
+        try {
+          await knex('PriceSnapshot').insert({
+            id: knex.raw('gen_random_uuid()'),
+            part_number_base: entry.base,
+            soldCount: metrics.count,
+            soldPriceAvg: metrics.median,
+            soldPriceMedian: metrics.median,
+            ebay_median_price: metrics.median,
+            ebay_min_price: metrics.min,
+            ebay_max_price: metrics.max,
+            source: 'importapart_drip',
+            snapshot_date: new Date(),
+          });
+        } catch (snapErr) { /* snapshot is supplementary */ }
         console.log(metrics.count + ' comps, $' + metrics.median + ' median');
         refreshed++;
       }
