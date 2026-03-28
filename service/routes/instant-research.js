@@ -169,7 +169,7 @@ router.get('/', async (req, res) => {
           VALUES (gen_random_uuid(), ?, ?, ?, 'hawkeye', ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())
           ON CONFLICT (part_number_base) DO UPDATE SET
             ebay_avg_price = EXCLUDED.ebay_avg_price, ebay_sold_90d = EXCLUDED.ebay_sold_90d,
-            source = CASE WHEN market_demand_cache.source = 'apify' THEN market_demand_cache.source ELSE 'hawkeye' END,
+            source = 'hawkeye',
             search_query = COALESCE(EXCLUDED.search_query, market_demand_cache.search_query),
             ebay_median_price = EXCLUDED.ebay_median_price,
             ebay_min_price = EXCLUDED.ebay_min_price, ebay_max_price = EXCLUDED.ebay_max_price,

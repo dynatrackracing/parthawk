@@ -770,7 +770,8 @@ async function start() {
 
     // app.use(authMiddleware());
 
-    const ebaySellerProcessingJob = schedule.scheduleJob('0 */6 * * *', function (scheduledTime) {
+    // importapart/pro-rebuild update inventory ~weekly, daily refresh is sufficient
+    const ebaySellerProcessingJob = schedule.scheduleJob('0 6 * * *', function (scheduledTime) {
       log.info({ scheduledTime }, `Starting cron route RIGHT NOW, ${scheduledTime}`);
       const cronWorker = new CronWorkRunner();
       cronWorker.work();
@@ -891,18 +892,7 @@ async function start() {
       }, 10000); // delay 10s to let migrations finish
     } catch (e) { /* ignore */ }
 
-    // LKQ scrape cron - runs every night at 2:00 AM (spec section 4.3)
-    const LKQScraper = require('./scrapers/LKQScraper');
-    const lkqScrapeJob = schedule.scheduleJob('0 2 * * *', async function (scheduledTime) {
-      log.info({ scheduledTime }, 'Starting nightly LKQ scrape');
-      try {
-        const scraper = new LKQScraper();
-        const results = await scraper.scrapeAll();
-        log.info({ results }, 'Nightly LKQ scrape complete');
-      } catch (err) {
-        log.error({ err }, 'Nightly LKQ scrape failed');
-      }
-    });
+    // LKQ scraping runs locally via Task Scheduler — CloudFlare blocks Railway
 
   } catch (err) {
     log.error({ err }, 'Unable to start server')

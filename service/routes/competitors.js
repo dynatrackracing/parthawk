@@ -890,27 +890,32 @@ function titleMatchesYard(title, yardMakes) {
   return false;
 }
 
-// Daily auto-scrape cron - 6AM Eastern (11:00 UTC)
+// Rotate one competitor per day to avoid eBay rate limit risk — full cycle every N days where N = number of tracked sellers
 try {
   const cron = require('node-cron');
   cron.schedule('0 11 * * *', async () => {
-    log.info('Daily competitor auto-scrape starting');
+    log.info('Daily competitor rotation starting');
     try {
-      const sellers = await database('SoldItemSeller').where('enabled', true);
-      for (const seller of sellers) {
-        const skipWindow = new Date(Date.now() - 20 * 60 * 60 * 1000);
-        if (seller.lastScrapedAt && new Date(seller.lastScrapedAt) > skipWindow) continue;
+      // Pick the LEAST recently scraped enabled seller (round-robin)
+      const seller = await database('SoldItemSeller')
+        .where('enabled', true)
+        .orderByRaw('COALESCE("lastScrapedAt", \'1970-01-01\'::timestamp) ASC')
+        .first();
+
+      if (seller) {
         try {
           const manager = new SoldItemsManager();
           await manager.scrapeCompetitor({ seller: seller.name, categoryId: '6030', maxPages: 3, useScraper: false });
           await database('SoldItemSeller').where('name', seller.name).update({ lastScrapedAt: new Date(), updatedAt: new Date() });
-          log.info({ seller: seller.name }, 'Auto-scraped seller');
+          log.info({ seller: seller.name }, 'Daily competitor rotation: scraped seller');
         } catch (err) {
-          log.error({ err: err.message, seller: seller.name }, 'Auto-scrape failed for seller');
+          log.error({ err: err.message, seller: seller.name }, 'Daily competitor rotation failed');
         }
+      } else {
+        log.info('No enabled sellers to rotate');
       }
     } catch (err) {
-      log.error({ err: err.message }, 'Auto-scrape cron error');
+      log.error({ err: err.message }, 'Competitor rotation cron error');
     }
 
     // Auto-graduate marks that have been sold
