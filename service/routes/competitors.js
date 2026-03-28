@@ -462,8 +462,7 @@ router.post('/auto-scrape', async (req, res) => {
           seller: seller.name,
           categoryId: '6030',
           maxPages: 3,
-          useScraper: false,
-        });
+            });
 
         await database('SoldItemSeller').where('name', seller.name).update({
           lastScrapedAt: new Date(),
@@ -634,28 +633,12 @@ router.patch('/mark/:id', async (req, res) => {
 
 /**
  * POST /competitors/mark/graduate
- * Auto-graduate marks that you've now sold. Called periodically.
+ * Auto-graduate marks that you've now sold. Uses shared graduateMarks() function.
  */
 router.post('/mark/graduate', async (req, res) => {
   try {
-    const activeMarks = await database('the_mark').where('active', true);
-    const yourSales = await database('YourSale').select('title').limit(25000);
-    const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
-
-    let graduated = 0;
-    for (const mark of activeMarks) {
-      if (matchesAny(mark.normalizedTitle, yourSoldTitles)) {
-        await database('the_mark').where('id', mark.id).update({
-          active: false,
-          graduatedAt: new Date(),
-          graduatedReason: 'Sold - entered normal restock cycle',
-          updatedAt: new Date(),
-        });
-        graduated++;
-      }
-    }
-
-    res.json({ success: true, graduated, checked: activeMarks.length });
+    const graduated = await graduateMarks();
+    res.json({ success: true, graduated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -778,7 +761,6 @@ router.post('/:sellerId/scrape', async (req, res) => {
       seller: sellerName,
       categoryId: '6030',
       maxPages: parseInt(pages),
-      useScraper: false,
     });
     log.info({ seller: sellerName, result }, 'Manual competitor scrape complete');
   } catch (err) {
@@ -890,9 +872,58 @@ function titleMatchesYard(title, yardMakes) {
   return false;
 }
 
-// DISABLED: Finding API dead since Feb 2025. Re-enable after Phase 2.5 competitor scraping rewire
-// Competitor scraping and mark graduation can still be triggered manually via:
-//   POST /competitors/:sellerId/scrape
-//   POST /competitors/mark/graduate
+// Weekly competitor scrape — Sunday 8pm UTC
+// Rewired from dead FindingsAPI to SoldItemsScraper (Playwright) in Phase 2.5
+// Also runs mark graduation after fresh data arrives
+async function graduateMarks() {
+  try {
+    const activeMarks = await database('the_mark').where('active', true);
+    const ySales = await database('YourSale').select('title').limit(25000);
+    const ySoldTitles = new Set(ySales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+
+    let graduated = 0;
+    for (const mark of activeMarks) {
+      if (matchesAny(mark.normalizedTitle, ySoldTitles)) {
+        await database('the_mark').where('id', mark.id).update({
+          active: false,
+          graduatedAt: new Date(),
+          graduatedReason: 'Sold - entered normal restock cycle',
+          updatedAt: new Date(),
+        });
+        log.info({ mark: mark.originalTitle }, 'Auto-graduated mark - sold');
+        graduated++;
+      }
+    }
+    return graduated;
+  } catch (gradErr) {
+    log.error({ err: gradErr.message }, 'Auto-graduation check failed');
+    return 0;
+  }
+}
+
+try {
+  const cron = require('node-cron');
+  cron.schedule('0 20 * * 0', async () => {
+    log.info('Starting weekly competitor scrape (Playwright)');
+    try {
+      const manager = new SoldItemsManager();
+      const results = await manager.scrapeAllCompetitors({
+        categoryId: '0',
+        maxPagesPerSeller: 3,
+        enrichCompatibility: false,
+      });
+      log.info({ results }, 'Weekly competitor scrape complete');
+    } catch (err) {
+      log.error({ err: err.message }, 'Weekly competitor scrape failed');
+    }
+
+    // Graduate marks after fresh competitor data
+    const graduated = await graduateMarks();
+    log.info({ graduated }, 'Mark graduation complete');
+  });
+  log.info('Weekly competitor scrape cron scheduled for Sunday 8pm UTC');
+} catch (e) {
+  log.warn('node-cron not available, competitor scrape cron not scheduled');
+}
 
 module.exports = router;

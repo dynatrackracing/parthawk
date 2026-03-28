@@ -2,25 +2,23 @@
 
 const { log } = require('../lib/logger');
 const SoldItemsScraper = require('../ebay/SoldItemsScraper');
-const FindingsAPI = require('../ebay/FindingsAPI');
 const TradingAPI = require('../ebay/TradingAPI');
 const SoldItemSeller = require('../models/SoldItemSeller');
 const SoldItem = require('../models/SoldItem');
 const Promise = require('bluebird');
 const { v4: uuidv4 } = require('uuid');
 
-// Default category for ECU parts
-const DEFAULT_CATEGORY_ID = '35596';
+// All categories for competitor intel (not just ECU)
+const DEFAULT_CATEGORY_ID = '0';
 
 /**
- * SoldItemsManager - Fetches sold items via eBay Finding API and stores them
- * Falls back to scraping if API is not available
+ * SoldItemsManager - Fetches sold items via Playwright scraping and stores them.
+ * FindingsAPI removed (decommissioned Feb 2025). Pure scraper now.
  */
 class SoldItemsManager {
   constructor() {
     this.log = log.child({ class: 'SoldItemsManager' }, true);
     this.scraper = new SoldItemsScraper();
-    this.findingsAPI = new FindingsAPI();
     this.tradingAPI = new TradingAPI();
   }
 
@@ -91,16 +89,15 @@ class SoldItemsManager {
   }
 
   /**
-   * Fetch sold items from a single seller using Finding API (with scraper fallback)
+   * Scrape sold items from a single seller via Playwright
    * @param {Object} options
    * @param {string} options.seller - Seller username
-   * @param {string} options.categoryId - Category ID
+   * @param {string} options.categoryId - Category ID (default: 0 = all)
    * @param {number} options.maxPages - Max pages to fetch
    * @param {boolean} options.enrichCompatibility - Whether to fetch compatibility data
-   * @param {boolean} options.useScraper - Force use scraper instead of API (default: false)
    */
-  async scrapeCompetitor({ seller, categoryId = DEFAULT_CATEGORY_ID, maxPages = 5, enrichCompatibility = false, useScraper = false }) {
-    this.log.info({ seller, categoryId, maxPages, useScraper }, 'Fetching sold items from seller');
+  async scrapeCompetitor({ seller, categoryId = DEFAULT_CATEGORY_ID, maxPages = 5, enrichCompatibility = false }) {
+    this.log.info({ seller, categoryId, maxPages }, 'Scraping seller sold items via Playwright');
 
     let scraped = 0;
     let stored = 0;
@@ -109,30 +106,16 @@ class SoldItemsManager {
     try {
       let items = [];
 
-      // Try Finding API first (official method), fall back to scraper
-      if (!useScraper && (process.env.FINDINGS_APP_NAME || process.env.TRADING_API_APP_NAME)) {
-        try {
-          this.log.info({ seller }, 'Using Finding API to fetch sold items');
-          if (!process.env.FINDINGS_APP_NAME && process.env.TRADING_API_APP_NAME) {
-            process.env.FINDINGS_APP_NAME = process.env.TRADING_API_APP_NAME;
-          }
-          items = await this.findingsAPI.fetchAllCompletedItems({
-            sellerName: seller,
-            categoryId,
-            maxPages,
-          });
-          this.log.info({ seller, itemCount: items.length }, 'Fetched items via Finding API');
-        } catch (apiErr) {
-          this.log.error({ err: apiErr, seller }, 'Finding API failed - not falling back to scraper on Railway');
-          items = [];
-        }
-      } else {
-        // Use scraper (may be blocked by bot detection)
+      try {
         items = await this.scraper.scrapeSoldItems({
           seller,
           categoryId,
           maxPages,
         });
+        this.log.info({ seller, itemCount: items.length }, 'Scraped sold items via Playwright');
+      } catch (scrapeErr) {
+        this.log.error({ err: scrapeErr, seller }, 'Playwright scrape failed');
+        items = [];
       }
 
       scraped = items.length;

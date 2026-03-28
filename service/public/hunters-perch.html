@@ -79,6 +79,7 @@ nav a.active{color:#DC2626;font-weight:700}
       <button class="btn btn-red" id="addBtn" onclick="addSeller()">Track</button>
     </div>
     <div style="font-size:10px;color:#6B7280;margin-top:8px">Only items $100+ are stored. Data auto-purges after 90 days (importapart & pro-rebuild are permanent).</div>
+    <div style="margin-top:8px"><button class="btn-sm" id="scrapeAllBtn" onclick="scrapeAll(this)">Scrape All Sellers</button></div>
   </div>
   <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div></div>
   <div id="sellers"></div>
@@ -132,7 +133,7 @@ function loadEmerging() {
       loading.style.display = 'none';
       results.style.display = 'block';
       if (!d.success || !d.emerging || d.emerging.length === 0) {
-        results.innerHTML = '<div class="empty">No emerging parts detected yet. Need more competitor data.</div>';
+        results.innerHTML = '<div class="empty">No emerging parts detected yet. Run a scrape to populate competitor data.</div>';
         return;
       }
       var h = '<div style="padding:6px 0;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a;margin-bottom:6px">' + d.newCount + ' new on scene · ' + d.accelCount + ' accelerating</div>';
@@ -173,7 +174,7 @@ function loadGapIntel() {
       gapResults.style.display = 'block';
 
       if (!d.success || !d.gaps || d.gaps.length === 0) {
-        gapResults.innerHTML = '<div class="empty">No gaps found. Scrape more competitors first.</div>';
+        gapResults.innerHTML = '<div class="empty">No competitor data yet — run a scrape to populate.</div>';
         return;
       }
 
@@ -366,6 +367,25 @@ function addSeller() {
       if (d.success) { sellersData = d.sellers; renderSellers(); }
     })
     .catch(function() { btn.disabled = false; btn.textContent = 'Track'; });
+}
+
+function scrapeAll(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Scraping all...';
+  fetch('/competitors/auto-scrape', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Scrape All Sellers';
+      if (d.success) {
+        var summary = (d.results || []).map(function(r) { return r.seller + ': ' + (r.scraped || 0) + ' scraped'; }).join(', ');
+        alert('Scrape complete! ' + summary);
+        load();
+        loadGapIntel();
+        loadEmerging();
+      }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = 'Scrape All Sellers'; });
 }
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
