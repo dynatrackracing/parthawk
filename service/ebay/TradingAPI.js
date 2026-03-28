@@ -21,6 +21,7 @@ class TradingAPI {
       'X-EBAY-API-CERT-NAME': process.env.TRADING_API_CERT_NAME,
       'X-EBAY-API-SITEID': '0',
       'X-EBAY-API-CALL-NAME': 'GetItem',
+      'X-EBAY-API-IAF-TOKEN': process.env.TRADING_API_TOKEN,
       'Content-Type': 'text/xml',
       'User-Agent': 'eBaySDK/2.2.0 Python/3.8.8 Darwin/20.4.0',
       'X-EBAY-SDK-REQUEST-ID': uuidv4(),
@@ -38,7 +39,7 @@ class TradingAPI {
         url: this.url,
         headers,
         timeout: 15000,
-        data: `<?xml version=\'1.0\' encoding=\'utf-8\'?><GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents"><RequesterCredentials><eBayAuthToken>${process.env.TRADING_API_TOKEN}</eBayAuthToken></RequesterCredentials><IncludeItemCompatibilityList>${options.includeItemCompatibility || 'true'}</IncludeItemCompatibilityList><IncludeItemSpecifics>${options.includeItemSpecifics || 'true'}</IncludeItemSpecifics><ItemID>${ebayItemId}</ItemID></GetItemRequest>`
+        data: `<?xml version='1.0' encoding='utf-8'?><GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents"><IncludeItemCompatibilityList>${options.includeItemCompatibility || 'true'}</IncludeItemCompatibilityList><IncludeItemSpecifics>${options.includeItemSpecifics || 'true'}</IncludeItemSpecifics><ItemID>${ebayItemId}</ItemID></GetItemRequest>`
       });
     } catch (err) {
       this.log.error({ err, ebayItemId }, 'Issue getting specifics for the item');
