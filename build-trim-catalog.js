@@ -20,6 +20,8 @@ const { getTrimTier } = require('./service/config/trim-tier-config');
 // Load .env if present
 try { require('dotenv').config({ path: path.resolve(__dirname, '.env') }); } catch (e) {}
 
+const LIMIT = parseInt(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] || '25', 10);
+
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error('DATABASE_URL is required');
@@ -150,6 +152,10 @@ async function fetchTrimsFromEbay(token, year, make, model) {
       // Invalid combo - skip
       return [];
     }
+    if (err.response?.status === 500) {
+      // eBay doesn't recognize this combo - return sentinel
+      return null;
+    }
     throw err;
   }
 }
@@ -196,8 +202,9 @@ async function main() {
   const trackedSet = new Set(tracked.map(t => `${t.year}|${t.make}|${t.model}`));
 
   // Filter to only new combos (compare with title case since tracked entries are stored in title case)
-  const newCombos = yardCombos.filter(c => !trackedSet.has(`${c.year}|${c.make}|${c.model}`));
-  console.log(`${newCombos.length} new combos to catalog (${trackedSet.size} already tracked)`);
+  const allNewCombos = yardCombos.filter(c => !trackedSet.has(`${c.year}|${c.make}|${c.model}`));
+  const newCombos = allNewCombos.slice(0, LIMIT);
+  console.log(`${allNewCombos.length} new combos to catalog (${trackedSet.size} already tracked), processing ${newCombos.length} (limit ${LIMIT})`);
 
   if (newCombos.length === 0) {
     console.log('Nothing new to catalog. Done.');
@@ -224,6 +231,17 @@ async function main() {
     const { year, make, model } = combo;
     try {
       const trimValues = await fetchTrimsFromEbay(token, year, make, model);
+
+      // eBay 500 = unrecognized combo, mark as tracked with -1 so we don't retry
+      if (trimValues === null) {
+        console.log(`  ${year} ${make} ${model}: eBay 500 - marking as unrecognized`);
+        await db('trim_catalog_tracked').insert({
+          year, make, model, trim_count: -1, cataloged_at: new Date(),
+        }).onConflict(db.raw('(year, make, model)')).ignore();
+        totalCombos++;
+        await sleep(500);
+        continue;
+      }
 
       let insertedForCombo = 0;
       for (const trimRaw of trimValues) {
