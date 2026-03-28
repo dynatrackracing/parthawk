@@ -524,7 +524,7 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${v.model}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + v.trim : '')}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
@@ -606,7 +606,7 @@
           <span>${sold90d} sold/90d</span>
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
         </div>
-        <div class="pd-reason">${p.reason || ''}</div>
+        <div class="pd-reason">${p.reason || ''}${p.trimMultiplier !== undefined && p.trimMultiplier < 1.0 ? (p.trimMultiplier === 0 ? ' <span style="color:#ef4444;font-weight:600">· Not expected on this trim</span>' : ' <span style="color:#f59e0b;font-weight:600">· ⚠️ Verify on vehicle</span>') : ''}</div>
         ${p.marketMedian > 0 ? `<div style="font-size:11px;margin-top:2px;display:flex;gap:8px;align-items:center">
           <span style="color:#9CA3AF">Market</span>
           <span style="color:${Math.abs(price - p.marketMedian) / p.marketMedian > 0.2 ? (price > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981'};font-weight:600">$${p.marketMedian} med</span>

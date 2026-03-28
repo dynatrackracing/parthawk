@@ -4,6 +4,7 @@ const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
 const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
+const { getPartScoreMultiplier } = require('../config/trim-tier-config');
 
 // Part types that require EXACT year matching (no ±1 tolerance)
 // These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
@@ -900,7 +901,20 @@ class AttackListService {
 
     filteredParts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
 
-    // === TOTAL VALUE: sum of all FILTERED part prices ===
+    // === TRIM INTELLIGENCE: adjust trim-dependent part scores ===
+    const vehicleTrim = vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || null;
+    for (const p of filteredParts) {
+      const trimResult = getPartScoreMultiplier(make, vehicleTrim, p.partType);
+      p.trimMultiplier = trimResult.multiplier;
+      p.trimNote = trimResult.reason;
+      if (trimResult.badge) p.trimBadge = trimResult.badge;
+      if (trimResult.multiplier < 1.0 && p.price) {
+        p.originalPrice = p.price;
+        p.price = Math.round(p.price * trimResult.multiplier);
+      }
+    }
+
+    // === TOTAL VALUE: sum of all FILTERED part prices (trim-adjusted) ===
     const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
     // Market data enrichment happens in getAttackList() after scoring (async context)
@@ -962,6 +976,14 @@ class AttackListService {
       trim_level: vehicle.trim_level || null,
       body_style: vehicle.body_style || null,
       stock_number: vehicle.stock_number || null,
+      decoded_trim: vehicle.decoded_trim || null,
+      trim_tier: vehicle.trim_tier || null,
+      trimBadge: vehicle.trim_tier ? {
+        tier: vehicle.trim_tier,
+        label: vehicle.trim_tier === 'PREMIUM' ? 'PREMIUM TRIM' : vehicle.trim_tier === 'BASE' ? 'BASE TRIM' : 'CHECK TRIM',
+        color: vehicle.trim_tier === 'PREMIUM' ? 'green' : vehicle.trim_tier === 'BASE' ? 'red' : 'yellow',
+        decodedTrim: vehicle.decoded_trim,
+      } : null,
       score, color_code: color, vehicle_verdict,
       est_value: totalValue,
       max_part_value: filteredParts.length > 0 ? Math.max(...filteredParts.map(p => p.price || 0)) : 0,
