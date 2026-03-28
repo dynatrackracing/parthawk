@@ -313,11 +313,16 @@
 
   function getSetDaysAgo(v) {
     // Use date_added (LKQ set date), NOT scraped_at
-    // Returns 0 for today, negative for future dates, positive for past
+    // Compare calendar dates in Eastern time (not raw UTC ms diff)
+    // This prevents timezone skew where "today" disappears by morning
     const d = v.date_added;
     if (!d) return 999;
-    const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
-    return days; // Can be negative for future-dated vehicles
+    const fmt = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const todayET = new Date().toLocaleDateString('en-CA', fmt); // YYYY-MM-DD
+    const addedET = new Date(d).toLocaleDateString('en-CA', fmt);
+    const todayMs = new Date(todayET + 'T00:00:00').getTime();
+    const addedMs = new Date(addedET + 'T00:00:00').getTime();
+    return Math.round((todayMs - addedMs) / 86400000);
   }
 
   function ageBadge(v) {
