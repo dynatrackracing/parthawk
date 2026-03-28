@@ -154,6 +154,11 @@ async function fetchTrimsFromEbay(token, year, make, model) {
   }
 }
 
+function titleCase(str) {
+  if (!str) return str;
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -181,13 +186,16 @@ async function main() {
     return;
   }
 
+  // Convert make/model to title case for eBay API and consistent storage
+  yardCombos = yardCombos.map(c => ({ year: c.year, make: titleCase(c.make), model: titleCase(c.model) }));
+
   console.log(`Found ${yardCombos.length} unique year/make/model combos in yards`);
 
   // Get already-tracked combos
   const tracked = await db('trim_catalog_tracked').select('year', 'make', 'model');
   const trackedSet = new Set(tracked.map(t => `${t.year}|${t.make}|${t.model}`));
 
-  // Filter to only new combos
+  // Filter to only new combos (compare with title case since tracked entries are stored in title case)
   const newCombos = yardCombos.filter(c => !trackedSet.has(`${c.year}|${c.make}|${c.model}`));
   console.log(`${newCombos.length} new combos to catalog (${trackedSet.size} already tracked)`);
 
