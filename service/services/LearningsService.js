@@ -39,12 +39,30 @@ class LearningsService {
         .orderByRaw('COUNT(*) DESC')
         .limit(50);
 
-      return rows.map(r => ({
-        partNumberBase: r.part_number_base,
-        deathCount: parseInt(r.death_count),
-        reasons: (r.reasons || []).filter(Boolean),
-        lastDeath: r.last_death,
-      }));
+      // Enrich with vehicle context from YourSale titles
+      const enriched = [];
+      for (const r of rows) {
+        let vehicle = null;
+        try {
+          const sale = await database('YourSale')
+            .where('title', 'ilike', `%${r.part_number_base}%`)
+            .select('title')
+            .first();
+          if (sale && sale.title) {
+            // Extract year make model from title (e.g. "2018 Jeep Wrangler JL BCM 68292029AC")
+            const m = sale.title.match(/\b((?:19|20)\d{2})\s+(\w+)\s+(\w[\w\s-]*?)(?:\s+\d|\s+[A-Z]{2,}\d|\s+OEM|\s+ECU|\s+ECM|\s+BCM|\s+TCM|\s+ABS|\s+TIPM|$)/i);
+            if (m) vehicle = `${m[1]} ${m[2]} ${m[3].trim()}`;
+          }
+        } catch (e) {}
+        enriched.push({
+          partNumberBase: r.part_number_base,
+          deathCount: parseInt(r.death_count),
+          reasons: (r.reasons || []).filter(Boolean),
+          lastDeath: r.last_death,
+          vehicle,
+        });
+      }
+      return enriched;
     } catch (e) {
       return [];
     }

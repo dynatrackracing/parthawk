@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a">
-<title>DarkHawk — LEARNINGS</title>
+<title>DarkHawk — INSTINCTS</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
@@ -26,7 +26,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
 </head>
 <body>
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js"></script><script>dhNav('learnings')</script>
+<script src="/admin/dh-nav.js"></script><script>dhNav('instincts')</script>
 <div class="container">
   <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div></div>
   <div id="content" style="display:none">
@@ -67,7 +67,8 @@ function load() {
             var color = r === 'overpriced' ? '#ef4444' : r === 'low_demand' ? '#f59e0b' : '#6B7280';
             return '<span class="badge" style="background:' + color + '22;color:' + color + '">' + (r || 'unknown') + '</span>';
           }).join('');
-          h += '<div class="item-row"><div style="font-weight:600">' + esc(p.partNumberBase || '') + ' <span style="color:#ef4444;font-size:11px">(' + p.deathCount + 'x died)</span></div><div style="margin-top:2px">' + reasons + '</div></div>';
+          var veh = p.vehicle ? ' <span style="color:#9CA3AF;font-weight:400;font-size:11px">— ' + esc(p.vehicle) + '</span>' : '';
+          h += '<div class="item-row"><div style="font-weight:600">' + esc(p.partNumberBase || '') + veh + ' <span style="color:#ef4444;font-size:11px">(' + p.deathCount + 'x died)</span></div><div style="margin-top:2px">' + reasons + '</div></div>';
         });
         dpEl.innerHTML = h;
       }

@@ -202,13 +202,13 @@ app.get('/admin/the-mark', (req, res) => {
 app.get('/admin/velocity', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'velocity.html'));
 });
-app.get('/admin/learnings', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'learnings.html'));
+app.get('/admin/instincts', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'instincts.html'));
 });
-app.get('/admin/lifecycle', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'lifecycle.html'));
+app.get('/admin/prey-cycle', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'prey-cycle.html'));
 });
-app.get('/admin/stale', (req, res) => {
+app.get('/admin/carcass', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'stale-inventory.html'));
 });
 app.get('/admin/scout-alerts', (req, res) => {
