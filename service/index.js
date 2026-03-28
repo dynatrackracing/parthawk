@@ -774,20 +774,16 @@ async function start() {
       log.info(`Server started at port ${PORT}`);
     });
 
-    if (process.env.RUN_JOB_NOW === '1') {
-      log.info('! server started with direct instructions to scrape immediately !');
-      const cronWorker = new CronWorkRunner();
-      cronWorker.work();
-    }
-
-    // app.use(authMiddleware());
-
-    // importapart/pro-rebuild update inventory ~weekly, daily refresh is sufficient
-    const ebaySellerProcessingJob = schedule.scheduleJob('0 6 * * *', function (scheduledTime) {
-      log.info({ scheduledTime }, `Starting cron route RIGHT NOW, ${scheduledTime}`);
-      const cronWorker = new CronWorkRunner();
-      cronWorker.work();
-    });
+    // DISABLED: CronWorkRunner used SellerItemManager → FindingsAPI (dead since Feb 2025).
+    // Item table (21K records) is permanently frozen. market_demand_cache is the pricing source of truth (see priceResolver.js).
+    // if (process.env.RUN_JOB_NOW === '1') {
+    //   const cronWorker = new CronWorkRunner();
+    //   cronWorker.work();
+    // }
+    // const ebaySellerProcessingJob = schedule.scheduleJob('0 6 * * *', function (scheduledTime) {
+    //   const cronWorker = new CronWorkRunner();
+    //   cronWorker.work();
+    // });
 
     // YOUR eBay data sync — orders + listings every 6 hours (offset by 1 hour from competitor cron)
     const YourDataManager = require('./managers/YourDataManager');
@@ -828,17 +824,13 @@ async function start() {
       await priceCheckRunner.work({ batchSize: 15 });
     });
 
-    // Market demand cache - runs nightly at 3:00 AM after LKQ scrape
-    const MarketDemandCronRunner = require('./lib/MarketDemandCronRunner');
-    const marketDemandJob = schedule.scheduleJob('0 3 * * *', async function (scheduledTime) {
-      log.info({ scheduledTime }, 'Starting nightly market demand cache update');
-      try {
-        const runner = new MarketDemandCronRunner();
-        await runner.work();
-      } catch (err) {
-        log.error({ err }, 'Market demand cache update failed');
-      }
-    });
+    // DISABLED: MarketDemandCronRunner used findCompletedItems (Finding API dead since Feb 2025).
+    // Market cache now populated by: PriceCheckService (weekly), yard sniper (on-demand), importapart drip (manual).
+    // const MarketDemandCronRunner = require('./lib/MarketDemandCronRunner');
+    // const marketDemandJob = schedule.scheduleJob('0 3 * * *', async function (scheduledTime) {
+    //   const runner = new MarketDemandCronRunner();
+    //   await runner.work();
+    // });
 
     // Stale inventory automation - runs weekly Wednesday at 3:00 AM
     const StaleInventoryService = require('./services/StaleInventoryService');
