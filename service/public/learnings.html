@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — LEARNINGS</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:800px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#a78bfa;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:20px;font-size:13px}
+.item-row{padding:8px 0;border-bottom:1px solid #1f1f1f;font-size:12px}
+.item-row:last-child{border-bottom:none}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;margin-right:4px}
+.stat-row{display:flex;gap:10px;margin-bottom:10px}
+.stat-box{flex:1;background:#1a1a1a;border-radius:8px;padding:12px;text-align:center}
+.stat-value{font-size:20px;font-weight:800}
+.stat-label{font-size:10px;color:#6B7280;margin-top:2px}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('learnings')</script>
+<div class="container">
+  <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div></div>
+  <div id="content" style="display:none">
+    <div class="card" style="border-color:#ef4444">
+      <div class="section-title" style="color:#ef4444">Dead Inventory Patterns</div>
+      <div style="font-size:11px;color:#6B7280;margin-bottom:8px">Parts that have died 2+ times — avoid unless market data supports</div>
+      <div id="deadPatterns"></div>
+    </div>
+    <div class="card" style="border-color:#f59e0b">
+      <div class="section-title" style="color:#f59e0b">Return Patterns</div>
+      <div id="returnPatterns"></div>
+    </div>
+    <div class="card" style="border-color:#22c55e">
+      <div class="section-title" style="color:#22c55e">Price Reduction Outcomes</div>
+      <div style="font-size:11px;color:#6B7280;margin-bottom:8px">Did stale inventory price reductions lead to sales?</div>
+      <div id="staleOutcomes"></div>
+    </div>
+  </div>
+</div>
+<script>
+function load() {
+  fetch('/intelligence/learnings')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      if (!d.success) { document.getElementById('content').innerHTML = '<div class="empty">Error loading</div>'; return; }
+
+      // Dead patterns
+      var dp = d.deadPatterns || [];
+      var dpEl = document.getElementById('deadPatterns');
+      if (dp.length === 0) {
+        dpEl.innerHTML = '<div class="empty">No repeat deaths yet — good sign.</div>';
+      } else {
+        var h = '';
+        dp.forEach(function(p) {
+          var reasons = (p.reasons || []).map(function(r) {
+            var color = r === 'overpriced' ? '#ef4444' : r === 'low_demand' ? '#f59e0b' : '#6B7280';
+            return '<span class="badge" style="background:' + color + '22;color:' + color + '">' + (r || 'unknown') + '</span>';
+          }).join('');
+          h += '<div class="item-row"><div style="font-weight:600">' + esc(p.partNumberBase || '') + ' <span style="color:#ef4444;font-size:11px">(' + p.deathCount + 'x died)</span></div><div style="margin-top:2px">' + reasons + '</div></div>';
+        });
+        dpEl.innerHTML = h;
+      }
+
+      // Return patterns
+      var rp = d.returnPatterns || {};
+      var rpEl = document.getElementById('returnPatterns');
+      var rpHtml = '<div class="stat-row"><div class="stat-box"><div class="stat-value">' + (rp.totalReturns || 0) + '</div><div class="stat-label">Total Returns</div></div></div>';
+      if ((rp.byGrade || []).length > 0) {
+        rpHtml += '<div style="margin-top:8px">';
+        rp.byGrade.forEach(function(g) {
+          var color = g.grade === 'A' ? '#22c55e' : g.grade === 'B' ? '#eab308' : '#ef4444';
+          rpHtml += '<div class="item-row"><span class="badge" style="background:' + color + ';color:#000">Grade ' + (g.grade || '?') + '</span> ' + g.count + ' returns</div>';
+        });
+        rpHtml += '</div>';
+      }
+      if ((rp.repeatOffenders || []).length > 0) {
+        rpHtml += '<div style="margin-top:8px;font-size:11px;color:#f59e0b;font-weight:600">Repeat Offenders:</div>';
+        rp.repeatOffenders.forEach(function(o) {
+          rpHtml += '<div class="item-row">' + esc(o.title || o.partNumber || '?') + ' <span style="color:#ef4444">(' + o.returnCount + 'x returned)</span></div>';
+        });
+      }
+      rpEl.innerHTML = rpHtml || '<div class="empty">No returns logged yet.</div>';
+
+      // Stale outcomes
+      var so = d.staleOutcomes || {};
+      var soEl = document.getElementById('staleOutcomes');
+      soEl.innerHTML = '<div class="stat-row">' +
+        '<div class="stat-box"><div class="stat-value">' + (so.totalActions || 0) + '</div><div class="stat-label">Price Reductions</div></div>' +
+        '<div class="stat-box"><div class="stat-value" style="color:' + ((so.successRate || 0) >= 50 ? '#22c55e' : '#f59e0b') + '">' + (so.successRate || 0) + '%</div><div class="stat-label">Led to Sale</div></div>' +
+        '<div class="stat-box"><div class="stat-value">' + (so.avgReductionPercent || 0) + '%</div><div class="stat-label">Avg Reduction</div></div>' +
+        '<div class="stat-box"><div class="stat-value">' + (so.avgDaysToSellAfterReduction || '—') + '</div><div class="stat-label">Avg Days to Sell</div></div>' +
+        '</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      document.getElementById('content').innerHTML = '<div class="empty" style="color:#ef4444">Error: ' + err.message + '</div>';
+    });
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — VELOCITY</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{padding:12px;max-width:800px;margin:0 auto}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.stat-row{display:flex;gap:10px;margin-bottom:10px}
+.stat-box{flex:1;background:#1a1a1a;border-radius:8px;padding:12px;text-align:center}
+.stat-value{font-size:24px;font-weight:800}
+.stat-label{font-size:10px;color:#6B7280;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
+.toggle-bar{display:flex;gap:4px;margin-bottom:10px}
+.toggle-btn{padding:6px 12px;border:1px solid #333;border-radius:4px;background:#1a1a1a;color:#6B7280;font-size:11px;cursor:pointer}
+.toggle-btn.active{color:#eab308;border-color:#eab308}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#eab308;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:30px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px;color:#6B7280;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
+td{padding:8px;border-bottom:1px solid #1f1f1f}
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:120px;padding:8px 0}
+.bar{background:#eab308;border-radius:3px 3px 0 0;min-width:12px;flex:1;position:relative;cursor:pointer}
+.bar:hover{background:#f59e0b}
+.bar-label{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:8px;color:#6B7280;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js"></script><script>dhNav('velocity')</script>
+<div class="container">
+  <div class="card" style="border-color:#eab308">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#eab308;text-transform:uppercase;letter-spacing:0.06em">VELOCITY INTELLIGENCE</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px">Sales velocity, health score, and top performers</div>
+      </div>
+    </div>
+    <div class="toggle-bar">
+      <button class="toggle-btn" onclick="setPeriod(30)">30d</button>
+      <button class="toggle-btn" onclick="setPeriod(60)">60d</button>
+      <button class="toggle-btn active" id="btn-90" onclick="setPeriod(90)">90d</button>
+    </div>
+    <div id="loading" style="text-align:center;padding:16px"><div class="spinner"></div></div>
+    <div id="content" style="display:none">
+      <div class="stat-row">
+        <div class="stat-box" id="healthBox"><div class="stat-value" id="healthScore">—</div><div class="stat-label">Health Score</div></div>
+        <div class="stat-box"><div class="stat-value" id="sellThrough">—</div><div class="stat-label">Sell-Through %</div></div>
+        <div class="stat-box"><div class="stat-value" id="activeCount">—</div><div class="stat-label">Active Listings</div></div>
+        <div class="stat-box"><div class="stat-value" id="avgWeekly">—</div><div class="stat-label">Avg/Week</div></div>
+      </div>
+      <div class="card">
+        <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:8px">Weekly Sales</div>
+        <div id="chartArea" class="bar-chart"></div>
+      </div>
+      <div class="card">
+        <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:8px">Top Performers</div>
+        <table>
+          <thead><tr><th>#</th><th>Part</th><th>Sold</th><th>Revenue</th><th>Avg $</th></tr></thead>
+          <tbody id="topTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var currentPeriod = 90;
+
+function setPeriod(days) {
+  currentPeriod = days;
+  document.querySelectorAll('.toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+  event.target.classList.add('active');
+  load();
+}
+
+function load() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('content').style.display = 'none';
+
+  Promise.all([
+    fetch('/demand-analysis/health').then(function(r) { return r.json(); }),
+    fetch('/demand-analysis/public/velocity?days=' + currentPeriod).then(function(r) { return r.json(); }),
+    fetch('/demand-analysis/public/sell-through?days=' + currentPeriod).then(function(r) { return r.json(); }),
+    fetch('/demand-analysis/public/top-performers?limit=10').then(function(r) { return r.json(); }),
+  ]).then(function(results) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+    var health = results[0].dashboard || {};
+    var velocity = results[1];
+    var sellThrough = results[2];
+    var topPerformers = results[3].items || [];
+
+    // Health score
+    var hs = health.healthScore || 0;
+    var hsColor = hs >= 80 ? '#22c55e' : hs >= 60 ? '#3b82f6' : hs >= 40 ? '#eab308' : '#ef4444';
+    document.getElementById('healthScore').textContent = hs;
+    document.getElementById('healthScore').style.color = hsColor;
+    document.getElementById('healthBox').style.borderLeft = '3px solid ' + hsColor;
+
+    // Sell-through
+    document.getElementById('sellThrough').textContent = (sellThrough.sellThroughRate || 0).toFixed(1) + '%';
+    document.getElementById('activeCount').textContent = sellThrough.activeListings || 0;
+
+    // Avg weekly
+    var trend = health.velocityTrend || {};
+    document.getElementById('avgWeekly').textContent = trend.avgWeeklySales || 0;
+
+    // Chart
+    var weeks = velocity.yourVelocity || [];
+    var chartArea = document.getElementById('chartArea');
+    if (weeks.length === 0) {
+      chartArea.innerHTML = '<div class="empty">No velocity data yet</div>';
+    } else {
+      var maxSales = Math.max.apply(null, weeks.map(function(w) { return w.salesCount; })) || 1;
+      var html = '';
+      weeks.forEach(function(w) {
+        var pct = (w.salesCount / maxSales) * 100;
+        var weekLabel = new Date(w.week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        html += '<div class="bar" style="height:' + Math.max(4, pct) + '%" title="' + weekLabel + ': ' + w.salesCount + ' sales, $' + Math.round(w.totalRevenue) + ' rev"><div class="bar-label">' + weekLabel + '</div></div>';
+      });
+      chartArea.innerHTML = html;
+    }
+
+    // Top performers table
+    var tbody = document.getElementById('topTable');
+    if (topPerformers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No sales data</td></tr>';
+    } else {
+      var rows = '';
+      topPerformers.forEach(function(p, i) {
+        rows += '<tr><td style="color:#6B7280">' + (i + 1) + '</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.title || '') + '</td><td style="font-weight:700">' + p.salesCount + '</td><td style="color:#22c55e">$' + Math.round(p.totalRevenue).toLocaleString() + '</td><td>$' + Math.round(p.avgPrice) + '</td></tr>';
+      });
+      tbody.innerHTML = rows;
+    }
+  }).catch(function(err) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    document.getElementById('content').innerHTML = '<div class="empty" style="color:#ef4444">Error: ' + err.message + '</div>';
+  });
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>

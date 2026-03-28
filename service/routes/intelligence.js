@@ -7,6 +7,22 @@ const WhatToPullService = require('../services/WhatToPullService');
 const PricingService = require('../services/PricingService');
 const DeadInventoryService = require('../services/DeadInventoryService');
 const OpportunityService = require('../services/OpportunityService');
+const LearningsService = require('../services/LearningsService');
+
+/**
+ * GET /intelligence/learnings
+ * Aggregate actionable patterns from dead inventory, returns, and stale actions
+ */
+router.get('/learnings', async (req, res) => {
+  try {
+    const service = new LearningsService();
+    const result = await service.getLearnings();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    log.error({ err }, 'Error getting learnings');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * GET /intelligence/what-to-pull

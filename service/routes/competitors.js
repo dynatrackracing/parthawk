@@ -890,58 +890,9 @@ function titleMatchesYard(title, yardMakes) {
   return false;
 }
 
-// Rotate one competitor per day to avoid eBay rate limit risk — full cycle every N days where N = number of tracked sellers
-try {
-  const cron = require('node-cron');
-  cron.schedule('0 11 * * *', async () => {
-    log.info('Daily competitor rotation starting');
-    try {
-      // Pick the LEAST recently scraped enabled seller (round-robin)
-      const seller = await database('SoldItemSeller')
-        .where('enabled', true)
-        .orderByRaw('COALESCE("lastScrapedAt", \'1970-01-01\'::timestamp) ASC')
-        .first();
-
-      if (seller) {
-        try {
-          const manager = new SoldItemsManager();
-          await manager.scrapeCompetitor({ seller: seller.name, categoryId: '6030', maxPages: 3, useScraper: false });
-          await database('SoldItemSeller').where('name', seller.name).update({ lastScrapedAt: new Date(), updatedAt: new Date() });
-          log.info({ seller: seller.name }, 'Daily competitor rotation: scraped seller');
-        } catch (err) {
-          log.error({ err: err.message, seller: seller.name }, 'Daily competitor rotation failed');
-        }
-      } else {
-        log.info('No enabled sellers to rotate');
-      }
-    } catch (err) {
-      log.error({ err: err.message }, 'Competitor rotation cron error');
-    }
-
-    // Auto-graduate marks that have been sold
-    try {
-      const activeMarks = await database('the_mark').where('active', true);
-      const ySales = await database('YourSale').select('title').limit(25000);
-      const ySoldTitles = new Set(ySales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
-
-      for (const mark of activeMarks) {
-        if (matchesAny(mark.normalizedTitle, ySoldTitles)) {
-          await database('the_mark').where('id', mark.id).update({
-            active: false,
-            graduatedAt: new Date(),
-            graduatedReason: 'Sold - entered normal restock cycle',
-            updatedAt: new Date(),
-          });
-          log.info({ mark: mark.originalTitle }, 'Auto-graduated mark - sold');
-        }
-      }
-    } catch (gradErr) {
-      log.error({ err: gradErr.message }, 'Auto-graduation check failed');
-    }
-  });
-  log.info('Competitor auto-scrape cron scheduled for 6AM Eastern daily');
-} catch (e) {
-  log.warn('node-cron not available, competitor auto-scrape cron not scheduled');
-}
+// DISABLED: Finding API dead since Feb 2025. Re-enable after Phase 2.5 competitor scraping rewire
+// Competitor scraping and mark graduation can still be triggered manually via:
+//   POST /competitors/:sellerId/scrape
+//   POST /competitors/mark/graduate
 
 module.exports = router;

@@ -161,4 +161,49 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Public DarkHawk endpoints (no auth) ──
+
+router.get('/health', async (req, res) => {
+  try {
+    const service = new DemandAnalysisService();
+    const dashboard = await service.getMarketHealthDashboard();
+    res.json({ success: true, dashboard });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/public/velocity', async (req, res) => {
+  const { days = 90 } = req.query;
+  try {
+    const service = new DemandAnalysisService();
+    const result = await service.analyzeSalesVelocity(parseInt(days, 10));
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/public/sell-through', async (req, res) => {
+  const { days = 30 } = req.query;
+  try {
+    const service = new DemandAnalysisService();
+    const result = await service.calculateSellThroughRate(parseInt(days, 10));
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/public/top-performers', async (req, res) => {
+  const { limit = 10 } = req.query;
+  try {
+    const service = new DemandAnalysisService();
+    const items = await service.getTopPerformers(parseInt(limit, 10));
+    res.json({ success: true, items });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

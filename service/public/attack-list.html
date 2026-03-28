@@ -669,7 +669,7 @@
       }
       html += `<div class="part-detail" id="pd-${v.id}-${pid}">
         <div class="pd-header">
-          <div class="pd-title">${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
+          <div class="pd-title">${p.isMarked ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
           <div class="pd-verdict ${vc}">${p.verdict} $${price} ${freshness}</div>
         </div>
         <div class="pd-stats">

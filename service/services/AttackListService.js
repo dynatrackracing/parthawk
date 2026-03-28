@@ -571,7 +571,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -914,6 +914,15 @@ class AttackListService {
       }
     }
 
+    // === MARK BOOST: parts matching the_mark get +15 bonus ===
+    for (const p of filteredParts) {
+      const pnUpper = (p.partNumber || '').toUpperCase();
+      const pnBase = (p.partNumberBase || pnUpper).toUpperCase();
+      if ((pnBase && markIndex.byPN.has(pnBase)) || (pnUpper && markIndex.byPN.has(pnUpper))) {
+        p.isMarked = true;
+      }
+    }
+
     // === TOTAL VALUE: sum of all FILTERED part prices (trim-adjusted) ===
     const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
@@ -935,6 +944,8 @@ class AttackListService {
     score += Math.min(15, (filteredParts.length - 1) * 3);
     // Bonus: any part sold 2+ times in 90d
     if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
+    // Bonus: any part on The Mark want list
+    if (filteredParts.some(p => p.isMarked)) score += 15;
     // Bonus: fresh arrival (today)
     if (vehicle.date_added) {
       const addedDate = new Date(vehicle.date_added);
@@ -1089,6 +1100,16 @@ class AttackListService {
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
 
+    // Build mark index from the_mark for score boosting
+    let markIndex = { byPN: new Map(), byTitle: new Set() };
+    try {
+      const marks = await database('the_mark').where('active', true).select('normalizedTitle', 'partNumber');
+      for (const m of marks) {
+        if (m.partNumber) markIndex.byPN.set(m.partNumber.toUpperCase(), true);
+        if (m.normalizedTitle) markIndex.byTitle.add(m.normalizedTitle);
+      }
+    } catch (e) { /* the_mark may not exist */ }
+
     // 7-day retention: show vehicles last seen within 7 days
     const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const activeOnly = options.activeOnly === true;
@@ -1119,7 +1140,7 @@ class AttackListService {
       if (vehicles.length === 0) continue;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex)
       );
       // Sort: active first, then highest single part value, then total value
       scored.sort((a, b) => {
