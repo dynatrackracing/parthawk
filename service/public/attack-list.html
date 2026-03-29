@@ -586,9 +586,9 @@
       if (chipTypes.has(t)) return false;
       chipTypes.add(t);
       return true;
-    }).slice(0, 4).map(p => {
+    }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 4).map(p => {
       const price = p.price || 0;
-      const cc = price >= 300 ? 'chip-green' : price >= 200 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : 'chip-red';
+      const cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
       return `<span class="chip ${cc}">${p.partType || '?'}</span>`;
     }).join('');
 
