@@ -24,8 +24,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:left;padding:8px;color:#6B7280;font-size:10px;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
 td{padding:8px;border-bottom:1px solid #1f1f1f}
-.bar-chart{display:flex;align-items:flex-end;gap:3px;height:120px;padding:8px 0;overflow-x:auto;overflow-y:visible}
-.bar{background:#eab308;border-radius:3px 3px 0 0;min-width:14px;width:14px;flex-shrink:0;position:relative;cursor:pointer}
+.bar-chart{display:flex;align-items:flex-end;height:140px;padding:8px 0 20px 0;overflow-x:auto;overflow-y:visible}
+.bar{background:#eab308;border-radius:3px 3px 0 0;position:relative;cursor:pointer;flex-shrink:0}
 .bar:hover{background:#f59e0b}
 .bar-label{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:8px;color:#6B7280;white-space:nowrap}
 </style>
@@ -126,13 +126,16 @@ function load() {
       chartArea.innerHTML = '<div class="empty">No velocity data yet</div>';
     } else {
       var maxSales = Math.max.apply(null, weeks.map(function(w) { return w.salesCount; })) || 1;
+      var chartWidth = chartArea.parentElement.offsetWidth || 600;
+      var naturalWidth = Math.floor((chartWidth - (weeks.length * 2)) / weeks.length);
+      var barWidth = naturalWidth < 14 ? 14 : naturalWidth > 60 ? 60 : naturalWidth;
+      var showLabels = barWidth >= 22;
       var html = '';
-      var showLabels = weeks.length <= 30;
       weeks.forEach(function(w) {
         var pct = (w.salesCount / maxSales) * 100;
         var weekLabel = new Date(w.week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         var labelHtml = showLabels ? '<div class="bar-label">' + weekLabel + '</div>' : '';
-        html += '<div class="bar" style="height:' + Math.max(4, pct) + '%" title="' + weekLabel + ': ' + w.salesCount + ' sales, $' + Math.round(w.totalRevenue) + ' rev">' + labelHtml + '</div>';
+        html += '<div class="bar" style="height:' + Math.max(4, pct) + '%;width:' + barWidth + 'px;margin-right:2px" title="' + weekLabel + ': ' + w.salesCount + ' sales, $' + Math.round(w.totalRevenue) + ' rev">' + labelHtml + '</div>';
       });
       chartArea.innerHTML = html;
     }
