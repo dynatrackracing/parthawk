@@ -92,6 +92,11 @@ function cleanModelForLookup(model, make) {
     }
   }
 
+  // Strip NHTSA trim lists stuffed into model names ("CAMRY LE/SE/XLE" → "CAMRY")
+  clean = clean.replace(/\s+(LE|SE|XLE|XSE|LX|EX|LT|LS|SL|SV|SR|DX|SXT|SLT|XLT|SEL|Limited|Sport|Base|Premium|Luxury|Touring)(\/[A-Za-z]+)*\s*$/i, '');
+  clean = clean.replace(/\s+[A-Z]{1,4}(\/[A-Z]{1,4}){2,}\s*$/i, '');
+  clean = clean.replace(/\b(NFA|NFB|NFC)\b/gi, '');
+
   // Normalize common model name variations
   for (const [from, to] of Object.entries(MODEL_NORMALIZATIONS)) {
     clean = clean.replace(new RegExp('\\b' + from + '\\b', 'gi'), to);
