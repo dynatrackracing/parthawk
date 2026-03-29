@@ -738,6 +738,8 @@ app.get('/api/market-price/status', async (req, res) => {
   }
 });
 
+app.use('/return-intelligence', require('./routes/return-intelligence'));
+
 // ═══ SPA CATCH-ALL — MUST BE LAST ═══
 // All API routes are registered above this point.
 // Static files + SPA fallback below catches everything else.

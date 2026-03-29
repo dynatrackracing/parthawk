@@ -11,3 +11,4 @@ run-scrape.bat
 scrape-local-old.js.js
 scrape-log.txt
 .claude/
+service/data/*.csv
