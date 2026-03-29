@@ -39,27 +39,81 @@ class LearningsService {
         .orderByRaw('COUNT(*) DESC')
         .limit(50);
 
-      // Enrich with vehicle context from YourSale titles
+      // Enrich with part name from Item table + vehicle from Auto/AIC
       const enriched = [];
       for (const r of rows) {
-        let vehicle = null;
+        let partName = null;
+        let yearStart = null;
+        let yearEnd = null;
+        let make = null;
+        let model = null;
+
         try {
-          const sale = await database('YourSale')
-            .where('title', 'ilike', `%${r.part_number_base}%`)
-            .select('title')
+          // 1. Look up Item by manufacturerPartNumber (case-insensitive)
+          const item = await database('Item')
+            .whereRaw('LOWER("manufacturerPartNumber") = ?', [r.part_number_base.toLowerCase()])
+            .select('id', 'title')
             .first();
-          if (sale && sale.title) {
-            // Extract year make model from title (e.g. "2018 Jeep Wrangler JL BCM 68292029AC")
-            const m = sale.title.match(/\b((?:19|20)\d{2})\s+(\w+)\s+(\w[\w\s-]*?)(?:\s+\d|\s+[A-Z]{2,}\d|\s+OEM|\s+ECU|\s+ECM|\s+BCM|\s+TCM|\s+ABS|\s+TIPM|$)/i);
-            if (m) vehicle = `${m[1]} ${m[2]} ${m[3].trim()}`;
+
+          if (item) {
+            partName = item.title;
+
+            // 2. Get vehicle fitment via AutoItemCompatibility → Auto
+            const autos = await database('AutoItemCompatibility as aic')
+              .join('Auto as a', 'a.id', 'aic.autoId')
+              .where('aic.itemId', item.id)
+              .select('a.year', 'a.make', 'a.model')
+              .orderBy('a.year', 'asc');
+
+            if (autos.length > 0) {
+              yearStart = autos[0].year;
+              yearEnd = autos[autos.length - 1].year;
+              // Use the most common make/model across matches
+              const makeModelCounts = {};
+              for (const a of autos) {
+                const key = `${a.make}|${a.model}`;
+                makeModelCounts[key] = (makeModelCounts[key] || 0) + 1;
+              }
+              const topMakeModel = Object.entries(makeModelCounts)
+                .sort((a, b) => b[1] - a[1])[0][0];
+              [make, model] = topMakeModel.split('|');
+            }
           }
-        } catch (e) {}
+
+          // Fallback: try dead_inventory's own description/vehicle_application fields
+          if (!partName) {
+            const diRow = await database('dead_inventory')
+              .where('part_number_base', r.part_number_base)
+              .whereNotNull('description')
+              .select('description', 'vehicle_application')
+              .first();
+            if (diRow) {
+              partName = diRow.description || null;
+              if (!make && diRow.vehicle_application) {
+                const m = diRow.vehicle_application.match(/\b((?:19|20)\d{2})\s+(\w+)\s+(\w[\w\s-]*)/i);
+                if (m) {
+                  yearStart = parseInt(m[1]);
+                  yearEnd = yearStart;
+                  make = m[2];
+                  model = m[3].trim();
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // enrichment failed, continue with nulls
+        }
+
         enriched.push({
           partNumberBase: r.part_number_base,
           deathCount: parseInt(r.death_count),
           reasons: (r.reasons || []).filter(Boolean),
           lastDeath: r.last_death,
-          vehicle,
+          partName,
+          yearStart,
+          yearEnd,
+          make,
+          model,
         });
       }
       return enriched;
