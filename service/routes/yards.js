@@ -4,6 +4,7 @@ const { log } = require('../lib/logger');
 const router = require('express-promise-router')();
 const LKQScraper = require('../scrapers/LKQScraper');
 const { database } = require('../database/database');
+const { enrichYard } = require('../services/PostScrapeService');
 
 // In-memory scrape status tracking
 let scrapeStatus = { running: false, started_at: null, finished_at: null, error: null };
@@ -104,56 +105,57 @@ router.post('/scrape/:id', async (req, res) => {
 
   log.info({ yard: yard.name }, `Manual scrape triggered for ${yard.name}`);
 
+  // Helper: run scraper then enrichment pipeline in background
+  async function scrapeAndEnrich(scrapePromise) {
+    try {
+      await scrapePromise;
+    } catch (err) {
+      log.error({ err }, `Scrape failed for ${yard.name}`);
+    }
+    try {
+      const enrichStats = await enrichYard(yard.id);
+      log.info({ yard: yard.name, ...enrichStats }, `Post-scrape enrichment complete for ${yard.name}`);
+    } catch (err) {
+      log.error({ err: err.message }, `Post-scrape enrichment failed for ${yard.name}`);
+    }
+  }
+
   if (yard.chain === 'LKQ') {
     const scraper = new LKQScraper();
     const location = scraper.locations.find(l => l.name === yard.name);
     if (location) {
-      scraper.scrapeLocation(location).catch(err => {
-        log.error({ err }, `Scrape failed for ${yard.name}`);
-      });
+      scrapeAndEnrich(scraper.scrapeLocation(location));
     }
   } else if (yard.chain === 'Foss') {
     const FossScraper = require('../scrapers/FossScraper');
     const scraper = new FossScraper();
     const location = scraper.locations.find(l => l.name === yard.name);
     if (location) {
-      scraper.scrapeLocation(location).catch(err => {
-        log.error({ err }, `Foss scrape failed for ${yard.name}`);
-      });
+      scrapeAndEnrich(scraper.scrapeLocation(location));
     }
   } else if (yard.chain === 'Pull-A-Part') {
     const PullAPartScraper = require('../scrapers/PullAPartScraper');
     const scraper = new PullAPartScraper();
-    scraper.scrapeYard(yard).catch(err => {
-      log.error({ err }, `Pull-A-Part scrape failed for ${yard.name}`);
-    });
+    scrapeAndEnrich(scraper.scrapeYard(yard));
   } else if (yard.chain === 'Carolina PNP') {
     const CarolinaPickNPullScraper = require('../scrapers/CarolinaPickNPullScraper');
     const scraper = new CarolinaPickNPullScraper();
-    scraper.scrapeYard(yard).catch(err => {
-      log.error({ err }, `Carolina PNP scrape failed for ${yard.name}`);
-    });
+    scrapeAndEnrich(scraper.scrapeYard(yard));
   } else if (yard.chain === 'upullandsave') {
     const UPullAndSaveScraper = require('../scrapers/UPullAndSaveScraper');
     const scraper = new UPullAndSaveScraper();
-    scraper.scrapeYard(yard).catch(err => {
-      log.error({ err }, `U Pull & Save scrape failed for ${yard.name}`);
-    });
+    scrapeAndEnrich(scraper.scrapeYard(yard));
   } else if (yard.chain === 'chesterfield') {
     const ChesterfieldScraper = require('../scrapers/ChesterfieldScraper');
     const scraper = new ChesterfieldScraper();
-    scraper.scrapeYard(yard).catch(err => {
-      log.error({ err }, `Chesterfield scrape failed for ${yard.name}`);
-    });
+    scrapeAndEnrich(scraper.scrapeYard(yard));
   } else if (yard.chain === 'pickapartva') {
     const PickAPartVAScraper = require('../scrapers/PickAPartVAScraper');
     const scraper = new PickAPartVAScraper();
-    scraper.scrapeYard(yard).catch(err => {
-      log.error({ err }, `Pick-A-Part VA scrape failed for ${yard.name}`);
-    });
+    scrapeAndEnrich(scraper.scrapeYard(yard));
   }
 
-  res.json({ message: `Scrape started for ${yard.name}` });
+  res.json({ message: `Scrape + enrichment started for ${yard.name}` });
 });
 
 // Get scrape status / last scrape info for all yards

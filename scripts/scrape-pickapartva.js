@@ -13,6 +13,7 @@ const path = require('path');
 try { require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') }); } catch (e) {}
 
 const PickAPartVAScraper = require('../service/scrapers/PickAPartVAScraper');
+const { enrichYard } = require('../service/services/PostScrapeService');
 
 async function main() {
   console.log('=== PICK-A-PART VIRGINIA SCRAPE ===');
@@ -34,6 +35,9 @@ async function main() {
     try {
       const result = await scraper.scrapeYard(yard);
       console.log('  Total: ' + result.total + ' | Inserted: ' + result.inserted + ' | Updated: ' + result.updated + ' | Deactivated: ' + (result.deactivated || 0));
+      console.log('  Running enrichment...');
+      const enrichStats = await enrichYard(yard.id);
+      console.log('  Enriched: ' + enrichStats.vinsDecoded + ' VINs, ' + enrichStats.trimsTiered + ' trims, ' + enrichStats.errors + ' errors');
     } catch (err) {
       console.error('  FAILED: ' + err.message);
     }

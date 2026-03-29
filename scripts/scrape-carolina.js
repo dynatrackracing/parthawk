@@ -13,6 +13,7 @@ const path = require('path');
 try { require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') }); } catch (e) {}
 
 const CarolinaPickNPullScraper = require('../service/scrapers/CarolinaPickNPullScraper');
+const { enrichYard } = require('../service/services/PostScrapeService');
 
 async function main() {
   console.log('=== CAROLINA PICK N PULL SCRAPE ===');
@@ -35,6 +36,10 @@ async function main() {
     try {
       const result = await scraper.scrapeYard(yard);
       console.log('  Result: ' + JSON.stringify(result));
+      // Post-scrape enrichment: VIN decode + trim tier + scout alerts
+      console.log('  Running enrichment...');
+      const enrichStats = await enrichYard(yard.id);
+      console.log('  Enriched: ' + enrichStats.vinsDecoded + ' VINs, ' + enrichStats.trimsTiered + ' trims, ' + enrichStats.errors + ' errors');
     } catch (err) {
       console.error('  FAILED: ' + err.message);
     }

@@ -68,43 +68,9 @@ class LKQScraper {
     }
     this.log.info({ results }, 'LKQ scrape complete');
 
-    // Auto-regenerate scout alerts after scrape
-    try {
-      const { generateAlerts } = require('../services/ScoutAlertService');
-      generateAlerts().catch(err => {
-        this.log.warn({ err: err.message }, 'Scout alert generation failed after scrape');
-      });
-    } catch (e) { /* ignore if table doesn't exist yet */ }
-
-    // Background market pricing pass — scrape eBay sold comps for matched parts
-    // Runs after scout alerts, non-blocking
-    try {
-      const AttackListService = require('../services/AttackListService');
-      const { batchPriceCheck } = require('../services/MarketPricingService');
-      const service = new AttackListService();
-      // Run in background — don't block scrape completion
-      (async () => {
-        try {
-          const allResults = await service.getAllYardsAttackList({ daysBack: 90 });
-          const parts = [];
-          for (const yard of allResults) {
-            for (const v of (yard.vehicles || [])) {
-              for (const p of (v.parts || [])) {
-                if (p.partType && p.price > 50) {
-                  parts.push({ title: p.title, make: v.make, model: v.model, year: parseInt(v.year), partType: p.partType });
-                }
-              }
-            }
-          }
-          if (parts.length > 0) {
-            this.log.info({ partCount: parts.length }, 'Starting post-scrape market pricing');
-            await batchPriceCheck(parts);
-          }
-        } catch (err) {
-          this.log.warn({ err: err.message }, 'Post-scrape market pricing failed');
-        }
-      })();
-    } catch (e) { /* ignore */ }
+    // Post-scrape enrichment (VIN decode, trim tier, scout alerts) is now handled
+    // by PostScrapeService.enrichYard() in the yards.js route handler.
+    // Local pipeline (scrape-local.js + run-scrape.bat) handles enrichment separately.
 
     return results;
   }
@@ -168,15 +134,6 @@ class LKQScraper {
 
     await database('yard').where('id', yard.id).update({ last_scraped: now, updatedAt: now });
     this.log.info({ location: location.name, total: vehicles.length, inserted, updated }, 'Complete');
-
-    // Decode VINs in background (non-blocking)
-    try {
-      const VinDecodeService = require('../services/VinDecodeService');
-      const vinService = new VinDecodeService();
-      vinService.decodeAllUndecoded().catch(err => {
-        this.log.warn({ err: err.message }, 'VIN decode batch failed');
-      });
-    } catch (e) { /* ignore */ }
 
     return { location: location.name, success: true, total: vehicles.length, inserted, updated };
   }
