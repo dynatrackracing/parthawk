@@ -48,7 +48,6 @@ router.post('/session', async (req, res) => {
       parts_cost: totalPaid,
       gate_fee: session.entryFee,
       tax_paid: 0,
-      mileage: session.mileageCost,
       total_true_cogs: session.totalTrueCost,
       total_market_value: session.totalMarketValue,
       blended_cogs_pct: session.blendedCogsRate,
@@ -99,8 +98,7 @@ router.get('/yards', async (req, res) => {
       ...y,
       region: y.region || 'nc',
       base_address: BASE_ADDRESSES[y.region || 'nc'] || BASE_ADDRESSES.nc,
-      mileage_cost: Math.round(parseFloat(y.distance_from_base || 0) * 2 * 0.67 * 100) / 100,
-      fixed_overhead: Math.round((parseFloat(y.entry_fee || 0) + parseFloat(y.distance_from_base || 0) * 2 * 0.67) * 100) / 100,
+      fixed_overhead: parseFloat(y.entry_fee || 0),
     }));
 
     res.json({ success: true, yards: yardsWithCalc });

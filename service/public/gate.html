@@ -120,7 +120,8 @@ async function loadYards() {
     yards = d.yards || [];
     const sel = document.getElementById('yardSel');
     sel.innerHTML = '<option value="">Select a yard...</option>' +
-      yards.map(y => '<option value="' + y.id + '">' + y.name + ' (' + y.distance_from_base + 'mi - $' + y.entry_fee + ' gate)</option>').join('');
+      '<option value="custom">-- Custom Junkyard --</option>' +
+      yards.map(y => '<option value="' + y.id + '">' + y.name + ' ($' + y.entry_fee + ' gate)</option>').join('');
   } catch(e) {
     document.getElementById('yardSel').innerHTML = '<option value="">Error loading yards</option>';
   }
@@ -128,8 +129,29 @@ async function loadYards() {
 
 async function onYardChange() {
   const id = document.getElementById('yardSel').value;
-  if (!id) { yardProfile = null; document.getElementById('summaryCard').style.display = 'none'; document.getElementById('breakdownCard').style.display = 'none'; return; }
+  if (!id) { yardProfile = null; document.getElementById('summaryCard').style.display = 'none'; document.getElementById('breakdownCard').style.display = 'none'; hideCustomYardInput(); return; }
 
+  if (id === 'custom') {
+    showCustomYardInput();
+    yardProfile = {
+      id: 'custom',
+      name: 'Custom Junkyard',
+      chain: 'custom',
+      entryFee: 0,
+      fixedOverhead: 0,
+      cogsReference: getDefaultCogsReference(),
+      defaultMarketValues: getDefaultMarketValues(),
+    };
+    document.getElementById('summaryCard').style.display = 'block';
+    document.getElementById('breakdownCard').style.display = 'block';
+    document.getElementById('partsList').innerHTML = '';
+    partIdCounter = 0;
+    addPart('ECM');
+    addPart('BCM');
+    return;
+  }
+
+  hideCustomYardInput();
   const r = await fetch('/cogs/yard-profile/' + id);
   const d = await r.json();
   if (!d.success) return;
@@ -142,6 +164,44 @@ async function onYardChange() {
   partIdCounter = 0;
   addPart('ECM');
   addPart('BCM');
+}
+
+function showCustomYardInput() {
+  let el = document.getElementById('customYardWrap');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'customYardWrap';
+    el.style.cssText = 'margin-top:10px';
+    el.innerHTML = '<label style="font-size:11px;color:var(--tf);display:block;margin-bottom:4px">Yard Name (optional)</label>' +
+      '<input type="text" id="customYardName" placeholder="e.g. Pull-A-Part Tampa" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:14px" oninput="if(yardProfile)yardProfile.name=this.value||\'Custom Junkyard\'" />';
+    document.getElementById('yardSel').parentNode.appendChild(el);
+  }
+  el.style.display = 'block';
+}
+
+function hideCustomYardInput() {
+  const el = document.getElementById('customYardWrap');
+  if (el) el.style.display = 'none';
+}
+
+function getDefaultCogsReference() {
+  return {
+    ECM: { label: 'ECM / Engine Computer', cogs: 0 },
+    BCM: { label: 'BCM / Body Control', cogs: 0 },
+    TCM: { label: 'TCM / Transmission Computer', cogs: 0 },
+    ABS: { label: 'ABS Module', cogs: 0 },
+    CLUSTER: { label: 'Instrument Cluster', cogs: 0 },
+    RADIO: { label: 'Radio / Head Unit', cogs: 0 },
+    AMPLIFIER: { label: 'Amplifier', cogs: 0 },
+    HVAC: { label: 'HVAC Control Module', cogs: 0 },
+    TPMS: { label: 'TPMS Module', cogs: 0 },
+    SAS: { label: 'Steering Angle Sensor', cogs: 0 },
+    OTHER: { label: 'Other Module', cogs: 0 },
+  };
+}
+
+function getDefaultMarketValues() {
+  return { ECM: 80, BCM: 60, TCM: 80, ABS: 50, CLUSTER: 60, RADIO: 50, AMPLIFIER: 40, HVAC: 30, TPMS: 30, SAS: 25, OTHER: 50 };
 }
 
 function getPartTypes() {
@@ -239,8 +299,6 @@ function recalc() {
 
   document.getElementById('breakdown').innerHTML =
     '<div class="brow"><span class="bl">Gate fee</span><span class="bv">$' + yardProfile.entryFee + '</span></div>' +
-    '<div class="brow"><span class="bl">Mileage (' + yardProfile.name + ')</span><span class="bv">$' + yardProfile.mileageCost + '</span></div>' +
-    '<div class="brow"><span class="bl">Fixed overhead</span><span class="bv">$' + overhead + '</span></div>' +
     '<div class="brow"><span class="bl">Parts at register</span><span class="bv">$' + Math.round(totalCogs) + '</span></div>' +
     '<div class="brow" style="border-top:1px solid var(--b);padding-top:8px;margin-top:2px"><span class="bl" style="font-weight:600">Target (30%)</span><span class="bv" style="color:var(--g)">$' + target + '</span></div>' +
     '<div class="brow"><span class="bl" style="font-weight:600">Absolute max (35%)</span><span class="bv" style="color:var(--y)">$' + ceiling + '</span></div>' +

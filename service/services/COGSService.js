@@ -6,7 +6,7 @@ const { getCogsReference, DEFAULT_MARKET_VALUES } = require('../config/yard-cogs
 /**
  * COGSService - True cost of goods calculation
  *
- * COGS = parts cost + gate fee + mileage. NO TAX.
+ * COGS = parts cost + gate fee. NO TAX, NO MILEAGE.
  * Puller sees: target spend (30%), ceiling (35%), live blended %, per-part colors.
  */
 class COGSService {
@@ -16,8 +16,6 @@ class COGSService {
     if (!yard) throw new Error('Yard not found');
 
     const entryFee = parseFloat(yard.entry_fee) || 0;
-    const distanceMiles = parseFloat(yard.distance_from_base) || 0;
-    const mileageCost = Math.round(distanceMiles * 2 * 0.67 * 100) / 100;
     const cogsRef = getCogsReference(yard.chain);
 
     return {
@@ -25,9 +23,7 @@ class COGSService {
       name: yard.name,
       chain: yard.chain,
       entryFee,
-      distanceMiles,
-      mileageCost,
-      fixedOverhead: Math.round((entryFee + mileageCost) * 100) / 100,
+      fixedOverhead: entryFee,
       cogsReference: cogsRef,
       defaultMarketValues: DEFAULT_MARKET_VALUES,
     };
@@ -38,8 +34,7 @@ class COGSService {
     if (!yard) throw new Error('Yard not found');
 
     const entryFee = parseFloat(yard.entry_fee) || 0;
-    const mileageCost = parseFloat(yard.distance_from_base || 0) * 2 * 0.67;
-    const fixedOverhead = entryFee + mileageCost;
+    const fixedOverhead = entryFee;
 
     const totalMarketValue = plannedParts.reduce((sum, p) => sum + (p.marketValue || 0), 0);
     const totalCogs = plannedParts.reduce((sum, p) => sum + (p.cogs || 0), 0);
@@ -63,7 +58,6 @@ class COGSService {
       totalMarketValue: Math.round(totalMarketValue),
       fixedOverhead: Math.round(fixedOverhead * 100) / 100,
       entryFee,
-      mileageCost: Math.round(mileageCost * 100) / 100,
       maxPartSpend: Math.max(0, Math.round(targetPartSpend)),
       ceilingPartSpend: Math.max(0, Math.round(ceilingPartSpend)),
       currentCogs: Math.round(totalCogs),
@@ -79,8 +73,7 @@ class COGSService {
     if (!yard) throw new Error('Yard not found');
 
     const entryFee = parseFloat(yard.entry_fee) || 0;
-    const mileageCost = parseFloat(yard.distance_from_base || 0) * 2 * 0.67;
-    const totalTrueCost = totalPaid + entryFee + mileageCost;
+    const totalTrueCost = totalPaid + entryFee;
     const totalMarketValue = parts.reduce((sum, p) => sum + (p.marketValue || 0), 0);
     const blendedCogsRate = totalMarketValue > 0 ? (totalTrueCost / totalMarketValue) * 100 : 0;
 
@@ -93,7 +86,7 @@ class COGSService {
     });
 
     return {
-      session: { totalPaid, entryFee, mileageCost: Math.round(mileageCost * 100) / 100,
+      session: { totalPaid, entryFee,
         totalTrueCost: Math.round(totalTrueCost * 100) / 100, totalMarketValue,
         blendedCogsRate: Math.round(blendedCogsRate * 10) / 10,
         verdict: blendedCogsRate <= 25 ? 'excellent' : blendedCogsRate <= 35 ? 'acceptable' : 'over_limit',
