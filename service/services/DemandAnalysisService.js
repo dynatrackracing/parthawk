@@ -26,13 +26,14 @@ class DemandAnalysisService {
    * Higher rate = items selling faster
    */
   async calculateSellThroughRate(daysBack = 30) {
-    const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    let soldQuery = YourSale.query();
+    if (daysBack > 0) {
+      const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+      soldQuery = soldQuery.where('soldDate', '>=', startDate);
+    }
 
     const [soldCount, avgListingCount] = await Promise.all([
-      YourSale.query()
-        .where('soldDate', '>=', startDate)
-        .count('* as count')
-        .first(),
+      soldQuery.count('* as count').first(),
       YourListing.query()
         .where('listingStatus', 'Active')
         .count('* as count')
@@ -90,10 +91,13 @@ class DemandAnalysisService {
    * Returns daily/weekly sales patterns
    */
   async analyzeSalesVelocity(daysBack = 90) {
-    const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    let query = YourSale.query();
+    if (daysBack > 0) {
+      const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+      query = query.where('soldDate', '>=', startDate);
+    }
 
-    const yourSales = await YourSale.query()
-      .where('soldDate', '>=', startDate)
+    const yourSales = await query
       .select(
         YourSale.raw("DATE_TRUNC('week', \"soldDate\") as week"),
         YourSale.raw('COUNT(*) as sales_count'),
@@ -126,9 +130,12 @@ class DemandAnalysisService {
    * Get top performing products (best sellers)
    */
   async getTopPerformers(limit = 20, daysBack = 90) {
-    const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    const sales = await YourSale.query()
-      .where('soldDate', '>=', startDate)
+    let query = YourSale.query();
+    if (daysBack > 0) {
+      const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+      query = query.where('soldDate', '>=', startDate);
+    }
+    const sales = await query
       .select(
         'title',
         YourSale.raw('COUNT(*) as sales_count'),
