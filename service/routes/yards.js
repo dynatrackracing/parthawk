@@ -145,6 +145,12 @@ router.post('/scrape/:id', async (req, res) => {
     scraper.scrapeYard(yard).catch(err => {
       log.error({ err }, `Chesterfield scrape failed for ${yard.name}`);
     });
+  } else if (yard.chain === 'pickapartva') {
+    const PickAPartVAScraper = require('../scrapers/PickAPartVAScraper');
+    const scraper = new PickAPartVAScraper();
+    scraper.scrapeYard(yard).catch(err => {
+      log.error({ err }, `Pick-A-Part VA scrape failed for ${yard.name}`);
+    });
   }
 
   res.json({ message: `Scrape started for ${yard.name}` });

@@ -475,7 +475,8 @@ function renderActiveTrip() {
   h += '<div class="yard-tab' + (activeYardFilter === 'all' ? ' active' : '') + '" onclick="setYardFilter(\'all\')">ALL</div>';
   yards.forEach(function(y) {
     var yid = y.yard.id;
-    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.yard.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + y.total_vehicles + '</span></div>';
+    var capLabel = (y.total_scored && y.total_scored > y.total_vehicles) ? y.total_vehicles + '/' + y.total_scored : '' + y.total_vehicles;
+    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.yard.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + capLabel + '</span></div>';
   });
   h += '</div>';
 
@@ -517,7 +518,7 @@ function renderActiveTrip() {
 
   // Vehicle list
   if (filtered.length === 0) {
-    h += '<div class="empty">No vehicles match your filters. Try adjusting sort and filter options above.</div>';
+    h += '<div class="empty">No vehicles above threshold. Road trip floor: $1,000+. Day trip floor: $600+. Premium and high-value vehicles always shown.</div>';
   } else {
     h += '<div style="margin:0 12px">';
     filtered.forEach(function(v) { h += renderVehicleCard(v); });
@@ -570,10 +571,13 @@ function renderVehicleCard(v) {
     badges += '<span style="font-size:10px;color:' + ageColor + '">' + ageText + '</span>';
   }
 
-  // High value callout
+  // High value callout (only identified part types, not OTHER)
   var hvLine = '';
   if (v.hasHighValuePart && v.parts) {
-    var hvParts = v.parts.filter(function(p) { return (p.price || 0) >= 200; });
+    var hvParts = v.parts.filter(function(p) {
+      var pt = (p.partType || '').toUpperCase();
+      return (p.price || 0) >= 200 && pt !== 'OTHER' && pt !== '';
+    });
     if (hvParts.length > 0) {
       hvLine = '<div class="v-highvalue">\u2605 HIGH VALUE: ' + hvParts.map(function(p) { return esc(p.partType || p.title || '?') + ' $' + (p.price || 0); }).join(', ') + '</div>';
     }

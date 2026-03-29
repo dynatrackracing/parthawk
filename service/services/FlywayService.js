@@ -147,6 +147,11 @@ class FlywayService {
       yardMap[y.id] = { yard: y, vehicles: [] };
     }
 
+    // Determine score floor based on trip distance
+    const maxDistance = Math.max(...trip.yards.map(y => parseFloat(y.distance_from_base) || 0), 0);
+    const MINIMUM_VALUE = maxDistance >= 150 ? 1000 : 600;
+    const MAX_VEHICLES_PER_YARD = 25;
+
     // Score each vehicle
     for (const vehicle of vehicles) {
       try {
@@ -154,19 +159,35 @@ class FlywayService {
           vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex
         );
 
-        // Apply Flyway age decay
+        // Flyway part filtering: exclude OTHER parts without proven sales from scoring
+        const qualifiedParts = (result.parts || []).filter(p => {
+          const pt = (p.partType || '').toUpperCase();
+          if (pt && pt !== 'OTHER') return true;
+          // OTHER parts only count if they have actual sales history
+          if ((p.sold_90d || 0) > 0) return true;
+          if (p.isMarked) return true;
+          return false;
+        });
+        const qualifiedValue = qualifiedParts.reduce((sum, p) => sum + (p.price || 0), 0);
+
+        // Apply Flyway age decay to the qualified (non-OTHER) value
         const daysInYard = this.calculateDaysInYard(vehicle.date_added);
         const ageDecay = this.calculateAgeDecay(daysInYard);
-        const decayedValue = Math.round((result.est_value || 0) * (1 - ageDecay));
+        const decayedValue = Math.round(qualifiedValue * (1 - ageDecay));
 
         // Premium flags
         const premiumFlags = this.getPremiumFlags(vehicle);
 
-        // High-value individual parts ($200+)
-        const highValueParts = (result.parts || []).filter(p => (p.price || 0) >= 200);
+        // High-value individual parts ($200+) -- only identified types, not OTHER
+        const highValueParts = qualifiedParts.filter(p => {
+          const pt = (p.partType || '').toUpperCase();
+          return (p.price || 0) >= 200 && pt !== 'OTHER';
+        });
 
         const flywayResult = {
           ...result,
+          parts: qualifiedParts,
+          matched_parts: qualifiedParts.length,
           daysInYard,
           ageDecay: Math.round(ageDecay * 100),
           flywayValue: decayedValue,
@@ -176,8 +197,8 @@ class FlywayService {
           isPremiumVehicle: premiumFlags.length > 0,
         };
 
-        // Filter: minimum $400 flyway value OR has high-value part OR is premium
-        if (decayedValue >= 400 || highValueParts.length > 0 || premiumFlags.length > 0) {
+        // Filter: minimum flyway value OR has high-value identified part OR is premium
+        if (decayedValue >= MINIMUM_VALUE || highValueParts.length > 0 || premiumFlags.length > 0) {
           if (yardMap[vehicle.yard_id]) {
             yardMap[vehicle.yard_id].vehicles.push(flywayResult);
           }
@@ -187,7 +208,7 @@ class FlywayService {
       }
     }
 
-    // Sort vehicles within each yard: premium first, then by flyway value
+    // Sort vehicles within each yard, then cap at MAX_VEHICLES_PER_YARD
     const yards = [];
     for (const entry of Object.values(yardMap)) {
       entry.vehicles.sort((a, b) => {
@@ -196,12 +217,16 @@ class FlywayService {
         return (b.flywayValue || 0) - (a.flywayValue || 0);
       });
 
+      // Cap results per yard
+      const capped = entry.vehicles.slice(0, MAX_VEHICLES_PER_YARD);
+
       yards.push({
         yard: entry.yard,
-        total_vehicles: entry.vehicles.length,
-        hot_vehicles: entry.vehicles.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
-        est_total_value: entry.vehicles.reduce((sum, v) => sum + (v.flywayValue || 0), 0),
-        vehicles: entry.vehicles,
+        total_vehicles: capped.length,
+        total_scored: entry.vehicles.length,
+        hot_vehicles: capped.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
+        est_total_value: capped.reduce((sum, v) => sum + (v.flywayValue || 0), 0),
+        vehicles: capped,
       });
     }
 
