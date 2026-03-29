@@ -8,6 +8,24 @@ const { getPartScoreMultiplier } = require('../config/trim-tier-config');
 const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
+function isExcludedPart(title) {
+  const t = title.toUpperCase();
+  const excluded = [
+    /\bENGINE ASSEMBLY\b/, /\bMOTOR ASSEMBLY\b/, /\bLONG BLOCK\b/, /\bSHORT BLOCK\b/,
+    /\bCOMPLETE ENGINE\b/, /\bCRATE ENGINE\b/, /\bREMAN ENGINE\b/,
+    /\bTRANSMISSION ASSEMBLY\b/, /\bTRANSAXLE ASSEMBLY\b/, /\bCOMPLETE TRANSMISSION\b/,
+    /\bREMAN TRANSMISSION\b/,
+    /\bPISTON\b/, /\bCRANKSHAFT\b/, /\bCONNECTING ROD\b/, /\bHEAD GASKET\b/,
+    /\bOIL PAN\b/, /\bTIMING CHAIN\b/, /\bTIMING BELT\b/, /\bENGINE BLOCK\b/,
+    /\bCYLINDER HEAD\b/, /\bROCKER ARM\b/, /\bLIFTER\b/, /\bPUSHROD\b/,
+    /\bOIL PUMP\b/, /\bFLYWHEEL\b/, /\bFLEXPLATE\b/,
+    /\bFENDER\b/, /\bBUMPER COVER\b/, /\bHOOD PANEL\b/, /\bDOOR SHELL\b/,
+    /\bQUARTER PANEL\b/, /\bROCKER PANEL\b/, /\bBED SIDE\b/, /\bTRUCK BED\b/,
+    /\bTRANSFER CASE\b/, /\bXFER CASE\b/, /\bSTEERING RACK\b/, /\bSTEERING GEAR\b/
+  ];
+  return excluded.some(rx => rx.test(t));
+}
+
 // Part types that require EXACT year matching (no ±1 tolerance)
 // These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
 const PN_EXACT_YEAR_TYPES = new Set([
@@ -280,7 +298,7 @@ class AttackListService {
             partNumber: row.manufacturerPartNumber,
             partNumberBase: row.manufacturerPartNumber,
             quantity: parseInt(row.quantity) || 1,
-            partType: detectPartType(row.title + ' ' + (row.categoryTitle || '')),
+            partType: detectPartType(row.title + ' ' + (row.categoryTitle || '')) || 'OTHER',
             seller: row.seller || null,
             isRebuild,
           });
@@ -332,7 +350,7 @@ class AttackListService {
         const model = this.extractModelFromTitle(title, make);
         if (!model) continue;
 
-        const partType = detectPartType(title);
+        const partType = detectPartType(title) || 'OTHER';
         const yearRange = this.extractYearRange(title);
 
         const key = `${make}|${model.toUpperCase()}`;
@@ -768,7 +786,7 @@ class AttackListService {
     const rebuildParts = [];
 
     for (const p of matchedParts) {
-      if (!p.partType) continue;
+      if (isExcludedPart(p.title || '')) continue;
       const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
 
       if (p.isRebuild) {
