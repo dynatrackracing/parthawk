@@ -50,6 +50,34 @@ function partRequiresExactYear(title) {
   return false;
 }
 
+function cleanNHTSATrim(trim) {
+  if (!trim) return null;
+
+  const slashCount = (trim.match(/\//g) || []).length;
+  const commaCount = (trim.match(/,/g) || []).length;
+
+  // 2+ slashes or 2+ commas means NHTSA gave us a list, not a single trim
+  if (slashCount >= 2 || commaCount >= 2) {
+    const parts = trim.split(/[\/,]/).map(s => s.trim()).filter(Boolean);
+    const premiumKeywords = ['limited', 'platinum', 'denali', 'laramie', 'lariat', 'king ranch', 'touring', 'prestige', 'premium', 'srt', 'gt', 'sport'];
+    for (const keyword of premiumKeywords) {
+      const match = parts.find(p => p.toLowerCase().includes(keyword));
+      if (match) return match.trim();
+    }
+    return null;
+  }
+
+  // Strip engine displacement prefixes ("2.5 SE" → "SE")
+  let clean = trim.replace(/^\d+\.\d+[LT]?\s+/i, '');
+
+  const junkPatterns = ['NFA', 'NFB', 'NFC', 'N/A', 'UNKNOWN', 'STANDARD', 'UNSPECIFIED'];
+  if (junkPatterns.includes(clean.toUpperCase())) return null;
+
+  if (clean.length > 30) return null;
+
+  return clean || null;
+}
+
 /**
  * AttackListService - Scores yard vehicles by pull value
  *
@@ -961,7 +989,7 @@ class AttackListService {
     filteredParts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
 
     // === TRIM INTELLIGENCE: adjust trim-dependent part scores ===
-    const vehicleTrim = vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || null;
+    const vehicleTrim = cleanNHTSATrim(vehicle.decoded_trim) || cleanNHTSATrim(vehicle.trim_level) || vehicle.trim || null;
     for (const p of filteredParts) {
       const trimResult = getPartScoreMultiplier(make, vehicleTrim, p.partType);
       p.trimMultiplier = trimResult.multiplier;
@@ -1056,7 +1084,7 @@ class AttackListService {
         tier: vehicle.trim_tier,
         label: vehicle.trim_tier === 'PERFORMANCE' ? 'PERFORMANCE' : vehicle.trim_tier === 'PREMIUM' ? 'PREMIUM TRIM' : vehicle.trim_tier === 'BASE' ? 'BASE TRIM' : 'CHECK TRIM',
         color: vehicle.trim_tier === 'PERFORMANCE' ? 'blue' : vehicle.trim_tier === 'PREMIUM' ? 'green' : vehicle.trim_tier === 'BASE' ? 'red' : 'yellow',
-        decodedTrim: vehicle.decoded_trim,
+        decodedTrim: cleanNHTSATrim(vehicle.decoded_trim) || cleanNHTSATrim(vehicle.trim_level),
       } : null,
       score, color_code: color, vehicle_verdict,
       est_value: totalValue,
