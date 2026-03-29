@@ -107,6 +107,115 @@ function detectPartType(title) {
   return null;
 }
 
+// ── Title parser — extract year/make/model/partType/partNumber/engine ──
+
+const MAKES_MAP = {
+  'ACURA':1,'AUDI':1,'BMW':1,'BUICK':1,'CADILLAC':1,'CHEVROLET':1,'CHEVY':'CHEVROLET',
+  'CHRYSLER':1,'DODGE':1,'FIAT':1,'FORD':1,'GENESIS':1,'GMC':1,'HONDA':1,'HYUNDAI':1,
+  'INFINITI':1,'JAGUAR':1,'JEEP':1,'KIA':1,'LAND ROVER':1,'LEXUS':1,'LINCOLN':1,
+  'MAZDA':1,'MERCEDES-BENZ':1,'MERCEDES':'MERCEDES-BENZ','MINI':1,'MITSUBISHI':1,
+  'NISSAN':1,'PORSCHE':1,'RAM':1,'SCION':1,'SUBARU':1,'TESLA':1,'TOYOTA':1,
+  'VOLKSWAGEN':1,'VW':'VOLKSWAGEN','VOLVO':1,
+};
+
+const MODELS_LIST = [
+  'Grand Cherokee','Grand Caravan','Transit Connect','Ram 1500','Ram 2500','Ram 3500',
+  'GL-Class','ML-Class','R-Class','Santa Fe','CR-V','HR-V','F-150','F-250','F-350',
+  'Accord','Altima','Camaro','Camry','Caravan','Challenger','Charger','Cherokee',
+  'Civic','Colorado','Compass','Corolla','Cruze','Dart','Durango','Edge','Elantra',
+  'Equinox','Escape','Explorer','Express','Fiesta','Fit','Focus','Forte','Frontier',
+  'Fusion','G35','G37','Highlander','Impala','Journey','Jetta','Kicks','Kona',
+  'Malibu','Maxima','Murano','Mustang','MKX','Optima','Outback','Pacifica',
+  'Pathfinder','Patriot','Pilot','Prius','Q50','Q60','QX60','Renegade','Rio',
+  'Rogue','Sentra','Sienna','Sierra','Silverado','Sorento','Soul','Sportage',
+  'Sonata','Suburban','Tacoma','Tahoe','Terrain','Titan','Transit','Traverse',
+  'Tucson','Tundra','Versa','Wrangler','Xterra',
+];
+// Pre-build model regexes sorted by length desc so "Grand Cherokee" matches before "Cherokee"
+const MODEL_PATTERNS = MODELS_LIST
+  .sort((a, b) => b.length - a.length)
+  .map(m => ({ name: m, re: new RegExp('\\b' + m.replace(/[-]/g, '[-\\s]?') + '\\b', 'i') }));
+
+const PART_TYPE_PATTERNS = [
+  { re: /\b(ECM|ECU|PCM|ENGINE\s*CONTROL|ENGINE\s*COMPUTER)\b/i, type: 'ECM' },
+  { re: /\bBCM\b|\bBODY\s*CONTROL\b/i, type: 'BCM' },
+  { re: /\b(TCM|TCU|TRANSMISSION\s*CONTROL)\b/i, type: 'TCM' },
+  { re: /\bTIPM\b/i, type: 'TIPM' },
+  { re: /\bABS\b.*(MODULE|PUMP|CONTROL)/i, type: 'ABS Module' },
+  { re: /\b(FUSE\s*BOX|JUNCTION|RELAY\s*BOX)\b/i, type: 'Fuse Box' },
+  { re: /\b(AMPLIFIER|AMP)\b/i, type: 'Amplifier' },
+  { re: /\b(RADIO|HEAD\s*UNIT|STEREO|INFOTAINMENT)\b/i, type: 'Radio' },
+  { re: /\b(CLUSTER|SPEEDOMETER|INSTRUMENT)\b/i, type: 'Cluster' },
+  { re: /\bTHROTTLE\b/i, type: 'Throttle Body' },
+  { re: /\b(IGNITION\s*SWITCH|IGNITION)\b/i, type: 'Ignition Switch' },
+  { re: /\b(BACKUP\s*CAMERA|CAMERA)\b/i, type: 'Camera' },
+  { re: /\b(BLIND\s*SPOT|BSM)\b/i, type: 'Blind Spot Module' },
+  { re: /\b(HVAC|CLIMATE\s*CONTROL)\b/i, type: 'HVAC Module' },
+  { re: /\b(AIRBAG|SRS)\b/i, type: 'Airbag Module' },
+  { re: /\b(SIDE\s*MIRROR|MIRROR)\b/i, type: 'Mirror' },
+  { re: /\bSEAT\s*BELT\b/i, type: 'Seat Belt' },
+];
+
+function parseTitle(title) {
+  const result = { year: null, yearEnd: null, make: null, model: null, partType: null, partNumber: null, engineSize: null };
+  if (!title) return result;
+  const t = title;
+
+  // Year range: "2015-2020" or single: "2017"
+  const rangeMatch = t.match(/\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b/);
+  if (rangeMatch) {
+    result.year = parseInt(rangeMatch[1]);
+    result.yearEnd = parseInt(rangeMatch[2]);
+  } else {
+    const singleMatch = t.match(/\b((?:19|20)\d{2})\b/);
+    if (singleMatch) result.year = parseInt(singleMatch[1]);
+  }
+
+  // Make
+  const tUpper = t.toUpperCase();
+  // Check multi-word makes first
+  if (/\bLAND\s+ROVER\b/i.test(t)) result.make = 'LAND ROVER';
+  else if (/\bMERCEDES[-\s]?BENZ\b/i.test(t)) result.make = 'MERCEDES-BENZ';
+  else {
+    for (const [key, val] of Object.entries(MAKES_MAP)) {
+      if (key.includes(' ')) continue; // skip multi-word, handled above
+      const re = new RegExp('\\b' + key + '\\b', 'i');
+      if (re.test(t)) {
+        result.make = typeof val === 'string' ? val : key;
+        break;
+      }
+    }
+  }
+
+  // Model
+  for (const { name, re } of MODEL_PATTERNS) {
+    if (re.test(t)) { result.model = name; break; }
+  }
+
+  // Part type
+  for (const { re, type } of PART_TYPE_PATTERNS) {
+    if (re.test(t)) { result.partType = type; break; }
+  }
+
+  // Part number: last alphanumeric token with both letters+digits, 6+ chars
+  const tokens = t.match(/[A-Z0-9][-A-Z0-9]{5,}/gi) || [];
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const tok = tokens[i];
+    if (/[A-Za-z]/.test(tok) && /\d/.test(tok) && tok.length >= 6) {
+      // Skip year-like tokens and common non-PN patterns
+      if (/^(19|20)\d{2}$/.test(tok)) continue;
+      result.partNumber = tok.toUpperCase();
+      break;
+    }
+  }
+
+  // Engine size: "5.7L", "3.5L", etc.
+  const engineMatch = t.match(/\b(\d\.\d)L\b/i);
+  if (engineMatch) result.engineSize = engineMatch[1] + 'L';
+
+  return result;
+}
+
 // ── Parse cache key back into components ────────────────────────
 
 function parseCacheKey(key) {
@@ -202,6 +311,8 @@ async function findOpportunities() {
 
   // 4. Score each market cache entry
   const opportunities = [];
+  let filteredCount = 0;
+  let totalConsidered = 0;
 
   for (const row of cacheRows) {
     const key = row.part_number_base;
@@ -275,7 +386,23 @@ async function findOpportunities() {
     // Hard exclude
     if (shouldExclude(description)) continue;
 
-    const partType = parsed.partType || detectPartType(description);
+    // ── Parse title for structured fields ──
+    const titleParsed = parseTitle(description);
+
+    // Merge: cache key fields take priority, title-parsed fills gaps
+    const oppMake = parsed.make || titleParsed.make;
+    const oppModel = parsed.model || titleParsed.model;
+    const oppYear = parsed.year || titleParsed.year;
+    const oppYearEnd = titleParsed.yearEnd || null;
+    const oppPartType = parsed.partType || detectPartType(description) || titleParsed.partType;
+    const oppPartNumber = titleParsed.partNumber || (parsed.type === 'PN' ? parsed.pn : null);
+    const oppEngine = titleParsed.engineSize || null;
+
+    // ── FILTER GATE: must have BOTH vehicle AND part identity ──
+    totalConsidered++;
+    if (!oppMake) { filteredCount++; continue; }
+    if (!oppPartType && !oppPartNumber) { filteredCount++; continue; }
+
     const velocity = soldCount > 0 ? Math.round((soldCount / 90) * 7 * 10) / 10 : 0;
 
     // ── SCORING ──
@@ -323,8 +450,10 @@ async function findOpportunities() {
     else recommendation = 'LOW — limited data, may be niche';
 
     opportunities.push({
-      cacheKey: key, description, partType,
-      make: parsed.make, model: parsed.model, year: parsed.year,
+      cacheKey: key, description,
+      partType: oppPartType, partNumber: oppPartNumber,
+      make: oppMake, model: oppModel, year: oppYear, yearEnd: oppYearEnd,
+      engineSize: oppEngine,
       marketMedian: median, soldCount, velocity, score,
       demandScore, priceScore, velocityScore, historyScore, scarcityScore,
       recommendation, inStock: false, soldByUs: historyBonus,
@@ -335,8 +464,10 @@ async function findOpportunities() {
     });
   }
 
+  console.log(`[OpportunityService] Filter gate: ${filteredCount} filtered out of ${totalConsidered} considered, ${opportunities.length} passed`);
+
   opportunities.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
   return opportunities;
 }
 
-module.exports = { findOpportunities, shouldExclude, parseCacheKey };
+module.exports = { findOpportunities, shouldExclude, parseCacheKey, parseTitle };

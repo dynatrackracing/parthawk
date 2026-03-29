@@ -154,21 +154,23 @@ function render() {
   list.innerHTML = allOpps.map((o, i) => {
     const color = scoreColor(o.score);
     const chips = [];
-    if (o.partType) chips.push('<span class="chip chip-type">' + o.partType + '</span>');
+    if (o.partType) chips.push('<span class="chip chip-type">' + esc(o.partType) + '</span>');
     if (o.soldByUs) chips.push('<span class="chip chip-proven">PROVEN SELLER</span>');
     if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
 
-    const desc = o.description.length > 80 ? o.description.substring(0, 77) + '...' : o.description;
-    const makeModel = [o.make, o.model].filter(Boolean).join(' ');
+    // Vehicle line: "2015-2018 Ford Transit"
+    const yearStr = o.yearEnd ? o.year + '-' + o.yearEnd : (o.year || '');
+    const vehicleLine = [yearStr, o.make, o.model].filter(Boolean).join(' ');
 
     return '<div class="opp-card" onclick="toggle(' + i + ')">' +
       '<div class="opp-top">' +
         '<div class="opp-score ' + color + '">' + o.score + '</div>' +
         '<div class="opp-info">' +
-          '<div class="opp-title">' + esc(desc) + '</div>' +
+          '<div class="opp-title">' + esc(vehicleLine || o.description) + '</div>' +
           '<div class="opp-meta">' +
-            (makeModel ? '<span>' + esc(makeModel) + '</span>' : '') +
-            (o.year ? '<span>' + o.year + '</span>' : '') +
+            (o.partType ? '<span>' + esc(o.partType) + '</span>' : '') +
+            (o.partNumber ? '<span>PN: ' + esc(o.partNumber) + '</span>' : '') +
+            (o.engineSize ? '<span>' + esc(o.engineSize) + '</span>' : '') +
           '</div>' +
         '</div>' +
         '<div class="opp-right">' +
