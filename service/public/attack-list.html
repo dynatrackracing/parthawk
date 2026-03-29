@@ -391,6 +391,17 @@
   function cleanModel(text, make) {
     if (!text) return text;
     var cleaned = stripLKQCodes(text);
+    // Suburban 1500/2500 → Suburban, Yukon XL 1500 → Yukon XL, Avalanche 1500 → Avalanche
+    cleaned = cleaned.replace(/\bSUBURBAN\s+1500\b/gi, 'Suburban');
+    cleaned = cleaned.replace(/\bSUBURBAN\s+2500\b/gi, 'Suburban');
+    cleaned = cleaned.replace(/\bYUKON\s+XL\s+1500\b/gi, 'Yukon XL');
+    cleaned = cleaned.replace(/\bAVALANCHE\s+1500\b/gi, 'Avalanche');
+    // Mazda: LKQ stores "3" but should display "Mazda3"
+    if (/mazda/i.test(make || '')) {
+      cleaned = cleaned.replace(/^3$/i, 'Mazda3');
+      cleaned = cleaned.replace(/^6$/i, 'Mazda6');
+      cleaned = cleaned.replace(/^5$/i, 'Mazda5');
+    }
     // Strip NHTSA trim lists stuffed into model names ("CAMRY LE/SE/XLE" → "CAMRY")
     cleaned = cleaned.replace(/\s+(LE|SE|XLE|XSE|LX|EX|LT|LS|SL|SV|SR|DX|SXT|SLT|XLT|SEL|Limited|Sport|Base|Premium|Luxury|Touring)(\/[A-Za-z]+)*\s*$/i, '');
     cleaned = cleaned.replace(/\s+[A-Z]{1,4}(\/[A-Z]{1,4}){2,}\s*$/i, '');
@@ -603,7 +614,7 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:13px;color:#b0b0b0;font-weight:600">${v.engine}</span>` : ''}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'orange' ? '#f97316' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.cult ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#fff">CULT</span>' : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); if (/4WD|4X4|AWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#f59e0b;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>'; if (/FWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">FWD</span>'; return ''; })()}${v.decoded_transmission ? (/manual/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#fff">MANUAL</span>' : /cvt/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>' : '') : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:13px;color:#b0b0b0;font-weight:600">${v.engine}</span>` : ''}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:#fff">${v.trimBadge.decodedTrim || v.trimBadge.label}</span>` : ''}${v.cult ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#fff">CULT</span>' : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); if (/4WD|4X4|AWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#f59e0b;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>'; if (/FWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">FWD</span>'; return ''; })()}${v.decoded_transmission ? (/manual/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#fff">MANUAL</span>' : /cvt/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>' : '') : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
