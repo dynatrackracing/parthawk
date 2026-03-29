@@ -147,7 +147,7 @@ class SoldItemsScraper {
           await page.waitForTimeout(2000);
 
           try {
-            await page.waitForSelector('ul.srp-results, .srp-river-results', { timeout: 15000 });
+            await page.waitForSelector('ul.srp-results, .srp-river-results, li.s-item, li.s-card', { timeout: 15000 });
           } catch (e) {
             this.log.warn({ pageNumber }, 'Results not found');
           }
@@ -249,12 +249,24 @@ class SoldItemsScraper {
           await page.evaluate(() => window.scrollTo(0, 1000));
           await page.waitForTimeout(2000);
 
-          // Wait for results container (new selector structure)
+          // Wait for results container — try both layouts
           try {
-            await page.waitForSelector('ul.srp-results, .srp-river-results', { timeout: 15000 });
+            await page.waitForSelector('ul.srp-results, .srp-river-results, li.s-item, li.s-card', { timeout: 15000 });
           } catch (e) {
             this.log.warn({ pageNumber }, 'Results selector not found, page may be empty or blocked');
+            // Log what we actually got for debugging
+            const bodyText = await page.evaluate(() => document.body?.innerText?.substring(0, 500) || '');
+            this.log.warn({ pageNumber, bodySnippet: bodyText }, 'Page body preview');
           }
+
+          // Detect which layout eBay served
+          const layoutInfo = await page.evaluate(() => {
+            const sCardCount = document.querySelectorAll('li.s-card').length;
+            const sItemCount = document.querySelectorAll('li.s-item').length;
+            const totalLi = document.querySelectorAll('ul.srp-results > li').length;
+            return { sCardCount, sItemCount, totalLi };
+          });
+          this.log.info({ pageNumber, ...layoutInfo }, 'eBay layout detected');
 
           // Extract items from page
           const items = await this.extractItemsFromPage(page, seller);
@@ -291,7 +303,8 @@ class SoldItemsScraper {
 
   /**
    * Extract sold items from a page
-   * Uses the new eBay card-based layout (2024+ structure)
+   * Handles BOTH eBay layouts: new .s-card__* (2024+) and old .s-item__* (legacy)
+   * eBay serves both layouts depending on the page/region/A-B test.
    * @param {Page} page - Playwright page object
    * @param {string} seller - Seller username for reference
    */
@@ -299,58 +312,82 @@ class SoldItemsScraper {
     return await page.evaluate((sellerName) => {
       const items = [];
 
-      // New eBay structure: ul.srp-results > li
+      // eBay uses ul.srp-results > li for both layouts
       const listings = document.querySelectorAll('ul.srp-results > li');
 
       listings.forEach((listing) => {
         try {
-          // Find the link to get item ID
-          const linkEl = listing.querySelector('a[href*="/itm/"]');
+          // Find the link to get item ID — generic selector works for both layouts
+          const linkEl = listing.querySelector('a.s-card__link') ||
+                         listing.querySelector('a.s-item__link') ||
+                         listing.querySelector('a.su-link') ||
+                         listing.querySelector('a[href*="/itm/"]');
           if (!linkEl) return;
 
           const href = linkEl.getAttribute('href') || '';
           const itemIdMatch = href.match(/\/itm\/(\d+)/);
           const ebayItemId = itemIdMatch ? itemIdMatch[1] : null;
 
-          // Skip promotional items (item ID 123456) and items without valid ID
+          // Skip promotional items and items without valid ID
           if (!ebayItemId || ebayItemId === '123456') return;
 
-          // Get title from card header or link text, clean it up
-          const titleEl = listing.querySelector('.s-card__title') ||
+          // Title — new layout first, then old layout fallback
+          const titleEl = listing.querySelector('.s-card__title span') ||
+                          listing.querySelector('.s-card__title') ||
+                          listing.querySelector('.s-item__title') ||
                           listing.querySelector('.su-card-container__header') ||
                           listing.querySelector('a[href*="/itm/"]');
           let title = titleEl?.textContent?.trim() || '';
-          // Remove "Opens in a new window or tab" suffix
           title = title.replace(/Opens in a new window or tab$/i, '').trim();
+          title = title.replace(/^New Listing\s*/i, '').trim();
 
-          // Get price - look for price-related classes
+          // Price — new layout first, then old layout fallback
           const priceEl = listing.querySelector('.s-card__price') ||
-                          listing.querySelector('[class*="price"]') ||
-                          listing.querySelector('.s-card__attribute-row');
+                          listing.querySelector('.s-item__price') ||
+                          listing.querySelector('[class*="price"]');
           let priceText = priceEl?.textContent?.trim() || '';
-          // Handle price ranges (take the first price)
           if (priceText.includes(' to ')) {
             priceText = priceText.split(' to ')[0];
           }
           const soldPrice = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
 
-          // Skip items with no valid price
           if (soldPrice === 0) return;
 
-          // Get condition from subtitle
-          const conditionEl = listing.querySelector('.s-card__subtitle') ||
-                             listing.querySelector('[class*="subtitle"]');
+          // Condition/subtitle — new layout first, then old layout fallback
+          const conditionEl = listing.querySelector('.s-card__subtitle span') ||
+                             listing.querySelector('.s-card__subtitle') ||
+                             listing.querySelector('.s-item__subtitle') ||
+                             listing.querySelector('.SECONDARY_INFO');
           const condition = conditionEl?.textContent?.trim() || '';
 
-          // Get image URL
+          // Image — check data-src first (lazy loading), then src
           const imgEl = listing.querySelector('img.s-card__image') ||
+                        listing.querySelector('.s-item__image-img') ||
                         listing.querySelector('.s-card__media-wrapper img') ||
                         listing.querySelector('img');
-          const pictureUrl = imgEl?.getAttribute('src') || imgEl?.getAttribute('data-src') || '';
+          const pictureUrl = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
 
-          // Sold date is not available in search results, will be null
-          // (could be fetched via individual item API call if needed)
-          const soldDate = null;
+          // Sold date — try to extract from listing text (e.g. "Sold Mar 15, 2026")
+          let soldDate = null;
+          const listingText = listing.textContent || '';
+          const soldDateMatch = listingText.match(/Sold\s+([A-Za-z]{3}\s+\d{1,2},?\s+\d{4})/);
+          if (soldDateMatch) {
+            const parsed = new Date(soldDateMatch[1]);
+            if (!isNaN(parsed.getTime())) soldDate = parsed.toISOString();
+          }
+
+          // Seller info — extract from listing if scraping keyword search (no seller filter)
+          let itemSeller = sellerName;
+          if (!itemSeller) {
+            const sellerEl = listing.querySelector('.s-card__seller-info') ||
+                            listing.querySelector('.s-item__seller-info-text') ||
+                            listing.querySelector('[class*="seller"]');
+            if (sellerEl) {
+              const sellerText = sellerEl.textContent?.trim() || '';
+              const sellerMatch = sellerText.match(/(?:from\s+|by\s+)?(\S+)/i);
+              if (sellerMatch) itemSeller = sellerMatch[1];
+            }
+          }
 
           items.push({
             ebayItemId,
@@ -359,7 +396,7 @@ class SoldItemsScraper {
             soldDate,
             condition,
             pictureUrl,
-            seller: sellerName,
+            seller: itemSeller,
           });
         } catch (err) {
           console.error('Error parsing listing:', err);

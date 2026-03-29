@@ -218,18 +218,24 @@ class MarketResearchScraper {
 
           if (!ebayItemId || ebayItemId === '123456') return;
 
-          // Title
-          const titleEl = listing.querySelector('.s-card__title');
+          // Title — dual layout: new .s-card, old .s-item
+          const titleEl = listing.querySelector('.s-card__title span') ||
+                          listing.querySelector('.s-card__title') ||
+                          listing.querySelector('.s-item__title') ||
+                          listing.querySelector('a[href*="/itm/"]');
           let title = titleEl?.textContent?.trim() || '';
           title = title.replace(/Opens in a new window or tab$/i, '').trim();
+          title = title.replace(/^New Listing\s*/i, '').trim();
 
-          // Price - current and original
-          const priceEl = listing.querySelector('.s-card__price');
+          // Price — dual layout
+          const priceEl = listing.querySelector('.s-card__price') ||
+                          listing.querySelector('.s-item__price') ||
+                          listing.querySelector('[class*="price"]');
           let priceText = priceEl?.textContent?.trim() || '';
           const currentPrice = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
 
           // Original price (strikethrough)
-          const origPriceEl = listing.querySelector('.s-card__price--original, [class*="STRIKETHROUGH"]');
+          const origPriceEl = listing.querySelector('.s-card__price--original, .s-item__price--original, [class*="STRIKETHROUGH"]');
           let originalPrice = null;
           if (origPriceEl) {
             const origText = origPriceEl.textContent?.trim() || '';
@@ -238,15 +244,16 @@ class MarketResearchScraper {
 
           if (currentPrice === 0) return;
 
-          // Seller info
-          const sellerEl = listing.querySelector('.s-card__seller-info, [class*="seller"]');
+          // Seller info — dual layout
+          const sellerEl = listing.querySelector('.s-card__seller-info') ||
+                           listing.querySelector('.s-item__seller-info-text') ||
+                           listing.querySelector('[class*="seller"]');
           let seller = null;
           let sellerFeedbackScore = null;
           let sellerFeedbackPercent = null;
 
           if (sellerEl) {
             const sellerText = sellerEl.textContent?.trim() || '';
-            // Parse: "parts4less-43 99.8% positive (82K)"
             const sellerMatch = sellerText.match(/([a-z0-9_-]+)\s+([\d.]+)%[^(]*\(([\d.]+K?)\)/i);
             if (sellerMatch) {
               seller = sellerMatch[1];
@@ -254,18 +261,23 @@ class MarketResearchScraper {
               let scoreStr = sellerMatch[3].replace('K', '000');
               sellerFeedbackScore = parseInt(scoreStr, 10);
             } else {
-              // Try simpler pattern
               const nameMatch = sellerText.match(/^([a-z0-9_-]+)/i);
               if (nameMatch) seller = nameMatch[1];
             }
           }
 
-          // Condition
-          const conditionEl = listing.querySelector('.s-card__subtitle, .SECONDARY_INFO');
+          // Condition — dual layout
+          const conditionEl = listing.querySelector('.s-card__subtitle span') ||
+                             listing.querySelector('.s-card__subtitle') ||
+                             listing.querySelector('.s-item__subtitle') ||
+                             listing.querySelector('.SECONDARY_INFO');
           const condition = conditionEl?.textContent?.trim() || '';
 
-          // Shipping
-          const shippingEl = listing.querySelector('[class*="shipping"], [class*="delivery"]');
+          // Shipping — dual layout
+          const shippingEl = listing.querySelector('.s-item__logisticsCost') ||
+                             listing.querySelector('.s-item__shipping') ||
+                             listing.querySelector('[class*="shipping"]') ||
+                             listing.querySelector('[class*="delivery"]');
           const shippingText = shippingEl?.textContent?.toLowerCase() || '';
           const freeShipping = shippingText.includes('free');
           let shippingCost = null;
@@ -285,9 +297,11 @@ class MarketResearchScraper {
           const locationEl = listing.querySelector('[class*="location"]');
           const location = locationEl?.textContent?.replace('Located in', '').trim() || null;
 
-          // Image
-          const imgEl = listing.querySelector('img.s-card__image, img');
-          const pictureUrl = imgEl?.getAttribute('src') || '';
+          // Image — dual layout, prefer data-src for lazy loading
+          const imgEl = listing.querySelector('img.s-card__image') ||
+                        listing.querySelector('.s-item__image-img') ||
+                        listing.querySelector('img');
+          const pictureUrl = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
 
           items.push({
             ebayItemId,
@@ -393,18 +407,24 @@ class MarketResearchScraper {
 
           if (!ebayItemId || ebayItemId === '123456') return;
 
-          // Title
-          const titleEl = listing.querySelector('.s-card__title');
+          // Title — dual layout
+          const titleEl = listing.querySelector('.s-card__title span') ||
+                          listing.querySelector('.s-card__title') ||
+                          listing.querySelector('.s-item__title') ||
+                          listing.querySelector('a[href*="/itm/"]');
           let title = titleEl?.textContent?.trim() || '';
           title = title.replace(/Opens in a new window or tab$/i, '').trim();
+          title = title.replace(/^New Listing\s*/i, '').trim();
 
-          // Sold price
-          const priceEl = listing.querySelector('.s-card__price');
+          // Sold price — dual layout
+          const priceEl = listing.querySelector('.s-card__price') ||
+                          listing.querySelector('.s-item__price') ||
+                          listing.querySelector('[class*="price"]');
           let priceText = priceEl?.textContent?.trim() || '';
           const soldPrice = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
 
           // Original price
-          const origPriceEl = listing.querySelector('.s-card__price--original, [class*="STRIKETHROUGH"]');
+          const origPriceEl = listing.querySelector('.s-card__price--original, .s-item__price--original, [class*="STRIKETHROUGH"]');
           let originalPrice = null;
           if (origPriceEl) {
             const origText = origPriceEl.textContent?.trim() || '';
@@ -416,7 +436,7 @@ class MarketResearchScraper {
           // Sold date - look for "Sold Jan 16, 2026" pattern
           let soldDate = null;
           const listingText = listing.textContent || '';
-          const soldDateMatch = listingText.match(/Sold\s+([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})/);
+          const soldDateMatch = listingText.match(/Sold\s+([A-Za-z]{3}\s+\d{1,2},?\s+\d{4})/);
           if (soldDateMatch) {
             const dateStr = soldDateMatch[1];
             const parsed = new Date(dateStr);
@@ -425,8 +445,10 @@ class MarketResearchScraper {
             }
           }
 
-          // Seller info
-          const sellerEl = listing.querySelector('.s-card__seller-info, [class*="seller"]');
+          // Seller info — dual layout
+          const sellerEl = listing.querySelector('.s-card__seller-info') ||
+                           listing.querySelector('.s-item__seller-info-text') ||
+                           listing.querySelector('[class*="seller"]');
           let seller = null;
           let sellerFeedbackScore = null;
           let sellerFeedbackPercent = null;
@@ -445,8 +467,11 @@ class MarketResearchScraper {
             }
           }
 
-          // Condition
-          const conditionEl = listing.querySelector('.s-card__subtitle, .SECONDARY_INFO');
+          // Condition — dual layout
+          const conditionEl = listing.querySelector('.s-card__subtitle span') ||
+                             listing.querySelector('.s-card__subtitle') ||
+                             listing.querySelector('.s-item__subtitle') ||
+                             listing.querySelector('.SECONDARY_INFO');
           const condition = conditionEl?.textContent?.trim() || '';
 
           // Shipping
@@ -460,9 +485,11 @@ class MarketResearchScraper {
           const locationMatch = listingText.match(/Located in\s+([^·\n]+)/i);
           const location = locationMatch ? locationMatch[1].trim() : null;
 
-          // Image
-          const imgEl = listing.querySelector('img.s-card__image, img');
-          const pictureUrl = imgEl?.getAttribute('src') || '';
+          // Image — dual layout, prefer data-src
+          const imgEl = listing.querySelector('img.s-card__image') ||
+                        listing.querySelector('.s-item__image-img') ||
+                        listing.querySelector('img');
+          const pictureUrl = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
 
           items.push({
             ebayItemId,
