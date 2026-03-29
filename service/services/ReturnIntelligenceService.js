@@ -140,8 +140,8 @@ class ReturnIntelligenceService {
 
     // Sales from YourSale — we detect part type in JS since YourSale has no part_type column
     const allSales = await database('YourSale')
-      .select('title', raw('COUNT(*) as cnt'), raw('SUM(CAST("soldFor" AS decimal)) as dollars'))
-      .where('saleDate', '>=', cutoffStr)
+      .select('title', raw('COUNT(*) as cnt'), raw('SUM(CAST("salePrice" AS decimal)) as dollars'))
+      .where('soldDate', '>=', cutoffStr)
       .groupBy('title');
 
     const salesByType = {};
@@ -268,8 +268,8 @@ class ReturnIntelligenceService {
 
     // Cross-ref with YourSale
     const allSales = await database('YourSale')
-      .select('title', raw('COUNT(*) as cnt'), raw('SUM(CAST("soldFor" AS decimal)) as dollars'))
-      .where('saleDate', '>=', cutoffStr)
+      .select('title', raw('COUNT(*) as cnt'), raw('SUM(CAST("salePrice" AS decimal)) as dollars'))
+      .where('soldDate', '>=', cutoffStr)
       .groupBy('title');
 
     const salesByMake = {};
