@@ -6,22 +6,57 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a">
 <title>DarkHawk — INSTINCTS</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
-.container{padding:12px;max-width:800px;margin:0 auto}
-.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+:root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--y:#eab308;--g:#22c55e;--o:#f59e0b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280;--purple:#a78bfa}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:40px}
+.container{padding:12px;max-width:900px;margin:0 auto}
+.card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
 .section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
-.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:#a78bfa;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+.spinner{width:16px;height:16px;border:2px solid #333;border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.empty{text-align:center;color:#6B7280;padding:20px;font-size:13px}
+.empty{text-align:center;color:var(--tf);padding:20px;font-size:13px}
 .item-row{padding:8px 0;border-bottom:1px solid #1f1f1f;font-size:12px}
 .item-row:last-child{border-bottom:none}
 .badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;margin-right:4px}
-.stat-row{display:flex;gap:10px;margin-bottom:10px}
-.stat-box{flex:1;background:#1a1a1a;border-radius:8px;padding:12px;text-align:center}
+.stat-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:100px;background:var(--s2);border-radius:8px;padding:12px;text-align:center}
 .stat-value{font-size:20px;font-weight:800}
-.stat-label{font-size:10px;color:#6B7280;margin-top:2px}
+.stat-label{font-size:10px;color:var(--tf);margin-top:2px}
+
+/* Return Intelligence styles */
+.ri-divider{border:none;border-top:2px solid var(--r);margin:24px 0 16px;opacity:0.4}
+.ri-header{font-size:16px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--r);margin-bottom:16px;text-align:center}
+.ri-sub{font-size:10px;color:var(--tf);text-align:center;margin-top:-12px;margin-bottom:16px}
+.ri-card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
+.ri-card.accent{border-color:#7f1d1d}
+.ri-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px}
+.ri-table{width:100%;border-collapse:collapse;font-size:11px}
+.ri-table th{text-align:left;padding:6px 8px;color:var(--tf);font-size:9px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--b);font-weight:700}
+.ri-table td{padding:6px 8px;border-bottom:1px solid #1a1a1a;white-space:nowrap}
+.ri-table tr:last-child td{border-bottom:none}
+.ri-table tr:hover{background:var(--s2)}
+.ri-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.rate-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;display:inline-block}
+.rate-green{background:#064e3b;color:var(--g)}
+.rate-yellow{background:#713f12;color:var(--y)}
+.rate-orange{background:#7c2d12;color:var(--o)}
+.rate-red{background:#7f1d1d;color:var(--r)}
+.count-red{color:var(--r);font-weight:700}
+.count-orange{color:var(--o);font-weight:700}
+.count-yellow{color:var(--y);font-weight:700}
+.alert-row{background:#1a0a0a !important}
+.ri-loading{text-align:center;padding:16px;color:var(--tf);font-size:12px}
+.ri-error{text-align:center;padding:12px;color:var(--r);font-size:11px}
+.chart-wrap{position:relative;height:220px;margin-bottom:12px}
+.rip-off-tag{font-size:8px;background:var(--r);color:#fff;padding:1px 4px;border-radius:2px;font-weight:700;margin-left:4px}
+.seasonal-flag{color:var(--r)}
+
+/* Responsive table scroll */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-scroll::-webkit-scrollbar{height:4px}
+.table-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
 </style>
 </head>
 <body>
@@ -45,8 +80,65 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
       <div id="staleOutcomes"></div>
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- RETURN INTELLIGENCE                                         -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <hr class="ri-divider" id="ri-top">
+  <div class="ri-header">RETURN INTELLIGENCE</div>
+  <div class="ri-sub">Transaction-level return analysis across all eBay stores</div>
+
+  <!-- 1. Header Cards -->
+  <div id="ri-summary">
+    <div class="ri-loading"><div class="spinner"></div> Loading summary...</div>
+  </div>
+
+  <!-- 2. Return Rate by Part Type -->
+  <div class="ri-card" id="ri-part-type-card">
+    <div class="ri-section-title" style="color:var(--o)">Return Rate by Part Type</div>
+    <div id="ri-part-type"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 3. Monthly Trend -->
+  <div class="ri-card" id="ri-trend-card">
+    <div class="ri-section-title" style="color:var(--purple)">Monthly Return Trend</div>
+    <div id="ri-trend"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 4. Make Heat Map -->
+  <div class="ri-card" id="ri-make-card">
+    <div class="ri-section-title" style="color:#38bdf8">Returns by Vehicle Make</div>
+    <div id="ri-make"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 5. Repeat Returners -->
+  <div class="ri-card" id="ri-returners-card">
+    <div class="ri-section-title" style="color:var(--r)">Repeat Returners</div>
+    <div id="ri-returners"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 6. INAD Fee Tracker -->
+  <div class="ri-card" id="ri-inad-card">
+    <div class="ri-section-title" style="color:var(--y)">INAD Fee Tracker</div>
+    <div id="ri-inad"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 7. High-Value Alerts -->
+  <div class="ri-card accent" id="ri-alerts-card">
+    <div class="ri-section-title" style="color:var(--r)">High-Value / High-Frequency Alerts</div>
+    <div style="font-size:10px;color:var(--tf);margin-bottom:8px">Part+make combos that are expensive AND frequently returned — these hurt the most</div>
+    <div id="ri-alerts"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- 8. Problem Parts -->
+  <div class="ri-card" id="ri-problems-card">
+    <div class="ri-section-title" style="color:var(--o)">Problem Parts (3+ Returns)</div>
+    <div id="ri-problems"><div class="ri-loading"><div class="spinner"></div></div></div>
+  </div>
 </div>
+
 <script>
+// ═══ Original Instincts load ═══
 function load() {
   fetch('/intelligence/learnings')
     .then(function(r) { return r.json(); })
@@ -113,6 +205,262 @@ function load() {
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 load();
+
+// ═══════════════════════════════════════════════════════════════
+// RETURN INTELLIGENCE
+// ═══════════════════════════════════════════════════════════════
+
+function $(x) { return document.getElementById(x); }
+function fmt$(n) { if (n == null || isNaN(n)) return '$0'; return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function fmtPct(n) { if (n == null) return '—'; return n.toFixed(1) + '%'; }
+function fmtNum(n) { return Number(n || 0).toLocaleString('en-US'); }
+function rateCls(pct) {
+  if (pct == null) return 'rate-green';
+  if (pct >= 25) return 'rate-red';
+  if (pct >= 15) return 'rate-orange';
+  if (pct >= 10) return 'rate-yellow';
+  return 'rate-green';
+}
+function countCls(n) {
+  if (n >= 10) return 'count-red';
+  if (n >= 5) return 'count-orange';
+  if (n >= 3) return 'count-yellow';
+  return '';
+}
+
+function riErr(el, msg) {
+  el.innerHTML = '<div class="ri-error">' + esc(msg) + '</div>';
+}
+
+function riLoad(url, el, renderFn) {
+  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.success) throw new Error(d.error || 'Unknown error');
+    renderFn(d, el);
+  }).catch(function(err) { riErr(el, 'Failed: ' + err.message); });
+}
+
+// ─── 1. Summary Header Cards ───
+riLoad('/return-intelligence/summary', $('ri-summary'), function(d, el) {
+  el.innerHTML = '<div class="stat-row">' +
+    '<div class="stat-box"><div class="stat-value">' + fmtNum(d.all_time.count) + '</div><div class="stat-label">Total Returns</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="color:var(--r)">' + fmt$(d.all_time.dollars) + '</div><div class="stat-label">Total Refunded</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="color:var(--y)">' + fmt$(d.inad.fees) + '</div><div class="stat-label">INAD Fees Paid</div></div>' +
+    '<div class="stat-box"><div class="stat-value">' + fmt$(d.all_time.avg) + '</div><div class="stat-label">Avg Return</div></div>' +
+    '</div>' +
+    '<div class="stat-row">' +
+    '<div class="stat-box"><div class="stat-value" style="font-size:16px">' + fmtNum(d.last_12_months.count) + '</div><div class="stat-label">Last 12 Months</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="font-size:16px;color:var(--r)">' + fmt$(d.last_12_months.dollars) + '</div><div class="stat-label">12mo Refunded</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="font-size:16px">' + fmtNum(d.last_90_days.count) + '</div><div class="stat-label">Last 90 Days</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="font-size:16px;color:var(--r)">' + fmt$(d.last_90_days.dollars) + '</div><div class="stat-label">90d Refunded</div></div>' +
+    '</div>';
+});
+
+// ─── 2. Return Rate by Part Type ───
+riLoad('/return-intelligence/by-part-type', $('ri-part-type'), function(d, el) {
+  var rows = d.data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No data</div>'; return; }
+  var h = '<div class="table-scroll"><table class="ri-table"><thead><tr>' +
+    '<th>Part Type</th><th class="num">Returns</th><th class="num">Sales</th><th class="num">Rate</th><th class="num">$ Returned</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var cls = rateCls(r.return_rate_pct);
+    h += '<tr><td style="font-weight:600">' + esc(r.part_type) + '</td>' +
+      '<td class="num">' + fmtNum(r.return_count) + '</td>' +
+      '<td class="num" style="color:var(--tf)">' + fmtNum(r.sale_count) + '</td>' +
+      '<td class="num"><span class="rate-badge ' + cls + '">' + fmtPct(r.return_rate_pct) + '</span></td>' +
+      '<td class="num" style="color:var(--r)">' + fmt$(r.return_dollars) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+});
+
+// ─── 3. Monthly Trend ───
+riLoad('/return-intelligence/monthly-trend', $('ri-trend'), function(d, el) {
+  var monthly = d.monthly || [];
+  var seasonal = d.seasonal || [];
+  if (!monthly.length) { el.innerHTML = '<div class="empty">No data</div>'; return; }
+
+  // Build chart
+  var labels = monthly.map(function(m) { return m.month; });
+  var values = monthly.map(function(m) { return m.return_count; });
+  var ripOffMonths = ['01','02','11','12'];
+  var colors = monthly.map(function(m) {
+    var mm = m.month.split('-')[1];
+    return ripOffMonths.indexOf(mm) >= 0 ? '#DC2626' : '#a78bfa';
+  });
+
+  var h = '<div class="chart-wrap"><canvas id="ri-trend-chart"></canvas></div>';
+
+  // Seasonal averages table
+  if (seasonal.length) {
+    h += '<div style="font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Seasonal Averages</div>';
+    h += '<div class="table-scroll"><table class="ri-table"><thead><tr><th>Month</th><th class="num">Avg Returns</th><th class="num">Avg $</th><th></th></tr></thead><tbody>';
+    seasonal.forEach(function(s) {
+      var flag = s.is_rip_off_season ? '<span class="rip-off-tag">RIP-OFF SZN</span>' : '';
+      var cls = s.is_rip_off_season ? ' class="seasonal-flag"' : '';
+      h += '<tr><td' + cls + ' style="font-weight:600">' + esc(s.month) + flag + '</td>' +
+        '<td class="num">' + s.avg_monthly_returns + '</td>' +
+        '<td class="num">' + fmt$(s.avg_monthly_dollars) + '</td>' +
+        '<td></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  el.innerHTML = h;
+
+  // Render chart
+  var ctx = document.getElementById('ri-trend-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 3,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return ctx.parsed.y + ' returns'; }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1a1a1a' } }
+      }
+    }
+  });
+});
+
+// ─── 4. Make Heat Map ───
+riLoad('/return-intelligence/by-make', $('ri-make'), function(d, el) {
+  var rows = d.data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No data</div>'; return; }
+  var h = '<div class="table-scroll"><table class="ri-table"><thead><tr>' +
+    '<th>Make</th><th class="num">Returns</th><th class="num">$ Returned</th><th class="num">Sales</th><th class="num">Rate</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var cls = rateCls(r.return_rate_pct);
+    h += '<tr><td style="font-weight:600">' + esc(r.make) + '</td>' +
+      '<td class="num">' + fmtNum(r.return_count) + '</td>' +
+      '<td class="num" style="color:var(--r)">' + fmt$(r.return_dollars) + '</td>' +
+      '<td class="num" style="color:var(--tf)">' + fmtNum(r.sale_count) + '</td>' +
+      '<td class="num"><span class="rate-badge ' + cls + '">' + fmtPct(r.return_rate_pct) + '</span></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+});
+
+// ─── 5. Repeat Returners ───
+riLoad('/return-intelligence/repeat-returners', $('ri-returners'), function(d, el) {
+  var rows = d.data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No repeat returners (3+ returns) found.</div>'; return; }
+  var h = '<div class="table-scroll"><table class="ri-table"><thead><tr>' +
+    '<th>Buyer</th><th class="num">Returns</th><th class="num">$ Refunded</th><th class="num">Avg $</th><th>Top Types</th><th>Date Range</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var cls = countCls(r.return_count);
+    var types = (r.top_part_types || []).join(', ');
+    var range = (r.first_return || '?').substring(0, 10) + ' — ' + (r.last_return || '?').substring(0, 10);
+    h += '<tr><td style="font-weight:600">' + esc(r.buyer_username) + '</td>' +
+      '<td class="num ' + cls + '">' + r.return_count + '</td>' +
+      '<td class="num" style="color:var(--r)">' + fmt$(r.total_refunded) + '</td>' +
+      '<td class="num">' + fmt$(r.avg_return) + '</td>' +
+      '<td style="color:var(--tf);font-size:10px">' + esc(types) + '</td>' +
+      '<td style="color:var(--tf);font-size:10px">' + range + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+});
+
+// ─── 6. INAD Fee Tracker ───
+riLoad('/return-intelligence/inad', $('ri-inad'), function(d, el) {
+  // Overview stats
+  var h = '<div class="stat-row">' +
+    '<div class="stat-box"><div class="stat-value">' + fmtNum(d.total_returns) + '</div><div class="stat-label">Total Returns</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="color:var(--y)">' + fmtNum(d.inad_count) + '</div><div class="stat-label">INAD Flagged</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="color:var(--o)">' + fmtPct(d.inad_rate_pct) + '</div><div class="stat-label">INAD Rate</div></div>' +
+    '<div class="stat-box"><div class="stat-value" style="color:var(--r)">' + fmt$(d.total_inad_fees) + '</div><div class="stat-label">Total INAD Fees</div></div>' +
+    '</div>';
+
+  // Quarterly trend
+  var q = d.quarterly || [];
+  if (q.length) {
+    h += '<div style="font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Quarterly Trend</div>';
+    h += '<div class="table-scroll"><table class="ri-table"><thead><tr><th>Quarter</th><th class="num">Returns</th><th class="num">INAD</th><th class="num">INAD Rate</th><th class="num">INAD Fees</th></tr></thead><tbody>';
+    q.forEach(function(r) {
+      h += '<tr><td style="font-weight:600">' + esc(r.quarter) + '</td>' +
+        '<td class="num">' + fmtNum(r.total_returns) + '</td>' +
+        '<td class="num" style="color:var(--y)">' + fmtNum(r.inad_count) + '</td>' +
+        '<td class="num">' + fmtPct(r.inad_rate_pct) + '</td>' +
+        '<td class="num" style="color:var(--r)">' + fmt$(r.inad_fees) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  // By part type
+  var bp = d.by_part_type || [];
+  if (bp.length) {
+    h += '<div style="font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">INAD by Part Type</div>';
+    h += '<div class="table-scroll"><table class="ri-table"><thead><tr><th>Part Type</th><th class="num">INAD Count</th><th class="num">INAD Fees</th></tr></thead><tbody>';
+    bp.forEach(function(r) {
+      h += '<tr><td style="font-weight:600">' + esc(r.part_type) + '</td>' +
+        '<td class="num" style="color:var(--y)">' + fmtNum(r.inad_count) + '</td>' +
+        '<td class="num" style="color:var(--r)">' + fmt$(r.inad_fees) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  el.innerHTML = h;
+});
+
+// ─── 7. High-Value Alerts ───
+riLoad('/return-intelligence/high-value-alerts', $('ri-alerts'), function(d, el) {
+  var rows = d.data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No high-value / high-frequency combos found.</div>'; return; }
+  var h = '<div class="table-scroll"><table class="ri-table"><thead><tr>' +
+    '<th>Part Type</th><th>Make</th><th class="num">Returns</th><th class="num">Avg $</th><th class="num">Total $</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    h += '<tr class="alert-row"><td style="font-weight:700;color:var(--r)">' + esc(r.part_type) + '</td>' +
+      '<td style="font-weight:600">' + esc(r.make) + '</td>' +
+      '<td class="num count-red">' + r.return_count + '</td>' +
+      '<td class="num" style="color:var(--o)">' + fmt$(r.avg_return) + '</td>' +
+      '<td class="num" style="color:var(--r);font-weight:700">' + fmt$(r.return_dollars) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+});
+
+// ─── 8. Problem Parts ───
+riLoad('/return-intelligence/problem-parts', $('ri-problems'), function(d, el) {
+  var rows = d.data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No problem parts (3+ returns on same title) found.</div>'; return; }
+  var h = '<div class="table-scroll"><table class="ri-table"><thead><tr>' +
+    '<th>Title</th><th>Type</th><th>Make</th><th class="num">Returns</th><th class="num">$ Returned</th><th>Date Range</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var title = r.title || '';
+    if (title.length > 60) title = title.substring(0, 58) + '...';
+    var range = (r.first_return || '?').substring(0, 10) + ' — ' + (r.last_return || '?').substring(0, 10);
+    var cls = countCls(r.return_count);
+    h += '<tr><td style="font-weight:600;white-space:normal;min-width:180px" title="' + esc(r.title) + '">' + esc(title) + '</td>' +
+      '<td style="color:var(--tf)">' + esc(r.part_type) + '</td>' +
+      '<td style="color:var(--tf)">' + esc(r.make) + '</td>' +
+      '<td class="num ' + cls + '">' + r.return_count + '</td>' +
+      '<td class="num" style="color:var(--r)">' + fmt$(r.return_dollars) + '</td>' +
+      '<td style="color:var(--tf);font-size:10px">' + range + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+});
 </script>
 </body>
 </html>
