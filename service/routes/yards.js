@@ -133,6 +133,12 @@ router.post('/scrape/:id', async (req, res) => {
     scraper.scrapeYard(yard).catch(err => {
       log.error({ err }, `Carolina PNP scrape failed for ${yard.name}`);
     });
+  } else if (yard.chain === 'upullandsave') {
+    const UPullAndSaveScraper = require('../scrapers/UPullAndSaveScraper');
+    const scraper = new UPullAndSaveScraper();
+    scraper.scrapeYard(yard).catch(err => {
+      log.error({ err }, `U Pull & Save scrape failed for ${yard.name}`);
+    });
   }
 
   res.json({ message: `Scrape started for ${yard.name}` });
