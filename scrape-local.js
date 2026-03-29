@@ -240,6 +240,64 @@ async function decodeVins() {
   console.log(`  Done: ${decoded} decoded, ${cached} cached, ${errors} errors`);
 }
 
+// ── FLYWAY HOOK ────────────────────────────────────────
+// After core scrape, check for active Flyway trip yards
+
+async function scrapeFlywayYards(coreYardNames) {
+  console.log('\n━━━ FLYWAY CHECK ━━━');
+  try {
+    const res = await axios.get('https://parthawk-production.up.railway.app/flyway/active-yards', { timeout: 10000 });
+    const yards = res.data || [];
+
+    if (!Array.isArray(yards) || yards.length === 0) {
+      console.log('  No active Flyway trip yards');
+      return;
+    }
+
+    // Only LKQ yards (scrape-local.js can only parse LKQ HTML)
+    const lkqYards = yards.filter(y =>
+      ((y.chain || '').toUpperCase().includes('LKQ')) ||
+      ((y.scrape_method || '').toLowerCase() === 'lkq')
+    );
+
+    // Skip already-scraped core yards
+    const extraYards = lkqYards.filter(y => !coreYardNames.includes(y.name));
+
+    if (extraYards.length === 0) {
+      console.log('  No additional LKQ yards to scrape');
+      return;
+    }
+
+    console.log(`  Scraping ${extraYards.length} Flyway yards: ${extraYards.map(y => y.name).join(', ')}`);
+
+    for (const yard of extraYards) {
+      if (!yard.scrape_url) { console.log(`  ${yard.name}: no scrape_url, skipping`); continue; }
+
+      // Extract slug from pyp.com URL: https://www.pyp.com/inventory/{slug}/ → slug
+      const slugMatch = yard.scrape_url.match(/pyp\.com\/inventory\/([^\/]+)/);
+      if (!slugMatch) { console.log(`  ${yard.name}: can't extract slug from ${yard.scrape_url}, skipping`); continue; }
+      const slug = slugMatch[1];
+
+      try {
+        console.log(`\n━━━ [FLYWAY] ${yard.name} ━━━`);
+        const newVehicles = await scrapePages(slug, yard.id);
+        await saveYard({ name: yard.name, slug }, newVehicles, yard.id);
+
+        await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
+          .update({ last_seen: new Date(), updatedAt: new Date() });
+      } catch (err) {
+        console.error(`  [FLYWAY] Failed ${yard.name}: ${err.message.substring(0, 80)}`);
+      }
+    }
+  } catch (err) {
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+      console.log('  Flyway endpoint unreachable, skipping');
+    } else {
+      console.log(`  Flyway hook error: ${err.message.substring(0, 80)}`);
+    }
+  }
+}
+
 // ── MAIN ────────────────────────────────────────────────
 
 function parseFloat2(s) { const n = parseFloat(s); return isNaN(n) ? null : n; }
@@ -270,6 +328,10 @@ async function main() {
       console.error(`  YARD ERROR [${loc.name}]: ${e.message.substring(0, 100)}`);
     }
   }
+
+  // === FLYWAY HOOK: scrape active trip yards ===
+  const coreYardNames = LOCATIONS.map(l => l.name);
+  await scrapeFlywayYards(coreYardNames);
 
   await decodeVins();
 

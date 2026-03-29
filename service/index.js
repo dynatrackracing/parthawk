@@ -739,6 +739,7 @@ app.get('/api/market-price/status', async (req, res) => {
 });
 
 app.use('/return-intelligence', require('./routes/return-intelligence'));
+app.use('/flyway', require('./routes/flyway'));
 
 // ═══ SPA CATCH-ALL — MUST BE LAST ═══
 // All API routes are registered above this point.
@@ -896,6 +897,14 @@ async function start() {
           log.warn({ err: e.message }, 'Scout alert startup generation failed');
         }
       }, 10000); // delay 10s to let migrations finish
+    } catch (e) { /* ignore */ }
+
+    // Auto-complete expired flyway trips
+    try {
+      const FlywayService = require('./services/FlywayService');
+      FlywayService.autoCompleteExpiredTrips()
+        .then(count => { if (count > 0) log.info({ count }, 'Flyway: auto-completed expired trips'); })
+        .catch(err => log.warn({ err: err.message }, 'Flyway: auto-complete error'));
     } catch (e) { /* ignore */ }
 
     // LKQ scraping runs locally via Task Scheduler — CloudFlare blocks Railway
