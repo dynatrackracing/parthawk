@@ -387,6 +387,15 @@
   // Strips letter+digit codes (DS1, DS6, WK2, LA1, RT1) and known platform-only letter codes (JK, JL, JT, WK, XK, MK, KJ, KL, DJ, DT, DH, BK, WJ, ZJ, TJ, ND, WD, PF, UF, FK)
   // Preserves real trims: LX, SXT, SRT, GT, SE, LE, XLE, LTZ, etc.
   const LKQ_PLATFORM_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH']);
+  // Clean model name: strip LKQ codes + remove duplicate words (e.g. "350 350") + BMW SA codes
+  function cleanModel(text) {
+    if (!text) return text;
+    var cleaned = stripLKQCodes(text);
+    // Remove duplicate consecutive words (case-insensitive): "350 350" → "350"
+    cleaned = cleaned.replace(/\b(\w+)\s+\1\b/gi, '$1');
+    return cleaned;
+  }
+
   function stripLKQCodes(text) {
     if (!text) return text;
     return text
@@ -590,7 +599,7 @@
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
-          <div class="v-title">${v.year} ${v.make} ${stripLKQCodes(v.model)}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + stripLKQCodes(v.trim) : '')}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'red' ? '#ef4444' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
+          <div class="v-title">${v.year} ${v.make} ${cleanModel(v.model)}${v.trim_level ? ' ' + v.trim_level : (v.trim ? ' ' + stripLKQCodes(v.trim) : '')}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'red' ? '#ef4444' : v.trimBadge.color === 'orange' ? '#f97316' : '#f59e0b'};color:${v.trimBadge.color === 'yellow' ? '#000' : '#fff'}" title="${v.trimBadge.decodedTrim || ''}">${v.trimBadge.label}</span>` : ''}${v.cult ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#fff">CULT</span>' : ''}${v.engine ? ' ' + v.engine : ''}${v.engine_type && v.engine_type !== 'Gas' ? ' ' + v.engine_type.toUpperCase() : ''}${v.drivetrain ? ' ' + v.drivetrain : ''} ${aBadge}${goneLabel}</div>
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
@@ -621,6 +630,12 @@
     let html = '';
 
     // Show platform siblings if any
+    if (v.expected_parts) {
+      html += `<div style="padding:8px 0;font-size:11px;color:#9CA3AF;border-bottom:1px solid var(--border);">
+        <span style="color:#a78bfa;font-weight:600;">EXPECTED:</span> ${v.expected_parts}${v.audio_brand ? ' · <span style="color:#f59e0b">🔊 ' + v.audio_brand + '</span>' : ''}
+      </div>`;
+    }
+
     if (v.platform_siblings && v.platform_siblings.length > 0) {
       html += `<div style="padding:8px 0;font-size:11px;color:#9CA3AF;border-bottom:1px solid var(--border);">
         <span style="color:var(--yellow);font-weight:600;">PLATFORM:</span> Also fits ${v.platform_siblings.join(', ')}

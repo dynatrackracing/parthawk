@@ -15,6 +15,7 @@ const knex = require('knex');
 const axios = require('axios').default;
 const path = require('path');
 const { getTrimTier } = require('./service/config/trim-tier-config');
+const TrimTierService = require('./service/services/TrimTierService');
 
 try { require('dotenv').config({ path: path.resolve(__dirname, '.env') }); } catch (e) {}
 
@@ -61,9 +62,15 @@ async function decodeBatch(vins) {
 }
 
 async function lookupTrimTier(year, make, model, trimName) {
-  if (!trimName) return null;
+  if (!trimName) return { tier: null, extra: null };
 
-  // Try trim_catalog first (has eBay-sourced data with body style stripped)
+  // TIER 1: trim_tier_reference (1,049-row curated table — most accurate)
+  try {
+    const ref = await TrimTierService.lookup(year, make, model, trimName);
+    if (ref) return { tier: ref.tierString, extra: ref };
+  } catch (e) {}
+
+  // TIER 2: trim_catalog (eBay Taxonomy API data)
   try {
     const match = await db('trim_catalog')
       .where('year', year)
@@ -71,10 +78,8 @@ async function lookupTrimTier(year, make, model, trimName) {
       .whereRaw('LOWER(model) = ?', [model.toLowerCase()])
       .whereRaw('LOWER(trim_name) = ?', [trimName.toLowerCase()])
       .first();
+    if (match) return { tier: match.tier, extra: null };
 
-    if (match) return match.tier;
-
-    // Try partial match - first word of decoded trim
     const firstWord = trimName.split(/\s+/)[0];
     if (firstWord && firstWord.length >= 2) {
       const partial = await db('trim_catalog')
@@ -83,15 +88,13 @@ async function lookupTrimTier(year, make, model, trimName) {
         .whereRaw('LOWER(model) = ?', [model.toLowerCase()])
         .whereRaw('LOWER(trim_name) LIKE ?', [firstWord.toLowerCase() + '%'])
         .first();
-      if (partial) return partial.tier;
+      if (partial) return { tier: partial.tier, extra: null };
     }
-  } catch (e) {
-    // trim_catalog may not exist yet
-  }
+  } catch (e) {}
 
-  // Fall back to static config
+  // TIER 3: Static config fallback
   const result = getTrimTier(make, trimName);
-  return result.tier;
+  return { tier: result.tier, extra: null };
 }
 
 async function main() {
@@ -164,23 +167,38 @@ async function main() {
 
       // Look up trim tier
       let trimTier = null;
+      let audioBrand = null;
+      let expectedParts = null;
+      let cult = false;
       if (decodedTrim) {
         const make = titleCase(row.make || r.Make || '');
         const model = titleCase(row.model || r.Model || '');
         const year = parseInt(r.ModelYear || row.year) || 0;
-        trimTier = await lookupTrimTier(year, make, model, decodedTrim);
+        const result = await lookupTrimTier(year, make, model, decodedTrim);
+        trimTier = result.tier;
+        if (result.extra) {
+          audioBrand = result.extra.audioBrand;
+          expectedParts = result.extra.expectedParts;
+          cult = result.extra.cult;
+        }
         withTrim++;
       } else {
         noTrim++;
       }
 
-      await db('yard_vehicle').where('id', row.id).update({
+      const updateData = {
         decoded_trim: decodedTrim,
         decoded_engine: decodedEngine,
         decoded_drivetrain: decodedDrivetrain,
         trim_tier: trimTier,
         vin_decoded_at: new Date(),
-      });
+      };
+      // Add new columns if they exist on the table
+      try { updateData.audio_brand = audioBrand; } catch (e) {}
+      try { updateData.expected_parts = expectedParts; } catch (e) {}
+      try { updateData.cult = cult; } catch (e) {}
+
+      await db('yard_vehicle').where('id', row.id).update(updateData);
 
       totalDecoded++;
     }

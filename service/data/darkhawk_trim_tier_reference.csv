@@ -1,0 +1,1050 @@
+make,model,gen_start,gen_end,trim,tier,tier_name,top_engine,audio_brand,expected_parts,notes,cult
+Dodge,Ram 1500,2002,2008,ST,1,base,3.7L V6,,,Base work truck,
+Dodge,Ram 1500,2002,2008,SLT,2,mid,4.7L V8,Infinity,Infinity amp if equipped,Most common trim at yards,
+Dodge,Ram 1500,2002,2008,Laramie,3,premium,5.7L HEMI,Infinity,"Infinity amp, heated seats, power seats, auto-dim mirror",HEMI is the money engine,
+Dodge,Ram 1500,2002,2008,SRT-10,4,performance,8.3L V10,Infinity,"Infinity amp, Viper V10 ECM, performance modules",Rare - Viper engine swap truck,
+Ram,1500,2009,2018,Tradesman,1,base,3.6L V6,,,Fleet/work truck. Sometimes called ST pre-2013,
+Ram,1500,2009,2018,Express,1,base,5.7L HEMI,,,"Appearance pkg on base, HEMI available but no premium modules",
+Ram,1500,2009,2018,SLT,2,mid,5.7L HEMI,,"Power seats possible, basic cluster",Volume trim. HEMI common.,
+Ram,1500,2009,2018,Big Horn,2,mid,5.7L HEMI,,"Power seats, chrome trim, upgraded cluster",Also called Lone Star in TX. Same trim.,
+Ram,1500,2009,2018,Lone Star,2,mid,5.7L HEMI,,"Power seats, chrome trim, upgraded cluster",Texas-market name for Big Horn,
+Ram,1500,2009,2018,Sport,2,mid,5.7L HEMI,Alpine,"Alpine amp (if equipped), sport hood, R/T badge pre-2013",Appearance-focused but can have Alpine,
+Ram,1500,2009,2018,Laramie,3,premium,5.7L HEMI,Alpine,"Alpine 9-speaker amp, heated/cooled seats, heated steering wheel, power folding mirrors, auto-dim mirror, park assist",First reliably premium trim,
+Ram,1500,2009,2018,Laramie Longhorn,3,premium,5.7L HEMI,Alpine,"Alpine amp, heated/cooled seats, heated steering wheel, ventilated seats, nav, premium cluster, 360 camera (late), power running boards",Longhorn = western luxury,
+Ram,1500,2009,2018,Limited,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon 19-speaker amp, heated/cooled seats, heated steering wheel, air suspension, power running boards, 360 camera, adaptive cruise",Top trim. HK audio is distinctive.,
+Ram,1500,2009,2018,Rebel,2,mid,5.7L HEMI,,"Off-road suspension, Bilstein shocks, skid plates","Off-road focused, not premium audio",
+Ram,1500,2009,2018,Night,2,mid,5.7L HEMI,,"Blacked out trim, sport hood","Appearance package, not premium",
+Ram,1500,2019,2025,Tradesman,1,base,3.6L V6,,,"Base work truck, eTorque mild hybrid available",
+Ram,1500,2019,2025,Big Horn,2,mid,5.7L HEMI,,"Power seats, 8.4in Uconnect, blind spot monitoring possible",Volume seller,
+Ram,1500,2019,2025,Lone Star,2,mid,5.7L HEMI,,"Power seats, 8.4in Uconnect",TX Big Horn,
+Ram,1500,2019,2025,Rebel,2,mid,5.7L HEMI,,"Off-road suspension, skid plates, 12in Uconnect possible",Off-road. Can have big screen.,
+Ram,1500,2019,2025,Laramie,3,premium,5.7L HEMI,Alpine,"Alpine amp, heated/cooled seats, heated steering wheel, 12in Uconnect, blind spot, park assist, power tailgate",First solid premium trim,
+Ram,1500,2019,2025,Laramie Longhorn,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon 19-speaker amp, heated/cooled seats, air suspension, head-up display, 360 camera, power running boards, 12in Uconnect",Full luxury,
+Ram,1500,2019,2025,Limited,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon 19-speaker amp, heated/cooled seats, air suspension, head-up display, 360 camera, power running boards, adaptive cruise, night vision (late)",Flagship trim,
+Ram,1500,2019,2025,TRX,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, Bilstein shocks, transfer case, unique TIPM, launch control module",Hellcat engine truck. Rare and valuable.,
+Ram,1500,2019,2025,REV,3,premium,EV Dual Motor,Harman Kardon,"Harman Kardon amp, EV-specific modules, battery management, 14.5in Uconnect",Electric. Different module ecosystem entirely.,
+Ram,2500,2010,2018,Tradesman,1,base,5.7L HEMI,,,Work truck,
+Ram,2500,2010,2018,SLT,2,mid,6.4L HEMI,,Power seats possible,Volume trim for HD,
+Ram,2500,2010,2018,Laramie,3,premium,6.7L Cummins,Alpine,"Alpine amp, heated/cooled seats, heated steering wheel, park assist",Cummins is the money engine for HD,
+Ram,2500,2010,2018,Laramie Longhorn,3,premium,6.7L Cummins,Alpine,"Alpine amp, heated/cooled seats, power running boards, nav",Western luxury HD,
+Ram,2500,2010,2018,Limited,3,premium,6.7L Cummins,Alpine,"Alpine amp, heated/cooled seats, adaptive cruise, air suspension rear",Top trim HD,
+Ram,2500,2010,2018,Power Wagon,2,mid,6.4L HEMI,,"Disconnecting sway bar, Warn winch, locking diffs","Off-road focused, not luxury",
+Ram,2500,2019,2025,Tradesman,1,base,6.4L HEMI,,,Work truck,
+Ram,2500,2019,2025,Big Horn,2,mid,6.4L HEMI,,"Power seats, 8.4in Uconnect",,
+Ram,2500,2019,2025,Laramie,3,premium,6.7L Cummins,Alpine,"Alpine amp, heated/cooled seats, 12in Uconnect, park assist",,
+Ram,2500,2019,2025,Limited,3,premium,6.7L Cummins,Harman Kardon,"Harman Kardon amp, heated/cooled seats, air suspension, 360 camera, adaptive cruise",,
+Ram,2500,2019,2025,Power Wagon,2,mid,6.4L HEMI,,"Warn winch, disconnecting sway bar, locking diffs, Bilstein shocks","HEMI only, no Cummins option",
+Dodge,Charger,2006,2010,SE,1,base,2.7L V6,,,Base. 2.7L is junk engine.,
+Dodge,Charger,2006,2010,SXT,2,mid,3.5L V6,,"Power seats, basic premium",3.5L better than 2.7L,
+Dodge,Charger,2006,2010,R/T,3,premium,5.7L HEMI,Infinity,"Infinity amp, HEMI ECM, heated seats possible",HEMI makes this premium,
+Dodge,Charger,2006,2010,SRT-8,4,performance,6.1L HEMI,Kicker,"Kicker amp, SRT ECM, Brembo brakes, SRT suspension",Performance flagship,
+Dodge,Charger,2011,2023,SE,1,base,3.6L V6,,,Base Pentastar,
+Dodge,Charger,2011,2023,SXT,2,mid,3.6L V6,,"Power seats, 8.4in Uconnect possible",Volume trim,
+Dodge,Charger,2011,2023,R/T,3,premium,5.7L HEMI,Alpine,"Alpine amp (if equipped), HEMI ECM, heated seats, performance pages",,
+Dodge,Charger,2011,2023,Scat Pack,3,premium,6.4L HEMI,Alpine,"Alpine amp (if equipped), 392 ECM, Brembo brakes, performance pages, launch control",392 HEMI. Big value ECM.,
+Dodge,Charger,2011,2023,SRT 392,4,performance,6.4L HEMI,Harman Kardon,"Harman Kardon amp, SRT ECM, Brembo brakes, adaptive suspension, SRT drive modes",,
+Dodge,Charger,2011,2023,Hellcat,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, unique TIPM, adaptive suspension, launch control",Supercharged. Very valuable ECM.,
+Dodge,Charger,2011,2023,Hellcat Redeye,4,performance,6.2L Supercharged HEMI (797hp),Harman Kardon,"Harman Kardon amp, supercharged ECM, unique TIPM, widebody fenders",Higher output supercharger,
+Dodge,Charger,2011,2023,Jailbreak,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, custom mix of SRT options",Last Call special edition,
+Dodge,Challenger,2008,2014,SXT,2,mid,3.6L V6,,"Power seats, basic Uconnect",,
+Dodge,Challenger,2008,2014,R/T,3,premium,5.7L HEMI,Alpine,"Alpine amp possible, HEMI ECM, heated seats possible",,
+Dodge,Challenger,2008,2014,SRT-8,4,performance,6.4L HEMI,Harman Kardon,"Harman Kardon amp, SRT ECM, Brembo brakes, adaptive suspension",,
+Dodge,Challenger,2015,2023,SXT,2,mid,3.6L V6,,"Power seats, 8.4in Uconnect",,
+Dodge,Challenger,2015,2023,R/T,3,premium,5.7L HEMI,Alpine,"Alpine amp possible, HEMI ECM",,
+Dodge,Challenger,2015,2023,R/T Scat Pack,3,premium,6.4L HEMI,Alpine,"Alpine amp, 392 ECM, Brembo brakes, launch control",,
+Dodge,Challenger,2015,2023,SRT Hellcat,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, unique TIPM, adaptive dampers",,
+Dodge,Challenger,2015,2023,SRT Demon,4,performance,6.2L Supercharged HEMI (840hp),Harman Kardon,"Harman Kardon amp, demon ECM, transbrake, torque reserve, drag mode",Ultra rare. Deleted passenger seat/radio optional.,
+Dodge,Durango,2011,2025,SXT,1,base,3.6L V6,,,Base family SUV,
+Dodge,Durango,2011,2025,GT,2,mid,3.6L V6,,"Power liftgate, heated seats, 8.4in Uconnect",,
+Dodge,Durango,2011,2025,Citadel,3,premium,5.7L HEMI,Alpine,"Alpine amp, heated/cooled seats, nav, power liftgate, park assist, premium cluster",Luxury Durango,
+Dodge,Durango,2011,2025,R/T,3,premium,5.7L HEMI,Alpine,"Alpine amp (if equipped), HEMI ECM, sport suspension, heated seats",,
+Dodge,Durango,2011,2025,SRT,4,performance,6.4L HEMI,Harman Kardon,"Harman Kardon amp, SRT ECM, Brembo brakes, adaptive suspension, launch control",2018+,
+Dodge,Durango,2011,2025,SRT Hellcat,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, Brembo, adaptive suspension",2021 only. Ultra rare.,
+Ford,F-150,2004,2008,XL,1,base,4.2L V6,,,Fleet/work,
+Ford,F-150,2004,2008,STX,1,base,4.6L V8,,,Sport appearance base,
+Ford,F-150,2004,2008,XLT,2,mid,5.4L V8,,"Power seats possible, cruise",Volume trim,
+Ford,F-150,2004,2008,Lariat,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated seats, power seats, moonroof possible",,
+Ford,F-150,2004,2008,King Ranch,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated/cooled seats, nav, premium leather",King Ranch leather is distinctive,
+Ford,F-150,2004,2008,Harley-Davidson,3,premium,5.4L V8 Supercharged,Audiophile,"Audiophile amp, supercharged ECM (if equipped), heated seats",Some had supercharged 5.4L,
+Ford,F-150,2009,2014,XL,1,base,3.7L V6,,,Fleet/work,
+Ford,F-150,2009,2014,STX,1,base,5.0L V8,,,"Sport appearance, V8 available",
+Ford,F-150,2009,2014,XLT,2,mid,5.0L V8,,"SYNC, power seats possible",Volume trim. 3.5L EcoBoost from 2011.,
+Ford,F-150,2009,2014,FX4,2,mid,3.5L EcoBoost,,"Off-road pkg, SYNC, power seats",FX2/FX4 discontinued after 2014,
+Ford,F-150,2009,2014,Lariat,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, SYNC with nav, power folding mirrors, rear camera",EcoBoost is the money engine from 2011+,
+Ford,F-150,2009,2014,King Ranch,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, nav, power running boards, tailgate step",,
+Ford,F-150,2009,2014,Platinum,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, massaging seats, power running boards, adaptive cruise",Top luxury trim,
+Ford,F-150,2009,2014,Limited,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, massaging seats, power running boards, 360 camera",2013+ only,
+Ford,F-150,2009,2014,SVT Raptor,4,performance,6.2L V8,Sony,"Sony amp, Raptor-specific ECM, Fox shocks, unique transfer case, Torsen front diff",6.2L V8. Very valuable parts.,
+Ford,F-150,2015,2020,XL,1,base,3.3L V6,,,Aluminum body starts here,
+Ford,F-150,2015,2020,XLT,2,mid,2.7L EcoBoost,,"SYNC 3, power seats possible",Volume trim,
+Ford,F-150,2015,2020,Lariat,3,premium,3.5L EcoBoost,B&O,"B&O Play amp, heated/cooled seats, SYNC 3 with nav, blind spot, lane keep, power tailgate",B&O system from 2016+,
+Ford,F-150,2015,2020,King Ranch,3,premium,3.5L EcoBoost,B&O,"B&O amp, heated/cooled seats, adaptive cruise, 360 camera, power running boards, massage seats",,
+Ford,F-150,2015,2020,Platinum,3,premium,3.5L EcoBoost,B&O,"B&O amp, heated/cooled seats, adaptive cruise, 360 camera, power running boards, head-up display, massage seats",,
+Ford,F-150,2015,2020,Limited,3,premium,3.5L EcoBoost HO,B&O,"B&O amp, all Platinum features plus 3.5L HO ECM, 22in wheels",450hp 3.5L HO from 2019,
+Ford,F-150,2015,2020,Raptor,4,performance,3.5L EcoBoost HO,B&O,"B&O amp, Raptor ECM, Fox Live Valve shocks (2019+), Torsen front diff, unique transfer case, Raptor-specific TIPM",Twin-turbo 3.5L. Most valuable F-150 parts.,
+Ford,F-150,2021,2025,XL,1,base,3.3L V6,,,,
+Ford,F-150,2021,2025,XLT,2,mid,2.7L EcoBoost,,"SYNC 4, power seats possible, Co-Pilot360",,
+Ford,F-150,2021,2025,Lariat,3,premium,3.5L EcoBoost,B&O,"B&O amp, heated/cooled seats, SYNC 4, 12in screen, BlueCruise ready, 360 camera, power tailgate",,
+Ford,F-150,2021,2025,King Ranch,3,premium,3.5L EcoBoost,B&O,"B&O 18-speaker amp, heated/cooled seats, massage seats, adaptive cruise, 360 camera",,
+Ford,F-150,2021,2025,Platinum,3,premium,3.5L EcoBoost,B&O Unleashed,"B&O Unleashed amp, heated/cooled/massage seats, head-up display, BlueCruise, 360 camera, Max Recline seats",,
+Ford,F-150,2021,2025,Limited,3,premium,3.5L EcoBoost HO,B&O Unleashed,"B&O Unleashed amp, all Platinum features, HO ECM, 22in wheels",,
+Ford,F-150,2021,2025,Raptor,4,performance,3.5L EcoBoost HO,B&O,"B&O amp, Raptor ECM, Fox Live Valve shocks, unique transfer case, Torsen front diff, EPAS rack",,
+Ford,F-150,2021,2025,Raptor R,4,performance,5.2L Supercharged V8,B&O Unleashed,"B&O amp, supercharged Predator ECM, Fox shocks, unique everything",Shelby GT500 engine in a truck. Ultra rare.,
+Ford,F-150,2021,2025,Lightning,3,premium,Dual Electric Motors,B&O,"B&O amp, EV-specific modules, battery management, mega power frunk, Pro Power Onboard",Electric F-150. Different module ecosystem.,
+Ford,Explorer,2011,2019,Base,1,base,3.5L V6,,,,
+Ford,Explorer,2011,2019,XLT,2,mid,3.5L V6,,"SYNC, power liftgate, rear camera",,
+Ford,Explorer,2011,2019,Limited,3,premium,3.5L V6,Sony,"Sony amp, heated/cooled seats, nav, power liftgate, park assist, blind spot",,
+Ford,Explorer,2011,2019,Sport,3,premium,3.5L EcoBoost,Sony,"Sony amp, EcoBoost ECM, sport suspension, heated seats",365hp EcoBoost,
+Ford,Explorer,2011,2019,Platinum,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, massage seats, adaptive cruise, 360 camera",2016+,
+Ford,Explorer,2020,2025,Base,1,base,2.3L EcoBoost,,,RWD-based platform now,
+Ford,Explorer,2020,2025,XLT,2,mid,2.3L EcoBoost,,"SYNC 3, Co-Pilot360",,
+Ford,Explorer,2020,2025,Limited,3,premium,2.3L EcoBoost,B&O,"B&O amp, heated/cooled seats, SYNC 3/4, park assist, blind spot",,
+Ford,Explorer,2020,2025,ST,4,performance,3.0L EcoBoost V6,B&O,"B&O amp, ST ECM, sport suspension, sport brakes, heated/cooled seats",400hp twin-turbo V6,
+Ford,Explorer,2020,2025,Platinum,3,premium,3.0L EcoBoost V6,B&O,"B&O amp, heated/cooled/massage seats, 360 camera, adaptive cruise, head-up display",,
+Ford,Explorer,2020,2025,Timberline,2,mid,2.3L EcoBoost,,"Off-road suspension, skid plates, all-terrain tires","Off-road, not luxury",
+Ford,Escape,2013,2019,S,1,base,2.5L I4,,,,
+Ford,Escape,2013,2019,SE,2,mid,1.6L EcoBoost,,"SYNC, power seats possible",,
+Ford,Escape,2013,2019,Titanium,3,premium,2.0L EcoBoost,Sony,"Sony amp, heated seats, nav, power liftgate, park assist, blind spot",,
+Ford,Edge,2015,2024,SE,1,base,2.0L EcoBoost,,,,
+Ford,Edge,2015,2024,SEL,2,mid,2.0L EcoBoost,,"SYNC 3, power liftgate",,
+Ford,Edge,2015,2024,Titanium,3,premium,2.0L EcoBoost,B&O,"B&O amp, heated/cooled seats, nav, park assist, blind spot",,
+Ford,Edge,2015,2024,ST,4,performance,2.7L EcoBoost V6,B&O,"B&O amp, ST ECM, sport suspension, sport brakes, heated/cooled seats",335hp twin-turbo,
+Ford,Mustang,2005,2009,V6,1,base,4.0L V6,,,,
+Ford,Mustang,2005,2009,GT,3,premium,4.6L V8,Shaker,"Shaker 500/1000 amp, GT ECM, Brembo brakes (Bullitt)",,
+Ford,Mustang,2005,2009,Shelby GT500,4,performance,5.4L Supercharged V8,Shaker,"Shaker 1000 amp, supercharged ECM, Tremec 6-speed, Brembo brakes",,
+Ford,Mustang,2010,2014,V6,1,base,3.7L V6,,,305hp V6 actually decent,
+Ford,Mustang,2010,2014,GT,3,premium,5.0L Coyote V8,Shaker,"Shaker amp, Coyote ECM, Brembo brakes possible, SYNC",5.0L Coyote starts here,
+Ford,Mustang,2010,2014,Shelby GT500,4,performance,5.8L Supercharged V8,Shaker,"Shaker amp, supercharged ECM, Tremec 6-speed, Brembo brakes, unique cooling",662hp,
+Ford,Mustang,2015,2023,EcoBoost,2,mid,2.3L EcoBoost,,"SYNC 3, performance pkg available",,
+Ford,Mustang,2015,2023,GT,3,premium,5.0L Coyote V8,B&O,"B&O amp (if equipped), Coyote ECM, MagneRide possible, Brembo brakes (PP)",,
+Ford,Mustang,2015,2023,Shelby GT350,4,performance,5.2L Flat-Plane V8,B&O,"B&O amp, Voodoo ECM, MagneRide, Brembo brakes, Tremec 6-speed",Flat-plane crank. Unique engine.,
+Ford,Mustang,2015,2023,Shelby GT500,4,performance,5.2L Supercharged V8,B&O,"B&O amp, Predator ECM, DCT transmission module, MagneRide, carbon fiber",760hp. Predator engine.,
+Ford,Expedition,2018,2025,XLT,2,mid,3.5L EcoBoost,,"SYNC 3, power liftgate, Co-Pilot360",,
+Ford,Expedition,2018,2025,Limited,3,premium,3.5L EcoBoost,B&O,"B&O amp, heated/cooled seats, adaptive cruise, 360 camera",,
+Ford,Expedition,2018,2025,King Ranch,3,premium,3.5L EcoBoost,B&O,"B&O amp, heated/cooled seats, massage seats, adaptive cruise, 360 camera",,
+Ford,Expedition,2018,2025,Platinum,3,premium,3.5L EcoBoost HO,B&O,"B&O amp, heated/cooled/massage seats, head-up display, rear entertainment, power running boards",,
+Ford,Expedition,2018,2025,Timberline,2,mid,3.5L EcoBoost,,"Off-road suspension, skid plates, all-terrain tires",,
+Chevrolet,Silverado 1500,2007,2013,WT,1,base,4.3L V6,,,Work truck,
+Chevrolet,Silverado 1500,2007,2013,LS,1,base,4.8L V8,,,,
+Chevrolet,Silverado 1500,2007,2013,LT,2,mid,5.3L V8,,"Power seats, OnStar, basic cluster",Volume trim. 5.3L most common.,
+Chevrolet,Silverado 1500,2007,2013,LTZ,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav, power pedals, auto-dim mirror, park assist",,
+GMC,Sierra 1500,2007,2013,SLE,2,mid,5.3L V8,,"Power seats, OnStar",GMC equivalent of LT,
+GMC,Sierra 1500,2007,2013,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav, park assist",GMC equivalent of LTZ,
+GMC,Sierra 1500,2007,2013,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, nav, magnetic ride (late), power running boards, 360 camera",6.2L is the money engine,
+Chevrolet,Silverado 1500,2014,2018,WT,1,base,4.3L V6,,,,
+Chevrolet,Silverado 1500,2014,2018,LS,1,base,5.3L V8,,,,
+Chevrolet,Silverado 1500,2014,2018,LT,2,mid,5.3L V8,,"MyLink 8in, power seats, rear camera",,
+Chevrolet,Silverado 1500,2014,2018,LTZ,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, wireless charging (late), lane keep, park assist, power liftgate (late)",,
+Chevrolet,Silverado 1500,2014,2018,High Country,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, nav, power running boards, head-up display, adaptive cruise",Top trim. 6.2L + 8-speed.,
+GMC,Sierra 1500,2014,2018,SLE,2,mid,5.3L V8,,"IntelliLink, power seats",,
+GMC,Sierra 1500,2014,2018,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav, park assist",,
+GMC,Sierra 1500,2014,2018,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, magnetic ride, power running boards, head-up display, adaptive cruise, 360 camera",,
+Chevrolet,Silverado 1500,2019,2025,WT,1,base,2.7L Turbo,,,,
+Chevrolet,Silverado 1500,2019,2025,Custom,1,base,5.3L V8,,,Appearance pkg on base,
+Chevrolet,Silverado 1500,2019,2025,LT,2,mid,5.3L V8,,"Infotainment 8in, power seats",,
+Chevrolet,Silverado 1500,2019,2025,RST,2,mid,5.3L V8,,"Sport appearance, 20in wheels, possible Bose",Can option up significantly,
+Chevrolet,Silverado 1500,2019,2025,LT Trail Boss,2,mid,5.3L V8,,"Off-road suspension, skid plates, Z71 pkg",,
+Chevrolet,Silverado 1500,2019,2025,LTZ,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, wireless charging, park assist, power tailgate",,
+Chevrolet,Silverado 1500,2019,2025,High Country,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, head-up display, adaptive cruise, 360 camera, power running boards, magnetic ride",,
+Chevrolet,Silverado 1500,2019,2025,ZR2,4,performance,6.2L V8,Bose,"Bose amp, 6.2L ECM, Multimatic DSSV shocks, front/rear e-lockers, unique transfer case",2022+. Off-road flagship.,
+GMC,Sierra 1500,2019,2025,SLE,2,mid,5.3L V8,,"Infotainment, power seats",,
+GMC,Sierra 1500,2019,2025,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, park assist",,
+GMC,Sierra 1500,2019,2025,AT4,2,mid,5.3L V8,,"Off-road suspension, skid plates, Rancho shocks",Off-road focused. Can have Bose.,
+GMC,Sierra 1500,2019,2025,AT4X,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, Multimatic DSSV shocks, e-lockers, adaptive cruise",2023+. Off-road luxury.,
+GMC,Sierra 1500,2019,2025,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, magnetic ride, head-up display, adaptive cruise, 360 camera, power running boards, CarbonPro bed (Ultimate)",,
+GMC,Sierra 1500,2019,2025,Denali Ultimate,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, 16.8in display, Super Cruise, AKG studio audio (2024+), CarbonPro bed, massage seats",Top of the line. AKG audio 2024+.,
+Chevrolet,Tahoe,2007,2014,LS,1,base,5.3L V8,,,,
+Chevrolet,Tahoe,2007,2014,LT,2,mid,5.3L V8,Bose,"Bose amp possible, heated seats, rear entertainment possible, power liftgate",,
+Chevrolet,Tahoe,2007,2014,LTZ,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav, power liftgate, park assist, blind spot",,
+GMC,Yukon,2007,2014,SLE,2,mid,5.3L V8,,"Power seats, rear entertainment possible",,
+GMC,Yukon,2007,2014,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav",,
+GMC,Yukon,2007,2014,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, nav, magnetic ride, power running boards, 360 camera",,
+Chevrolet,Tahoe,2015,2020,LS,1,base,5.3L V8,,,,
+Chevrolet,Tahoe,2015,2020,LT,2,mid,5.3L V8,Bose,"Bose amp possible, heated seats, MyLink 8in, rear camera",,
+Chevrolet,Tahoe,2015,2020,Premier,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, wireless charging, adaptive cruise, 360 camera, magnetic ride",2018+ replaces LTZ,
+Chevrolet,Tahoe,2015,2020,RST,2,mid,6.2L V8,Bose,"Bose amp possible, 6.2L ECM, sport appearance, 22in wheels",2018+ performance appearance,
+GMC,Yukon,2015,2020,SLE,2,mid,5.3L V8,,,,
+GMC,Yukon,2015,2020,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, nav",,
+GMC,Yukon,2015,2020,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, magnetic ride, head-up display, adaptive cruise, 360 camera",,
+Chevrolet,Tahoe,2021,2025,LS,1,base,5.3L V8,,,IRS now standard,
+Chevrolet,Tahoe,2021,2025,LT,2,mid,5.3L V8,Bose,"Bose amp possible, heated seats, 10.2in infotainment",,
+Chevrolet,Tahoe,2021,2025,Z71,2,mid,5.3L V8,Bose,"Bose amp possible, off-road suspension, skid plates",,
+Chevrolet,Tahoe,2021,2025,RST,2,mid,5.3L V8,Bose,"Bose amp possible, sport appearance",,
+Chevrolet,Tahoe,2021,2025,Premier,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, magnetic ride, adaptive cruise, 360 camera, power running boards",,
+Chevrolet,Tahoe,2021,2025,High Country,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, magnetic ride, head-up display, adaptive cruise, 360 camera, Super Cruise (late), rear entertainment",,
+GMC,Yukon,2021,2025,SLE,2,mid,5.3L V8,,,,
+GMC,Yukon,2021,2025,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated/cooled seats, park assist",,
+GMC,Yukon,2021,2025,AT4,2,mid,5.3L V8,Bose,"Bose amp possible, off-road suspension, skid plates",,
+GMC,Yukon,2021,2025,Denali,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, heated/cooled seats, magnetic ride, head-up display, adaptive cruise, 360 camera, power running boards",,
+GMC,Yukon,2021,2025,Denali Ultimate,3,premium,6.2L V8,Bose,"Bose amp, 6.2L ECM, Super Cruise, AKG audio (2024+), massage seats, 16.8in display",,
+Chevrolet,Equinox,2010,2017,LS,1,base,2.4L I4,,,,
+Chevrolet,Equinox,2010,2017,LT,2,mid,2.4L I4,,"MyLink, power seats, rear camera",,
+Chevrolet,Equinox,2010,2017,LTZ,3,premium,3.6L V6,Pioneer,"Pioneer amp, heated/cooled seats, nav, power liftgate, blind spot",V6 is the premium engine,
+Chevrolet,Equinox,2018,2025,LS,1,base,1.5L Turbo,,,,
+Chevrolet,Equinox,2018,2025,LT,2,mid,1.5L Turbo,,"Infotainment, heated seats possible",,
+Chevrolet,Equinox,2018,2025,Premier,3,premium,2.0L Turbo,Bose,"Bose amp, heated/cooled seats, power liftgate, park assist, blind spot",2.0T discontinued 2020,
+Chevrolet,Equinox,2018,2025,RS,2,mid,1.5L Turbo,,"Sport appearance, blacked out trim",Appearance only,
+Chevrolet,Traverse,2018,2025,LS,1,base,3.6L V6,,,,
+Chevrolet,Traverse,2018,2025,LT,2,mid,3.6L V6,,"Power liftgate, heated seats, rear camera",,
+Chevrolet,Traverse,2018,2025,RS,2,mid,3.6L V6,,"Sport appearance, Bose possible",,
+Chevrolet,Traverse,2018,2025,Premier,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, park assist, blind spot, rear entertainment possible",,
+Chevrolet,Traverse,2018,2025,High Country,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, adaptive cruise, 360 camera, head-up display",2022+,
+Chevrolet,Camaro,2010,2015,LS,1,base,3.6L V6,,,,
+Chevrolet,Camaro,2010,2015,LT,2,mid,3.6L V6,,RS pkg appearance possible,,
+Chevrolet,Camaro,2010,2015,SS,3,premium,6.2L V8,Boston Acoustics,"Boston Acoustics amp, LS3/L99 ECM, Brembo brakes possible, mag ride possible",,
+Chevrolet,Camaro,2010,2015,ZL1,4,performance,6.2L Supercharged V8,Boston Acoustics,"Boston Acoustics amp, LSA supercharged ECM, magnetic ride, Brembo brakes, performance exhaust",580hp supercharged,
+Chevrolet,Camaro,2010,2015,Z/28,4,performance,7.0L LS7 V8,,"LS7 ECM, carbon-ceramic brakes, no radio/AC delete, aero pkg",2014 only. Race car.,
+Chevrolet,Camaro,2016,2024,LT,2,mid,2.0L Turbo,,,,
+Chevrolet,Camaro,2016,2024,SS,3,premium,6.2L V8,Bose,"Bose amp, LT1 ECM, MagneRide possible, Brembo brakes (1LE)",,
+Chevrolet,Camaro,2016,2024,ZL1,4,performance,6.2L Supercharged V8,Bose,"Bose amp, LT4 supercharged ECM, magnetic ride, Brembo brakes, electronic LSD, performance exhaust",650hp,
+Jeep,Grand Cherokee,2005,2010,Laredo,2,mid,3.7L V6,,"Power seats, basic electronics",Volume trim,
+Jeep,Grand Cherokee,2005,2010,Limited,3,premium,5.7L HEMI,Infinity,"Infinity amp, HEMI ECM, heated seats, nav, park assist, power liftgate",,
+Jeep,Grand Cherokee,2005,2010,Overland,3,premium,5.7L HEMI,Infinity,"Infinity amp, HEMI ECM, heated/cooled seats, air suspension, nav",,
+Jeep,Grand Cherokee,2005,2010,SRT8,4,performance,6.1L HEMI,Infinity,"Infinity amp, SRT ECM, Brembo brakes, adaptive suspension",,
+Jeep,Grand Cherokee,2011,2021,Laredo,2,mid,3.6L V6,,"Uconnect, power seats",Volume trim. Most common at yards.,
+Jeep,Grand Cherokee,2011,2021,Limited,3,premium,5.7L HEMI,Alpine,"Alpine amp, HEMI ECM, heated/cooled seats, nav, park assist, power liftgate, blind spot",,
+Jeep,Grand Cherokee,2011,2021,Overland,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon amp, HEMI ECM, heated/cooled seats, air suspension, Quadra-Drive II, 360 camera, adaptive cruise",,
+Jeep,Grand Cherokee,2011,2021,Summit,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon amp, HEMI ECM, heated/cooled seats, air suspension, adaptive cruise, 360 camera, head-up display (late)",,
+Jeep,Grand Cherokee,2011,2021,Trailhawk,2,mid,3.6L V6,,"Off-road suspension, skid plates, Quadra-Drive II, hill descent","Off-road, not luxury",
+Jeep,Grand Cherokee,2011,2021,SRT,4,performance,6.4L HEMI,Harman Kardon,"Harman Kardon amp, 392 ECM, Brembo brakes, adaptive suspension, launch control",,
+Jeep,Grand Cherokee,2011,2021,Trackhawk,4,performance,6.2L Supercharged HEMI,Harman Kardon,"Harman Kardon amp, supercharged ECM, Brembo brakes, adaptive suspension, launch control, unique transfer case",707hp. Most valuable GC parts.,
+Jeep,Grand Cherokee,2022,2025,Laredo,2,mid,3.6L V6,,"Uconnect 5, power seats",,
+Jeep,Grand Cherokee,2022,2025,Limited,3,premium,5.7L HEMI,Alpine,"Alpine amp, heated/cooled seats, 10.1in Uconnect, park assist, wireless charging",HEMI dropped 2024,
+Jeep,Grand Cherokee,2022,2025,Overland,3,premium,5.7L HEMI,McIntosh,"McIntosh amp (19-speaker), heated/cooled seats, air suspension, adaptive cruise, 360 camera",McIntosh audio is new for WL,
+Jeep,Grand Cherokee,2022,2025,Summit,3,premium,5.7L HEMI,McIntosh,"McIntosh amp, heated/cooled seats, air suspension, adaptive cruise, 360 camera, head-up display, night vision",,
+Jeep,Grand Cherokee,2022,2025,Trailhawk,2,mid,5.7L HEMI,,"Off-road suspension, skid plates, Quadra-Drive II, sway bar disconnect",,
+Jeep,Grand Cherokee,2022,2025,4xe,3,premium,2.0L Turbo + Electric,Alpine,"Alpine amp, PHEV-specific modules, battery management, heated seats",Plug-in hybrid. Different module set.,
+Jeep,Wrangler,2007,2018,Sport,1,base,3.6L V6,,,Base wrangler. 3.8L pre-2012.,
+Jeep,Wrangler,2007,2018,Sport S,2,mid,3.6L V6,,"Power windows/locks, A/C",2016+,
+Jeep,Wrangler,2007,2018,Sahara,2,mid,3.6L V6,Alpine,"Alpine amp possible, nav, body-color fenders, heated seats possible",,
+Jeep,Wrangler,2007,2018,Rubicon,3,premium,3.6L V6,Alpine,"Alpine amp possible, Dana 44 axles, electronic lockers, disconnecting sway bar, rock rails",Off-road premium. Lockers and axles are $$.,
+Jeep,Wrangler,2018,2025,Sport,1,base,3.6L V6,,,,
+Jeep,Wrangler,2018,2025,Sport S,2,mid,3.6L V6,,"Power windows/locks, Uconnect 7in",,
+Jeep,Wrangler,2018,2025,Sahara,2,mid,3.6L V6,Alpine,"Alpine amp, nav, heated seats, LED headlights, body-color top",,
+Jeep,Wrangler,2018,2025,Rubicon,3,premium,3.6L V6,Alpine,"Alpine amp, Dana 44 axles, electronic lockers, disconnecting sway bar, rock rails, 12.3in Uconnect (2024+)",,
+Jeep,Wrangler,2018,2025,Rubicon 392,4,performance,6.4L HEMI,Alpine,"Alpine amp, 392 ECM, Dana 44 axles, electronic lockers, Fox shocks, half doors, 470hp HEMI in a Wrangler",2021-2024. HEMI Wrangler. Rare.,
+Jeep,Wrangler,2018,2025,4xe,2,mid,2.0L Turbo + Electric,Alpine,"Alpine amp possible, PHEV-specific modules, battery management",Plug-in hybrid,
+Jeep,Cherokee,2014,2023,Sport,1,base,2.4L I4,,,,
+Jeep,Cherokee,2014,2023,Latitude,2,mid,3.2L V6,,"Uconnect, power seats, heated seats possible",,
+Jeep,Cherokee,2014,2023,Limited,3,premium,3.2L V6,Alpine,"Alpine amp, heated/cooled seats, nav, park assist, power liftgate, blind spot",,
+Jeep,Cherokee,2014,2023,Trailhawk,2,mid,3.2L V6,,"Off-road suspension, skid plates, locking diff, red tow hooks",,
+Jeep,Cherokee,2014,2023,Overland,3,premium,3.2L V6,Alpine,"Alpine amp, heated/cooled seats, ventilated seats, nav, premium leather",,
+Chrysler,300,2005,2010,Touring,2,mid,3.5L V6,,"Power seats, basic electronics",,
+Chrysler,300,2005,2010,Limited,3,premium,3.5L V6,Infinity,"Infinity amp, heated seats, nav",,
+Chrysler,300,2005,2010,300C,3,premium,5.7L HEMI,Infinity,"Infinity amp, HEMI ECM, heated seats, nav, premium leather",HEMI is the money engine,
+Chrysler,300,2005,2010,SRT-8,4,performance,6.1L HEMI,Kicker,"Kicker amp, SRT ECM, Brembo brakes, adaptive suspension",,
+Chrysler,300,2011,2023,Touring,2,mid,3.6L V6,,"Uconnect, power seats",,
+Chrysler,300,2011,2023,Limited,3,premium,3.6L V6,Alpine,"Alpine amp, heated seats, nav, 8.4in Uconnect",,
+Chrysler,300,2011,2023,300C,3,premium,5.7L HEMI,Harman Kardon,"Harman Kardon amp, HEMI ECM, heated/cooled seats, nav, adaptive cruise",,
+Chrysler,300,2011,2023,300S,2,mid,3.6L V6,Alpine,"Alpine amp, sport appearance, blacked out trim",Appearance + Alpine,
+Chrysler,300,2011,2023,SRT-8,4,performance,6.4L HEMI,Harman Kardon,"Harman Kardon amp, 392 ECM, Brembo brakes, adaptive suspension, launch control",2012-2014,
+Chrysler,Pacifica,2017,2025,Touring,1,base,3.6L V6,,,,
+Chrysler,Pacifica,2017,2025,Touring L,2,mid,3.6L V6,,"Power sliding doors, Uconnect, rear camera",,
+Chrysler,Pacifica,2017,2025,Limited,3,premium,3.6L V6,Harman Kardon,"Harman Kardon amp, heated/cooled seats, nav, power liftgate, 360 camera, rear entertainment",,
+Chrysler,Pacifica,2017,2025,Pinnacle,3,premium,3.6L V6,Harman Kardon,"Harman Kardon amp, heated/cooled seats, premium quilted leather, rear entertainment, 360 camera",2021+,
+Chrysler,Pacifica,2017,2025,Hybrid,3,premium,3.6L V6 + Electric,Harman Kardon,"Harman Kardon amp possible, PHEV modules, battery management, regen braking module",Plug-in hybrid,
+Toyota,Camry,2007,2011,LE,1,base,2.5L I4,,,,
+Toyota,Camry,2007,2011,SE,2,mid,2.5L I4,,"Sport suspension, sport seats",,
+Toyota,Camry,2007,2011,XLE,3,premium,3.5L V6,JBL,"JBL amp, heated seats, nav, moonroof, power seats",V6 XLE is the premium combo,
+Toyota,Camry,2012,2017,L,1,base,2.5L I4,,,,
+Toyota,Camry,2012,2017,LE,1,base,2.5L I4,,,,
+Toyota,Camry,2012,2017,SE,2,mid,2.5L I4,,"Sport suspension, sport seats, paddle shifters",,
+Toyota,Camry,2012,2017,XLE,3,premium,3.5L V6,JBL,"JBL amp, heated seats, nav, moonroof, blind spot, rear cross traffic",,
+Toyota,Camry,2012,2017,XSE,3,premium,3.5L V6,JBL,"JBL amp, sport suspension, nav, moonroof, blind spot",2015+,
+Toyota,Camry,2018,2024,L,1,base,2.5L I4,,,,
+Toyota,Camry,2018,2024,LE,1,base,2.5L I4,,,,
+Toyota,Camry,2018,2024,SE,2,mid,2.5L I4,,"Sport suspension, paddle shifters",,
+Toyota,Camry,2018,2024,XLE,3,premium,2.5L I4,JBL,"JBL amp, heated seats, nav, moonroof, blind spot, rear cross traffic, head-up display",V6 dropped late in gen,
+Toyota,Camry,2018,2024,XSE,3,premium,3.5L V6,JBL,"JBL amp, sport suspension, nav, moonroof, blind spot, head-up display",V6 XSE is the hot one,
+Toyota,Camry,2018,2024,TRD,2,mid,3.5L V6,,"TRD suspension, sport exhaust, cat-back, TRD brakes",2020+. No JBL typically.,
+Toyota,RAV4,2013,2018,LE,1,base,2.5L I4,,,,
+Toyota,RAV4,2013,2018,XLE,2,mid,2.5L I4,,"Power liftgate, moonroof possible, Entune",,
+Toyota,RAV4,2013,2018,Limited,3,premium,2.5L I4,JBL,"JBL amp, heated seats, nav, moonroof, blind spot, rear cross traffic, power liftgate",,
+Toyota,RAV4,2019,2025,LE,1,base,2.5L I4,,,,
+Toyota,RAV4,2019,2025,XLE,2,mid,2.5L I4,,"Power liftgate, moonroof possible",,
+Toyota,RAV4,2019,2025,XLE Premium,2,mid,2.5L I4,,"SofTex seats, power liftgate, blind spot",,
+Toyota,RAV4,2019,2025,Adventure,2,mid,2.5L I4,,"Multi-terrain select, roof rails, all-weather mats",,
+Toyota,RAV4,2019,2025,TRD Off-Road,2,mid,2.5L I4,,"TRD suspension, multi-terrain select",,
+Toyota,RAV4,2019,2025,Limited,3,premium,2.5L I4,JBL,"JBL amp, heated/ventilated seats, nav, 360 camera, digital rearview mirror, head-up display, adaptive cruise",,
+Toyota,RAV4,2019,2025,Prime,3,premium,2.5L I4 + Electric,JBL,"JBL amp possible, PHEV modules, battery management, 302hp combined",Plug-in hybrid. Fastest RAV4.,
+Toyota,Highlander,2014,2019,LE,1,base,2.7L I4,,,,
+Toyota,Highlander,2014,2019,LE Plus,2,mid,3.5L V6,,"Power liftgate, alloy wheels",,
+Toyota,Highlander,2014,2019,XLE,2,mid,3.5L V6,,"Moonroof, Entune, heated seats",,
+Toyota,Highlander,2014,2019,Limited,3,premium,3.5L V6,JBL,"JBL amp, heated/ventilated seats, nav, panoramic moonroof, blind spot, park assist",,
+Toyota,Highlander,2014,2019,Limited Platinum,3,premium,3.5L V6,JBL,"JBL amp, heated/ventilated seats, panoramic moonroof, 360 camera, rear entertainment",2017+,
+Toyota,Tacoma,2016,2023,SR,1,base,2.7L I4,,,,
+Toyota,Tacoma,2016,2023,SR5,2,mid,3.5L V6,,"Entune, rear camera",,
+Toyota,Tacoma,2016,2023,TRD Sport,2,mid,3.5L V6,,"Sport suspension, hood scoop, JBL possible",,
+Toyota,Tacoma,2016,2023,TRD Off-Road,2,mid,3.5L V6,JBL,"JBL amp possible, crawl control, multi-terrain select, locking rear diff",,
+Toyota,Tacoma,2016,2023,Limited,3,premium,3.5L V6,JBL,"JBL amp, heated seats, nav, leather, blind spot, premium cluster",,
+Toyota,Tacoma,2016,2023,TRD Pro,3,premium,3.5L V6,JBL,"JBL amp, Fox shocks, TRD skid plate, TRD exhaust, crawl control, multi-terrain select",Off-road flagship,
+Toyota,Tundra,2007,2021,SR,1,base,4.6L V8,,,,
+Toyota,Tundra,2007,2021,SR5,2,mid,5.7L V8,,"Power seats, Entune",,
+Toyota,Tundra,2007,2021,Limited,3,premium,5.7L V8,JBL,"JBL amp, heated/cooled seats, nav, moonroof, blind spot",,
+Toyota,Tundra,2007,2021,Platinum,3,premium,5.7L V8,JBL,"JBL amp, heated/cooled seats, nav, moonroof, adaptive cruise (late), 360 camera (late)",,
+Toyota,Tundra,2007,2021,1794 Edition,3,premium,5.7L V8,JBL,"JBL amp, premium leather, heated/cooled seats, nav",2014+. Named after the ranch.,
+Toyota,Tundra,2007,2021,TRD Pro,3,premium,5.7L V8,JBL,"JBL amp, Fox shocks, TRD skid plate, TRD exhaust, unique ECM tune possible",2015+,
+Honda,Civic,2006,2011,DX,1,base,1.8L I4,,,,
+Honda,Civic,2006,2011,LX,1,base,1.8L I4,,,,
+Honda,Civic,2006,2011,EX,2,mid,1.8L I4,,"Moonroof, alloy wheels",,
+Honda,Civic,2006,2011,EX-L,3,premium,1.8L I4,,"Heated leather seats, moonroof, nav possible",,
+Honda,Civic,2006,2011,Si,4,performance,2.0L I4,,"Si ECM, LSD, sport suspension, sport exhaust",197hp K20,
+Honda,Civic,2016,2021,LX,1,base,2.0L I4,,,,
+Honda,Civic,2016,2021,EX,2,mid,1.5L Turbo,,"Honda Sensing, moonroof, Apple CarPlay",,
+Honda,Civic,2016,2021,EX-L,3,premium,1.5L Turbo,,"Heated leather seats, moonroof, Honda Sensing, power seats",,
+Honda,Civic,2016,2021,Touring,3,premium,1.5L Turbo,,"Heated leather seats, nav, LED headlights, rain-sensing wipers, Honda Sensing",,
+Honda,Civic,2016,2021,Si,4,performance,1.5L Turbo (205hp),,"Si ECM, LSD, sport suspension, adaptive dampers (2020+), sport exhaust",,
+Honda,Civic,2016,2021,Type R,4,performance,2.0L Turbo (306hp),,"Type R ECM, LSD, Brembo brakes, adaptive dampers, triple exhaust, aero kit",FK8. Very valuable.,
+Honda,Accord,2013,2017,LX,1,base,2.4L I4,,,,
+Honda,Accord,2013,2017,Sport,2,mid,2.4L I4,,"Sport suspension, 19in wheels, paddle shifters",,
+Honda,Accord,2013,2017,EX,2,mid,2.4L I4,,"Honda Sensing, moonroof, heated seats",,
+Honda,Accord,2013,2017,EX-L,3,premium,3.5L V6,,"Heated leather seats, moonroof, power seats, Honda Sensing",V6 is premium,
+Honda,Accord,2013,2017,Touring,3,premium,3.5L V6,,"Heated/ventilated seats, nav, LED headlights, adaptive cruise, lane keep, rain-sensing wipers",,
+Honda,Accord,2018,2025,LX,1,base,1.5L Turbo,,,,
+Honda,Accord,2018,2025,Sport,2,mid,1.5L Turbo,,"Sport suspension, 19in wheels, Honda Sensing",,
+Honda,Accord,2018,2025,EX-L,3,premium,1.5L Turbo,,"Heated leather seats, moonroof, power seats, Honda Sensing",,
+Honda,Accord,2018,2025,Touring,3,premium,2.0L Turbo,,"Heated/ventilated seats, nav, head-up display, wireless charging, adaptive dampers, Honda Sensing",2.0T is money engine. Dropped 2023 for hybrid.,
+Honda,Accord,2018,2025,Sport Hybrid,2,mid,2.0L Hybrid,,"Hybrid modules, Honda Sensing, sport appearance",2023+,
+Honda,Accord,2018,2025,Touring Hybrid,3,premium,2.0L Hybrid,,"Hybrid modules, heated/ventilated seats, head-up display, Bose amp (11th gen), wireless charging, Google Built-in",2023+,
+Honda,CR-V,2012,2016,LX,1,base,2.4L I4,,,,
+Honda,CR-V,2012,2016,EX,2,mid,2.4L I4,,"Moonroof, heated seats, Honda Sensing (2015+)",,
+Honda,CR-V,2012,2016,EX-L,3,premium,2.4L I4,,"Heated leather seats, moonroof, nav possible, power liftgate (2015+)",,
+Honda,CR-V,2012,2016,Touring,3,premium,2.4L I4,,"Heated leather seats, nav, power liftgate, Honda Sensing, LED headlights",2015+ only,
+Honda,CR-V,2017,2024,LX,1,base,1.5L Turbo,,,,
+Honda,CR-V,2017,2024,EX,2,mid,1.5L Turbo,,"Moonroof, Honda Sensing, heated seats, power liftgate",,
+Honda,CR-V,2017,2024,EX-L,3,premium,1.5L Turbo,,"Heated leather seats, moonroof, power liftgate, power seats",,
+Honda,CR-V,2017,2024,Touring,3,premium,1.5L Turbo,,"Heated leather seats, nav, power liftgate, wireless charging, LED headlights, hands-free liftgate",,
+Honda,CR-V,2017,2024,Sport Touring Hybrid,3,premium,2.0L Hybrid,,"Hybrid modules, heated leather seats, Bose amp (6th gen), nav, 12-speaker audio, wireless charging",2023+ 6th gen hybrid,
+Honda,Pilot,2009,2015,LX,1,base,3.5L V6,,,,
+Honda,Pilot,2009,2015,EX,2,mid,3.5L V6,,"Moonroof, power seats",,
+Honda,Pilot,2009,2015,EX-L,3,premium,3.5L V6,,"Heated leather seats, moonroof, rear entertainment possible, nav possible",,
+Honda,Pilot,2009,2015,Touring,3,premium,3.5L V6,,"Heated leather seats, nav, rear entertainment, power liftgate, blind spot",,
+Honda,Pilot,2016,2025,LX,1,base,3.5L V6,,,,
+Honda,Pilot,2016,2025,EX,2,mid,3.5L V6,,"Honda Sensing, moonroof, power liftgate, heated seats",,
+Honda,Pilot,2016,2025,EX-L,3,premium,3.5L V6,,"Heated leather seats, moonroof, power liftgate, power seats, Honda Sensing",,
+Honda,Pilot,2016,2025,Touring,3,premium,3.5L V6,,"Heated/ventilated seats, nav, rear entertainment, hands-free liftgate, wireless charging",,
+Honda,Pilot,2016,2025,Elite,3,premium,3.5L V6,,"Heated/ventilated seats, panoramic moonroof, rear entertainment, wireless charging, Bose amp (4th gen)",,
+Honda,Pilot,2016,2025,TrailSport,2,mid,3.5L V6,,"Off-road suspension, all-terrain tires, steel skid plates, trail mode",2023+,
+Honda,Pilot,2016,2025,Black Edition,3,premium,3.5L V6,,"All Elite features plus blacked out trim, red ambient lighting",2017-2022,
+Nissan,Altima,2013,2018,S,1,base,2.5L I4,,,,
+Nissan,Altima,2013,2018,SV,2,mid,2.5L I4,,"Power seats, Bluetooth, rear camera",,
+Nissan,Altima,2013,2018,SL,3,premium,3.5L V6,Bose,"Bose amp, heated leather seats, moonroof, nav, blind spot",,
+Nissan,Altima,2013,2018,SR,2,mid,2.5L I4,,"Sport suspension, paddle shifters, sport seats",,
+Nissan,Altima,2019,2025,S,1,base,2.5L I4,,,,
+Nissan,Altima,2019,2025,SV,2,mid,2.5L I4,,"ProPILOT Assist possible, heated seats, rear camera",,
+Nissan,Altima,2019,2025,SL,3,premium,2.5L I4,Bose,"Bose amp, heated leather seats, moonroof, ProPILOT Assist, blind spot, 360 camera",,
+Nissan,Altima,2019,2025,SR,2,mid,2.5L I4,,"Sport suspension, paddle shifters, sport seats, ProPILOT possible",,
+Nissan,Altima,2019,2025,Platinum,3,premium,2.5L I4,Bose,"Bose amp, heated/cooled leather seats, ProPILOT Assist, 360 camera, rain-sensing wipers",2019-2020 had optional 2.0L turbo,
+Nissan,Rogue,2014,2020,S,1,base,2.5L I4,,,,
+Nissan,Rogue,2014,2020,SV,2,mid,2.5L I4,,"Power liftgate, heated seats, ProPILOT possible",,
+Nissan,Rogue,2014,2020,SL,3,premium,2.5L I4,Bose,"Bose amp, heated leather seats, nav, 360 camera, power liftgate, ProPILOT",,
+Nissan,Rogue,2014,2020,SL Platinum,3,premium,2.5L I4,Bose,"Bose amp, heated/cooled seats, ProPILOT, 360 camera, LED headlights",2018+,
+Nissan,Pathfinder,2013,2020,S,1,base,3.5L V6,,,,
+Nissan,Pathfinder,2013,2020,SV,2,mid,3.5L V6,,"Power liftgate, heated seats, rear camera",,
+Nissan,Pathfinder,2013,2020,SL,3,premium,3.5L V6,Bose,"Bose amp, heated leather seats, nav, power liftgate, 360 camera",,
+Nissan,Pathfinder,2013,2020,Platinum,3,premium,3.5L V6,Bose,"Bose amp, heated/cooled seats, rear entertainment, adaptive cruise, 360 camera",,
+Nissan,Maxima,2016,2023,S,1,base,3.5L V6,,,,
+Nissan,Maxima,2016,2023,SV,2,mid,3.5L V6,,"Power seats, heated seats, NissanConnect",,
+Nissan,Maxima,2016,2023,SL,3,premium,3.5L V6,Bose,"Bose amp, heated/cooled leather, moonroof, nav, blind spot",,
+Nissan,Maxima,2016,2023,SR,2,mid,3.5L V6,,"Sport suspension, sport seats, paddle shifters",,
+Nissan,Maxima,2016,2023,Platinum,3,premium,3.5L V6,Bose,"Bose amp, heated/cooled seats, adaptive cruise, rain-sensing wipers, around view monitor",,
+Hyundai,Sonata,2015,2019,SE,1,base,2.4L I4,,,,
+Hyundai,Sonata,2015,2019,Sport,2,mid,2.0L Turbo,,"Sport suspension, larger wheels, turbo ECM",,
+Hyundai,Sonata,2015,2019,Limited,3,premium,2.0L Turbo,Infinity,"Infinity amp, heated/cooled seats, nav, panoramic moonroof, blind spot, adaptive cruise",,
+Hyundai,Sonata,2020,2025,SE,1,base,2.5L I4,,,,
+Hyundai,Sonata,2020,2025,SEL,2,mid,2.5L I4,,"Heated seats, blind spot, rear camera",,
+Hyundai,Sonata,2020,2025,SEL Plus,2,mid,1.6L Turbo,,"Moonroof, heated seats, Bose possible",,
+Hyundai,Sonata,2020,2025,Limited,3,premium,1.6L Turbo,Bose,"Bose amp, heated/ventilated seats, panoramic moonroof, head-up display, 360 camera, adaptive cruise, digital key",,
+Hyundai,Sonata,2020,2025,N Line,4,performance,2.5L Turbo,Bose,"Bose amp, N-specific ECM, sport suspension, sport exhaust, N drive modes, launch control",290hp,
+Hyundai,Tucson,2022,2025,SE,1,base,2.5L I4,,,,
+Hyundai,Tucson,2022,2025,SEL,2,mid,2.5L I4,,"Heated seats, blind spot, rear camera",,
+Hyundai,Tucson,2022,2025,N Line,2,mid,2.5L Turbo,,"N Line ECM, sport suspension, 19in wheels",,
+Hyundai,Tucson,2022,2025,Limited,3,premium,2.5L I4,Bose,"Bose amp, heated/ventilated seats, panoramic moonroof, 360 camera, digital key, head-up display",,
+Hyundai,Tucson,2022,2025,Hybrid,2,mid,1.6L Turbo Hybrid,,"Hybrid modules, heated seats",,
+Hyundai,Tucson,2022,2025,PHEV,3,premium,1.6L Turbo PHEV,Bose,"Bose amp possible, PHEV modules, battery management",,
+Kia,Optima,2011,2015,LX,1,base,2.4L I4,,,,
+Kia,Optima,2011,2015,EX,2,mid,2.4L I4,,"Heated seats, power seats, Uvo",,
+Kia,Optima,2011,2015,SX,3,premium,2.0L Turbo,Infinity,"Infinity amp, heated/cooled seats, nav, panoramic moonroof, blind spot",,
+Kia,Optima,2016,2020,LX,1,base,2.4L I4,,,,
+Kia,Optima,2016,2020,EX,2,mid,2.4L I4,,"Heated seats, power seats",,
+Kia,Optima,2016,2020,SX,3,premium,2.0L Turbo,Harman Kardon,"Harman Kardon amp, heated/cooled seats, nav, panoramic moonroof, blind spot, adaptive cruise",,
+Kia,K5,2021,2025,LX,1,base,1.6L Turbo,,,,
+Kia,K5,2021,2025,GT-Line,2,mid,1.6L Turbo,,"Sport appearance, heated seats",,
+Kia,K5,2021,2025,EX,2,mid,1.6L Turbo,,"Heated seats, power seats, blind spot",,
+Kia,K5,2021,2025,GT,4,performance,2.5L Turbo,Bose,"Bose amp, GT ECM, sport suspension, launch control, sport exhaust, 290hp",,
+Kia,Telluride,2020,2025,LX,1,base,3.8L V6,,,,
+Kia,Telluride,2020,2025,S,2,mid,3.8L V6,,"Heated seats, blind spot, rear camera",,
+Kia,Telluride,2020,2025,EX,2,mid,3.8L V6,,"Heated/ventilated seats, sunroof, power liftgate",,
+Kia,Telluride,2020,2025,SX,3,premium,3.8L V6,Harman Kardon,"Harman Kardon amp, heated/ventilated seats, nav, head-up display, 360 camera, Nappa leather, rear entertainment",,
+Kia,Telluride,2020,2025,SX Prestige,3,premium,3.8L V6,Harman Kardon,"Harman Kardon amp, heated/ventilated seats, 360 camera, blind spot with rear collision avoidance, self-parking",,
+Kia,Telluride,2020,2025,X-Pro,2,mid,3.8L V6,,"Off-road suspension, all-terrain tires, BFGoodrich, skid plates",2023+,
+Kia,Sorento,2016,2020,L,1,base,2.4L I4,,,,
+Kia,Sorento,2016,2020,LX,2,mid,3.3L V6,,"Power seats, rear camera",,
+Kia,Sorento,2016,2020,EX,2,mid,3.3L V6,,"Heated seats, power liftgate, blind spot",,
+Kia,Sorento,2016,2020,SX,3,premium,3.3L V6,Infinity,"Infinity amp, heated/ventilated seats, nav, panoramic moonroof, 360 camera, power liftgate",,
+Kia,Sorento,2021,2025,LX,1,base,2.5L I4,,,,
+Kia,Sorento,2021,2025,EX,2,mid,2.5L Turbo,,"Heated seats, power liftgate, blind spot",,
+Kia,Sorento,2021,2025,SX,3,premium,2.5L Turbo,Bose,"Bose amp, heated/ventilated seats, panoramic moonroof, head-up display, 360 camera, Nappa leather",,
+Kia,Sorento,2021,2025,SX Prestige,3,premium,2.5L Turbo,Bose,"Bose amp, heated/ventilated seats, 360 camera, rear entertainment, self-parking",,
+Kia,Sorento,2021,2025,PHEV,3,premium,1.6L Turbo PHEV,Bose,"Bose amp possible, PHEV modules, battery management",,
+BMW,3 Series,2006,2011,328i,2,mid,3.0L I6,,"Power seats, iDrive",N52 engine,
+BMW,3 Series,2006,2011,335i,3,premium,3.0L Twin-Turbo I6,Harman Kardon,"Harman Kardon amp, twin-turbo ECM, sport seats, nav, heads-up display possible",N54/N55 engine. Turbo = premium.,
+BMW,3 Series,2006,2011,M3,4,performance,4.0L V8,Harman Kardon,"Harman Kardon amp, S65 V8 ECM, M differential, M suspension, Brembo brakes, carbon fiber roof (coupe)",S65 V8. Very valuable.,
+BMW,3 Series,2012,2018,320i,1,base,2.0L Turbo I4,,,Entry BMW. Detuned N20.,
+BMW,3 Series,2012,2018,328i,2,mid,2.0L Turbo I4,,"Power seats, iDrive",N20 engine. Renamed 330i in 2017.,
+BMW,3 Series,2012,2018,340i,3,premium,3.0L Turbo I6,Harman Kardon,"Harman Kardon amp, B58 ECM, sport seats, nav, heads-up display possible",B58 engine. 2016+,
+BMW,3 Series,2012,2018,M3,4,performance,3.0L Twin-Turbo I6,Harman Kardon,"Harman Kardon amp, S55 ECM, M differential, adaptive M suspension, carbon fiber roof, Brembo brakes",S55 engine. 425hp.,
+BMW,3 Series,2019,2025,330i,2,mid,2.0L Turbo I4,,"Live Cockpit, power seats",,
+BMW,3 Series,2019,2025,330e,2,mid,2.0L Turbo + Electric,,"PHEV modules, battery management, Live Cockpit",Plug-in hybrid,
+BMW,3 Series,2019,2025,M340i,3,premium,3.0L Turbo I6,Harman Kardon,"Harman Kardon amp, B58 ECM, M Sport differential, adaptive M suspension, M brakes",,
+BMW,3 Series,2019,2025,M3,4,performance,3.0L Twin-Turbo I6,Harman Kardon,"Harman Kardon amp, S58 ECM, M differential, M carbon brakes optional, adaptive M suspension",473-503hp,
+BMW,5 Series,2006,2010,528i,2,mid,3.0L I6,,,N52 engine,
+BMW,5 Series,2006,2010,535i,3,premium,3.0L Twin-Turbo I6,Harman Kardon,"Harman Kardon amp, N54 ECM, comfort seats, nav",,
+BMW,5 Series,2006,2010,550i,3,premium,4.8L V8,Harman Kardon,"Harman Kardon amp, N62 V8 ECM, comfort seats, nav, soft-close doors",,
+BMW,5 Series,2006,2010,M5,4,performance,5.0L V10,Harman Kardon,"Harman Kardon amp, S85 V10 ECM, M differential, SMG/6-speed, Brembo brakes",S85 V10. Legendary.,
+BMW,5 Series,2011,2016,528i,2,mid,2.0L Turbo I4,,,N20 engine,
+BMW,5 Series,2011,2016,535i,3,premium,3.0L Turbo I6,Harman Kardon,"Harman Kardon amp, N55 ECM, comfort seats, nav, heads-up display",,
+BMW,5 Series,2011,2016,550i,3,premium,4.4L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, N63 V8 ECM, comfort seats, nav, soft-close doors",,
+BMW,5 Series,2011,2016,M5,4,performance,4.4L Twin-Turbo V8,Bang & Olufsen,"B&O amp, S63 V8 ECM, M differential, adaptive M suspension, carbon fiber roof",560hp,
+BMW,X5,2007,2013,xDrive35i,2,mid,3.0L Turbo I6,,"Panoramic moonroof, power seats, iDrive",,
+BMW,X5,2007,2013,xDrive50i,3,premium,4.4L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, V8 ECM, comfort seats, nav, soft-close doors, adaptive air suspension",,
+BMW,X5,2007,2013,X5 M,4,performance,4.4L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, S63 V8 ECM, M differential, adaptive M suspension, Brembo brakes",555hp,
+BMW,X5,2014,2018,xDrive35i,2,mid,3.0L Turbo I6,,"Panoramic moonroof, power seats",,
+BMW,X5,2014,2018,xDrive50i,3,premium,4.4L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, V8 ECM, comfort seats, nav, soft-close doors, gesture control (2016+)",,
+BMW,X5,2014,2018,X5 M,4,performance,4.4L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, S63 V8 ECM, M differential, adaptive M suspension",567hp,
+BMW,X5,2019,2025,xDrive40i,2,mid,3.0L Turbo I6,,"Live Cockpit Pro, panoramic moonroof",,
+BMW,X5,2019,2025,xDrive50e,3,premium,3.0L Turbo + Electric,Harman Kardon,"Harman Kardon amp, PHEV modules, battery management, air suspension",PHEV,
+BMW,X5,2019,2025,M50i,3,premium,4.4L Twin-Turbo V8,Bowers & Wilkins,"Bowers & Wilkins amp, V8 ECM, M Sport differential, adaptive M suspension, M brakes",Renamed M60i 2023+,
+BMW,X5,2019,2025,X5 M,4,performance,4.4L Twin-Turbo V8,Bowers & Wilkins,"Bowers & Wilkins amp, S68 V8 ECM, M differential, M carbon brakes, adaptive M suspension",600+ hp,
+Lincoln,MKZ,2013,2020,Premiere,2,mid,2.0L Turbo,,"SYNC, heated seats, power seats",,
+Lincoln,MKZ,2013,2020,Select,2,mid,2.0L Turbo,,"Heated seats, nav possible",,
+Lincoln,MKZ,2013,2020,Reserve,3,premium,3.0L Twin-Turbo V6,Revel,"Revel amp, heated/cooled seats, adaptive cruise, park assist, 360 camera",3.0L TT AWD is the money powertrain,
+Lincoln,MKZ,2013,2020,Black Label,3,premium,3.0L Twin-Turbo V6,Revel Ultima,"Revel Ultima amp, Alcantara headliner, premium everything",,
+Lincoln,MKS,2009,2016,Base,2,mid,3.7L V6,,"THX amp possible, heated/cooled seats",,
+Lincoln,MKS,2009,2016,EcoBoost,3,premium,3.5L EcoBoost,THX,"THX amp, heated/cooled seats, nav, adaptive cruise, park assist",,
+Lincoln,MKX,2016,2018,Premiere,2,mid,3.7L V6,,"SYNC, heated seats",Renamed Nautilus 2019,
+Lincoln,MKX,2016,2018,Reserve,3,premium,2.7L EcoBoost,Revel,"Revel amp, heated/cooled seats, adaptive cruise, 360 camera",,
+Lincoln,MKX,2016,2018,Black Label,3,premium,2.7L EcoBoost,Revel Ultima,"Revel Ultima amp, premium everything",,
+Lincoln,Navigator,2018,2025,Standard,3,premium,3.5L EcoBoost,Revel,"Revel amp, heated/cooled seats, SYNC 3, adaptive cruise, 360 camera, power running boards",Base Navigator is still premium,
+Lincoln,Navigator,2018,2025,Reserve,3,premium,3.5L EcoBoost,Revel,"Revel amp, heated/cooled seats, 30-way seats, adaptive cruise, 360 camera",,
+Lincoln,Navigator,2018,2025,Black Label,3,premium,3.5L EcoBoost,Revel Ultima,"Revel Ultima 28-speaker amp, massage seats, power running boards, rear entertainment, head-up display",Ultimate luxury truck,
+Cadillac,Escalade,2007,2014,Base,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled seats, nav, magnetic ride, power liftgate, rear entertainment possible",All Escalades are premium,
+Cadillac,Escalade,2007,2014,Platinum,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled seats, nav, magnetic ride, power running boards, rear entertainment, 360 camera",,
+Cadillac,Escalade,2015,2020,Standard,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled seats, CUE, magnetic ride, power liftgate, surround vision",,
+Cadillac,Escalade,2015,2020,Luxury,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled seats, CUE, magnetic ride, power running boards, rear entertainment",,
+Cadillac,Escalade,2015,2020,Premium Luxury,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled/massage seats, CUE, magnetic ride, power running boards, rear entertainment, head-up display",,
+Cadillac,Escalade,2015,2020,Platinum,3,premium,6.2L V8,Bose,"Bose amp, heated/cooled/massage seats, CUE, magnetic ride, power running boards, rear entertainment, head-up display, 360 camera",,
+Cadillac,Escalade,2021,2025,Luxury,3,premium,6.2L V8,AKG,"AKG 36-speaker amp, 38in OLED display, Super Cruise, magnetic ride, air suspension, 360 camera",AKG Studio audio. 36 speakers.,
+Cadillac,Escalade,2021,2025,Premium Luxury,3,premium,6.2L V8,AKG,"AKG 36-speaker amp, 38in OLED, Super Cruise, magnetic ride, air suspension, 360 camera, rear entertainment",,
+Cadillac,Escalade,2021,2025,Sport,3,premium,6.2L V8,AKG,"AKG 36-speaker amp, 38in OLED, Super Cruise, magnetic ride, sport appearance",,
+Cadillac,Escalade,2021,2025,V,4,performance,6.2L Supercharged V8,AKG,"AKG 36-speaker amp, supercharged ECM, 38in OLED, Super Cruise, magnetic ride, air suspension, Brembo brakes",682hp supercharged,
+Buick,Enclave,2008,2017,Convenience,1,base,3.6L V6,,,,
+Buick,Enclave,2008,2017,Leather,2,mid,3.6L V6,Bose,"Bose amp, heated seats, nav possible, rear camera",,
+Buick,Enclave,2008,2017,Premium,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, power liftgate, blind spot, adaptive cruise",,
+Buick,Enclave,2018,2025,Preferred,1,base,3.6L V6,,,,
+Buick,Enclave,2018,2025,Essence,2,mid,3.6L V6,Bose,"Bose amp, heated seats, power liftgate",,
+Buick,Enclave,2018,2025,Premium,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, adaptive cruise, 360 camera, power liftgate",,
+Buick,Enclave,2018,2025,Avenir,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, adaptive cruise, 360 camera, sport appearance, premium leather",Avenir is top Buick trim across lineup,
+Buick,LaCrosse,2010,2016,Base,1,base,2.4L I4,,,,
+Buick,LaCrosse,2010,2016,Leather,2,mid,3.6L V6,Bose,"Bose amp, heated seats, nav possible",,
+Buick,LaCrosse,2010,2016,Premium,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, adaptive cruise, magnetic ride, head-up display",,
+Buick,LaCrosse,2017,2019,Preferred,1,base,2.5L I4,,,,
+Buick,LaCrosse,2017,2019,Essence,2,mid,3.6L V6,Bose,"Bose amp, heated seats, nav",,
+Buick,LaCrosse,2017,2019,Premium,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, adaptive cruise, head-up display, magnetic ride",,
+Buick,LaCrosse,2017,2019,Avenir,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, magnetic ride, adaptive cruise, 360 camera",,
+Lexus,RX 350,2010,2015,Base,2,mid,3.5L V6,,"Power seats, moonroof, leather",,
+Lexus,RX 350,2010,2015,F Sport,3,premium,3.5L V6,Mark Levinson,"Mark Levinson amp, sport suspension, sport seats, nav",2013+,
+Lexus,RX 350,2016,2022,Base,2,mid,3.5L V6,,"Lexus Safety System, power liftgate, leather",,
+Lexus,RX 350,2016,2022,F Sport,3,premium,3.5L V6,Mark Levinson,"Mark Levinson amp, adaptive suspension, sport seats, nav, heads-up display, 360 camera",,
+Lexus,RX 350,2023,2025,Standard,2,mid,2.4L Turbo,,"Lexus Safety System 3.0, 14in display",,
+Lexus,RX 350,2023,2025,F Sport,3,premium,2.4L Turbo,Mark Levinson,"Mark Levinson amp, adaptive suspension, sport seats, head-up display, 360 camera",,
+Lexus,RX 350,2023,2025,Luxury,3,premium,2.4L Turbo,Mark Levinson,"Mark Levinson amp, heated/ventilated seats, 360 camera, head-up display, panoramic moonroof",,
+Lexus,RX 500h,2023,2025,F Sport Performance,4,performance,2.4L Turbo Hybrid,Mark Levinson,"Mark Levinson amp, performance hybrid ECM, adaptive suspension, sport brakes, 367hp",,
+Lexus,IS,2006,2013,IS 250,2,mid,2.5L V6,,"Power seats, moonroof",,
+Lexus,IS,2006,2013,IS 350,3,premium,3.5L V6,Mark Levinson,"Mark Levinson amp, sport seats, nav",,
+Lexus,IS,2006,2013,IS F,4,performance,5.0L V8,Mark Levinson,"Mark Levinson amp, 2UR-GSE V8 ECM, Torsen LSD, Brembo brakes, sport suspension",416hp V8,
+Lexus,IS,2014,2020,IS 200t,1,base,2.0L Turbo,,,,
+Lexus,IS,2014,2020,IS 300,2,mid,3.5L V6,,"Lexus Safety, power seats",,
+Lexus,IS,2014,2020,IS 350,3,premium,3.5L V6,Mark Levinson,"Mark Levinson amp, F Sport suspension, nav, heads-up display",,
+Lexus,GS,2013,2020,GS 350,2,mid,3.5L V6,,"Lexus Safety, power seats, leather",,
+Lexus,GS,2013,2020,GS 350 F Sport,3,premium,3.5L V6,Mark Levinson,"Mark Levinson amp, adaptive suspension, LSD, sport seats, nav",,
+Lexus,GS,2013,2020,GS F,4,performance,5.0L V8,Mark Levinson,"Mark Levinson amp, 2UR-GSE V8 ECM, Torsen LSD, Brembo brakes, carbon fiber, adaptive suspension",467hp V8,
+Infiniti,G37,2008,2013,Journey,2,mid,3.7L V6,,"Power seats, moonroof",,
+Infiniti,G37,2008,2013,Sport,3,premium,3.7L V6,Bose,"Bose amp, sport suspension, sport brakes, LSD, nav",,
+Infiniti,G37,2008,2013,IPL,4,performance,3.7L V6 (348hp),Bose,"Bose amp, tuned ECM, sport exhaust, sport suspension, sport brakes",,
+Infiniti,Q50,2014,2025,Pure,1,base,3.0L Twin-Turbo V6,,,"2.0T early, then 3.0TT",
+Infiniti,Q50,2014,2025,Luxe,2,mid,3.0L Twin-Turbo V6,Bose,"Bose amp, heated seats, nav, around view monitor",,
+Infiniti,Q50,2014,2025,Sport,3,premium,3.0L Twin-Turbo V6,Bose,"Bose amp, sport suspension, sport brakes, DAS, nav",400hp,
+Infiniti,Q50,2014,2025,Red Sport 400,4,performance,3.0L Twin-Turbo V6 (400hp),Bose,"Bose amp, 400hp ECM, sport suspension, sport brakes, sport exhaust",400hp twin-turbo,
+Acura,TLX,2015,2020,Base,1,base,2.4L I4,,,,
+Acura,TLX,2015,2020,Technology,2,mid,3.5L V6,,"AcuraWatch, nav, power seats, heated seats",,
+Acura,TLX,2015,2020,A-Spec,3,premium,3.5L V6,ELS Studio,"ELS Studio amp, sport suspension, sport seats, sport exhaust tips",,
+Acura,TLX,2015,2020,Advance,3,premium,3.5L V6,ELS Studio,"ELS Studio amp, heated/ventilated seats, adaptive cruise, AEB, rear entertainment",,
+Acura,TLX,2021,2025,Base,2,mid,2.0L Turbo,,"AcuraWatch, 10.2in display",,
+Acura,TLX,2021,2025,A-Spec,3,premium,2.0L Turbo,ELS Studio 3D,"ELS Studio 3D amp, sport suspension, sport seats, 360 camera possible",,
+Acura,TLX,2021,2025,Advance,3,premium,2.0L Turbo,ELS Studio 3D,"ELS Studio 3D amp, heated/ventilated seats, adaptive dampers, head-up display, 360 camera",,
+Acura,TLX,2021,2025,Type S,4,performance,3.0L Turbo V6,ELS Studio 3D,"ELS Studio 3D amp, Type S ECM, sport suspension, sport brakes, sport exhaust, LSD, 355hp",,
+Acura,MDX,2014,2020,Base,2,mid,3.5L V6,,"AcuraWatch, power liftgate",,
+Acura,MDX,2014,2020,Technology,2,mid,3.5L V6,ELS Studio,"ELS Studio amp, nav, heated seats, power liftgate",,
+Acura,MDX,2014,2020,Advance,3,premium,3.5L V6,ELS Studio,"ELS Studio amp, heated/ventilated seats, rear entertainment, adaptive cruise, 360 camera",,
+Acura,MDX,2022,2025,Base,2,mid,3.5L V6,,"AcuraWatch, 12.3in display",,
+Acura,MDX,2022,2025,Technology,2,mid,3.5L V6,ELS Studio 3D,"ELS Studio 3D amp, heated seats, wireless charging",,
+Acura,MDX,2022,2025,A-Spec,3,premium,3.5L V6,ELS Studio 3D,"ELS Studio 3D amp, sport appearance, heated/ventilated seats",,
+Acura,MDX,2022,2025,Advance,3,premium,3.5L V6,ELS Studio 3D,"ELS Studio 3D amp, heated/ventilated seats, 360 camera, parking sensors, rear entertainment",,
+Acura,MDX,2022,2025,Type S,4,performance,3.0L Turbo V6,ELS Studio 3D,"ELS Studio 3D amp, Type S ECM, sport suspension, sport brakes, Brembo, 355hp",,
+Subaru,Outback,2010,2014,2.5i,1,base,2.5L H4,,,,
+Subaru,Outback,2010,2014,2.5i Premium,2,mid,2.5L H4,,"Heated seats, moonroof, power seats",,
+Subaru,Outback,2010,2014,2.5i Limited,3,premium,2.5L H4,Harman Kardon,"Harman Kardon amp, heated leather seats, nav, moonroof, auto-dim mirror",,
+Subaru,Outback,2010,2014,3.6R Limited,3,premium,3.6L H6,Harman Kardon,"Harman Kardon amp, H6 ECM, heated leather seats, nav",H6 is the money engine,
+Subaru,Outback,2015,2019,2.5i,1,base,2.5L H4,,,,
+Subaru,Outback,2015,2019,2.5i Premium,2,mid,2.5L H4,,"EyeSight, heated seats, moonroof",,
+Subaru,Outback,2015,2019,2.5i Limited,3,premium,2.5L H4,Harman Kardon,"Harman Kardon amp, heated leather seats, nav, EyeSight, power liftgate",,
+Subaru,Outback,2015,2019,3.6R Touring,3,premium,3.6L H6,Harman Kardon,"Harman Kardon amp, H6 ECM, heated leather seats, nav, EyeSight",,
+Subaru,Outback,2020,2025,Base,1,base,2.5L H4,,,,
+Subaru,Outback,2020,2025,Premium,2,mid,2.5L H4,,"EyeSight, heated seats, 11.6in display",,
+Subaru,Outback,2020,2025,Limited,3,premium,2.5L H4,Harman Kardon,"Harman Kardon amp, heated leather seats, nav, EyeSight, power liftgate",,
+Subaru,Outback,2020,2025,Touring,3,premium,2.5L H4,Harman Kardon,"Harman Kardon amp, heated/ventilated seats, rain-sensing wipers, nav",,
+Subaru,Outback,2020,2025,XT,3,premium,2.4L Turbo H4,Harman Kardon,"Harman Kardon amp, turbo ECM, heated leather seats possible",Turbo is the money engine now,
+Subaru,Outback,2020,2025,Wilderness,2,mid,2.4L Turbo H4,,"Off-road suspension, skid plates, all-terrain tires, X-Mode",,
+Subaru,WRX,2008,2014,Base,2,mid,2.5L Turbo H4,,"Sport seats, turbo ECM",,
+Subaru,WRX,2008,2014,STI,4,performance,2.5L Turbo H4 (305hp),,"STI ECM, DCCD AWD, Brembo brakes, 6-speed, sport suspension",EJ257 turbo,
+Subaru,WRX,2015,2021,Base,2,mid,2.0L Turbo H4,,"Sport seats, turbo ECM",FA20 engine,
+Subaru,WRX,2015,2021,Premium,2,mid,2.0L Turbo H4,,"Moonroof, heated seats",,
+Subaru,WRX,2015,2021,Limited,3,premium,2.0L Turbo H4,Harman Kardon,"Harman Kardon amp, heated leather seats, nav, auto-dim mirror",,
+Subaru,WRX,2015,2021,STI,4,performance,2.5L Turbo H4 (310hp),Harman Kardon,"Harman Kardon amp possible, STI ECM, DCCD AWD, Brembo brakes, 6-speed, STI suspension",EJ257 turbo. Last EJ.,
+Mercedes-Benz,C-Class,2008,2014,C300,2,mid,3.0L V6,,"Power seats, Comand nav possible",,
+Mercedes-Benz,C-Class,2008,2014,C350,3,premium,3.5L V6,Harman Kardon,"Harman Kardon amp, heated seats, nav, moonroof",,
+Mercedes-Benz,C-Class,2008,2014,C63 AMG,4,performance,6.2L V8,Harman Kardon,"Harman Kardon amp, M156 V8 ECM, AMG suspension, Brembo brakes, LSD",451-510hp V8,
+Mercedes-Benz,C-Class,2015,2021,C300,2,mid,2.0L Turbo,,"COMAND/MBUX, power seats",,
+Mercedes-Benz,C-Class,2015,2021,C43 AMG,3,premium,3.0L Twin-Turbo V6,Burmester,"Burmester amp, AMG ECM, AMG suspension, AMG brakes, sport exhaust",,
+Mercedes-Benz,C-Class,2015,2021,C63 AMG,4,performance,4.0L Twin-Turbo V8,Burmester,"Burmester amp, M177 V8 ECM, AMG suspension, AMG carbon brakes possible, LSD, sport exhaust",469-503hp,
+Mercedes-Benz,E-Class,2010,2016,E350,2,mid,3.5L V6,,"COMAND, power seats, heated seats",,
+Mercedes-Benz,E-Class,2010,2016,E550,3,premium,4.7L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, V8 ECM, air suspension possible, heated/cooled seats",,
+Mercedes-Benz,E-Class,2010,2016,E63 AMG,4,performance,5.5L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, M157 V8 ECM, AMG suspension, AMG brakes, LSD",550-577hp,
+Mercedes-Benz,E-Class,2017,2023,E300,2,mid,2.0L Turbo,,"MBUX, power seats",,
+Mercedes-Benz,E-Class,2017,2023,E450,3,premium,3.0L Turbo I6,Burmester,"Burmester amp, heated/cooled seats, MBUX, air suspension possible",,
+Mercedes-Benz,E-Class,2017,2023,E53 AMG,3,premium,3.0L Turbo I6 + EQ Boost,Burmester,"Burmester amp, AMG ECM, AMG suspension, AMG brakes, sport exhaust",429hp,
+Mercedes-Benz,E-Class,2017,2023,E63 AMG,4,performance,4.0L Twin-Turbo V8,Burmester,"Burmester amp, M177 V8 ECM, AMG suspension, AMG carbon brakes, electronic LSD, drift mode (S)",603hp,
+Mercedes-Benz,ML,2006,2011,ML350,2,mid,3.5L V6,,"COMAND possible, power seats",,
+Mercedes-Benz,ML,2006,2011,ML550,3,premium,5.5L V8,Harman Kardon,"Harman Kardon amp, V8 ECM, airmatic, heated/cooled seats",,
+Mercedes-Benz,ML,2006,2011,ML63 AMG,4,performance,6.2L V8,Harman Kardon,"Harman Kardon amp, M156 V8 ECM, AMG suspension, AMG brakes",503hp,
+Mercedes-Benz,GLE,2016,2019,GLE350,2,mid,3.5L V6,,"COMAND, power seats, heated seats",,
+Mercedes-Benz,GLE,2016,2019,GLE450 AMG,3,premium,3.0L Twin-Turbo V6,Harman Kardon,"Harman Kardon amp, AMG suspension, heated/cooled seats",,
+Mercedes-Benz,GLE,2016,2019,GLE63 AMG,4,performance,5.5L Twin-Turbo V8,Harman Kardon,"Harman Kardon amp, M157 V8 ECM, AMG suspension, AMG brakes",577hp S model,
+Mercedes-Benz,GLE,2020,2025,GLE350,2,mid,2.0L Turbo,,"MBUX, power seats",,
+Mercedes-Benz,GLE,2020,2025,GLE450,3,premium,3.0L Turbo I6 + EQ Boost,Burmester,"Burmester amp, heated/cooled seats, MBUX, air suspension possible",,
+Mercedes-Benz,GLE,2020,2025,GLE53 AMG,3,premium,3.0L Turbo I6 + EQ Boost,Burmester,"Burmester amp, AMG ECM, AMG suspension, AMG brakes",,
+Mercedes-Benz,GLE,2020,2025,GLE63 AMG,4,performance,4.0L Twin-Turbo V8,Burmester,"Burmester amp, M177 V8 ECM, AMG suspension, AMG carbon brakes, e-LSD",603hp S model,
+Volkswagen,Jetta,2011,2018,S,1,base,2.0L I4,,,,
+Volkswagen,Jetta,2011,2018,SE,2,mid,1.4L Turbo,,"Heated seats, moonroof possible",,
+Volkswagen,Jetta,2011,2018,SEL,3,premium,1.8L Turbo,Fender,"Fender amp, heated leather seats, nav, moonroof, blind spot",,
+Volkswagen,Jetta,2011,2018,GLI,4,performance,2.0L Turbo,Fender,"Fender amp, GLI ECM, sport suspension, sport brakes, LSD (late), sport exhaust",,
+Volkswagen,Jetta,2019,2025,S,1,base,1.5L Turbo,,,,
+Volkswagen,Jetta,2019,2025,SE,2,mid,1.5L Turbo,,"Heated seats, Digital Cockpit possible",,
+Volkswagen,Jetta,2019,2025,SEL,3,premium,1.5L Turbo,Beats,"Beats amp, heated leather seats, Digital Cockpit, moonroof",Beats audio replaces Fender on Jetta,
+Volkswagen,Jetta,2019,2025,GLI,4,performance,2.0L Turbo,Beats,"Beats amp, GLI ECM, sport suspension, VAQ LSD, sport brakes, DCC possible",,
+Volkswagen,Tiguan,2018,2025,S,1,base,2.0L Turbo,,,,
+Volkswagen,Tiguan,2018,2025,SE,2,mid,2.0L Turbo,,"Heated seats, Digital Cockpit",,
+Volkswagen,Tiguan,2018,2025,SEL,3,premium,2.0L Turbo,Fender,"Fender amp, heated leather seats, park assist, Digital Cockpit Pro, power liftgate",,
+Volkswagen,Tiguan,2018,2025,SEL R-Line,3,premium,2.0L Turbo,Harman Kardon,"Harman Kardon amp (2024+), heated/ventilated seats, head-up display, 360 camera",2024 refresh,
+Volkswagen,Atlas,2018,2025,S,1,base,2.0L Turbo,,,,
+Volkswagen,Atlas,2018,2025,SE,2,mid,3.6L V6,,"Heated seats, power liftgate",,
+Volkswagen,Atlas,2018,2025,SEL,3,premium,3.6L V6,Fender,"Fender amp, heated/ventilated seats, Digital Cockpit, park assist, 360 camera",,
+Volkswagen,Atlas,2018,2025,SEL Premium,3,premium,3.6L V6,Fender,"Fender amp, heated/ventilated seats, adaptive cruise, 360 camera, rain-sensing wipers",,
+Mazda,Mazda3,2014,2018,Sport,1,base,2.0L I4,,,,
+Mazda,Mazda3,2014,2018,Touring,2,mid,2.5L I4,,"Heated seats, moonroof, Bose possible",,
+Mazda,Mazda3,2014,2018,Grand Touring,3,premium,2.5L I4,Bose,"Bose amp, heated leather seats, nav, heads-up display, adaptive cruise",,
+Mazda,Mazda3,2019,2025,Base,1,base,2.5L I4,,,,
+Mazda,Mazda3,2019,2025,Select,2,mid,2.5L I4,,"Heated seats, blind spot",,
+Mazda,Mazda3,2019,2025,Premium,3,premium,2.5L I4,Bose,"Bose amp, heated leather seats, nav, heads-up display, adaptive cruise",,
+Mazda,Mazda3,2019,2025,Turbo,4,performance,2.5L Turbo I4,Bose,"Bose amp, turbo ECM, heated leather seats, all premium features, 250hp",,
+Mazda,CX-5,2017,2025,Sport,1,base,2.5L I4,,,,
+Mazda,CX-5,2017,2025,Touring,2,mid,2.5L I4,,"Heated seats, blind spot, power liftgate",,
+Mazda,CX-5,2017,2025,Grand Touring,3,premium,2.5L I4,Bose,"Bose amp, heated/ventilated seats, nav, heads-up display, power liftgate",,
+Mazda,CX-5,2017,2025,Signature,3,premium,2.5L Turbo,Bose,"Bose amp, turbo ECM, Nappa leather, heated/ventilated seats, nav, heads-up display",2019+. Turbo is premium engine.,
+Mazda,CX-5,2017,2025,Turbo,3,premium,2.5L Turbo,Bose,"Bose amp, turbo ECM, heated leather seats, Bose",2021+,
+Mazda,CX-9,2016,2023,Sport,1,base,2.5L Turbo,,,All CX-9 have turbo,
+Mazda,CX-9,2016,2023,Touring,2,mid,2.5L Turbo,,"Heated seats, blind spot, power liftgate",,
+Mazda,CX-9,2016,2023,Grand Touring,3,premium,2.5L Turbo,Bose,"Bose amp, heated/ventilated seats, nav, heads-up display, 360 camera",,
+Mazda,CX-9,2016,2023,Signature,3,premium,2.5L Turbo,Bose,"Bose amp, Nappa leather, heated/ventilated seats, nav, heads-up display",,
+Audi,A4,2005,2008,2.0T,2,mid,2.0L Turbo I4,Bose,"Bose amp possible, turbo ECM, power seats",,
+Audi,A4,2005,2008,3.2,3,premium,3.2L V6,Bose,"Bose amp, V6 ECM, heated seats, nav possible",V6 is premium,
+Audi,A4,2005,2008,S4,4,performance,4.2L V8,Bose,"Bose amp, 4.2L V8 ECM, sport suspension, sport diff, Recaro seats possible",BBK V8. Timing chain issues = lots at yards.,CULT
+Audi,A4,2009,2016,Premium,2,mid,2.0L Turbo I4,,"Power seats, MMI, heated seats",,
+Audi,A4,2009,2016,Premium Plus,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O amp, heated seats, nav, blind spot, parking sensors, auto-dim mirrors",,
+Audi,A4,2009,2016,Prestige,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O amp, heated seats, nav, adaptive cruise, heads-up display (late), LED headlights",,
+Audi,A4,2009,2016,S4,4,performance,3.0L Supercharged V6,Bang & Olufsen,"B&O amp, supercharged V6 ECM, sport differential, DRC suspension, sport exhaust, Alcantara",333hp. Supercharged 3.0T is the money engine.,CULT
+Audi,A4,2017,2025,Premium,2,mid,2.0L Turbo I4,,"Virtual Cockpit possible, power seats, heated seats",,
+Audi,A4,2017,2025,Premium Plus,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit, nav, blind spot, parking sensors, wireless charging",,
+Audi,A4,2017,2025,Prestige,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit, nav, adaptive cruise, heads-up display, matrix LED headlights",,
+Audi,A4,2017,2025,S4,4,performance,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, turbo V6 ECM, sport differential, adaptive suspension, sport exhaust",349hp. EA839 engine.,CULT
+Audi,A6,2012,2018,Premium,2,mid,2.0L Turbo I4,,"Power seats, MMI, heated seats",,
+Audi,A6,2012,2018,Premium Plus,3,premium,3.0L Supercharged V6,Bose,"Bose amp, supercharged V6 ECM, heated seats, nav, blind spot, LED headlights",,
+Audi,A6,2012,2018,Prestige,3,premium,3.0L Supercharged V6,Bose,"Bose amp, heated/cooled seats, nav, adaptive cruise, heads-up display, night vision possible",,
+Audi,A6,2012,2018,S6,4,performance,4.0L Twin-Turbo V8,Bose,"Bose amp, V8 ECM, sport differential, adaptive air suspension, sport exhaust, ceramic brakes possible",450hp twin-turbo V8,CULT
+Audi,A6,2019,2025,Premium,2,mid,2.0L Turbo I4,,"Dual MMI screens, power seats",,
+Audi,A6,2019,2025,Premium Plus,3,premium,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit Plus, nav, 360 camera, heated/ventilated seats",,
+Audi,A6,2019,2025,Prestige,3,premium,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit Plus, nav, adaptive cruise, heads-up display, matrix LED",,
+Audi,A6,2019,2025,S6,4,performance,2.9L Twin-Turbo V6,Bang & Olufsen,"B&O 3D amp, twin-turbo V6 ECM, sport differential, adaptive air suspension, sport exhaust",444hp,CULT
+Audi,A6,2019,2025,RS6 Avant,4,performance,4.0L Twin-Turbo V8,Bang & Olufsen,"B&O 3D amp, V8 ECM, sport differential, adaptive air suspension, ceramic brakes, sport exhaust, carbon fiber",591hp. Ultra rare wagon. Parts worth a fortune.,CULT
+Audi,Q5,2009,2017,Premium,2,mid,2.0L Turbo I4,,"Power seats, heated seats, panoramic moonroof",,
+Audi,Q5,2009,2017,Premium Plus,3,premium,3.0L Supercharged V6,Bose,"Bose amp, heated seats, nav, parking sensors, auto-dim mirrors",,
+Audi,Q5,2009,2017,Prestige,3,premium,3.0L Supercharged V6,Bang & Olufsen,"B&O amp, heated seats, nav, adaptive cruise, LED headlights",,
+Audi,Q5,2009,2017,SQ5,4,performance,3.0L Supercharged V6 (354hp),Bang & Olufsen,"B&O amp, supercharged ECM, sport suspension, sport brakes, sport exhaust, sport differential",2014+,CULT
+Audi,Q5,2018,2025,Premium,2,mid,2.0L Turbo I4,,"Virtual Cockpit possible, power seats, heated seats",,
+Audi,Q5,2018,2025,Premium Plus,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O amp, Virtual Cockpit, nav, 360 camera, parking sensors",,
+Audi,Q5,2018,2025,Prestige,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit, nav, adaptive cruise, heads-up display",,
+Audi,Q5,2018,2025,SQ5,4,performance,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, V6 ECM, sport differential, adaptive suspension, sport exhaust, sport brakes",349hp,CULT
+Audi,Q7,2007,2015,Premium,2,mid,3.6L V6,,"Power seats, heated seats, panoramic moonroof",,
+Audi,Q7,2007,2015,Premium Plus,3,premium,3.0L Supercharged V6,Bose,"Bose amp, heated seats, nav, parking sensors, blind spot",Supercharged 3.0T from 2011+,
+Audi,Q7,2007,2015,Prestige,3,premium,3.0L Supercharged V6,Bose,"Bose amp, heated/cooled seats, nav, adaptive cruise, rear entertainment, adaptive air suspension",,
+Audi,Q7,2017,2025,Premium,2,mid,2.0L Turbo I4,,"Virtual Cockpit, power seats, heated seats",,
+Audi,Q7,2017,2025,Premium Plus,3,premium,3.0L Turbo V6,Bose,"Bose amp, Virtual Cockpit, nav, 360 camera, blind spot, parking sensors",,
+Audi,Q7,2017,2025,Prestige,3,premium,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit, nav, adaptive cruise, heads-up display, matrix LED, air suspension",,
+Audi,Q7,2017,2025,SQ7,4,performance,4.0L Twin-Turbo V8,Bang & Olufsen,"B&O 3D amp, V8 ECM, sport differential, adaptive air suspension, sport exhaust, sport brakes",500hp. 2021+,CULT
+Audi,A5,2008,2016,Premium,2,mid,2.0L Turbo I4,,"Power seats, heated seats, MMI",,
+Audi,A5,2008,2016,Premium Plus,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O amp, heated seats, nav, blind spot, parking sensors",,
+Audi,A5,2008,2016,S5,4,performance,3.0L Supercharged V6,Bang & Olufsen,"B&O amp, supercharged V6 ECM, sport differential, sport exhaust, sport suspension",333hp. 4.2L V8 pre-2010.,CULT
+Audi,A5,2008,2016,RS5,4,performance,4.2L V8,Bang & Olufsen,"B&O amp, 4.2L V8 ECM (450hp), sport differential, ceramic brakes optional, sport exhaust, carbon fiber",2013-2015. Naturally aspirated V8. Incredible sound.,CULT
+Audi,A5,2017,2025,Premium,2,mid,2.0L Turbo I4,,"Virtual Cockpit, power seats",,
+Audi,A5,2017,2025,Premium Plus,3,premium,2.0L Turbo I4,Bang & Olufsen,"B&O 3D amp, Virtual Cockpit, nav, 360 camera, wireless charging",,
+Audi,A5,2017,2025,S5,4,performance,3.0L Turbo V6,Bang & Olufsen,"B&O 3D amp, turbo V6 ECM, sport differential, adaptive suspension, sport exhaust",349hp,CULT
+Audi,A5,2017,2025,RS5,4,performance,2.9L Twin-Turbo V6,Bang & Olufsen,"B&O 3D amp, twin-turbo ECM, sport differential, adaptive suspension, ceramic brakes possible, carbon fiber, sport exhaust",444hp,CULT
+Audi,TT,2008,2015,2.0T,2,mid,2.0L Turbo I4,Bose,"Bose amp possible, turbo ECM",,CULT
+Audi,TT,2008,2015,TTS,3,premium,2.0L Turbo I4 (265hp),Bose,"Bose amp, TTS ECM, magnetic ride, sport exhaust, sport differential",,CULT
+Audi,TT,2008,2015,TT RS,4,performance,2.5L Turbo I5,Bose,"Bose amp, 2.5L I5 ECM, magnetic ride, sport exhaust, ceramic brakes possible",360hp 5-cylinder. Iconic engine.,CULT
+Audi,TT,2016,2023,2.0T,2,mid,2.0L Turbo I4,Bose,"Bose amp possible, Virtual Cockpit (standard)",,CULT
+Audi,TT,2016,2023,TTS,3,premium,2.0L Turbo I4 (288hp),Bose,"Bose amp, TTS ECM, magnetic ride, sport exhaust",,CULT
+Audi,TT,2016,2023,TT RS,4,performance,2.5L Turbo I5 (394hp),Bang & Olufsen,"B&O amp, 2.5L I5 ECM, magnetic ride, sport exhaust, ceramic brakes possible, OLED taillights",394hp 5-cylinder. Cult legend.,CULT
+Audi,R8,2008,2015,4.2,3,premium,4.2L V8,Bang & Olufsen,"B&O amp, V8 ECM, magnetic ride, ceramic brakes optional, carbon fiber",Mid-engine V8 supercar,CULT
+Audi,R8,2008,2015,5.2 V10,4,performance,5.2L V10,Bang & Olufsen,"B&O amp, V10 ECM, magnetic ride, ceramic brakes, carbon fiber, R-tronic/S-tronic",V10 from Lamborghini Gallardo,CULT
+Audi,R8,2017,2023,V10,4,performance,5.2L V10,Bang & Olufsen,"B&O amp, V10 ECM, magnetic ride, ceramic brakes, carbon fiber, Virtual Cockpit",540-602hp,CULT
+Mitsubishi,Eclipse,1995,1999,RS,1,base,2.0L I4 (420A),,,Non-turbo. Chrysler 420A engine. Not the cult one.,
+Mitsubishi,Eclipse,1995,1999,GS,2,mid,2.0L I4 (420A),,,Non-turbo FWD,
+Mitsubishi,Eclipse,1995,1999,GS-T,3,premium,2.0L Turbo I4 (4G63T),,"4G63T turbo ECM, turbo, intercooler, turbo manifold, injectors",FWD turbo. 4G63 is the cult engine.,CULT
+Mitsubishi,Eclipse,1995,1999,GSX,4,performance,2.0L Turbo I4 (4G63T) AWD,,"4G63T turbo ECM, turbo, intercooler, AWD transfer case, rear diff, turbo manifold",AWD turbo. THE cult DSM. Every part is gold.,CULT
+Mitsubishi,Eclipse,2000,2005,RS,1,base,2.4L I4,,,,
+Mitsubishi,Eclipse,2000,2005,GS,2,mid,2.4L I4,Infinity,Infinity amp possible,,
+Mitsubishi,Eclipse,2000,2005,GT,3,premium,3.0L V6,Infinity,"Infinity amp, V6 ECM, power seats, moonroof",V6 is decent but not cult,
+Mitsubishi,Eclipse,2000,2005,GTS,3,premium,3.0L V6 (210hp),Infinity,"Infinity amp, V6 ECM, sport suspension, leather",,
+Mitsubishi,Lancer,2003,2006,Evolution VIII,4,performance,2.0L Turbo I4 (4G63T),,"4G63T ECM, AYC/ACD AWD modules, Brembo brakes, turbo, intercooler, boost controller",Evo 8. Rally legend. Every drivetrain part is valuable.,CULT
+Mitsubishi,Lancer,2003,2006,Evolution VIII MR,4,performance,2.0L Turbo I4 (4G63T),,"4G63T ECM, MIVEC, BBS wheels, Bilstein shocks, AYC/ACD modules",MR = most refined. MIVEC head.,CULT
+Mitsubishi,Lancer,2008,2015,Evolution X GSR,4,performance,2.0L Turbo I4 (4B11T),,"4B11T ECM, S-AWC module, AYC/ACD modules, Brembo brakes, Eibach springs, 5-speed manual",Evo X. Last of the breed. 4B11T engine.,CULT
+Mitsubishi,Lancer,2008,2015,Evolution X MR,4,performance,2.0L Turbo I4 (4B11T),,"4B11T ECM, S-AWC module, AYC/ACD modules, Brembo brakes, BBS wheels, Bilstein shocks, SST dual-clutch TCM",SST transmission module is unique. Twin-clutch.,CULT
+Acura,Integra,1994,2001,RS,1,base,1.8L I4 (B18B1),,,Non-VTEC. Still has cult following for chassis.,CULT
+Acura,Integra,1994,2001,LS,2,mid,1.8L I4 (B18B1),,"Power seats, moonroof, leather possible",Non-VTEC. Popular swap candidate.,CULT
+Acura,Integra,1994,2001,GS,2,mid,1.8L I4 (B18B1),,"Leather, ABS, power everything",,CULT
+Acura,Integra,1994,2001,GS-R,3,premium,1.8L VTEC I4 (B18C1),,"B18C1 VTEC ECM, LSD, sport suspension, VTEC solenoid, 170hp",VTEC engine. ECM is very valuable.,CULT
+Acura,Integra,1994,2001,Type R,4,performance,1.8L VTEC I4 (B18C5),,"B18C5 ECM, close-ratio LSD, Recaro seats, 195hp, hand-ported head, lighter flywheel",THE holy grail. B18C5 is the most valuable Honda ECM. Entire car is collectible.,CULT
+Acura,RSX,2002,2006,Base,2,mid,2.0L I4 (K20A3),,,K20A3 is still sought after for swaps,CULT
+Acura,RSX,2002,2006,Type-S,4,performance,2.0L VTEC I4 (K20A2/Z1),,"K20A2 ECM, LSD, 6-speed, sport suspension, Brembo brakes (2005+), 200-210hp",K20 Type S ECM and LSD are cult parts. i-VTEC.,CULT
+Honda,Civic,1992,1995,CX,1,base,1.5L I4 (D15B8),,,Lightest Civic. Popular for swaps.,CULT
+Honda,Civic,1992,1995,DX,1,base,1.5L I4 (D15B7),,,,CULT
+Honda,Civic,1992,1995,EX,2,mid,1.6L VTEC I4 (D16Z6),,"D16Z6 VTEC ECM, power moonroof, power windows",Single-cam VTEC. ECM sought after.,CULT
+Honda,Civic,1992,1995,Si,3,premium,1.6L VTEC I4 (D16Z6),,"D16Z6 VTEC ECM, sport suspension, rear disc brakes",Hatchback Si is most valuable body.,CULT
+Honda,Civic,1996,2000,CX,1,base,1.6L I4 (D16Y7),,,Lightest EK. Swap candidate.,CULT
+Honda,Civic,1996,2000,DX,1,base,1.6L I4 (D16Y7),,,,CULT
+Honda,Civic,1996,2000,EX,2,mid,1.6L VTEC I4 (D16Y8),,"D16Y8 VTEC ECM, power moonroof",Single-cam VTEC,CULT
+Honda,Civic,1996,2000,Si,4,performance,1.6L DOHC VTEC I4 (B16A2),,"B16A2 ECM, LSD, sport suspension, 160hp, close-ratio 5-speed",B16A2 is legendary. EM1 coupe only.,CULT
+Honda,Civic,2001,2005,DX,1,base,1.7L I4 (D17A1),,,,
+Honda,Civic,2001,2005,LX,1,base,1.7L I4 (D17A1),,,,
+Honda,Civic,2001,2005,EX,2,mid,1.7L VTEC I4 (D17A2),,"D17A2 ECM, moonroof, power seats",,
+Honda,Civic,2001,2005,Si,4,performance,2.0L I4 (K20A3),,"K20A3 ECM, close-ratio 5-speed, sport suspension, 160hp",EP3 hatchback. K20 in a Civic.,CULT
+Honda,S2000,2000,2003,AP1,4,performance,2.0L VTEC I4 (F20C),,"F20C ECM (9000rpm redline!), 6-speed, LSD, sport suspension, power soft top",F20C revs to 9000rpm. Most valuable Honda ECM after Type R.,CULT
+Honda,S2000,2004,2009,AP2,4,performance,2.2L VTEC I4 (F22C1),,"F22C1 ECM (8000rpm), 6-speed, LSD, sport suspension, power soft top, VSA module",AP2 has more torque. Both are cult.,CULT
+Honda,Prelude,1997,2001,Base,2,mid,2.2L VTEC I4 (H22A4),,"H22A4 VTEC ECM, power moonroof",H22 is a cult swap engine.,CULT
+Honda,Prelude,1997,2001,Type SH,3,premium,2.2L VTEC I4 (H22A4),,"H22A4 ECM, ATTS torque vectoring module, LSD, sport suspension",ATTS module is rare and valuable. Torque vectoring before it was cool.,CULT
+Toyota,Supra,1993,1998,Base,3,premium,3.0L I6 (2JZ-GE),,"2JZ-GE ECM, 6-speed available, T-top",Non-turbo 2JZ. Still valuable for swap base.,CULT
+Toyota,Supra,1993,1998,Turbo,4,performance,3.0L Twin-Turbo I6 (2JZ-GTE),,"2JZ-GTE ECM, sequential twin-turbo, 6-speed Getrag, Torsen LSD, sport suspension, 320hp stock",THE cult car. 2JZ-GTE ECM is gold. 1000hp capable engine.,CULT
+Toyota,Supra,2020,2025,2.0,2,mid,2.0L Turbo I4,,"Sport seats, 8.8in display",BMW B48 engine,CULT
+Toyota,Supra,2020,2025,3.0,3,premium,3.0L Turbo I6,,"Sport seats, JBL possible, adaptive suspension, Brembo brakes, LSD, 382hp (2021+)",BMW B58 engine. Tuner favorite already.,CULT
+Toyota,Supra,2020,2025,3.0 A91/45th Anniversary,4,performance,3.0L Turbo I6,,"Unique ECM tune, carbon fiber, exclusive colors, all 3.0 features",Special editions,CULT
+Toyota,MR2,1991,1995,Turbo,4,performance,2.0L Turbo I4 (3S-GTE),,"3S-GTE ECM, turbo, intercooler, LSD, sport suspension, T-top",Mid-engine turbo. Snap oversteer legend. 3S-GTE parts are gold.,CULT
+Toyota,MR2,1991,1999,Base,2,mid,2.2L I4 (5S-FE),,"5S-FE ECM, T-top, mid-engine layout",Non-turbo. Still cult for chassis.,CULT
+Toyota,Celica,1994,1999,GT,2,mid,2.2L I4 (5S-FE),,,,
+Toyota,Celica,1994,1999,GT-Four,4,performance,2.0L Turbo I4 (3S-GTE) AWD,,"3S-GTE ECM, AWD transfer case, turbo, intercooler, LSD",ST205 GT-Four. Rally heritage. JDM import cult.,CULT
+Nissan,240SX,1989,1994,Base,2,mid,2.4L I4 (KA24DE),,KA24DE ECM,S13. Drift king platform. KA24DE is the stock engine.,CULT
+Nissan,240SX,1989,1994,SE,3,premium,2.4L I4 (KA24DE),,"KA24DE ECM, LSD, sport suspension, ABS",S13. LSD model is more valuable.,CULT
+Nissan,240SX,1995,1998,Base,2,mid,2.4L I4 (KA24DE),,KA24DE ECM,S14. Kouki (97-98) more valuable than Zenki (95-96).,CULT
+Nissan,240SX,1995,1998,SE,3,premium,2.4L I4 (KA24DE),,"KA24DE ECM, LSD, sport suspension, ABS, power everything",LSD is worth more than the car sometimes.,CULT
+Nissan,300ZX,1990,1996,Base,2,mid,3.0L V6 (VG30DE),,"VG30DE ECM, T-top, power seats",Non-turbo. Still cult.,CULT
+Nissan,300ZX,1990,1996,Twin Turbo,4,performance,3.0L Twin-Turbo V6 (VG30DETT),,"VG30DETT ECM, twin turbo, intercoolers, LSD, sport suspension, Brembo-style brakes, 300hp",THE 90s Japanese GT car. Twin turbo V6 ECM is gold.,CULT
+Nissan,350Z,2003,2009,Enthusiast,2,mid,3.5L V6 (VQ35DE/HR),,"VQ35 ECM, 6-speed, RWD","DE early, HR from 2007. Both cult.",CULT
+Nissan,350Z,2003,2009,Track,3,premium,3.5L V6 (VQ35DE/HR),Bose,"Bose amp, VQ35 ECM, LSD, Brembo brakes, sport suspension, 6-speed",,CULT
+Nissan,350Z,2003,2009,Nismo,4,performance,3.5L V6 (VQ35HR) 306hp,Bose,"Bose amp, Nismo ECM, LSD, Brembo brakes, Nismo suspension, sport exhaust",2007-2008. NISMO tuned.,CULT
+Nissan,370Z,2009,2020,Base,2,mid,3.7L V6 (VQ37VHR),,"VQ37VHR ECM, 6-speed, RWD",,CULT
+Nissan,370Z,2009,2020,Sport,3,premium,3.7L V6 (VQ37VHR),Bose,"Bose amp, VQ37 ECM, LSD, sport suspension, sport brakes, SynchroRev Match",,CULT
+Nissan,370Z,2009,2020,Nismo,4,performance,3.7L V6 (VQ37VHR) 350hp,Bose,"Bose amp, Nismo ECM, LSD, Nismo suspension, Nismo exhaust, Recaro seats",Nismo tune. Rare.,CULT
+Nissan,GT-R,2009,2024,Premium,3,premium,3.8L Twin-Turbo V6 (VR38DETT),Bose,"Bose amp, VR38DETT ECM, ATTESA E-TS AWD module, GR6 DCT TCM, Brembo brakes, 545-565hp",Hand-built engine. Every module is extremely valuable.,CULT
+Nissan,GT-R,2009,2024,Nismo,4,performance,3.8L Twin-Turbo V6 (VR38DETT) 600hp,Bose,"Bose amp, Nismo VR38DETT ECM, ATTESA E-TS, Nismo suspension, carbon fiber, Brembo carbon ceramic",Nismo GT-R. Six-figure car. Parts are insane value.,CULT
+Mazda,RX-7,1993,1995,Base,3,premium,1.3L Twin-Turbo Rotary (13B-REW),,"13B-REW ECM, sequential twin-turbo, LSD, sport suspension",Rotary turbo. ECM and engine parts are extremely valuable.,CULT
+Mazda,RX-7,1993,1995,R1/R2/Touring,3,premium,1.3L Twin-Turbo Rotary (13B-REW),,"13B-REW ECM, sequential twin-turbo, LSD, sport suspension, leather (Touring)",All FD RX-7s are cult. Different option pkgs.,CULT
+Mazda,RX-8,2004,2012,Sport,2,mid,1.3L Rotary (Renesis) 197hp,,"Renesis ECM, 6-speed, sport suspension",6-port 9000rpm version,CULT
+Mazda,RX-8,2004,2012,Grand Touring,3,premium,1.3L Rotary (Renesis) 212hp,Bose,"Bose amp, Renesis ECM, 6-speed, LSD, sport suspension, heated leather",R3 pkg is the track version,CULT
+Mazda,Miata,1990,1997,Base,2,mid,1.6L/1.8L I4,,"ECM, LSD (if equipped), power steering, soft top mechanism",NA Miata. The answer is always Miata.,CULT
+Mazda,Miata,1990,1997,R Package,3,premium,1.8L I4,,"ECM, Torsen LSD, sport suspension, Bilstein shocks, sport seats",R Package = track-ready NA,CULT
+Mazda,Miata,1999,2005,Base,2,mid,1.8L I4,,"ECM, Torsen LSD possible",NB Miata,CULT
+Mazda,Miata,1999,2005,Mazdaspeed,4,performance,1.8L Turbo I4,,"Turbo ECM, turbo, intercooler, LSD, sport suspension, 178hp",Factory turbo Miata. Only 2004-2005. Very rare.,CULT
+Mazda,MX-5 Miata,2006,2015,Sport,2,mid,2.0L I4,,"ECM, LSD possible, soft top",NC Miata,CULT
+Mazda,MX-5 Miata,2006,2015,Grand Touring,3,premium,2.0L I4,Bose,"Bose amp, ECM, LSD, sport suspension, power hardtop possible",,CULT
+Mazda,MX-5 Miata,2016,2025,Sport,2,mid,2.0L I4,,"ECM, LSD possible",ND Miata,CULT
+Mazda,MX-5 Miata,2016,2025,Grand Touring,3,premium,2.0L I4,Bose,"Bose amp, ECM, LSD, Bilstein shocks, BBS wheels possible",,CULT
+Mazda,MX-5 Miata,2016,2025,Club,3,premium,2.0L I4,Bose,"Bose amp possible, ECM, LSD, Bilstein shocks, sport suspension, BBS possible",Track-focused trim,CULT
+Mazda,Mazdaspeed3,2007,2013,Base,4,performance,2.3L DISI Turbo I4,,"DISI Turbo ECM, turbo, intercooler, LSD, sport suspension, sport exhaust, 263hp",MZR turbo engine. Only trim level. All are hot.,CULT
+Mazda,Mazdaspeed6,2006,2007,Base,4,performance,2.3L DISI Turbo I4 AWD,Bose,"Bose amp, DISI Turbo ECM, AWD transfer case, turbo, intercooler, LSD, 274hp",Turbo AWD sedan. Only 2 years. Very rare.,CULT
+Toyota,Pickup,1989,1995,Base,2,mid,2.4L I4 (22RE),,"22RE ECM, manual trans, 4WD transfer case if equipped",22RE is indestructible. Cult following. SR5 has more options.,CULT
+Toyota,Pickup,1989,1995,SR5,3,premium,3.0L V6 (3VZ-E),,"3VZ-E ECM, power windows/locks, A/C, 4WD",V6 4WD SR5 is the money truck,CULT
+Toyota,Tacoma,1995,2004,Base,2,mid,2.4L I4 (2RZ-FE),,"2RZ-FE ECM, 5-speed manual",First gen Tacoma. Bulletproof.,CULT
+Toyota,Tacoma,1995,2004,SR5,2,mid,3.4L V6 (5VZ-FE),,"5VZ-FE ECM, power windows, A/C, 4WD if equipped",5VZ-FE V6 is legendary reliability,CULT
+Toyota,Tacoma,1995,2004,PreRunner,2,mid,3.4L V6 (5VZ-FE),,"5VZ-FE ECM, 2WD with off-road suspension",TRD Off-Road pkg available,CULT
+Toyota,Tacoma,1995,2004,Limited,3,premium,3.4L V6 (5VZ-FE),,"5VZ-FE ECM, leather, power seats, diff lock",Rare. Loaded 1st gen.,CULT
+Toyota,Tacoma,2005,2015,Base,1,base,2.7L I4 (2TR-FE),,,,CULT
+Toyota,Tacoma,2005,2015,PreRunner,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, off-road suspension, 2WD",1GR-FE V6 is sought after,CULT
+Toyota,Tacoma,2005,2015,SR5,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, TRD Off-Road available, rear diff lock",,CULT
+Toyota,Tacoma,2005,2015,TRD Off-Road,3,premium,4.0L V6 (1GR-FE),,"1GR-FE ECM, rear diff lock, crawl control (late), multi-terrain select",Off-road pkg. Very desirable.,CULT
+Toyota,Tacoma,2005,2015,TRD Sport,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, sport suspension, hood scoop, sport appearance",,CULT
+Toyota,4Runner,1996,2002,SR5,2,mid,3.4L V6 (5VZ-FE),,"5VZ-FE ECM, power windows, rear diff lock if equipped",3rd gen is peak cult 4Runner. Headgaskets are the killer.,CULT
+Toyota,4Runner,1996,2002,Limited,3,premium,3.4L V6 (5VZ-FE),,"5VZ-FE ECM, leather, moonroof, rear diff lock, multi-mode 4WD",Full-time 4WD with center diff lock on Limited,CULT
+Toyota,4Runner,2003,2009,SR5,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, power windows, rear camera (late)",,CULT
+Toyota,4Runner,2003,2009,Sport Edition,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, sport suspension, hood scoop, X-REAS suspension",X-REAS interconnected shocks are unique,CULT
+Toyota,4Runner,2003,2009,Limited,3,premium,4.7L V8 (2UZ-FE),JBL,"JBL amp, 2UZ-FE V8 ECM, KDSS (late), leather, moonroof, multi-mode 4WD, rear diff lock",V8 is the premium engine. 2UZ-FE is bulletproof.,CULT
+Toyota,4Runner,2010,2025,SR5,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, Entune, rear camera",,CULT
+Toyota,4Runner,2010,2025,SR5 Premium,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, leather, moonroof, heated seats",,CULT
+Toyota,4Runner,2010,2025,Trail / TRD Off-Road,3,premium,4.0L V6 (1GR-FE),,"1GR-FE ECM, rear diff lock, crawl control, multi-terrain select, kinetic dynamic suspension (KDSS)",Rear locker is the money feature,CULT
+Toyota,4Runner,2010,2025,TRD Off-Road Premium,3,premium,4.0L V6 (1GR-FE),JBL,"JBL amp, 1GR-FE ECM, KDSS, rear diff lock, crawl control, leather, moonroof",,CULT
+Toyota,4Runner,2010,2025,Limited,3,premium,4.0L V6 (1GR-FE),JBL,"JBL amp, 1GR-FE ECM, leather, KDSS, moonroof, heated/ventilated seats, park assist",Full-time 4WD (no 2H mode),CULT
+Toyota,4Runner,2010,2025,TRD Pro,4,performance,4.0L V6 (1GR-FE),JBL,"JBL amp, TRD-tuned ECM possible, Fox shocks, TRD skid plate, TRD exhaust, rear diff lock, crawl control",TRD Pro holds value better than almost any vehicle. Parts are gold.,CULT
+Toyota,Land Cruiser,1998,2007,Base,3,premium,4.7L V8 (2UZ-FE),,"2UZ-FE ECM, full-time 4WD, center diff lock, AHC suspension, multi-mode transfer case",100 Series. Overbuilt everything. Parts hold value forever.,CULT
+Toyota,Land Cruiser,2008,2021,Base,3,premium,5.7L V8 (3UR-FE),JBL,"JBL amp, 3UR-FE V8 ECM, KDSS, crawl control, multi-terrain select, AHC height control, center diff lock, heated/cooled seats",Every 200 Series is premium. Only one trim in US. Parts are extremely valuable.,CULT
+Toyota,Land Cruiser,2024,2025,1958,2,mid,2.4L Turbo Hybrid,,"Turbo hybrid ECM, hybrid modules, off-road suspension, locking center diff",Heritage-inspired base trim,CULT
+Toyota,Land Cruiser,2024,2025,First Edition,3,premium,2.4L Turbo Hybrid,JBL,"JBL amp, turbo hybrid ECM, hybrid modules, locking diffs, crawl control, heated/ventilated seats, 360 camera",Loaded launch edition,CULT
+Toyota,FJ Cruiser,2007,2014,Base,2,mid,4.0L V6 (1GR-FE),,"1GR-FE ECM, part-time 4WD, rear diff lock, A-TRAC",FJ holds insane resale value. Everything is cult.,CULT
+Toyota,FJ Cruiser,2007,2014,Trail Teams,3,premium,4.0L V6 (1GR-FE),,"1GR-FE ECM, Bilstein shocks, TRD exhaust, locking rear diff, unique colors",Special editions. Even more valuable.,CULT
+Toyota,FJ Cruiser,2007,2014,Ultimate Edition,3,premium,4.0L V6 (1GR-FE),,"1GR-FE ECM, TRD suspension, locking rear diff, roof rack, unique final edition",2014 only. Final year. Ultra collectible.,CULT
+Lexus,GX 470,2003,2009,Base,3,premium,4.7L V8 (2UZ-FE),Mark Levinson,"Mark Levinson amp, 2UZ-FE V8 ECM, full-time 4WD, center diff lock, AHC height control, KDSS, heated seats, nav",Land Cruiser Prado platform. Bulletproof V8. Cult off-roader.,CULT
+Lexus,GX 460,2010,2025,Base,3,premium,4.6L V8 (1UR-FE),,"1UR-FE V8 ECM, full-time 4WD, KDSS, crawl control",Same platform as 4Runner/Prado. V8 luxury off-roader.,CULT
+Lexus,GX 460,2010,2025,Luxury,3,premium,4.6L V8 (1UR-FE),Mark Levinson,"Mark Levinson amp, V8 ECM, KDSS, crawl control, heated/cooled seats, adaptive cruise (late), 360 camera (late)",Full loaded. ML audio is the differentiator.,CULT
+Lexus,LX 470,1998,2007,Base,3,premium,4.7L V8 (2UZ-FE),Nakamichi,"Nakamichi amp (early) / Mark Levinson amp (late), 2UZ-FE V8 ECM, AHC height control, center diff lock, heated seats, nav",Land Cruiser 100 luxury twin. Nakamichi amp on early models is rare.,CULT
+Lexus,LX 570,2008,2021,Base,3,premium,5.7L V8 (3UR-FE),Mark Levinson,"Mark Levinson amp, 3UR-FE V8 ECM, AHC height control, KDSS, crawl control, heated/cooled seats, rear entertainment, adaptive cruise",Land Cruiser 200 luxury twin. ML amp + V8 ECM are premium pulls.,CULT
+Volkswagen,Golf GTI,2006,2009,Base,3,premium,2.0L Turbo I4 (FSI),,"FSI turbo ECM, sport suspension, LSD possible, 6-speed",Mk5 GTI. EA113 engine.,CULT
+Volkswagen,Golf GTI,2010,2014,Base,3,premium,2.0L Turbo I4 (TSI),,"TSI turbo ECM, sport suspension, LSD possible, 6-speed",Mk6 GTI. EA888 Gen1.,CULT
+Volkswagen,Golf GTI,2015,2021,S,2,mid,2.0L Turbo I4 (EA888),,"EA888 ECM, sport suspension, 6-speed or DSG",Mk7/7.5 GTI,CULT
+Volkswagen,Golf GTI,2015,2021,SE,3,premium,2.0L Turbo I4 (EA888),Fender,"Fender amp, EA888 ECM, sport suspension, DCC possible, lighting pkg",,CULT
+Volkswagen,Golf GTI,2015,2021,Autobahn,3,premium,2.0L Turbo I4 (EA888),Fender,"Fender amp, EA888 ECM, DCC adaptive dampers, nav, Digital Cockpit, 12.3in display",,CULT
+Volkswagen,Golf R,2015,2021,Base,4,performance,2.0L Turbo I4 (EA888) AWD 292hp,Fender,"Fender amp, EA888 ECM (292hp tune), Haldex AWD module, DCC adaptive dampers, sport exhaust, sport brakes",Mk7/7.5 Golf R. AWD hot hatch. Haldex module is valuable.,CULT
+Volkswagen,Golf R,2022,2025,Base,4,performance,2.0L Turbo I4 (EA888 Evo4) AWD 315hp,Harman Kardon,"Harman Kardon amp, EA888 ECM (315hp), 4Motion AWD module, DCC, torque vectoring rear diff, drift mode",Mk8 Golf R. Torque vectoring rear diff is unique part.,CULT
+Ford,Focus,2013,2018,ST,4,performance,2.0L EcoBoost (252hp),Sony,"Sony amp, EcoBoost ECM, sport suspension, Recaro seats, sport exhaust, LSD",Hot hatch. Recaro seats are valuable.,CULT
+Ford,Focus,2016,2018,RS,4,performance,2.3L EcoBoost AWD (350hp),Sony,"Sony amp, RS ECM, AWD module, drift mode, Brembo brakes, Recaro seats, adaptive suspension",AWD hot hatch. Drift mode. RS parts are extremely valuable.,CULT
+Ford,Fiesta,2014,2019,ST,4,performance,1.6L EcoBoost (197hp),,"EcoBoost ECM, sport suspension, Recaro seats, sport exhaust, Torsen LSD",Tiny hot hatch. Cult following. Recaro seats are $$$.,CULT
+Hyundai,Veloster,2019,2022,N,4,performance,2.0L Turbo I4 (275hp),,"N ECM, electronic LSD, adaptive suspension, launch control, N drive modes, sport exhaust with valve, Brembo brakes possible",Korean hot hatch done right. Discontinued = parts getting scarce.,CULT
+Honda,Civic,2022,2025,Type R,4,performance,2.0L Turbo I4 (K20C1) 315hp,,"K20C1 ECM, LSD, Brembo brakes, adaptive dampers, rev match, 6-speed",FL5 Type R. Latest gen. K20C1 ECM is top dollar.,CULT
+Toyota,GR86,2022,2025,Base,2,mid,2.4L H4 (FA24),,"FA24 ECM, 6-speed, LSD, sport suspension",,CULT
+Toyota,GR86,2022,2025,Premium,3,premium,2.4L H4 (FA24),,"FA24 ECM, heated seats, 8in display, sport mode, 6-speed, LSD",,CULT
+Subaru,BRZ,2013,2020,Premium,2,mid,2.0L H4 (FA20),,"FA20 ECM, 6-speed, LSD, sport suspension",FA20 = Toyota 86/Scion FR-S twin,CULT
+Subaru,BRZ,2013,2020,Limited,3,premium,2.0L H4 (FA20),,"FA20 ECM, 6-speed, LSD, heated seats, push-button start",,CULT
+Subaru,BRZ,2013,2020,tS,4,performance,2.0L H4 (FA20),,"FA20 ECM, STI-tuned suspension, Brembo brakes, STI body kit, LSD",STI tuned. 2018 only. 500 made.,CULT
+Subaru,BRZ,2022,2025,Premium,2,mid,2.4L H4 (FA24),,"FA24 ECM, 6-speed, LSD, sport suspension",,CULT
+Subaru,BRZ,2022,2025,Limited,3,premium,2.4L H4 (FA24),,"FA24 ECM, heated seats, 8in display, 6-speed, LSD",,CULT
+Subaru,BRZ,2022,2025,tS,4,performance,2.4L H4 (FA24),,"FA24 ECM, STI-tuned suspension, Brembo brakes, STI body kit, Recaro seats, LSD",2024+. STI treatment.,CULT
+Toyota,Corolla,2023,2025,GR Core,4,performance,1.6L Turbo I3 (G16E-GTS) AWD 300hp,,"G16E-GTS ECM, GR-Four AWD module, Torsen LSD front+rear, 6-speed, sport suspension",3-cylinder turbo AWD hot hatch. GR-Four drivetrain is unique.,CULT
+Toyota,Corolla,2023,2025,GR Circuit,4,performance,1.6L Turbo I3 (G16E-GTS) AWD 300hp,,"G16E-GTS ECM, GR-Four AWD, Torsen LSDs, forged wheels, performance exhaust, carbon fiber roof",Limited production. Performance pkg adds forged + carbon.,CULT
+Toyota,Corolla,2023,2025,GR MORIZO,4,performance,1.6L Turbo I3 (G16E-GTS) AWD 300hp,,"G16E-GTS ECM, GR-Four AWD, close-ratio 6-speed, Torsen LSDs, deleted rear seats, lighter weight",Ultra limited. Track weapon. Deleted rear seats.,CULT
+Toyota,86,2017,2020,Base,2,mid,2.0L H4 (FA20),,"FA20 ECM, 6-speed, LSD, sport suspension",Renamed from Scion FR-S to Toyota 86,CULT
+Toyota,86,2017,2020,GT,3,premium,2.0L H4 (FA20),,"FA20 ECM, heated seats, fog lights, 6-speed, LSD",,CULT
+Dodge,Viper,2003,2010,SRT-10,4,performance,8.3L V10,,"8.3L V10 ECM, Tremec 6-speed, sport suspension, massive Brembo brakes","If one shows up at a yard, pull everything. V10 ECM is worth the trip alone.",CULT
+Dodge,Viper,2013,2017,SRT/GTS/ACR,4,performance,8.4L V10 (640-645hp),,"8.4L V10 ECM, Tremec 6-speed, carbon fiber, Brembo brakes, ACR aero",Gen 5 Viper. Rarest of the rare at yards.,CULT
+Ford,F-150,1997,2003,XL,1,base,4.2L V6,,,Work truck. 4.2L Essex V6.,
+Ford,F-150,1997,2003,XLT,2,mid,4.6L V8,,"Power seats possible, cruise",Volume trim. Triton V8.,
+Ford,F-150,1997,2003,Lariat,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated seats, leather, power seats",5.4L Triton is premium engine,
+Ford,F-150,1997,2003,King Ranch,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated seats, premium King Ranch leather, power seats",2001+. First King Ranch edition.,
+Ford,F-150,1997,2003,Lightning,4,performance,5.4L Supercharged V8,,"Supercharged 5.4L ECM, lowered suspension, unique intake, 380hp",SVT Lightning. Supercharged truck. ECM is gold.,CULT
+Ford,Explorer,2002,2005,XLS,1,base,4.0L V6,,,3rd gen. SOHC V6.,
+Ford,Explorer,2002,2005,XLT,2,mid,4.0L V6,,"Power seats, cruise, rear camera (late)",,
+Ford,Explorer,2002,2005,Eddie Bauer,3,premium,4.6L V8,Audiophile,"Audiophile amp, heated seats, leather, moonroof, V8 ECM",V8 is premium,
+Ford,Explorer,2002,2005,Limited,3,premium,4.6L V8,Audiophile,"Audiophile amp, heated seats, leather, moonroof, nav possible",,
+Ford,Explorer,2006,2010,XLT,2,mid,4.0L V6,,"Power seats, SYNC (late)",4th gen. Redesigned.,
+Ford,Explorer,2006,2010,Eddie Bauer,3,premium,4.6L V8,Audiophile,"Audiophile amp, V8 ECM, heated seats, nav, moonroof",,
+Ford,Explorer,2006,2010,Limited,3,premium,4.6L V8,Audiophile,"Audiophile amp, V8 ECM, heated/cooled seats, nav, power liftgate",,
+Ford,Explorer,2006,2010,Sport Trac,2,mid,4.0L V6,,"Pickup bed variant, power seats",Truck version of Explorer,
+Ford,Explorer,2006,2010,Sport Trac Adrenalin,3,premium,4.6L V8,Audiophile,"Audiophile amp, V8 ECM, sport suspension, leather",Performance Sport Trac,
+Ford,Escape,2001,2007,XLS,1,base,2.0L I4,,,,
+Ford,Escape,2001,2007,XLT,2,mid,3.0L V6,,"Power seats, V6 ECM",Duratec V6,
+Ford,Escape,2001,2007,Limited,3,premium,3.0L V6,,"Heated leather seats, moonroof, V6 ECM, ABS",,
+Ford,Escape,2008,2012,XLS,1,base,2.3L I4,,,,
+Ford,Escape,2008,2012,XLT,2,mid,3.0L V6,,"SYNC, power seats",,
+Ford,Escape,2008,2012,Limited,3,premium,3.0L V6,,"Heated leather seats, SYNC with nav, moonroof, blind spot (late)",,
+Ford,Edge,2007,2014,SE,1,base,3.5L V6,,,,
+Ford,Edge,2007,2014,SEL,2,mid,3.5L V6,,"SYNC, power liftgate (late), rear camera",,
+Ford,Edge,2007,2014,Limited,3,premium,3.5L V6,Sony,"Sony amp, heated/cooled seats, nav, park assist, blind spot",,
+Ford,Edge,2007,2014,Sport,3,premium,3.7L V6,Sony,"Sony amp, 3.7L ECM, sport suspension, 22in wheels possible",305hp. Only Ford SUV with this engine.,
+Ford,Expedition,2003,2006,XLS,1,base,4.6L V8,,,,
+Ford,Expedition,2003,2006,XLT,2,mid,5.4L V8,,"Power seats, rear A/C, 3rd row",,
+Ford,Expedition,2003,2006,Eddie Bauer,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated/cooled seats, nav, moonroof, power running boards",,
+Ford,Expedition,2003,2006,King Ranch,3,premium,5.4L V8,Audiophile,"Audiophile amp, heated/cooled seats, King Ranch leather, power running boards, nav",,
+Ford,Expedition,2007,2017,XLT,2,mid,5.4L V8,,"SYNC, power seats, rear camera","5.4L to 2014, then 3.5L EcoBoost",
+Ford,Expedition,2007,2017,Limited,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, nav, power liftgate, power running boards",EcoBoost from 2015+,
+Ford,Expedition,2007,2017,King Ranch,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, nav, power running boards, adaptive cruise (late)",,
+Ford,Expedition,2007,2017,Platinum,3,premium,3.5L EcoBoost,Sony,"Sony amp, heated/cooled seats, power running boards, massage seats (late), adaptive cruise",2015+,
+Ford,Mustang,1999,2004,V6,1,base,3.8L V6,,,,
+Ford,Mustang,1999,2004,GT,3,premium,4.6L V8,Mach,"Mach 460/1000 amp, 4.6L 2V ECM, limited slip",Mach 460 or Mach 1000 audio,CULT
+Ford,Mustang,1999,2004,Mach 1,4,performance,4.6L DOHC V8,Mach,"Mach 1000 amp, 4.6L 4V ECM, shaker hood scoop, limited slip",2003-2004. DOHC 4V Cobra engine.,CULT
+Ford,Mustang,1999,2004,Cobra,4,performance,4.6L DOHC V8,Mach,"Mach 1000 amp, DOHC 4V ECM, IRS, Brembo brakes","1999-2001 NA, 2003-2004 supercharged Terminator",CULT
+Ford,Mustang,1999,2004,Cobra R,4,performance,5.4L DOHC V8 (385hp),,"5.4L DOHC ECM, Brembo brakes, no radio, no AC, no backseat",2000 only. 300 made. Ultra rare.,CULT
+Ford,Focus,2000,2007,LX,1,base,2.0L I4,,,,
+Ford,Focus,2000,2007,SE,2,mid,2.0L I4,,"Power windows, cruise",,
+Ford,Focus,2000,2007,ZX3/ZX5,2,mid,2.0L I4,,"Hatchback, sport appearance",,
+Ford,Focus,2000,2007,SVT,4,performance,2.0L I4 (170hp),,"SVT ECM, close-ratio 6-speed (first US Ford 6-speed), sport suspension, Recaro seats possible",SVT Focus. Revvy 2.0L. Cult hot hatch.,CULT
+Chevrolet,Silverado 1500,1999,2006,WT,1,base,4.3L V6,,,GMT800 generation,
+Chevrolet,Silverado 1500,1999,2006,LS,1,base,4.8L V8,,,,
+Chevrolet,Silverado 1500,1999,2006,LT,2,mid,5.3L V8,,"Power seats, OnStar, cruise",5.3L Vortec most common,
+Chevrolet,Silverado 1500,1999,2006,LT Z71,2,mid,5.3L V8,,"Z71 off-road suspension, skid plates, power seats",Z71 package,
+Chevrolet,Silverado 1500,1999,2006,SS,4,performance,6.0L V8 (345hp),,"6.0L Vortec ECM, AWD, sport suspension, 345hp",Silverado SS. AWD performance truck.,CULT
+GMC,Sierra 1500,1999,2006,SLE,2,mid,5.3L V8,,"Power seats, OnStar",,
+GMC,Sierra 1500,1999,2006,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated leather seats, power seats",,
+GMC,Sierra 1500,1999,2006,Denali,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, AWD, heated leather, nav, OnStar",2002+. First Denali truck. AWD only.,
+Chevrolet,Tahoe,2000,2006,LS,1,base,4.8L V8,,,,
+Chevrolet,Tahoe,2000,2006,LT,2,mid,5.3L V8,Bose,"Bose amp possible, heated seats, OnStar, rear entertainment possible",,
+Chevrolet,Tahoe,2000,2006,Z71,2,mid,5.3L V8,,"Z71 off-road suspension, skid plates",,
+Chevrolet,Suburban,2000,2006,LS,1,base,5.3L V8,,,,
+Chevrolet,Suburban,2000,2006,LT,2,mid,5.3L V8,Bose,"Bose amp possible, heated leather, rear entertainment possible, power liftglass",,
+GMC,Yukon,2000,2006,SLE,2,mid,5.3L V8,,"Power seats, OnStar",,
+GMC,Yukon,2000,2006,SLT,3,premium,5.3L V8,Bose,"Bose amp, heated leather, OnStar",,
+GMC,Yukon,2000,2006,Denali,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, AWD, heated leather, nav, power everything",,
+GMC,Yukon XL,2000,2006,SLE,2,mid,5.3L V8,,"Power seats, OnStar",Suburban twin,
+GMC,Yukon XL,2000,2006,Denali,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, AWD, heated leather, nav, rear entertainment",,
+Chevrolet,Equinox,2005,2009,LS,1,base,3.4L V6,,,1st gen. 3.4L only engine initially.,
+Chevrolet,Equinox,2005,2009,LT,2,mid,3.4L V6,,"Power seats, OnStar, heated seats possible",,
+Chevrolet,Equinox,2005,2009,Sport,2,mid,3.6L V6,,"3.6L V6 ECM, sport suspension, 18in wheels",2008-2009. V6 upgrade.,
+Chevrolet,Traverse,2009,2017,LS,1,base,3.6L V6,,,,
+Chevrolet,Traverse,2009,2017,LT,2,mid,3.6L V6,,"Power liftgate, heated seats, rear camera",,
+Chevrolet,Traverse,2009,2017,LTZ,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, park assist, blind spot, rear entertainment",,
+Chevrolet,Camaro,1998,2002,Base,1,base,3.8L V6,,,4th gen. LS1 era.,CULT
+Chevrolet,Camaro,1998,2002,Z28,3,premium,5.7L V8 (LS1),,"LS1 ECM, T56 6-speed, limited slip, sport suspension, 310hp",LS1 engine. THE cult muscle car ECM.,CULT
+Chevrolet,Camaro,1998,2002,SS,4,performance,5.7L V8 (LS1) 325hp,,"LS1 ECM (SS tune), forced-air hood, sport suspension, larger brakes, limited slip",SLP SS package. 325hp LS1.,CULT
+Chevrolet,Impala,2000,2005,Base,1,base,3.4L V6,,,,
+Chevrolet,Impala,2000,2005,LS,2,mid,3.8L V6,,"Power seats, cruise, OnStar",,
+Chevrolet,Impala,2000,2005,SS,4,performance,3.8L Supercharged V6,,"Supercharged 3.8L ECM, sport suspension, larger brakes, 240hp",2004-2005. Supercharged SS.,CULT
+Chevrolet,Impala,2006,2013,LS,1,base,3.5L V6,,,,
+Chevrolet,Impala,2006,2013,LT,2,mid,3.5L V6,,"Power seats, OnStar",,
+Chevrolet,Impala,2006,2013,LTZ,3,premium,3.9L V6,Bose,"Bose amp, heated leather, moonroof",,
+Chevrolet,Impala,2006,2013,SS,4,performance,5.3L V8,Bose,"Bose amp, 5.3L V8 ECM, sport suspension, 303hp",2006-2009. LS4 V8 in a sedan.,CULT
+Chevrolet,Corvette,1997,2004,Base,3,premium,5.7L V8 (LS1),,"LS1 ECM, 6-speed or auto, sport suspension, Bose standard",C5. LS1 is the money engine.,CULT
+Chevrolet,Corvette,1997,2004,Z06,4,performance,5.7L V8 (LS6) 405hp,,"LS6 ECM, 6-speed only, FE4 sport suspension, titanium exhaust, lighter",LS6 hardtop. 405hp.,CULT
+Chevrolet,Corvette,2005,2013,Base,3,premium,6.2L V8 (LS3),Bose,"Bose amp, LS3 ECM, magnetic ride available","C6. LS2 to 2007, LS3 from 2008.",CULT
+Chevrolet,Corvette,2005,2013,Z06,4,performance,7.0L V8 (LS7) 505hp,Bose,"Bose amp, LS7 ECM, 6-speed, dry sump, carbon fiber, larger brakes",LS7 7.0L. Hand-built. 505hp NA.,CULT
+Chevrolet,Corvette,2005,2013,ZR1,4,performance,6.2L Supercharged V8 (LS9) 638hp,Bose,"Bose amp, LS9 supercharged ECM, carbon ceramic brakes, carbon fiber body panels, magnetic ride",LS9 supercharged. 638hp. C6 king.,CULT
+Dodge,Durango,1998,2003,SLT,2,mid,4.7L V8,,"Power seats, A/C, cruise",1st gen. Body-on-frame.,
+Dodge,Durango,1998,2003,SLT Plus,3,premium,5.9L V8,Infinity,"Infinity amp, 5.9L Magnum ECM, heated leather, power seats",5.9L Magnum is the premium engine,
+Dodge,Durango,2004,2009,SLT,2,mid,4.7L V8,,"Power seats, cruise",2nd gen. HEMI available from 2004.,
+Dodge,Durango,2004,2009,Limited,3,premium,5.7L HEMI,Infinity,"Infinity amp, HEMI ECM, heated leather, nav possible, power liftgate",,
+Dodge,Durango,2004,2009,SRT8,4,performance,6.1L HEMI,Infinity,"Infinity amp, SRT 6.1L ECM, Brembo brakes, sport suspension, 425hp",2006-2007. Rare SRT Durango.,CULT
+Dodge,Ram 1500,1994,2001,Work Special,1,base,3.9L V6,,,2nd gen. Magnum V6.,
+Dodge,Ram 1500,1994,2001,SLT,2,mid,5.2L V8,,"Power seats, cruise, A/C",5.2L or 5.9L Magnum V8,
+Dodge,Ram 1500,1994,2001,Laramie SLT,3,premium,5.9L V8,Infinity,"Infinity amp possible, heated seats (late), leather, power seats",5.9L Magnum is the money engine,
+Dodge,Ram 1500,1994,2001,Sport,2,mid,5.9L V8,,"Sport appearance, body color bumpers, sport hood",,
+Ram,2500,2003,2009,ST,1,base,5.7L HEMI,,,Work truck,
+Ram,2500,2003,2009,SLT,2,mid,5.9L Cummins,,"Power seats, cruise",5.9L Cummins is THE cult diesel,CULT
+Ram,2500,2003,2009,Laramie,3,premium,5.9L Cummins,Infinity,"Infinity amp, heated leather, nav possible, power seats",5.9L/6.7L Cummins (6.7 from 2007),
+Ram,2500,2003,2009,Power Wagon,2,mid,5.7L HEMI,,"Disconnecting sway bar, Warn winch, locking diffs","2005+. HEMI only, no Cummins.",
+Jeep,Grand Cherokee,1999,2004,Laredo,2,mid,4.0L I6,,"Power seats, cruise",WJ. 4.0L inline-6 is bulletproof.,CULT
+Jeep,Grand Cherokee,1999,2004,Limited,3,premium,4.7L V8,Infinity,"Infinity amp, V8 ECM, heated leather, moonroof, Selec-Trac, park assist",,
+Jeep,Grand Cherokee,1999,2004,Overland,3,premium,4.7L HO V8,Infinity,"Infinity amp, HO V8 ECM (265hp), Quadra-Drive, air suspension, heated leather, nav",HO = High Output V8,
+Jeep,Wrangler,1997,2006,SE,1,base,2.5L I4,,,TJ. 2.5L 4-cylinder base.,CULT
+Jeep,Wrangler,1997,2006,Sport,2,mid,4.0L I6,,"4.0L I6 ECM, Dana 35 rear (standard), A/C optional",4.0L is the desirable engine.,CULT
+Jeep,Wrangler,1997,2006,Sahara,2,mid,4.0L I6,,"4.0L I6 ECM, color-matched fenders, fog lights, sound bar",,CULT
+Jeep,Wrangler,1997,2006,Rubicon,3,premium,4.0L I6,,"4.0L I6 ECM, Dana 44 front+rear, electronic lockers, disconnecting sway bar, rock rails, 4.11 gears",2003+. First factory Rubicon. Dana 44s are gold.,CULT
+Jeep,Cherokee,1997,2001,SE,1,base,2.5L I4,,,XJ. Legendary platform.,CULT
+Jeep,Cherokee,1997,2001,Sport,2,mid,4.0L I6,,"4.0L I6 ECM, power windows/locks, A/C",4.0L is the cult engine,CULT
+Jeep,Cherokee,1997,2001,Classic,2,mid,4.0L I6,,"4.0L I6 ECM, fog lights, roof rack, upgraded cloth",,CULT
+Jeep,Cherokee,1997,2001,Limited,3,premium,4.0L I6,,"4.0L I6 ECM, leather, heated seats, Infinity amp possible, moonroof, full-time 4WD",,CULT
+Jeep,Liberty,2002,2007,Sport,2,mid,3.7L V6,,"Power windows, A/C, 4WD",KJ. Replaced Cherokee.,
+Jeep,Liberty,2002,2007,Limited,3,premium,3.7L V6,Infinity,"Infinity amp, heated leather, moonroof, power seats",,
+Jeep,Liberty,2002,2007,Renegade,2,mid,3.7L V6,,"Off-road suspension, skid plates, tow hooks",,
+Jeep,Liberty,2008,2012,Sport,2,mid,3.7L V6,,"Power windows, A/C",KK. Last Liberty.,
+Jeep,Liberty,2008,2012,Limited,3,premium,3.7L V6,Infinity,"Infinity amp, heated leather, nav, moonroof",,
+Toyota,Camry,2002,2006,LE,1,base,2.4L I4,,,XV30. 2AZ-FE engine.,
+Toyota,Camry,2002,2006,SE,2,mid,2.4L I4,,"Sport suspension, sport seats",,
+Toyota,Camry,2002,2006,XLE,3,premium,3.3L V6,JBL,"JBL amp, V6 ECM, heated leather, nav, moonroof, power seats",V6 XLE is the premium combo,
+Toyota,Camry,2002,2006,Solara,2,mid,3.3L V6,,"Coupe/convertible, V6 ECM, power seats",Camry-based coupe,
+Toyota,RAV4,2001,2005,Base,1,base,2.0L I4,,,XA20. 2nd gen. 2.0L/2.4L depending on year.,
+Toyota,RAV4,2001,2005,L,2,mid,2.4L I4,,"Power windows, A/C, alloy wheels",,
+Toyota,RAV4,2006,2012,Base,1,base,2.5L I4,,,XA30. 3rd gen.,
+Toyota,RAV4,2006,2012,Sport,2,mid,3.5L V6,,"V6 ECM, sport suspension, 269hp",V6 RAV4 was actually quick,
+Toyota,RAV4,2006,2012,Limited,3,premium,3.5L V6,JBL,"JBL amp, V6 ECM, heated leather, moonroof, nav, rear camera",,
+Toyota,Highlander,2001,2007,Base,1,base,2.4L I4,,,XU20. 1st gen. Camry platform.,
+Toyota,Highlander,2001,2007,Limited,3,premium,3.3L V6,JBL,"JBL amp, V6 ECM, heated leather, moonroof, nav, 3rd row",,
+Toyota,Highlander,2008,2013,Base,1,base,2.7L I4,,,XU40. 2nd gen.,
+Toyota,Highlander,2008,2013,SE,2,mid,3.5L V6,,"Sport appearance, V6 ECM, power seats",,
+Toyota,Highlander,2008,2013,Limited,3,premium,3.5L V6,JBL,"JBL amp, V6 ECM, heated leather, nav, moonroof, rear entertainment, park assist",,
+Toyota,Tundra,2000,2006,Base,1,base,3.4L V6,,,1st gen. T100 replacement.,
+Toyota,Tundra,2000,2006,SR5,2,mid,4.7L V8 (2UZ-FE),,"2UZ-FE V8 ECM, power seats, A/C",2UZ-FE is bulletproof,CULT
+Toyota,Tundra,2000,2006,Limited,3,premium,4.7L V8 (2UZ-FE),JBL,"JBL amp, 2UZ-FE ECM, heated leather, moonroof",,CULT
+Honda,Accord,2003,2007,DX,1,base,2.4L I4,,,7th gen. K24 engine.,
+Honda,Accord,2003,2007,LX,1,base,2.4L I4,,,,
+Honda,Accord,2003,2007,EX,2,mid,2.4L I4,,"Moonroof, power seats, heated seats possible",,
+Honda,Accord,2003,2007,EX-L,3,premium,3.0L V6,,"V6 ECM, heated leather, moonroof, nav possible, XM radio",V6 is the premium engine,
+Honda,Accord,2008,2012,LX,1,base,2.4L I4,,,8th gen.,
+Honda,Accord,2008,2012,EX,2,mid,2.4L I4,,"Moonroof, power seats",,
+Honda,Accord,2008,2012,EX-L,3,premium,3.5L V6,,"V6 ECM, heated leather, moonroof, nav possible",3.5L V6 = J35,
+Honda,Accord,2008,2012,EX-L V6,3,premium,3.5L V6,,"V6 ECM, heated leather, moonroof, nav",Explicitly V6 trim,
+Honda,CR-V,2002,2006,LX,1,base,2.4L I4 (K24),,,2nd gen. K24A1 engine.,
+Honda,CR-V,2002,2006,EX,2,mid,2.4L I4 (K24),,"Moonroof, ABS, power seats possible",,
+Honda,CR-V,2002,2006,SE,3,premium,2.4L I4 (K24),,"Leather, moonroof, heated seats (late), 6-disc CD",2005-2006 Special Edition,
+Honda,CR-V,2007,2011,LX,1,base,2.4L I4 (K24),,,3rd gen.,
+Honda,CR-V,2007,2011,EX,2,mid,2.4L I4 (K24),,"Moonroof, power seats, ABS",,
+Honda,CR-V,2007,2011,EX-L,3,premium,2.4L I4 (K24),,"Heated leather, moonroof, nav possible (EX-L Navi)",,
+Honda,Pilot,2003,2008,LX,1,base,3.5L V6,,,1st gen. J35 engine.,
+Honda,Pilot,2003,2008,EX,2,mid,3.5L V6,,"Moonroof, power seats, rear entertainment possible",,
+Honda,Pilot,2003,2008,EX-L,3,premium,3.5L V6,,"Heated leather, moonroof, nav possible, rear entertainment possible, power seats",,
+Nissan,Altima,2002,2006,S,1,base,2.5L I4,,,L31. QR25DE engine.,
+Nissan,Altima,2002,2006,SL,3,premium,3.5L V6,Bose,"Bose amp, V6 ECM, heated leather, moonroof, 245hp",VQ35DE V6. Quick sedan.,
+Nissan,Altima,2002,2006,SE-R,4,performance,3.5L V6 (260hp),Bose,"Bose amp, SE-R V6 ECM, sport suspension, 6-speed manual, Brembo brakes (Spec V)",SE-R Spec V had Brembo brakes + 6-speed,CULT
+Nissan,Altima,2007,2012,S,1,base,2.5L I4,,,L32.,
+Nissan,Altima,2007,2012,SL,3,premium,3.5L V6,Bose,"Bose amp, V6 ECM, heated leather, moonroof, nav, blind spot (late)",,
+Nissan,Altima,2007,2012,Coupe 3.5 SR,3,premium,3.5L V6,Bose,"Bose amp, V6 ECM, sport suspension, paddle shifters, leather",Altima Coupe. Sporty.,
+Nissan,Rogue,2008,2013,S,1,base,2.5L I4,,,S35. 1st gen.,
+Nissan,Rogue,2008,2013,SV,2,mid,2.5L I4,,"Heated seats, rear camera, power seats",,
+Nissan,Rogue,2008,2013,SL,3,premium,2.5L I4,Bose,"Bose amp, heated leather, nav, rear camera, around view monitor (late)",,
+Nissan,Pathfinder,2005,2012,S,1,base,4.0L V6,,,R51. Body-on-frame. Last real truck Pathfinder.,
+Nissan,Pathfinder,2005,2012,SE,2,mid,4.0L V6,,"Power seats, heated seats, rear camera",,
+Nissan,Pathfinder,2005,2012,LE,3,premium,5.6L V8,Bose,"Bose amp, V8 ECM, heated leather, nav, rear entertainment, around view monitor",VK56 V8 from Titan/Armada,
+Nissan,Maxima,2004,2008,SE,2,mid,3.5L V6,,"Power seats, heated seats, moonroof",VQ35DE. 4DSC (4-door sports car).,
+Nissan,Maxima,2004,2008,SL,3,premium,3.5L V6,Bose,"Bose amp, heated leather, nav, moonroof, rear camera (late)",,
+Nissan,Maxima,2009,2014,S,2,mid,3.5L V6,,"Power seats, push-button start",A35.,
+Nissan,Maxima,2009,2014,SV,3,premium,3.5L V6,Bose,"Bose amp, heated leather, moonroof, nav",,
+Nissan,Sentra,2002,2006,SE-R,3,premium,2.5L I4 (QR25DE) 165hp,,"QR25DE ECM, sport suspension, 6-speed, rear disc brakes",B15 SE-R. Hot Sentra.,CULT
+Nissan,Sentra,2002,2006,SE-R Spec V,4,performance,2.5L I4 (QR25DE) 175hp,,"Spec V ECM, Brembo brakes, Helical LSD, 6-speed, sport suspension",Spec V had Brembo + LSD. Cult.,CULT
+Hyundai,Sonata,2006,2010,GLS,1,base,2.4L I4,,,NF generation.,
+Hyundai,Sonata,2006,2010,SE,2,mid,3.3L V6,,"V6 ECM, power seats, moonroof",,
+Hyundai,Sonata,2006,2010,Limited,3,premium,3.3L V6,Infinity,"Infinity amp, V6 ECM, heated leather, moonroof, nav",,
+Hyundai,Sonata,2011,2014,GLS,1,base,2.4L I4,,,YF. Theta II engine.,
+Hyundai,Sonata,2011,2014,SE,2,mid,2.0L Turbo,,"Turbo ECM, sport suspension, panoramic moonroof possible",,
+Hyundai,Sonata,2011,2014,Limited,3,premium,2.0L Turbo,Infinity,"Infinity amp, turbo ECM, heated/cooled leather, panoramic moonroof, nav, blind spot",,
+Hyundai,Tucson,2005,2009,GLS,1,base,2.0L I4,,,1st gen. JM.,
+Hyundai,Tucson,2005,2009,Limited,3,premium,2.7L V6,,"V6 ECM, heated leather, moonroof, power seats",,
+Hyundai,Tucson,2010,2015,GLS,1,base,2.0L I4,,,2nd gen. LM.,
+Hyundai,Tucson,2010,2015,Limited,3,premium,2.4L I4,,"Heated leather, panoramic moonroof, nav, rear camera, blind spot",,
+Hyundai,Tucson,2016,2021,SE,1,base,2.0L I4,,,3rd gen. TL.,
+Hyundai,Tucson,2016,2021,Sport,2,mid,1.6L Turbo,,"Turbo ECM, heated seats, blind spot",,
+Hyundai,Tucson,2016,2021,Limited,3,premium,1.6L Turbo,,"Turbo ECM, heated/ventilated leather, panoramic moonroof, nav, 360 camera",,
+Kia,Optima,2001,2006,LX,1,base,2.4L I4,,,MS/MG. Early Optima.,
+Kia,Optima,2001,2006,EX,2,mid,2.7L V6,,"V6 ECM, heated leather possible",,
+Kia,Optima,2006,2010,LX,1,base,2.4L I4,,,,
+Kia,Optima,2006,2010,EX,2,mid,2.7L V6,,"V6 ECM, heated leather, moonroof",,
+Kia,Optima,2006,2010,SX,3,premium,2.7L V6,,"V6 ECM, heated leather, sport suspension, moonroof",,
+Kia,Sorento,2003,2009,LX,1,base,3.5L V6,,,BL. Body-on-frame. Real truck.,
+Kia,Sorento,2003,2009,EX,3,premium,3.5L V6,Infinity,"Infinity amp, heated leather, moonroof, power seats",,
+Kia,Sorento,2011,2015,LX,1,base,2.4L I4,,,XM. Unibody crossover now.,
+Kia,Sorento,2011,2015,EX,2,mid,3.3L V6,,"V6 ECM, heated leather, power seats, rear camera",,
+Kia,Sorento,2011,2015,SX,3,premium,3.3L V6,Infinity,"Infinity amp, V6 ECM, heated/cooled leather, panoramic moonroof, nav, blind spot",,
+BMW,3 Series,1999,2005,325i,2,mid,2.5L I6 (M54),,"Power seats, auto climate, rain sensor",E46. M54 engine.,CULT
+BMW,3 Series,1999,2005,330i,3,premium,3.0L I6 (M54),Harman Kardon,"Harman Kardon amp, M54 3.0L ECM, sport seats, nav possible, xenon headlights",,CULT
+BMW,3 Series,1999,2005,M3,4,performance,3.2L I6 (S54),Harman Kardon,"Harman Kardon amp, S54 ECM, 6-speed or SMG, M differential, 333hp",E46 M3. S54 is one of the greatest engines ever made.,CULT
+BMW,5 Series,1997,2003,525i,2,mid,2.5L I6 (M54),,"Power seats, auto climate",E39. Best-driving 5 Series ever made.,CULT
+BMW,5 Series,1997,2003,530i,3,premium,3.0L I6 (M54),Harman Kardon,"Harman Kardon amp, M54 ECM, sport pkg possible, nav",,CULT
+BMW,5 Series,1997,2003,540i,3,premium,4.4L V8 (M62),Harman Kardon,"Harman Kardon amp, M62 V8 ECM, sport seats, nav, xenon headlights",V8 is premium,CULT
+BMW,5 Series,1997,2003,M5,4,performance,4.9L V8 (S62) 394hp,Harman Kardon,"Harman Kardon amp, S62 V8 ECM, 6-speed only, M differential, 394hp",E39 M5. THE benchmark sport sedan. S62 hand-built V8.,CULT
+BMW,X5,2000,2006,3.0i,2,mid,3.0L I6 (M54),,"Panoramic moonroof, power seats, iDrive (late)",E53. First BMW SUV.,
+BMW,X5,2000,2006,4.4i,3,premium,4.4L V8 (M62/N62),Harman Kardon,"Harman Kardon amp, V8 ECM, nav, sport pkg possible, adaptive suspension",,
+BMW,X5,2000,2006,4.8is,3,premium,4.8L V8 (N62) 355hp,Harman Kardon,"Harman Kardon amp, 4.8L V8 ECM, sport suspension, 20in wheels, body kit",IS = sport model. 355hp.,
+Lexus,IS,2001,2005,IS 300,3,premium,3.0L I6 (2JZ-GE),Mark Levinson,"Mark Levinson amp possible, 2JZ-GE ECM, sport suspension, LSD (manual), leather, moonroof",2JZ-GE. Same block as Supra non-turbo. Drift/swap favorite.,CULT
+Lexus,GS,1998,2005,GS 300,2,mid,3.0L I6 (2JZ-GE),,"2JZ-GE ECM, power seats, moonroof, leather",2JZ platform.,CULT
+Lexus,GS,1998,2005,GS 430,3,premium,4.3L V8 (3UZ-FE),Mark Levinson,"Mark Levinson amp, 3UZ-FE V8 ECM, heated/cooled seats, nav, adaptive cruise",V8 luxury sport sedan,
+Lexus,GS,2006,2011,GS 350,2,mid,3.5L V6,,"Power seats, nav, moonroof, leather",S190.,
+Lexus,GS,2006,2011,GS 460,3,premium,4.6L V8 (1UR-FE),Mark Levinson,"Mark Levinson amp, 1UR-FE V8 ECM, heated/cooled seats, adaptive cruise, adaptive suspension",,
+Lexus,RX 330,2004,2006,Base,2,mid,3.3L V6,Mark Levinson,"Mark Levinson amp possible, power liftgate, heated seats, moonroof",XU30. Renamed RX 350 in 2007.,
+Lexus,RX 350,2007,2009,Base,2,mid,3.5L V6,Mark Levinson,"Mark Levinson amp possible, power liftgate, heated seats, moonroof, nav possible",,
+Mercedes-Benz,C-Class,2001,2007,C230,2,mid,2.5L V6,,"Power seats, auto climate","W203. Kompressor early, V6 late.",
+Mercedes-Benz,C-Class,2001,2007,C320,3,premium,3.2L V6,Harman Kardon,"Harman Kardon amp, V6 ECM, heated seats, nav possible",,
+Mercedes-Benz,C-Class,2001,2007,C32 AMG,4,performance,3.2L Supercharged V6 (349hp),Harman Kardon,"Harman Kardon amp, supercharged M112 ECM, AMG brakes, AMG suspension, LSD",2002-2004. Supercharged V6 AMG.,CULT
+Mercedes-Benz,C-Class,2001,2007,C55 AMG,4,performance,5.4L V8 (362hp),Harman Kardon,"Harman Kardon amp, M113 V8 ECM, AMG brakes, AMG suspension",2005-2006. NA V8 AMG. Raw.,CULT
+Mercedes-Benz,E-Class,2003,2009,E320,2,mid,3.2L V6,,"Power seats, heated seats, auto climate",W211.,
+Mercedes-Benz,E-Class,2003,2009,E500,3,premium,5.0L V8,Harman Kardon,"Harman Kardon amp, M113 V8 ECM, heated/cooled seats, nav, airmatic suspension",,
+Mercedes-Benz,E-Class,2003,2009,E55 AMG,4,performance,5.4L Supercharged V8 (469hp),Harman Kardon,"Harman Kardon amp, M113K supercharged ECM, AMG brakes, airmatic, LSD",E55 AMG. Supercharged V8 sleeper. Legendary.,CULT
+Mercedes-Benz,E-Class,2003,2009,E63 AMG,4,performance,6.2L V8 (507hp),Harman Kardon,"Harman Kardon amp, M156 V8 ECM, AMG brakes, airmatic, LSD, 507hp",2007-2009. M156 NA V8.,CULT
+Mercedes-Benz,ML,1998,2005,ML320,2,mid,3.2L V6,,"Power seats, heated seats",W163. 1st gen ML.,
+Mercedes-Benz,ML,1998,2005,ML430,3,premium,4.3L V8,Harman Kardon,"Harman Kardon amp possible, V8 ECM, heated seats, nav possible",1999-2001,
+Mercedes-Benz,ML,1998,2005,ML500,3,premium,5.0L V8,Harman Kardon,"Harman Kardon amp, V8 ECM, heated seats, nav, moonroof",2002-2005,
+Mercedes-Benz,ML,1998,2005,ML55 AMG,4,performance,5.4L V8 (342hp),Harman Kardon,"Harman Kardon amp, M113 V8 ECM, AMG brakes, AMG suspension, body kit",,CULT
+Lincoln,Navigator,2003,2006,Luxury,3,premium,5.4L V8,THX,"THX amp, V8 ECM, heated/cooled seats, nav, air suspension, power running boards",2nd gen. THX audio.,
+Lincoln,Navigator,2003,2006,Ultimate,3,premium,5.4L V8,THX,"THX amp, V8 ECM, heated/cooled seats, nav, air suspension, power running boards, rear entertainment",,
+Lincoln,Navigator,2007,2017,Base,3,premium,5.4L V8,THX,"THX amp, V8 ECM, heated/cooled seats, nav, power running boards, rear camera","3rd gen. 5.4L to 2014, 3.5L EB from 2015.",
+Lincoln,Navigator,2007,2017,L,3,premium,3.5L EcoBoost,THX,"THX amp, EcoBoost ECM, heated/cooled seats, nav, power running boards, adaptive cruise (late)",Long wheelbase,
+Lincoln,LS,2000,2006,V6,2,mid,3.0L V6,,"Power seats, heated seats, leather",Rear-wheel drive sport sedan.,
+Lincoln,LS,2000,2006,V8,3,premium,3.9L V8,,"V8 ECM, heated/cooled seats, nav possible, sport suspension",V8 model. Underrated car.,
+Lincoln,Town Car,1998,2011,Executive,1,base,4.6L V8,,,Panther platform. Bulletproof.,
+Lincoln,Town Car,1998,2011,Signature,2,mid,4.6L V8,,"Heated seats, leather, power everything, air ride",,
+Lincoln,Town Car,1998,2011,Cartier/Designer,3,premium,4.6L V8,Alpine,"Alpine amp (late), heated/cooled seats, moonroof, nav, premium leather",Top trim varied by year,
+Cadillac,Escalade,2002,2006,Base,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, heated/cooled seats, nav, OnStar, power liftgate",2nd gen GMT800. All Escalades are premium.,
+Cadillac,Escalade,2002,2006,ESV,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, heated/cooled seats, nav, rear entertainment, power liftgate",Extended. Suburban platform.,
+Cadillac,Escalade,2002,2006,EXT,3,premium,6.0L V8,Bose,"Bose amp, 6.0L V8 ECM, heated/cooled seats, nav, midgate",Truck bed. Avalanche platform.,
+Cadillac,CTS,2003,2007,Base,2,mid,3.6L V6,,"Power seats, OnStar, leather",1st gen.,
+Cadillac,CTS,2003,2007,CTS-V,4,performance,5.7L V8 (LS6) 400hp,,"LS6 ECM, Tremec 6-speed, limited slip, Brembo brakes, sport suspension",LS6 from Corvette Z06. First V-series.,CULT
+Cadillac,CTS,2008,2013,Base,2,mid,3.0L V6,Bose,"Bose amp, power seats",2nd gen.,
+Cadillac,CTS,2008,2013,Premium,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, nav, blind spot",,
+Cadillac,CTS,2008,2013,CTS-V,4,performance,6.2L Supercharged V8 (LSA) 556hp,Bose,"Bose amp, LSA supercharged ECM, Tremec 6-speed, magnetic ride, Brembo brakes, limited slip",LSA supercharged. 556hp. One of the greatest GM performance cars ever.,CULT
+Cadillac,CTS,2014,2019,Luxury,2,mid,2.0L Turbo,Bose,"Bose amp, power seats, CUE infotainment",3rd gen.,
+Cadillac,CTS,2014,2019,Premium Luxury,3,premium,3.6L V6,Bose,"Bose amp, heated/cooled seats, head-up display, adaptive cruise, magnetic ride",,
+Cadillac,CTS,2014,2019,V-Sport,3,premium,3.6L Twin-Turbo V6 (420hp),Bose,"Bose amp, twin-turbo ECM, magnetic ride, Brembo brakes, electronic LSD",Twin-turbo V6. Serious performance.,
+Cadillac,CTS,2016,2019,CTS-V,4,performance,6.2L Supercharged V8 (LT4) 640hp,Bose,"Bose amp, LT4 supercharged ECM, magnetic ride, Brembo carbon ceramics, electronic LSD, 640hp",LT4 supercharged. 640hp 4-door. Monster.,CULT
+Volkswagen,Jetta,2005,2010,2.5,1,base,2.5L I5,,,Mk5. Inline-5 engine.,
+Volkswagen,Jetta,2005,2010,SEL,3,premium,2.0L Turbo,Fender,"Fender amp, turbo ECM, heated leather, nav, moonroof",,
+Volkswagen,Jetta,2005,2010,GLI,4,performance,2.0L Turbo I4,Fender,"Fender amp, GLI ECM, sport suspension, sport brakes, LSD (late), Recaro possible",Mk5 GLI. EA113 turbo.,CULT
+Volkswagen,Tiguan,2009,2017,S,1,base,2.0L Turbo I4,,,1st gen. 5N.,
+Volkswagen,Tiguan,2009,2017,SE,2,mid,2.0L Turbo I4,,"Heated seats, panoramic moonroof, rear camera",,
+Volkswagen,Tiguan,2009,2017,SEL,3,premium,2.0L Turbo I4,Fender,"Fender amp, heated leather, nav, park assist, panoramic moonroof",,
+Volkswagen,Tiguan,2009,2017,R-Line,2,mid,2.0L Turbo I4,,"Sport appearance, R-Line bumpers, 19in wheels",,
+Mazda,Mazda3,2004,2009,i,1,base,2.0L I4,,,BK. 1st gen.,
+Mazda,Mazda3,2004,2009,s,2,mid,2.3L I4,,"Sport suspension, larger wheels, power moonroof possible",s trim = sport/larger engine,
+Mazda,Mazda3,2004,2009,s Grand Touring,3,premium,2.3L I4,Bose,"Bose amp, heated leather, moonroof, xenon headlights",,
+Mazda,Mazda3,2010,2013,i Sport,1,base,2.0L I4,,,BL. 2nd gen.,
+Mazda,Mazda3,2010,2013,s Grand Touring,3,premium,2.5L I4,Bose,"Bose amp, heated leather, moonroof, xenon headlights, blind spot (late)",,
+Mazda,CX-5,2013,2016,Sport,1,base,2.0L I4,,,KE. 1st gen CX-5.,
+Mazda,CX-5,2013,2016,Touring,2,mid,2.5L I4,,"Heated seats, blind spot, rear camera, power seats",,
+Mazda,CX-5,2013,2016,Grand Touring,3,premium,2.5L I4,Bose,"Bose amp, heated leather, nav, power liftgate, rain-sensing wipers",,
+Mazda,CX-9,2007,2015,Sport,1,base,3.7L V6,,,TB. Ford Edge platform. 3.7L Duratec V6.,
+Mazda,CX-9,2007,2015,Touring,2,mid,3.7L V6,,"Heated seats, power seats, rear camera",,
+Mazda,CX-9,2007,2015,Grand Touring,3,premium,3.7L V6,Bose,"Bose amp, heated leather, moonroof, nav, power liftgate, blind spot",,
+Subaru,Outback,2000,2004,Base,1,base,2.5L H4,,,BH. 2nd gen.,
+Subaru,Outback,2000,2004,Limited,3,premium,3.0L H6,,"H6 ECM, heated leather, moonroof, power seats",H6 is premium,
+Subaru,Outback,2000,2004,VDC,3,premium,3.0L H6,,"H6 ECM, Vehicle Dynamics Control, heated leather, moonroof",AWD stability system,
+Subaru,Outback,2000,2004,LL Bean,3,premium,3.0L H6,,"H6 ECM, heated leather, moonroof, power seats, special trim",Special edition. Premium.,
+Subaru,Outback,2005,2009,2.5i,1,base,2.5L H4,,,BP. 3rd gen.,
+Subaru,Outback,2005,2009,2.5i Limited,3,premium,2.5L H4,,"Heated leather, moonroof, power seats",,
+Subaru,Outback,2005,2009,2.5XT,3,premium,2.5L Turbo H4,,"Turbo ECM, sport suspension, 250hp",Turbo Outback. Underrated.,CULT
+Subaru,Outback,2005,2009,3.0R,3,premium,3.0L H6,,"H6 ECM, heated leather, moonroof, 245hp",,
+Subaru,WRX,2002,2007,Base,2,mid,2.0L Turbo H4 (EJ205),,"EJ205 turbo ECM, sport suspension, 6-speed (STI) or 5-speed","Blob-eye, bug-eye, hawk-eye. All cult.",CULT
+Subaru,WRX,2002,2007,STI,4,performance,2.5L Turbo H4 (EJ257) 300hp,,"EJ257 STI ECM, DCCD AWD, Brembo brakes, 6-speed, STI suspension, gold BBS wheels",THE Subaru. DCCD is the magic. Every part is cult gold.,CULT
+Subaru,Forester,2004,2008,X,1,base,2.5L H4,,,,
+Subaru,Forester,2004,2008,XT,3,premium,2.5L Turbo H4,,"Turbo ECM, sport suspension, turbo, intercooler, 230hp",Turbo Forester. Fast wagon. Cult.,CULT
+Subaru,Forester,2004,2008,XT Sports,4,performance,2.5L Turbo H4 (230hp),,"Turbo ECM, sport suspension, manual trans, sport exhaust, STI intercooler (late)",2007-2008 XT Sports. Closest to STI Forester.,CULT
+Audi,A4,2002,2004,1.8T,2,mid,1.8L Turbo I4,,"Power seats, heated seats, auto climate",B6. 1.8T is the tuner engine.,CULT
+Audi,A4,2002,2004,3.0,3,premium,3.0L V6,Bose,"Bose amp, V6 ECM, heated leather, moonroof, nav possible",,
+Audi,A4,2002,2004,S4,4,performance,4.2L V8,Bose,"Bose amp, 4.2L V8 ECM, sport suspension, 6-speed available",BBK V8. 340hp. Timing chain killer.,CULT
+Audi,A6,1998,2004,2.8/3.0,2,mid,3.0L V6,,"Power seats, heated seats, auto climate",C5.,
+Audi,A6,1998,2004,4.2,3,premium,4.2L V8,Bose,"Bose amp, V8 ECM, heated leather, nav, moonroof",,
+Audi,A6,1998,2004,S6,4,performance,4.2L V8 (340hp),Bose,"Bose amp, V8 ECM, sport suspension, sport seats, sport exhaust",2002-2004. C5 S6.,CULT
+Audi,A6,1998,2004,RS6,4,performance,4.2L Twin-Turbo V8 (450hp),Bose,"Bose amp, twin-turbo V8 ECM, Brembo brakes, DRC suspension, 450hp",2003-2004. C5 RS6. Biturbo V8. Ultra rare.,CULT
+Audi,A6,2005,2011,3.2,2,mid,3.2L V6,,"Power seats, heated seats, MMI",C6.,
+Audi,A6,2005,2011,4.2,3,premium,4.2L V8,Bose,"Bose amp, V8 ECM, heated leather, nav, adaptive air suspension",,
+Audi,A6,2005,2011,S6,4,performance,5.2L V10 (435hp),Bose,"Bose amp, V10 ECM (Lamborghini-derived), sport differential, adaptive suspension, sport exhaust",C6 S6. Lamborghini V10 in a sedan.,CULT
+Audi,A6,2005,2011,RS6,4,performance,5.0L Twin-Turbo V10 (580hp),Bose,"Bose amp, biturbo V10 ECM, DRC, carbon ceramic brakes, sport exhaust",C6 RS6. Biturbo V10. Never sold in US (Euro import cult).,CULT
+Audi,TT,1999,2006,1.8T,2,mid,1.8L Turbo I4 (180hp),Bose,"Bose amp possible, 1.8T ECM, Haldex AWD (quattro models)",Mk1 TT. 1.8T tuner engine.,CULT
+Audi,TT,1999,2006,1.8T 225,3,premium,1.8L Turbo I4 (225hp),Bose,"Bose amp, 225hp 1.8T ECM, Haldex AWD, larger brakes, sport suspension","225hp model. Bigger turbo, more boost.",CULT
+Audi,TT,1999,2006,3.2 V6,3,premium,3.2L V6 (250hp),Bose,"Bose amp, VR6 ECM, DSG dual-clutch, Haldex AWD, sport suspension",VR6 TT. DSG first appeared here.,CULT
+Infiniti,G35,2003,2007,Base,2,mid,3.5L V6 (VQ35DE),,"VQ35DE ECM, power seats, moonroof, leather",V35. 350Z platform sedan.,CULT
+Infiniti,G35,2003,2007,Sport,3,premium,3.5L V6 (VQ35DE),Bose,"Bose amp, VQ35DE ECM, sport suspension, sport brakes, LSD (6-speed coupe), nav",Coupe with 6-speed + LSD is most valuable.,CULT
+Acura,TL,2004,2008,Base,2,mid,3.2L V6,,"Power seats, heated leather, moonroof, XM",3rd gen. J32 engine.,
+Acura,TL,2004,2008,Type-S,4,performance,3.5L V6 (286hp),,"J35 Type-S ECM, sport suspension, Brembo brakes, LSD, sport exhaust",2007-2008. Type-S is cult Acura.,CULT
+Acura,TL,2009,2014,Base,2,mid,3.5L V6,,"Power seats, heated leather, nav possible",4th gen.,
+Acura,TL,2009,2014,SH-AWD,3,premium,3.7L V6,,"3.7L V6 ECM, Super Handling AWD module, sport suspension",SH-AWD torque vectoring. Tech showcase.,CULT
+Acura,TL,2009,2014,SH-AWD Advance,3,premium,3.7L V6,ELS,"ELS amp, 3.7L V6 ECM, SH-AWD module, heated/cooled seats, adaptive cruise, collision mitigation",,
+Acura,TSX,2004,2008,Base,2,mid,2.4L I4 (K24A2),,"K24A2 ECM, heated leather, moonroof, 6-speed manual available",Euro Accord. K24 i-VTEC.,CULT
+Acura,TSX,2009,2014,Base,2,mid,2.4L I4,,"Power seats, heated leather, nav possible",,
+Acura,TSX,2009,2014,V6,3,premium,3.5L V6,,"V6 ECM, heated leather, nav, moonroof",V6 with 6-speed auto only,
+Acura,TSX,2009,2014,Special Edition,3,premium,2.4L I4,,"Unique wheels, sport appearance, heated leather",,
+Acura,MDX,2001,2006,Base,2,mid,3.5L V6,Bose,"Bose amp, V6 ECM, heated leather, moonroof, 3rd row, rear entertainment possible",1st gen. Only one trim level.,
+Acura,MDX,2001,2006,Touring,3,premium,3.5L V6,Bose,"Bose amp, V6 ECM, nav, rear entertainment, heated leather, moonroof",,
+Acura,MDX,2007,2013,Base,2,mid,3.7L V6,,"SH-AWD, power liftgate, heated leather",2nd gen. SH-AWD standard.,
+Acura,MDX,2007,2013,Technology,3,premium,3.7L V6,ELS,"ELS amp, nav, rear entertainment, AcuraLink, heated seats, adaptive cruise (late)",,
+Acura,MDX,2007,2013,Advance,3,premium,3.7L V6,ELS,"ELS amp, heated/ventilated seats, adaptive cruise, collision mitigation, blind spot",,

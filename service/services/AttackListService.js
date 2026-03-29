@@ -5,6 +5,7 @@ const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
 const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
 const { getPartScoreMultiplier } = require('../config/trim-tier-config');
+const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
 // Part types that require EXACT year matching (no ±1 tolerance)
@@ -1001,10 +1002,13 @@ class AttackListService {
       stock_number: vehicle.stock_number || null,
       decoded_trim: vehicle.decoded_trim || null,
       trim_tier: vehicle.trim_tier || null,
+      audio_brand: vehicle.audio_brand || null,
+      expected_parts: vehicle.expected_parts || null,
+      cult: vehicle.cult === true,
       trimBadge: vehicle.trim_tier ? {
         tier: vehicle.trim_tier,
-        label: vehicle.trim_tier === 'PREMIUM' ? 'PREMIUM TRIM' : vehicle.trim_tier === 'BASE' ? 'BASE TRIM' : 'CHECK TRIM',
-        color: vehicle.trim_tier === 'PREMIUM' ? 'green' : vehicle.trim_tier === 'BASE' ? 'red' : 'yellow',
+        label: vehicle.trim_tier === 'PERFORMANCE' ? 'PERFORMANCE' : vehicle.trim_tier === 'PREMIUM' ? 'PREMIUM TRIM' : vehicle.trim_tier === 'BASE' ? 'BASE TRIM' : 'CHECK TRIM',
+        color: vehicle.trim_tier === 'PERFORMANCE' ? 'orange' : vehicle.trim_tier === 'PREMIUM' ? 'green' : vehicle.trim_tier === 'BASE' ? 'red' : 'yellow',
         decodedTrim: vehicle.decoded_trim,
       } : null,
       score, color_code: color, vehicle_verdict,

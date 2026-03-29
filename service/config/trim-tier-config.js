@@ -11,7 +11,7 @@
  * If trim not found, default = CHECK (0.5x)
  */
 
-const TIER = { PREMIUM: 1.0, CHECK: 0.5, BASE: 0.0 };
+const TIER = { PERFORMANCE: 1.3, PREMIUM: 1.0, CHECK: 0.5, BASE: 0.0 };
 
 const TRIM_DEPENDENT_PARTS = [
   'amplifier', 'amp', 'premium radio', 'camera', 'parking sensor',
@@ -152,6 +152,7 @@ function getPartScoreMultiplier(make, trim, partType) {
 }
 
 function tierToResult(multiplier) {
+  if (multiplier === TIER.PERFORMANCE) return { tier: 'PERFORMANCE', multiplier: 1.3, badge: 'PERFORMANCE', color: 'orange' };
   if (multiplier === TIER.PREMIUM) return { tier: 'PREMIUM', multiplier: 1.0, badge: 'PREMIUM TRIM', color: 'green' };
   if (multiplier === TIER.BASE) return { tier: 'BASE', multiplier: 0.0, badge: 'BASE TRIM', color: 'red' };
   return { tier: 'CHECK', multiplier: 0.5, badge: 'CHECK TRIM', color: 'yellow' };
