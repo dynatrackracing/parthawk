@@ -125,9 +125,10 @@ class DemandAnalysisService {
   /**
    * Get top performing products (best sellers)
    */
-  async getTopPerformers(limit = 20) {
-    // Group sales by title keywords to find best categories
+  async getTopPerformers(limit = 20, daysBack = 90) {
+    const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
     const sales = await YourSale.query()
+      .where('soldDate', '>=', startDate)
       .select(
         'title',
         YourSale.raw('COUNT(*) as sales_count'),

@@ -196,10 +196,10 @@ router.get('/public/sell-through', async (req, res) => {
 });
 
 router.get('/public/top-performers', async (req, res) => {
-  const { limit = 10 } = req.query;
+  const { limit = 10, days = 90 } = req.query;
   try {
     const service = new DemandAnalysisService();
-    const items = await service.getTopPerformers(parseInt(limit, 10));
+    const items = await service.getTopPerformers(parseInt(limit, 10), parseInt(days, 10));
     res.json({ success: true, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

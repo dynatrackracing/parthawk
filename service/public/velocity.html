@@ -87,7 +87,7 @@ function load() {
     fetch('/demand-analysis/health').then(function(r) { return r.json(); }),
     fetch('/demand-analysis/public/velocity?days=' + currentPeriod).then(function(r) { return r.json(); }),
     fetch('/demand-analysis/public/sell-through?days=' + currentPeriod).then(function(r) { return r.json(); }),
-    fetch('/demand-analysis/public/top-performers?limit=25').then(function(r) { return r.json(); }),
+    fetch('/demand-analysis/public/top-performers?limit=25&days=' + currentPeriod).then(function(r) { return r.json(); }),
   ]).then(function(results) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
