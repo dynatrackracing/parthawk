@@ -117,6 +117,8 @@ function detectPartType(title) {
   if (t.includes('TRANSFER CASE') || t.includes('XFER CASE')) return null; // never pull these
   if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
   if (t.includes('MIRROR')) return 'MIRROR';
+  if (t.includes('SUNROOF') || t.includes('MOONROOF') || t.includes('MOON ROOF') || t.includes('SUN ROOF')) return 'SUNROOF';
+  if (t.includes('FUEL PUMP DRIVER') || t.includes('FUEL PUMP MODULE') || t.includes('FUEL PUMP CONTROL')) return 'FUEL_MODULE';
   return null;
 }
 
