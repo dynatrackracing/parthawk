@@ -127,6 +127,12 @@ router.post('/scrape/:id', async (req, res) => {
     scraper.scrapeYard(yard).catch(err => {
       log.error({ err }, `Pull-A-Part scrape failed for ${yard.name}`);
     });
+  } else if (yard.chain === 'Carolina PNP') {
+    const CarolinaPickNPullScraper = require('../scrapers/CarolinaPickNPullScraper');
+    const scraper = new CarolinaPickNPullScraper();
+    scraper.scrapeYard(yard).catch(err => {
+      log.error({ err }, `Carolina PNP scrape failed for ${yard.name}`);
+    });
   }
 
   res.json({ message: `Scrape started for ${yard.name}` });
