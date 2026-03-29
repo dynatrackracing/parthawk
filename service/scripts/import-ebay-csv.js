@@ -94,7 +94,7 @@ async function importCSV(filePath, storeName) {
       }
 
       await database('YourSale').insert({
-        ebayOrderId: orderId,
+        ebayOrderId: row['Item Number'] ? `${orderId}-${row['Item Number']}` : orderId,
         ebayItemId: row['Item Number'] || null,
         title: row['Item Title'] || null,
         sku: row['Custom Label'] || null,
