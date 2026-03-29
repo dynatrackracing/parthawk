@@ -278,7 +278,7 @@ class AttackListService {
       const cacheIndex = await resolvePricesBatch(allPNs, { itemPrices: itemPriceMap });
 
       for (const row of rows) {
-        const key = `${row.make}|${row.model}|${row.year}`;
+        const key = `${row.make.toLowerCase()}|${row.model.toLowerCase()}|${row.year}`;
         if (!index[key]) {
           index[key] = { items: [], count: 0, totalValue: 0, avgPrice: 0 };
         }
@@ -353,7 +353,7 @@ class AttackListService {
         const partType = detectPartType(title) || 'OTHER';
         const yearRange = this.extractYearRange(title);
 
-        const key = `${make}|${model.toUpperCase()}`;
+        const key = `${make.toLowerCase()}|${model.toLowerCase()}`;
         if (!index[key]) {
           index[key] = { make, model, sales: [] };
         }
@@ -489,7 +489,7 @@ class AttackListService {
         if (make) {
           const model = this.extractModelFromTitle(title, make);
           if (model) {
-            const key = `${make}|${model.toUpperCase()}`;
+            const key = `${make.toLowerCase()}|${model.toLowerCase()}`;
             byMakeModel[key] = (byMakeModel[key] || 0) + qty;
           }
         }
@@ -524,7 +524,7 @@ class AttackListService {
     const candidates = [];
     for (const m of allMakes) {
       for (let y = year - 1; y <= year + 1; y++) {
-        const key = `${m}|${model}|${y}`;
+        const key = `${m.toLowerCase()}|${model.toLowerCase()}|${y}`;
         const match = inventoryIndex[key];
         if (match) {
           for (const item of match.items) {
@@ -538,14 +538,14 @@ class AttackListService {
     // "Grand Cherokee" must NOT match "Cherokee" — require exact word boundary
     // TODO: migrate to partIntelligence.modelMatches() for consistency
     if (candidates.length === 0) {
-      const modelNorm = model.toUpperCase().replace(/[-]/g, ' ').trim();
+      const modelNorm = model.toLowerCase().replace(/[-]/g, ' ').trim();
       const modelRe = new RegExp('\\b' + modelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       for (const [key, entry] of Object.entries(inventoryIndex)) {
         const [iMake, iModel, iYear] = key.split('|');
         const iYearNum = parseInt(iYear);
         if (iYearNum < year - 1 || iYearNum > year + 1) continue;
-        if (!allMakes.includes(iMake)) continue;
-        const iModelNorm = iModel.toUpperCase().replace(/[-]/g, ' ').trim();
+        if (!allMakes.map(m => m.toLowerCase()).includes(iMake)) continue;
+        const iModelNorm = iModel.replace(/[-]/g, ' ').trim();
         // One-directional: exact match OR vehicle model appears in inventory model
         // Cherokee (inventory) must NOT match Grand Cherokee (vehicle)
         if (modelNorm === iModelNorm || modelRe.test(iModelNorm)) {
@@ -608,7 +608,7 @@ class AttackListService {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
-    const modelUpper = model.toUpperCase();
+    const modelLower = model.toLowerCase();
 
     // Find matching inventory parts (from Auto+Item tables — may be empty)
     let matchedParts = [];
@@ -624,13 +624,13 @@ class AttackListService {
     // Collect all candidate salesIndex entries by make+model (exact + partial model)
     const candidateKeys = new Set();
     for (const m of allMakes) {
-      const exactKey = `${m}|${modelUpper}`;
+      const exactKey = `${m.toLowerCase()}|${modelLower}`;
       if (salesIndex[exactKey]) candidateKeys.add(exactKey);
       // One-directional model match: vehicle model must appear in sale model.
       // "Grand Cherokee" (vehicle) matches "Grand Cherokee" (sale) — yes.
       // "Cherokee" (sale) must NOT match "Grand Cherokee" (vehicle) — removed reverse check.
       for (const sKey of Object.keys(salesIndex)) {
-        if (!sKey.startsWith(m + '|')) continue;
+        if (!sKey.startsWith(m.toLowerCase() + '|')) continue;
         const sModel = sKey.split('|')[1];
         if (sModel && piModelMatches(sModel, model)) {
           candidateKeys.add(sKey);
@@ -640,19 +640,19 @@ class AttackListService {
 
     // Platform cross-reference: add sibling make+model keys
     // e.g., Chrysler 300 → also match Dodge Charger, Dodge Challenger, Dodge Magnum
-    const platformKey = `${make}|${modelUpper}`;
+    const platformKey = `${make}|${model}`.toUpperCase();
     const siblings = platformIndex[platformKey] || [];
     let platformSiblingNames = [];
     for (const sib of siblings) {
       // Only include siblings whose year range covers this vehicle
       if (year >= sib.yearStart && year <= sib.yearEnd) {
-        const sibModel = sib.model.toUpperCase();
-        const sibKey = `${sib.make}|${sibModel}`;
+        const sibModelLower = sib.model.toLowerCase();
+        const sibKey = `${sib.make.toLowerCase()}|${sibModelLower}`;
         if (salesIndex[sibKey]) candidateKeys.add(sibKey);
         // Also word-boundary match siblings
-        const sibRe = new RegExp('\\b' + sibModel.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+        const sibRe = new RegExp('\\b' + sibModelLower.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
         for (const sKey of Object.keys(salesIndex)) {
-          if (!sKey.startsWith(sib.make + '|')) continue;
+          if (!sKey.startsWith(sib.make.toLowerCase() + '|')) continue;
           const sModel = sKey.split('|')[1];
           if (sModel && sibRe.test(sModel.replace(/[-]/g, ' '))) {
             candidateKeys.add(sKey);
@@ -710,14 +710,14 @@ class AttackListService {
     // Current stock from YourListing — match by make+model, not just make
     let stock = 0;
     for (const m of allMakes) {
-      const stockKey = `${m}|${modelUpper}`;
+      const stockKey = `${m.toLowerCase()}|${modelLower}`;
       stock += stockIndex[stockKey] || 0;
       // Also check word-boundary model matches (F-150 = F150, NOT Cherokee = Grand Cherokee)
-      const stockModelRe = new RegExp('\\b' + modelUpper.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      const stockModelRe = new RegExp('\\b' + modelLower.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       for (const [sk, sv] of Object.entries(stockIndex)) {
-        if (!sk.startsWith(m + '|')) continue;
+        if (!sk.startsWith(m.toLowerCase() + '|')) continue;
         const sModel = sk.split('|')[1];
-        if (sModel !== modelUpper && stockModelRe.test(sModel.replace(/[-]/g, ' '))) {
+        if (sModel !== modelLower && stockModelRe.test(sModel.replace(/[-]/g, ' '))) {
           stock += sv;
         }
       }
