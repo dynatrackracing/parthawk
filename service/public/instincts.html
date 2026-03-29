@@ -70,15 +70,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
       <div style="font-size:11px;color:#6B7280;margin-bottom:8px">Parts that have died 2+ times — avoid unless market data supports</div>
       <div id="deadPatterns"></div>
     </div>
-    <div class="card" style="border-color:#f59e0b">
-      <div class="section-title" style="color:#f59e0b">Return Patterns</div>
-      <div id="returnPatterns"></div>
-    </div>
-    <div class="card" style="border-color:#22c55e">
-      <div class="section-title" style="color:#22c55e">Price Reduction Outcomes</div>
-      <div style="font-size:11px;color:#6B7280;margin-bottom:8px">Did stale inventory price reductions lead to sales?</div>
-      <div id="staleOutcomes"></div>
-    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -173,35 +164,6 @@ function load() {
         dpEl.innerHTML = h;
       }
 
-      // Return patterns
-      var rp = d.returnPatterns || {};
-      var rpEl = document.getElementById('returnPatterns');
-      var rpHtml = '<div class="stat-row"><div class="stat-box"><div class="stat-value">' + (rp.totalReturns || 0) + '</div><div class="stat-label">Total Returns</div></div></div>';
-      if ((rp.byGrade || []).length > 0) {
-        rpHtml += '<div style="margin-top:8px">';
-        rp.byGrade.forEach(function(g) {
-          var color = g.grade === 'A' ? '#22c55e' : g.grade === 'B' ? '#eab308' : '#ef4444';
-          rpHtml += '<div class="item-row"><span class="badge" style="background:' + color + ';color:#000">Grade ' + (g.grade || '?') + '</span> ' + g.count + ' returns</div>';
-        });
-        rpHtml += '</div>';
-      }
-      if ((rp.repeatOffenders || []).length > 0) {
-        rpHtml += '<div style="margin-top:8px;font-size:11px;color:#f59e0b;font-weight:600">Repeat Offenders:</div>';
-        rp.repeatOffenders.forEach(function(o) {
-          rpHtml += '<div class="item-row">' + esc(o.title || o.partNumber || '?') + ' <span style="color:#ef4444">(' + o.returnCount + 'x returned)</span></div>';
-        });
-      }
-      rpEl.innerHTML = rpHtml || '<div class="empty">No returns logged yet.</div>';
-
-      // Stale outcomes
-      var so = d.staleOutcomes || {};
-      var soEl = document.getElementById('staleOutcomes');
-      soEl.innerHTML = '<div class="stat-row">' +
-        '<div class="stat-box"><div class="stat-value">' + (so.totalActions || 0) + '</div><div class="stat-label">Price Reductions</div></div>' +
-        '<div class="stat-box"><div class="stat-value" style="color:' + ((so.successRate || 0) >= 50 ? '#22c55e' : '#f59e0b') + '">' + (so.successRate || 0) + '%</div><div class="stat-label">Led to Sale</div></div>' +
-        '<div class="stat-box"><div class="stat-value">' + (so.avgReductionPercent || 0) + '%</div><div class="stat-label">Avg Reduction</div></div>' +
-        '<div class="stat-box"><div class="stat-value">' + (so.avgDaysToSellAfterReduction || '—') + '</div><div class="stat-label">Avg Days to Sell</div></div>' +
-        '</div>';
     })
     .catch(function(err) {
       document.getElementById('loading').style.display = 'none';
