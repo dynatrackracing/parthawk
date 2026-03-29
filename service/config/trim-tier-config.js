@@ -76,6 +76,7 @@ const TRIM_TIERS = {
   'grand touring': TIER.PREMIUM, 'signature': TIER.PREMIUM,
   'f sport': TIER.PREMIUM, 'luxury': TIER.PREMIUM,
   'premium': TIER.PREMIUM, 'prestige': TIER.PREMIUM,
+  'sho': TIER.PREMIUM,
 };
 
 const MAKE_TRIM_OVERRIDES = {
