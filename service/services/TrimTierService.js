@@ -182,6 +182,27 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
       .where('gen_start', '<=', yearNum + 1)
       .where('gen_end', '>=', yearNum - 1);
 
+    // BMW: the model number IS the trim identity (325i, 528i, M3, etc.)
+    if (/bmw/i.test(make) && !trimName && model) {
+      const originalModel = model.toUpperCase().trim();
+      const mCarMatch = originalModel.match(/\b(M[2-8])\b/);
+      const numericMatch = originalModel.match(/\b([1-8]\d{2})[A-Z]*/);
+      if (mCarMatch) {
+        trimName = mCarMatch[1];
+      } else if (numericMatch) {
+        trimName = numericMatch[1] + 'i';
+      }
+    }
+
+    // Mercedes: model number is the trim identity (C300, E350, etc.)
+    if (/mercedes/i.test(make) && !trimName && model) {
+      const originalModel = model.toUpperCase().trim();
+      const mbMatch = originalModel.match(/\b([A-Z]{1,3}\s*\d{2,3})\b/);
+      if (mbMatch) {
+        trimName = mbMatch[1].replace(/\s+/g, '');
+      }
+    }
+
     // Get all candidates for cult checks
     let candidates = await baseQuery().select('*');
     if (candidates.length === 0) {
