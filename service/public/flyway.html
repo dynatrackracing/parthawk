@@ -466,6 +466,7 @@ function renderActiveTrip() {
   h += '<div><div class="trip-header-name">' + esc(trip.name) + '</div>';
   h += '<div class="trip-header-dates">' + fmtDateRange(trip.start_date, trip.end_date) + '</div>';
   h += '<div class="trip-countdown' + (daysLeft <= 0 ? ' pulse' : '') + '" style="color:' + countdownColor + '">' + countdownText + '</div></div>';
+  h += '<button class="btn btn-gray btn-sm" id="scrapeBtn" onclick="triggerFlywayScrape(' + trip.id + ')" style="margin-right:4px">SCRAPE YARDS</button>';
   h += '<button class="btn btn-gray btn-sm" onclick="confirmComplete()">Complete</button>';
   h += '</div></div>';
 
@@ -688,6 +689,46 @@ function toggleFilter(which) {
   if (which === 'premium') filterPremium = !filterPremium;
   if (which === 'highvalue') filterHighValue = !filterHighValue;
   renderActiveTrip();
+}
+
+// ═══ SCRAPE ═══
+async function triggerFlywayScrape(tripId) {
+  var btn = document.getElementById('scrapeBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Scraping...'; }
+  try {
+    var data = await api('/flyway/trips/' + tripId + '/scrape', { method: 'POST' });
+    if (data.success) {
+      showToast('Scrape started. Non-LKQ yards will update in a few minutes. LKQ yards update via nightly local scrape.');
+      setTimeout(function() { loadScrapeStatus(tripId); }, 30000);
+    } else {
+      showToast(data.error || 'Scrape failed');
+    }
+  } catch (err) {
+    showToast('Scrape request failed');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'SCRAPE YARDS'; }
+  }
+}
+
+async function loadScrapeStatus(tripId) {
+  try {
+    var data = await api('/flyway/trips/' + tripId + '/scrape-status');
+    if (data.success && data.status) {
+      data.status.forEach(function(y) {
+        var scraped = y.last_scraped ? timeAgo(y.last_scraped) : 'never';
+        var badge = y.scrape_type === 'local' ? 'LOCAL' : y.scrape_type === 'manual' ? 'PASTE' : 'AUTO';
+        console.log('[Flyway] ' + y.name + ': ' + badge + ' | ' + scraped + ' | ' + y.vehicle_count + ' vehicles');
+      });
+    }
+  } catch (err) { /* silent */ }
+}
+
+function showToast(msg) {
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#141414;border:1px solid #2a2a2a;color:#F0F0F0;padding:10px 16px;border-radius:8px;font-size:12px;z-index:300;max-width:90vw;text-align:center';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 5000);
 }
 
 function confirmComplete() {

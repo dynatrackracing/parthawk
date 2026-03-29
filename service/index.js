@@ -887,6 +887,18 @@ async function start() {
       }
     });
 
+    // Flyway scrape: daily 6am UTC - scrapes Pull-A-Part/Foss/Carolina PNP for active road trips
+    const FlywayScrapeRunner = require('./lib/FlywayScrapeRunner');
+    const flywayJob = schedule.scheduleJob('0 6 * * *', async function (scheduledTime) {
+      log.info({ scheduledTime }, 'Starting Flyway scrape run');
+      try {
+        const runner = new FlywayScrapeRunner();
+        await runner.work();
+      } catch (err) {
+        log.error({ err }, 'Flyway scrape run failed');
+      }
+    });
+
     // Load Auto table models into partMatcher cache, then regenerate scout alerts
     try {
       const { loadModelsFromDB } = require('./utils/partMatcher');

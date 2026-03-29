@@ -113,4 +113,63 @@ router.get('/available-yards', async (req, res) => {
   }
 });
 
+// Trigger manual scrape for all yards in a trip (non-LKQ only)
+router.post('/trips/:id/scrape', async (req, res) => {
+  try {
+    const trip = await FlywayService.getTrip(req.params.id);
+    if (!trip) return res.status(404).json({ success: false, error: 'Trip not found' });
+    if (trip.status !== 'active') return res.status(400).json({ success: false, error: 'Trip must be active to scrape' });
+
+    const FlywayScrapeRunner = require('../lib/FlywayScrapeRunner');
+    const runner = new FlywayScrapeRunner();
+    runner.work().catch(err => console.error('[Flyway] Manual scrape error:', err.message));
+
+    res.json({
+      success: true,
+      message: 'Flyway scrape started in background. Non-LKQ yards will be scraped. Refresh in a few minutes.',
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get scrape status for a trip's yards
+router.get('/trips/:id/scrape-status', async (req, res) => {
+  try {
+    const trip = await FlywayService.getTrip(req.params.id);
+    if (!trip) return res.status(404).json({ success: false, error: 'Trip not found' });
+
+    const yardIds = trip.yards.map(y => y.id);
+    const yards = await database('yard')
+      .whereIn('id', yardIds)
+      .select('id', 'name', 'chain', 'scrape_method', 'last_scraped');
+
+    const counts = await database('yard_vehicle')
+      .whereIn('yard_id', yardIds)
+      .where('active', true)
+      .groupBy('yard_id')
+      .select('yard_id')
+      .count('id as vehicle_count');
+
+    const countMap = {};
+    counts.forEach(c => { countMap[c.yard_id] = parseInt(c.vehicle_count); });
+
+    const status = yards.map(y => ({
+      id: y.id,
+      name: y.name,
+      chain: y.chain,
+      scrape_method: y.scrape_method,
+      last_scraped: y.last_scraped,
+      vehicle_count: countMap[y.id] || 0,
+      scrape_type: (y.scrape_method || '').toLowerCase() === 'lkq' ? 'local' :
+                   (y.scrape_method || '').toLowerCase() === 'manual' || (y.scrape_method || '').toLowerCase() === 'none' ? 'manual' : 'server',
+      needs_scrape: !y.last_scraped || (Date.now() - new Date(y.last_scraped).getTime()) > 24 * 60 * 60 * 1000,
+    }));
+
+    res.json({ success: true, status });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
