@@ -89,7 +89,6 @@
     letter-spacing: 0.03em; text-transform: uppercase;
   }
   .chip-type { background: #1e3a5f; color: #60a5fa; }
-  .chip-proven { background: #064e3b; color: #22c55e; }
   .chip-velocity { background: #713f12; color: #eab308; }
 
   .opp-expanded { display: none; padding: 10px 0 4px; margin-top: 8px; border-top: 1px solid var(--border); }
@@ -157,9 +156,9 @@ function scoreColor(score) {
 }
 
 function recClass(score) {
-  if (score >= 85) return 'rec-high';
-  if (score >= 70) return 'rec-strong';
-  if (score >= 55) return 'rec-moderate';
+  if (score >= 80) return 'rec-high';
+  if (score >= 60) return 'rec-strong';
+  if (score >= 40) return 'rec-moderate';
   return 'rec-low';
 }
 
@@ -167,7 +166,6 @@ function renderCard(o, i, isDismissed) {
   const color = scoreColor(o.score || 0);
   const chips = [];
   if (o.partType) chips.push('<span class="chip chip-type">' + esc(o.partType) + '</span>');
-  if (o.soldByUs) chips.push('<span class="chip chip-proven">PROVEN SELLER</span>');
   if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
 
   const yearStr = o.yearEnd ? o.year + '-' + o.yearEnd : (o.year || '');
@@ -204,8 +202,7 @@ function renderCard(o, i, isDismissed) {
         '<div class="opp-detail">' +
           '<strong>Market median:</strong> $' + o.marketMedian.toFixed(2) + '<br>' +
           '<strong>eBay sold (90d):</strong> ' + o.soldCount + ' &nbsp; <strong>Velocity:</strong> ' + o.velocity + '/week<br>' +
-          '<strong>Score breakdown:</strong> Demand ' + o.demandScore + ' + Price ' + o.priceScore + ' + Velocity ' + o.velocityScore + ' + History ' + o.historyScore + ' + Scarcity ' + o.scarcityScore + '<br>' +
-          (o.soldByUs ? '<strong>We sold:</strong> ' + o.ourSoldCount + 'x @ $' + (o.ourAvgPrice||0) + ' avg, last ' + (o.lastSoldByUs ? new Date(o.lastSoldByUs).toLocaleDateString() : '?') + '<br>' : '') +
+          '<strong>Score breakdown:</strong> Demand ' + o.demandScore + ' + Price ' + o.priceScore + ' + Velocity ' + o.velocityScore + ' + Scarcity ' + o.scarcityScore + '<br>' +
           '<strong>Cache key:</strong> ' + esc(o.cacheKey) +
         '</div>' +
         '<div class="opp-rec ' + recClass(o.score) + '">' + esc(o.recommendation) + '</div>' +

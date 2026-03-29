@@ -1,23 +1,22 @@
 'use strict';
 
 /**
- * OpportunityService — Surfaces parts with strong market demand we don't stock.
+ * OpportunityService — Surfaces parts with strong market demand we've NEVER sold.
  *
  * Data sources (no scraping — reads existing caches):
  *   1. market_demand_cache — eBay sold comps (median price, sold count)
  *   2. YourListing — current active stock
- *   3. YourSale — our historical sales (proven seller bonus)
+ *   3. YourSale — our ALL-TIME sales history (exclusion gate, not bonus)
  *
- * Scoring (max 110):
- *   Demand:   max 35pts (eBay sold count)
- *   Price:    max 25pts (median price tiers)
- *   Velocity: max 15pts (sales per week)
- *   History:  20pts if we've sold this before
- *   Scarcity: max 15pts (niche high-margin parts)
+ * Scoring (max 100):
+ *   Demand:   max 35pts  (eBay sold count)     × 0.40
+ *   Price:    max 25pts  (median price tiers)   × 0.30
+ *   Velocity: max 15pts  (sales per week)       × 0.30
+ *   Scarcity: max 15pts  (niche high-margin)
  *   Floor: median >= $300 + any market signal → minimum 75
  *
  * Hard excludes: complete engines, complete transmissions, body panels.
- * Always allows: modules, sensors, pumps, throttle bodies, amplifiers, etc.
+ * Sold-before exclusion: if we've ever sold this part, skip it (restock → Scour Stream).
  */
 
 const { database } = require('../database/database');
@@ -264,61 +263,65 @@ async function findOpportunities() {
     }
   }
 
-  // 3. Load our 180d sales history — index by base PN and by keyword combo
+  // 3. Load ALL-TIME sales history for sold-before exclusion
+  //    Parts we've sold before belong in Scour Stream / The Quarry, not Sky Watch.
   const salesRows = await database.raw(`
-    SELECT title, COUNT(*) as cnt, ROUND(AVG("salePrice")::numeric, 2) as avg_price,
-           MAX("soldDate") as last_sold
+    SELECT title, COUNT(*) as cnt
     FROM "YourSale"
-    WHERE "soldDate" > NOW() - INTERVAL '180 days' AND title IS NOT NULL
+    WHERE title IS NOT NULL
     GROUP BY title
   `);
 
-  const salesByPN = new Map();
-  const salesByKeyword = new Map(); // "MAKE|MODEL|PARTTYPE" → {count, avgPrice, lastSold}
+  // Build normalized title set for sold-before matching (0.8 word overlap threshold)
+  const soldTitleWords = new Map(); // normalized title → word array
+  const soldByPN = new Set(); // exact part number matches
+  const soldSampleTitles = new Map(); // PN → sample title for description fallback
 
   for (const row of (salesRows.rows || salesRows)) {
     const title = row.title || '';
-    const cnt = parseInt(row.cnt) || 0;
-    const price = parseFloat(row.avg_price) || 0;
 
+    // Index by part number
     const pns = extractPartNumbers(title);
     for (const pn of pns) {
-      if (!salesByPN.has(pn.base)) {
-        salesByPN.set(pn.base, { count: 0, avgPrice: 0, lastSold: null, sampleTitle: title });
-      }
-      const e = salesByPN.get(pn.base);
-      e.count += cnt;
-      e.avgPrice = price;
-      if (!e.lastSold || new Date(row.last_sold) > new Date(e.lastSold)) e.lastSold = row.last_sold;
+      soldByPN.add(pn.base);
+      soldByPN.add(pn.normalized);
+      if (!soldSampleTitles.has(pn.base)) soldSampleTitles.set(pn.base, title);
     }
 
-    // Keyword index for make|model|partType matching
-    const partType = detectPartType(title);
-    if (partType) {
-      const titleUpper = title.toUpperCase();
-      // Build a rough keyword key
-      const MAKES = ['FORD','TOYOTA','HONDA','DODGE','JEEP','CHRYSLER','RAM','CHEVROLET','GMC',
-        'NISSAN','BMW','MERCEDES','MAZDA','KIA','HYUNDAI','SUBARU','LEXUS','ACURA','CADILLAC',
-        'BUICK','LINCOLN','VOLVO','AUDI','VOLKSWAGEN','INFINITI','MITSUBISHI','PONTIAC','SATURN',
-        'MERCURY','SCION','MINI','PORSCHE','JAGUAR','LAND ROVER'];
-      let make = null;
-      for (const m of MAKES) { if (titleUpper.includes(m)) { make = m; break; } }
-      if (make) {
-        const kwKey = [make, partType].join('|');
-        if (!salesByKeyword.has(kwKey)) {
-          salesByKeyword.set(kwKey, { count: 0, avgPrice: 0, lastSold: null });
-        }
-        const e = salesByKeyword.get(kwKey);
-        e.count += cnt;
-        e.avgPrice = price;
-        if (!e.lastSold || new Date(row.last_sold) > new Date(e.lastSold)) e.lastSold = row.last_sold;
-      }
+    // Index by normalized title words for fuzzy matching
+    const norm = normalizeOppTitle(title);
+    if (norm.length >= 10) {
+      const words = norm.split(' ').filter(w => w.length > 2);
+      if (words.length >= 2) soldTitleWords.set(norm, words);
     }
+  }
+
+  // Check if a description matches something we've sold (0.8 word overlap)
+  function hasSoldBefore(description, descPartNumber) {
+    // Exact PN match
+    if (descPartNumber && soldByPN.has(descPartNumber)) return true;
+
+    // Fuzzy title match at 0.8 threshold
+    const norm = normalizeOppTitle(description);
+    if (soldTitleWords.has(norm)) return true;
+
+    const words = norm.split(' ').filter(w => w.length > 2);
+    if (words.length < 2) return false;
+
+    for (const [, soldWords] of soldTitleWords) {
+      let matches = 0;
+      for (const w of words) {
+        if (soldWords.includes(w)) matches++;
+      }
+      if (matches / words.length >= 0.8) return true;
+    }
+    return false;
   }
 
   // 4. Score each market cache entry
   const opportunities = [];
   let filteredCount = 0;
+  let soldBeforeCount = 0;
   let totalConsidered = 0;
 
   for (const row of cacheRows) {
@@ -331,12 +334,11 @@ async function findOpportunities() {
     if (median >= 150 && soldCount < 1) continue;
     if (median < 150 && soldCount < 2) continue;
 
-    // Check stock
+    // Check stock (0.85 word overlap for ilike matching)
     let inStock = false;
     if (parsed.type === 'PN') {
       inStock = stockByPN.has(parsed.pn);
     } else if (parsed.make && parsed.partType) {
-      // For keyword keys, check if we have a listing with this make+model+partType
       try {
         let q = database('YourListing').where('listingStatus', 'Active')
           .where('title', 'ilike', `%${parsed.make}%`);
@@ -361,25 +363,15 @@ async function findOpportunities() {
 
     if (inStock) continue;
 
-    // Sales history check
-    let soldByUs = null;
-    if (parsed.type === 'PN') {
-      soldByUs = salesByPN.get(parsed.pn) || null;
-    } else if (parsed.make && parsed.partType) {
-      const kwKey = [parsed.make, parsed.partType].join('|');
-      soldByUs = salesByKeyword.get(kwKey) || null;
-    }
-    const historyBonus = !!soldByUs;
-
     // Build description
     let description;
     if (parsed.type === 'KEYWORD') {
       description = [parsed.year, parsed.make, parsed.model, parsed.partType].filter(Boolean).join(' ');
     } else {
-      // Try to find a sample title from our sales
-      const saleEntry = salesByPN.get(parsed.pn);
-      if (saleEntry?.sampleTitle) {
-        description = saleEntry.sampleTitle;
+      // Try to find a sample title for display (but NOT as a sales indicator)
+      const sampleTitle = soldSampleTitles.get(parsed.pn);
+      if (sampleTitle) {
+        description = sampleTitle;
       } else {
         try {
           const sample = await database('YourSale').where('title', 'ilike', `%${parsed.pn}%`).first('title');
@@ -410,9 +402,13 @@ async function findOpportunities() {
     if (!oppMake) { filteredCount++; continue; }
     if (!oppPartType && !oppPartNumber) { filteredCount++; continue; }
 
+    // ── SOLD-BEFORE GATE: skip parts we've ever sold (restock → Scour Stream) ──
+    if (hasSoldBefore(description, oppPartNumber)) { soldBeforeCount++; continue; }
+
     const velocity = soldCount > 0 ? Math.round((soldCount / 90) * 7 * 10) / 10 : 0;
 
-    // ── SCORING ──
+    // ── SCORING (no history bonus — only new discoveries) ──
+    // Demand: max 35pts
     let demandScore = 0;
     if (soldCount >= 50) demandScore = 35;
     else if (soldCount >= 30) demandScore = 30;
@@ -422,6 +418,7 @@ async function findOpportunities() {
     else if (soldCount >= 2) demandScore = 8;
     else if (soldCount >= 1) demandScore = 4;
 
+    // Price: max 25pts
     let priceScore = 0;
     if (median >= 400) priceScore = 25;
     else if (median >= 300) priceScore = 22;
@@ -431,6 +428,7 @@ async function findOpportunities() {
     else if (median >= 75) priceScore = 6;
     else if (median >= 50) priceScore = 3;
 
+    // Velocity: max 15pts
     let velocityScore = 0;
     if (velocity >= 5) velocityScore = 15;
     else if (velocity >= 3) velocityScore = 12;
@@ -438,23 +436,26 @@ async function findOpportunities() {
     else if (velocity >= 1) velocityScore = 7;
     else if (velocity >= 0.5) velocityScore = 4;
 
-    const historyScore = historyBonus ? 20 : 0;
-
+    // Scarcity: max 15pts
     let scarcityScore = 0;
     if (soldCount <= 5 && median >= 200) scarcityScore = 15;
     else if (soldCount <= 10 && median >= 150) scarcityScore = 10;
     else if (soldCount <= 20 && median >= 100) scarcityScore = 5;
 
-    let score = demandScore + priceScore + velocityScore + historyScore + scarcityScore;
+    // Weighted score: demand 40%, price 30%, velocity+scarcity 30%
+    let score = Math.round(
+      (demandScore / 35) * 40 +
+      (priceScore / 25) * 30 +
+      ((velocityScore + scarcityScore) / 30) * 30
+    );
 
     if (median >= 300 && soldCount >= 1) score = Math.max(75, score);
 
     let recommendation;
-    if (score >= 85) recommendation = 'HIGH PRIORITY — strong demand, high margin';
-    else if (score >= 70) recommendation = 'STRONG — proven market, worth hunting';
-    else if (score >= 55) recommendation = 'MODERATE — good opportunity if convenient';
-    else if (score >= 40) recommendation = 'WATCH — market exists, check yard availability';
-    else recommendation = 'LOW — limited data, may be niche';
+    if (score >= 80) recommendation = 'Source this part — high demand, low competition';
+    else if (score >= 60) recommendation = 'Worth sourcing — solid opportunity';
+    else if (score >= 40) recommendation = 'Consider sourcing — moderate opportunity';
+    else recommendation = 'Low priority';
 
     opportunities.push({
       cacheKey: key, description,
@@ -462,16 +463,13 @@ async function findOpportunities() {
       make: oppMake, model: oppModel, year: oppYear, yearEnd: oppYearEnd,
       engineSize: oppEngine,
       marketMedian: median, soldCount, velocity, score,
-      demandScore, priceScore, velocityScore, historyScore, scarcityScore,
-      recommendation, inStock: false, soldByUs: historyBonus,
-      lastSoldByUs: soldByUs?.lastSold || null,
-      ourAvgPrice: soldByUs?.avgPrice || null,
-      ourSoldCount: soldByUs?.count || null,
+      demandScore, priceScore, velocityScore, scarcityScore,
+      recommendation, inStock: false,
       lastUpdated: row.last_updated,
     });
   }
 
-  console.log(`[OpportunityService] Filter gate: ${filteredCount} filtered out of ${totalConsidered} considered, ${opportunities.length} passed`);
+  console.log(`[OpportunityService] Filter gate: ${filteredCount} incomplete, ${soldBeforeCount} sold-before excluded, ${opportunities.length} passed (of ${totalConsidered} considered)`);
 
   // ── Dismiss filter: remove previously dismissed opportunities ──
   let dismissedCount = 0;
