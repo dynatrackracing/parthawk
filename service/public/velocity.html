@@ -52,6 +52,7 @@ td{padding:8px;border-bottom:1px solid #1f1f1f}
         <div class="stat-box" id="healthBox"><div class="stat-value" id="healthScore">—</div><div class="stat-label">Health Score</div></div>
         <div class="stat-box"><div class="stat-value" id="sellThrough">—</div><div class="stat-label">Sell-Through %</div></div>
         <div class="stat-box"><div class="stat-value" id="activeCount">—</div><div class="stat-label">Active Listings</div></div>
+        <div class="stat-box"><div class="stat-value" id="totalSales">—</div><div class="stat-label">Total Sales</div></div>
         <div class="stat-box"><div class="stat-value" id="avgWeekly">—</div><div class="stat-label">Avg/Week</div></div>
       </div>
       <div class="card">
@@ -106,6 +107,10 @@ function load() {
     // Sell-through
     document.getElementById('sellThrough').textContent = (sellThrough.sellThroughRate || 0).toFixed(1) + '%';
     document.getElementById('activeCount').textContent = sellThrough.activeListings || 0;
+
+    // Total sales from velocity totals
+    var totals = velocity.totals || {};
+    document.getElementById('totalSales').textContent = (totals.count || 0).toLocaleString();
 
     // Avg weekly
     var trend = health.velocityTrend || {};

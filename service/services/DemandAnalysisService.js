@@ -92,7 +92,6 @@ class DemandAnalysisService {
   async analyzeSalesVelocity(daysBack = 90) {
     const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
 
-    // Get your sales grouped by week
     const yourSales = await YourSale.query()
       .where('soldDate', '>=', startDate)
       .select(
@@ -104,16 +103,8 @@ class DemandAnalysisService {
       .groupByRaw("DATE_TRUNC('week', \"soldDate\")")
       .orderBy('week', 'asc');
 
-    // Get market sales for comparison
-    const marketSales = await SoldItem.query()
-      .where('soldDate', '>=', startDate)
-      .select(
-        SoldItem.raw("DATE_TRUNC('week', \"soldDate\") as week"),
-        SoldItem.raw('COUNT(*) as sales_count'),
-        SoldItem.raw('AVG("soldPrice") as avg_price')
-      )
-      .groupByRaw("DATE_TRUNC('week', \"soldDate\")")
-      .orderBy('week', 'asc');
+    const totalCount = yourSales.reduce((s, r) => s + parseInt(r.sales_count, 10), 0);
+    const totalRevenue = yourSales.reduce((s, r) => s + parseFloat(r.total_revenue || 0), 0);
 
     return {
       yourVelocity: yourSales.map(row => ({
@@ -122,11 +113,11 @@ class DemandAnalysisService {
         totalRevenue: parseFloat(row.total_revenue || 0),
         avgPrice: parseFloat(row.avg_price || 0),
       })),
-      marketVelocity: marketSales.map(row => ({
-        week: row.week,
-        salesCount: parseInt(row.sales_count, 10),
-        avgPrice: parseFloat(row.avg_price || 0),
-      })),
+      totals: {
+        count: totalCount,
+        revenue: totalRevenue,
+        avgPrice: totalCount > 0 ? totalRevenue / totalCount : 0,
+      },
       daysAnalyzed: daysBack,
     };
   }
