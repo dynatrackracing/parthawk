@@ -232,6 +232,13 @@ function parseCacheKey(key) {
   return { type: 'PN', pn: key, year: null, make: null, model: null, partType: null };
 }
 
+// ── Normalize title for dismiss dedup ───────────────────────────
+
+function normalizeOppTitle(title) {
+  if (!title) return '';
+  return title.toUpperCase().replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 65);
+}
+
 // ── Main opportunity finder ─────────────────────────────────────
 
 async function findOpportunities() {
@@ -466,8 +473,26 @@ async function findOpportunities() {
 
   console.log(`[OpportunityService] Filter gate: ${filteredCount} filtered out of ${totalConsidered} considered, ${opportunities.length} passed`);
 
+  // ── Dismiss filter: remove previously dismissed opportunities ──
+  let dismissedCount = 0;
+  try {
+    const dismissedRows = await database('dismissed_opportunity').select('opportunity_key');
+    if (dismissedRows.length > 0) {
+      const dismissedKeys = new Set(dismissedRows.map(r => r.opportunity_key));
+      const beforeCount = opportunities.length;
+      const filtered = opportunities.filter(o => !dismissedKeys.has(normalizeOppTitle(o.description)));
+      dismissedCount = beforeCount - filtered.length;
+      console.log(`[OpportunityService] Dismissed filter: ${dismissedCount} removed, ${filtered.length} remaining`);
+      filtered.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
+      return filtered;
+    }
+  } catch (e) {
+    // Table may not exist yet
+    console.log('[OpportunityService] dismissed_opportunity table not found, skipping dismiss filter');
+  }
+
   opportunities.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
   return opportunities;
 }
 
-module.exports = { findOpportunities, shouldExclude, parseCacheKey, parseTitle };
+module.exports = { findOpportunities, shouldExclude, parseCacheKey, parseTitle, normalizeOppTitle };

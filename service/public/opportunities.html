@@ -17,18 +17,10 @@
   }
   body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 14px 16px; position: sticky; top: 0; z-index: 100;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .header-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; }
-  .header-left p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-
   .sort-bar {
     display: flex; gap: 6px; padding: 10px 16px;
     background: var(--surface); border-bottom: 1px solid var(--border);
-    overflow-x: auto;
+    overflow-x: auto; align-items: center;
   }
   .sort-btn {
     padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
@@ -36,6 +28,13 @@
     font-weight: 600; cursor: pointer; white-space: nowrap;
   }
   .sort-btn.active { background: #064e3b; color: #22c55e; border-color: #22c55e44; }
+  .sort-spacer { flex: 1; }
+  .toggle-dismissed {
+    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-faint); font-size: 11px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .toggle-dismissed.active { background: #7f1d1d; color: #ef4444; border-color: #ef444444; }
 
   .status-bar {
     padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
@@ -45,9 +44,12 @@
   .opp-list { padding: 0; }
   .opp-card {
     border-bottom: 1px solid var(--border); background: var(--surface2);
-    padding: 12px 14px; cursor: pointer;
+    padding: 12px 14px; cursor: pointer; transition: opacity 0.3s, max-height 0.3s;
   }
   .opp-card:active { background: var(--surface); }
+  .opp-card.dismissing { opacity: 0; max-height: 0; padding: 0 14px; overflow: hidden; }
+  .opp-card.dismissed-card { opacity: 0.4; }
+  .opp-card.dismissed-card:hover { opacity: 0.6; }
 
   .opp-top { display: flex; align-items: center; gap: 10px; }
   .opp-score {
@@ -64,9 +66,22 @@
   .opp-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .opp-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
 
-  .opp-right { text-align: right; flex-shrink: 0; }
+  .opp-right { text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
   .opp-price { font-size: 14px; font-weight: 700; color: var(--green); }
   .opp-sold { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .opp-dismiss-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-faint); font-size: 14px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .opp-dismiss-btn:hover { background: #7f1d1d; color: #ef4444; border-color: #ef4444; }
+  .opp-undismiss-btn {
+    padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--green); font-size: 10px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .opp-undismiss-btn:hover { background: #064e3b; border-color: #22c55e; }
 
   .opp-chips { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
   .chip {
@@ -101,6 +116,8 @@
   <button class="sort-btn" data-sort="price">Price</button>
   <button class="sort-btn" data-sort="sold">Sold Count</button>
   <button class="sort-btn" data-sort="velocity">Velocity</button>
+  <div class="sort-spacer"></div>
+  <button class="toggle-dismissed" id="toggleDismissed">Show Dismissed</button>
 </div>
 
 <div class="status-bar">
@@ -115,6 +132,8 @@
 <script>
 let allOpps = [];
 let currentSort = 'score';
+let showingDismissed = false;
+let dismissedItems = [];
 
 async function load() {
   try {
@@ -144,41 +163,43 @@ function recClass(score) {
   return 'rec-low';
 }
 
-function render() {
-  const list = document.getElementById('oppList');
-  if (allOpps.length === 0) {
-    list.innerHTML = '<div class="empty">No opportunities found. Run the nightly price refresh to populate market data.</div>';
-    return;
-  }
+function renderCard(o, i, isDismissed) {
+  const color = scoreColor(o.score || 0);
+  const chips = [];
+  if (o.partType) chips.push('<span class="chip chip-type">' + esc(o.partType) + '</span>');
+  if (o.soldByUs) chips.push('<span class="chip chip-proven">PROVEN SELLER</span>');
+  if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
 
-  list.innerHTML = allOpps.map((o, i) => {
-    const color = scoreColor(o.score);
-    const chips = [];
-    if (o.partType) chips.push('<span class="chip chip-type">' + esc(o.partType) + '</span>');
-    if (o.soldByUs) chips.push('<span class="chip chip-proven">PROVEN SELLER</span>');
-    if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
+  const yearStr = o.yearEnd ? o.year + '-' + o.yearEnd : (o.year || '');
+  const vehicleLine = [yearStr, o.make, o.model].filter(Boolean).join(' ');
+  const title = o.description || o.original_title || '';
 
-    // Vehicle line: "2015-2018 Ford Transit"
-    const yearStr = o.yearEnd ? o.year + '-' + o.yearEnd : (o.year || '');
-    const vehicleLine = [yearStr, o.make, o.model].filter(Boolean).join(' ');
+  const actionBtn = isDismissed
+    ? '<button class="opp-undismiss-btn" onclick="undismiss(event, ' + i + ')">Restore</button>'
+    : '<button class="opp-dismiss-btn" onclick="dismiss(event, ' + i + ')" title="Dismiss">&#x2715;</button>';
 
-    return '<div class="opp-card" onclick="toggle(' + i + ')">' +
-      '<div class="opp-top">' +
-        '<div class="opp-score ' + color + '">' + o.score + '</div>' +
-        '<div class="opp-info">' +
-          '<div class="opp-title">' + esc(vehicleLine || o.description) + '</div>' +
-          '<div class="opp-meta">' +
-            (o.partType ? '<span>' + esc(o.partType) + '</span>' : '') +
-            (o.partNumber ? '<span>PN: ' + esc(o.partNumber) + '</span>' : '') +
-            (o.engineSize ? '<span>' + esc(o.engineSize) + '</span>' : '') +
-          '</div>' +
-        '</div>' +
-        '<div class="opp-right">' +
-          '<div class="opp-price">$' + Math.round(o.marketMedian) + '</div>' +
-          '<div class="opp-sold">' + o.soldCount + ' sold</div>' +
+  var cardClass = 'opp-card' + (isDismissed ? ' dismissed-card' : '');
+
+  var html = '<div class="' + cardClass + '" id="card-' + (isDismissed ? 'd' : '') + i + '" onclick="' + (isDismissed ? '' : 'toggle(' + i + ')') + '">' +
+    '<div class="opp-top">' +
+      (isDismissed ? '' : '<div class="opp-score ' + color + '">' + o.score + '</div>') +
+      '<div class="opp-info">' +
+        '<div class="opp-title">' + esc(vehicleLine || title) + '</div>' +
+        '<div class="opp-meta">' +
+          (o.partType ? '<span>' + esc(o.partType) + '</span>' : '') +
+          (o.partNumber ? '<span>PN: ' + esc(o.partNumber) + '</span>' : '') +
+          (o.engineSize ? '<span>' + esc(o.engineSize) + '</span>' : '') +
+          (isDismissed ? '<span style="color:#ef4444">Dismissed ' + new Date(o.dismissed_at).toLocaleDateString() + '</span>' : '') +
         '</div>' +
       '</div>' +
-      '<div class="opp-chips">' + chips.join('') + '</div>' +
+      '<div class="opp-right">' +
+        (isDismissed ? '' : '<div><div class="opp-price">$' + Math.round(o.marketMedian) + '</div><div class="opp-sold">' + o.soldCount + ' sold</div></div>') +
+        actionBtn +
+      '</div>' +
+    '</div>';
+
+  if (!isDismissed) {
+    html += '<div class="opp-chips">' + chips.join('') + '</div>' +
       '<div class="opp-expanded" id="exp-' + i + '">' +
         '<div class="opp-detail">' +
           '<strong>Market median:</strong> $' + o.marketMedian.toFixed(2) + '<br>' +
@@ -188,13 +209,100 @@ function render() {
           '<strong>Cache key:</strong> ' + esc(o.cacheKey) +
         '</div>' +
         '<div class="opp-rec ' + recClass(o.score) + '">' + esc(o.recommendation) + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+      '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function render() {
+  const list = document.getElementById('oppList');
+  if (allOpps.length === 0 && !showingDismissed) {
+    list.innerHTML = '<div class="empty">No opportunities found. Run the nightly price refresh to populate market data.</div>';
+    return;
+  }
+
+  var html = '';
+  if (!showingDismissed) {
+    html = allOpps.map(function(o, i) { return renderCard(o, i, false); }).join('');
+  }
+
+  if (showingDismissed && dismissedItems.length > 0) {
+    if (html) html += '<div style="border-top:2px solid #7f1d1d;margin:8px 0"></div>';
+    html += '<div style="padding:8px 16px;font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.05em;background:#141414;border-bottom:1px solid #2a2a2a">Dismissed (' + dismissedItems.length + ')</div>';
+    html += dismissedItems.map(function(o, i) { return renderCard(o, i, true); }).join('');
+  }
+
+  if (!html) {
+    html = '<div class="empty">No dismissed opportunities.</div>';
+  }
+
+  list.innerHTML = html;
+}
+
+async function dismiss(event, idx) {
+  event.stopPropagation();
+  var o = allOpps[idx];
+  if (!o) return;
+
+  var card = document.getElementById('card-' + idx);
+  if (card) card.classList.add('dismissing');
+
+  try {
+    var res = await fetch('/opportunities/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: o.description })
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    setTimeout(function() {
+      allOpps.splice(idx, 1);
+      document.getElementById('statusText').textContent = allOpps.length + ' opportunities found';
+      render();
+    }, 300);
+  } catch(e) {
+    if (card) card.classList.remove('dismissing');
+    alert('Failed to dismiss: ' + e.message);
+  }
+}
+
+async function undismiss(event, idx) {
+  event.stopPropagation();
+  var o = dismissedItems[idx];
+  if (!o) return;
+
+  try {
+    var res = await fetch('/opportunities/undismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: o.original_title })
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    dismissedItems.splice(idx, 1);
+    render();
+  } catch(e) {
+    alert('Failed to undismiss: ' + e.message);
+  }
+}
+
+async function loadDismissed() {
+  try {
+    var res = await fetch('/opportunities/dismissed');
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    dismissedItems = data.dismissed || [];
+  } catch(e) {
+    dismissedItems = [];
+  }
 }
 
 function toggle(idx) {
-  const el = document.getElementById('exp-' + idx);
+  var el = document.getElementById('exp-' + idx);
   if (el) el.classList.toggle('open');
 }
 
@@ -204,19 +312,31 @@ function esc(s) {
 }
 
 // Sort buttons
-document.querySelectorAll('.sort-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+document.querySelectorAll('.sort-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     currentSort = btn.dataset.sort;
 
-    if (currentSort === 'price') allOpps.sort((a, b) => b.marketMedian - a.marketMedian);
-    else if (currentSort === 'sold') allOpps.sort((a, b) => b.soldCount - a.soldCount);
-    else if (currentSort === 'velocity') allOpps.sort((a, b) => b.velocity - a.velocity);
-    else allOpps.sort((a, b) => b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian);
+    if (currentSort === 'price') allOpps.sort(function(a, b) { return b.marketMedian - a.marketMedian; });
+    else if (currentSort === 'sold') allOpps.sort(function(a, b) { return b.soldCount - a.soldCount; });
+    else if (currentSort === 'velocity') allOpps.sort(function(a, b) { return b.velocity - a.velocity; });
+    else allOpps.sort(function(a, b) { return b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian; });
 
     render();
   });
+});
+
+// Dismissed toggle
+document.getElementById('toggleDismissed').addEventListener('click', async function() {
+  showingDismissed = !showingDismissed;
+  this.classList.toggle('active', showingDismissed);
+  this.textContent = showingDismissed ? 'Hide Dismissed' : 'Show Dismissed';
+
+  if (showingDismissed) {
+    await loadDismissed();
+  }
+  render();
 });
 
 load();

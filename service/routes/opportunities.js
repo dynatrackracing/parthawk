@@ -1,7 +1,8 @@
 'use strict';
 
 const router = require('express-promise-router')();
-const { findOpportunities } = require('../services/OpportunityService');
+const { findOpportunities, normalizeOppTitle } = require('../services/OpportunityService');
+const { database } = require('../database/database');
 
 /**
  * GET /opportunities
@@ -40,6 +41,66 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('Error generating opportunities:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /opportunities/dismiss
+ * Dismiss an opportunity so it never reappears.
+ */
+router.post('/dismiss', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ success: false, error: 'title required' });
+
+    const key = normalizeOppTitle(title);
+    if (!key) return res.status(400).json({ success: false, error: 'title is empty after normalization' });
+
+    await database('dismissed_opportunity')
+      .insert({ opportunity_key: key, original_title: title, dismissed_at: new Date() })
+      .onConflict('opportunity_key')
+      .merge();
+
+    res.json({ success: true, dismissed: key });
+  } catch (err) {
+    console.error('Error dismissing opportunity:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /opportunities/undismiss
+ * Restore a previously dismissed opportunity.
+ */
+router.post('/undismiss', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ success: false, error: 'title required' });
+
+    const key = normalizeOppTitle(title);
+    const deleted = await database('dismissed_opportunity').where('opportunity_key', key).del();
+
+    res.json({ success: true, undismissed: key, removed: deleted });
+  } catch (err) {
+    console.error('Error undismissing opportunity:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /opportunities/dismissed
+ * List all dismissed opportunities.
+ */
+router.get('/dismissed', async (req, res) => {
+  try {
+    const rows = await database('dismissed_opportunity')
+      .orderBy('dismissed_at', 'desc')
+      .select('*');
+
+    res.json({ success: true, total: rows.length, dismissed: rows });
+  } catch (err) {
+    console.error('Error fetching dismissed opportunities:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
