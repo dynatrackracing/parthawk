@@ -605,6 +605,7 @@
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
             ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age ${v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
             ${v.drivetrain ? `<span class="chip chip-age age-recent" style="font-size:9px;font-weight:700">${v.drivetrain}</span>` : ''}
+            ${v.decoded_transmission && /manual/i.test(v.decoded_transmission) ? '<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#fff" title="Manual Transmission">MANUAL</span>' : ''}
             ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
           </div>
           <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
@@ -631,8 +632,10 @@
 
     // Show platform siblings if any
     if (v.expected_parts) {
-      html += `<div style="padding:8px 0;font-size:11px;color:#9CA3AF;border-bottom:1px solid var(--border);">
-        <span style="color:#a78bfa;font-weight:600;">EXPECTED:</span> ${v.expected_parts}${v.audio_brand ? ' · <span style="color:#f59e0b">🔊 ' + v.audio_brand + '</span>' : ''}
+      html += `<div style="margin:6px 0 8px 0;padding:6px 8px;background:#1a1a2e;border-radius:6px;border:1px solid #333">
+        <span style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Expected on this trim</span>
+        ${v.audio_brand ? `<span style="color:#d946ef;font-size:10px;margin-left:8px;font-weight:600">🔊 ${v.audio_brand}</span>` : ''}
+        <div style="color:#ccc;font-size:12px;margin-top:3px">${v.expected_parts}</div>
       </div>`;
     }
 

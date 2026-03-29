@@ -86,7 +86,7 @@ function formatResult(match, engineInferred, cultOverride) {
  * Supports make aliases (Dodge↔Ram, Chevy↔Chevrolet), model normalization,
  * and ±1 year tolerance.
  */
-async function lookup(year, make, model, trimName, engineDisplacement) {
+async function lookup(year, make, model, trimName, engineDisplacement, transmission, drivetrain) {
   if (!make || !model) return null;
 
   try {
@@ -166,6 +166,22 @@ async function lookup(year, make, model, trimName, engineDisplacement) {
           if (!refNum || refNum.length < 2) return false;
           return refNum.startsWith(engineNum) || engineNum.startsWith(refNum);
         });
+
+        // Transmission-based filtering when ambiguous
+        if (transmission && engineMatches.length > 1) {
+          const isManual = /manual/i.test(transmission);
+          const isDCT = /dual.clutch|dct|dsg|sst|pdk/i.test(transmission);
+          if (isManual || isDCT) {
+            const isTruck = /1500|2500|3500|f-?150|f-?250|f-?350|silverado|sierra|tundra|tacoma|ranger|colorado|frontier|titan/i.test(modelNorm || '');
+            if (!isTruck || isDCT) {
+              // Manual on cars or DCT anywhere biases toward sport/performance
+              const sportFiltered = engineMatches.filter(c => c.tier >= 3);
+              if (sportFiltered.length > 0) {
+                engineMatches.splice(0, engineMatches.length, ...sportFiltered);
+              }
+            }
+          }
+        }
 
         if (engineMatches.length > 0) {
           const tiers = [...new Set(engineMatches.map(c => c.tier))];

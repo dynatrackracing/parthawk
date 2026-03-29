@@ -61,13 +61,13 @@ async function decodeBatch(vins) {
   }
 }
 
-async function lookupTrimTier(year, make, model, trimName, engineDisplacement) {
+async function lookupTrimTier(year, make, model, trimName, engineDisplacement, transmission, drivetrain) {
   if (!trimName && !engineDisplacement) return { tier: null, extra: null };
 
   // TIER 1: trim_tier_reference (1,049-row curated table — most accurate)
-  // Handles both trim-based and engine-based inference
+  // Handles trim, engine, transmission, and drivetrain signals
   try {
-    const ref = await TrimTierService.lookup(year, make, model, trimName, engineDisplacement);
+    const ref = await TrimTierService.lookup(year, make, model, trimName, engineDisplacement, transmission, drivetrain);
     if (ref) return { tier: ref.tierString, extra: ref };
   } catch (e) {}
 
@@ -165,6 +165,8 @@ async function main() {
       const decodedTrim = r.Trim || null;
       const decodedEngine = r.DisplacementL ? `${r.DisplacementL}L` : null;
       const decodedDrivetrain = r.DriveType || null;
+      const decodedTransmission = r.TransmissionStyle || null;
+      const transmissionSpeeds = r.TransmissionSpeeds || null;
 
       // Look up trim tier
       let trimTier = null;
@@ -175,7 +177,7 @@ async function main() {
       const modelTc = titleCase(row.model || r.Model || '');
       const yearNum = parseInt(r.ModelYear || row.year) || 0;
       if (decodedTrim || decodedEngine) {
-        const result = await lookupTrimTier(yearNum, makeTc, modelTc, decodedTrim, decodedEngine);
+        const result = await lookupTrimTier(yearNum, makeTc, modelTc, decodedTrim, decodedEngine, decodedTransmission, decodedDrivetrain);
         trimTier = result.tier;
         if (result.extra) {
           audioBrand = result.extra.audioBrand;
@@ -192,6 +194,8 @@ async function main() {
         decoded_trim: decodedTrim,
         decoded_engine: decodedEngine,
         decoded_drivetrain: decodedDrivetrain,
+        decoded_transmission: decodedTransmission,
+        transmission_speeds: transmissionSpeeds,
         trim_tier: trimTier,
         vin_decoded_at: new Date(),
       };

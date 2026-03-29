@@ -1001,6 +1001,7 @@ class AttackListService {
       body_style: vehicle.body_style || null,
       stock_number: vehicle.stock_number || null,
       decoded_trim: vehicle.decoded_trim || null,
+      decoded_transmission: vehicle.decoded_transmission || null,
       trim_tier: vehicle.trim_tier || null,
       audio_brand: vehicle.audio_brand || null,
       expected_parts: vehicle.expected_parts || null,
