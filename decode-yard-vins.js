@@ -167,6 +167,8 @@ async function main() {
       const decodedDrivetrain = r.DriveType || null;
       let decodedTransmission = r.TransmissionStyle || null;
       const transmissionSpeeds = r.TransmissionSpeeds || null;
+      const fuelType = r.FuelTypePrimary || null;
+      const isDiesel = /diesel/i.test(fuelType || '') || /diesel|cummins|duramax|power.?stroke|tdi|cdi|ecodiesel|crd/i.test(decodedEngine || '');
 
       // Look up trim tier
       let trimTier = null;
@@ -207,6 +209,7 @@ async function main() {
       try { updateData.audio_brand = audioBrand; } catch (e) {}
       try { updateData.expected_parts = expectedParts; } catch (e) {}
       try { updateData.cult = cult; } catch (e) {}
+      try { updateData.diesel = isDiesel || (result.extra && result.extra.diesel) || false; } catch (e) {}
 
       await db('yard_vehicle').where('id', row.id).update(updateData);
 

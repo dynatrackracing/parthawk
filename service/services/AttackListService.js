@@ -1082,6 +1082,7 @@ class AttackListService {
       audio_brand: vehicle.audio_brand || null,
       expected_parts: vehicle.expected_parts || null,
       cult: vehicle.cult === true,
+      diesel: vehicle.diesel || false,
       trimBadge: vehicle.trim_tier ? {
         tier: vehicle.trim_tier,
         label: vehicle.trim_tier === 'PERFORMANCE' ? 'PERFORMANCE' : vehicle.trim_tier === 'PREMIUM' ? 'PREMIUM TRIM' : vehicle.trim_tier === 'BASE' ? 'BASE TRIM' : 'CHECK TRIM',

@@ -138,6 +138,7 @@ function formatResult(match, engineInferred, cultOverride) {
     audioBrand: match.audio_brand || null,
     expectedParts: match.expected_parts || null,
     cult: cultOverride !== undefined ? cultOverride : (match.cult === true),
+    diesel: match.diesel || false,
     transmission: match.transmission || null,
     topEngine: match.top_engine || null,
     notes: match.notes || null,
@@ -156,6 +157,15 @@ function formatResult(match, engineInferred, cultOverride) {
  */
 async function lookup(year, make, model, trimName, engineDisplacement, transmission, drivetrain) {
   if (!make || !model) return null;
+
+  // Diesel detection from engine string — catches cases where reference entry lacks diesel flag
+  function applyDiesel(result) {
+    if (!result) return result;
+    if (engineDisplacement && /diesel|cummins|duramax|power.?stroke|tdi|cdi|ecodiesel|crd/i.test(engineDisplacement)) {
+      result.diesel = true;
+    }
+    return result;
+  }
 
   try {
     const makeVariants = getMakeVariants(make);
@@ -242,7 +252,7 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
     if (match) {
       // Cult: matched entry is cult, OR the entire model is cult
       const isCult = match.cult === true || allCult;
-      return formatResult(match, false, isCult);
+      return applyDiesel(formatResult(match, false, isCult));
     }
 
     // === ENGINE-BASED INFERENCE ===
@@ -281,12 +291,12 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
             const best = engineMatches.reduce((a, b) => a.tier < b.tier ? a : b);
             const result = formatResult(best, true, inferredCult(best));
             result.engineConfident = true;
-            return result;
+            return applyDiesel(result);
           } else {
             const conservative = engineMatches.reduce((a, b) => a.tier < b.tier ? a : b);
             const result = formatResult(conservative, true, inferredCult(conservative));
             result.engineConfident = false;
-            return result;
+            return applyDiesel(result);
           }
         }
       }
@@ -308,7 +318,7 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
           // Engine doesn't match any known trim — only return if entire model is cult
           if (allCult) {
             const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
-            return formatResult(lowest, false, true);
+            return applyDiesel(formatResult(lowest, false, true));
           }
           return null; // No match — don't guess
         }
@@ -318,13 +328,13 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
     // === NO TRIM, NO ENGINE MATCH — check if entire model is cult ===
     if (allCult) {
       const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
-      return formatResult(lowest, false, true);
+      return applyDiesel(formatResult(lowest, false, true));
     }
 
     // Return lowest-tier reference (conservative) without cult
     if (!trimName) {
       const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
-      return formatResult(lowest, false, false);
+      return applyDiesel(formatResult(lowest, false, false));
     }
 
     return null;
