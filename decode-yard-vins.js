@@ -19,6 +19,61 @@ const TrimTierService = require('./service/services/TrimTierService');
 
 try { require('dotenv').config({ path: path.resolve(__dirname, '.env') }); } catch (e) {}
 
+function cleanDecodedTrim(raw) {
+  if (!raw) return null;
+  let t = raw.trim();
+  if (!t) return null;
+
+  // Exact junk → null
+  const JUNK = new Set([
+    'nfa','nfb','nfc','cma','std','sa','hev','phev',
+    'n/a','na','unknown','standard','unspecified',
+    'styleside','flareside','stepside','sportside',
+    'crew','crew cab','regular cab','extended cab','supercab','supercrew','double cab','quad cab','king cab','access cab',
+    'middle level','middle-low level','high level','low level',
+    'middle grade','middle-low grade','high grade','low grade',
+    'xdrive','sdrive','4matic','quattro',
+    'leather','cloth','premium cloth',
+    'f-series','f series',
+  ]);
+  if (JUNK.has(t.toLowerCase())) return null;
+
+  // Strip parenthetical descriptors
+  t = t.replace(/\s*\([^)]*\)\s*/g, '').trim();
+
+  // Strip engine descriptors from trim
+  t = t.replace(/\b[VIL][\-\s]?\d\b/gi, '').trim();
+  t = t.replace(/\b\d\.\d[A-Z]?\s*(L|LITER)?\b/gi, '').trim();
+
+  // Normalize leather/nav shorthand
+  t = t.replace(/\bW\/LEA(THER)?\b/gi, '-L').trim();
+  t = t.replace(/\bWITH\s+LEATHER\b/gi, '-L').trim();
+  t = t.replace(/\bW\/NAV(I|IGATION)?\b/gi, '').trim();
+  t = t.replace(/\bW\/RES\b/gi, '').trim();
+  t = t.replace(/\bWITH\s+RES\b/gi, '').trim();
+  t = t.replace(/\bWITH\s+NAV(IGATION)?\b/gi, '').trim();
+
+  // Collapse spacing
+  t = t.replace(/\s+\-/g, '-').replace(/\-\s+/g, '-').replace(/\s+/g, ' ').trim();
+
+  // Model numbers as trim → null
+  if (/^[A-Z]{0,3}\d{2,3}[A-Z]?$/i.test(t)) return null;
+  if (/^\d\.\d[a-z]{1,2}$/i.test(t)) return null;
+
+  // Comma lists → take first
+  if (/,/.test(t)) {
+    t = t.split(',')[0].trim();
+  }
+  // Slash lists → take last (usually highest trim)
+  if (/\//.test(t)) {
+    const parts = t.split('/').map(p => p.trim()).filter(Boolean);
+    t = parts[parts.length - 1];
+  }
+
+  if (!t || t.length < 2 || t.length > 30) return null;
+  return t;
+}
+
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error('DATABASE_URL is required');
@@ -162,7 +217,7 @@ async function main() {
         continue;
       }
 
-      const decodedTrim = r.Trim || null;
+      const decodedTrim = cleanDecodedTrim(r.Trim || null);
       const decodedEngine = r.DisplacementL ? `${r.DisplacementL}L` : null;
       const decodedDrivetrain = r.DriveType || null;
       let decodedTransmission = r.TransmissionStyle || null;

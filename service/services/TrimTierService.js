@@ -92,6 +92,36 @@ function cleanModelForLookup(model, make) {
     }
   }
 
+  // Lexus: ES350 → ES, RX300 → RX, IS250 → IS, GX470 → GX, NX200T → NX
+  if (/lexus/i.test(make || '')) {
+    clean = clean.replace(/\b([A-Z]{2,3})\s*\d{2,3}[A-Z]?\b/gi, (m, prefix) => prefix.toUpperCase());
+  }
+
+  // Infiniti: M35 → M, FX35 → FX, QX56 → QX
+  if (/infiniti/i.test(make || '')) {
+    clean = clean.replace(/\b([A-Z]{1,2})\s*\d{2,3}\b/gi, (m, prefix) => prefix.toUpperCase());
+  }
+
+  // Chrysler 300 — ensure "300C" normalizes to "300" for reference lookup
+  if (/chrysler/i.test(make || '')) {
+    clean = clean.replace(/\b300[A-Z]?\b/gi, '300');
+  }
+
+  // Ford F-250/F-350 SUPER DUTY → F-250/F-350
+  clean = clean.replace(/\bSUPER\s*DUTY\b/gi, '').trim();
+
+  // Ford E-series: E-150, E-250, E-350, ECONOLINE → E-Series
+  clean = clean.replace(/\bE[\-\s]?(150|250|350)\s*(ECONOLINE|VAN)?\b/gi, 'E-Series');
+  clean = clean.replace(/\bECONOLINE\b/gi, 'E-Series');
+
+  // Express 1500/2500/3500 → Express
+  clean = clean.replace(/\bEXPRESS\s*\d{4}\b/gi, 'Express');
+
+  // Acura model cleanup — strip trailing generation numbers
+  if (/acura/i.test(make || '')) {
+    clean = clean.replace(/\b(RDX|MDX|TLX|ILX|TSX|TL|RSX|RL|CL|CDX)\s*\d+\b/gi, (m, model) => model.toUpperCase());
+  }
+
   // Suburban 1500/2500 → Suburban (LKQ adds the tonnage)
   clean = clean.replace(/\bSUBURBAN\s+1500\b/gi, 'Suburban');
   clean = clean.replace(/\bSUBURBAN\s+2500\b/gi, 'Suburban');
@@ -114,7 +144,7 @@ function cleanModelForLookup(model, make) {
   // Strip NHTSA trim lists stuffed into model names ("CAMRY LE/SE/XLE" → "CAMRY")
   clean = clean.replace(/\s+(LE|SE|XLE|XSE|LX|EX|LT|LS|SL|SV|SR|DX|SXT|SLT|XLT|SEL|Limited|Sport|Base|Premium|Luxury|Touring)(\/[A-Za-z]+)*\s*$/i, '');
   clean = clean.replace(/\s+[A-Z]{1,4}(\/[A-Z]{1,4}){2,}\s*$/i, '');
-  clean = clean.replace(/\b(NFA|NFB|NFC)\b/gi, '');
+  clean = clean.replace(/\b(NFA|NFB|NFC|CMA)\b/gi, '');
 
   // Normalize common model name variations
   for (const [from, to] of Object.entries(MODEL_NORMALIZATIONS)) {

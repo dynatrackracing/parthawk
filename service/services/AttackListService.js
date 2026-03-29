@@ -50,32 +50,99 @@ function partRequiresExactYear(title) {
   return false;
 }
 
-function cleanNHTSATrim(trim) {
-  if (!trim) return null;
+function cleanNHTSATrim(raw) {
+  if (!raw) return null;
+  let t = raw.trim();
+  if (!t || t.length === 0) return null;
 
-  const slashCount = (trim.match(/\//g) || []).length;
-  const commaCount = (trim.match(/,/g) || []).length;
+  // --- Junk codes: return null ---
+  const JUNK_EXACT = new Set([
+    'nfa','nfb','nfc','cma','std','sa','hev','phev',
+    'n/a','na','unknown','standard','unspecified','base',
+    'styleside','flareside','stepside','sportside',
+    'crew','crew cab','regular cab','extended cab','supercab','supercrew','double cab','quad cab','king cab','access cab',
+    'middle level','middle-low level','high level','low level',
+    'middle grade','middle-low grade','high grade','low grade',
+    'xdrive','sdrive','4matic','quattro','awd','fwd','rwd','4x4','4x2','2wd','4wd',
+    'leather','cloth','premium cloth',
+    'f-series','f series',
+    'jetta','jetta, s',
+  ]);
+  if (JUNK_EXACT.has(t.toLowerCase())) return null;
 
-  // 2+ slashes or 2+ commas means NHTSA gave us a list, not a single trim
-  if (slashCount >= 2 || commaCount >= 2) {
-    const parts = trim.split(/[\/,]/).map(s => s.trim()).filter(Boolean);
-    const premiumKeywords = ['limited', 'platinum', 'denali', 'laramie', 'lariat', 'king ranch', 'touring', 'prestige', 'premium', 'srt', 'gt', 'sport'];
-    for (const keyword of premiumKeywords) {
-      const match = parts.find(p => p.toLowerCase().includes(keyword));
-      if (match) return match.trim();
+  // --- Strip parenthetical NHTSA descriptors: "GLS(Middle grade)" → "GLS" ---
+  t = t.replace(/\s*\([^)]*\)\s*/g, '').trim();
+
+  // --- Strip engine descriptors NHTSA stuffs into trim: "EX V-6 W/LEA" → "EX W/LEA" ---
+  t = t.replace(/\b[VIL][\-\s]?\d\b/gi, '').trim();           // V-6, V6, I4, L4, V-8
+  t = t.replace(/\b\d\.\d[A-Z]?\s*(L|LITER)?\b/gi, '').trim(); // 3.5L, 2.4, 5.0L
+
+  // --- Normalize leather/navigation/entertainment shorthand ---
+  t = t.replace(/\bW\/LEA(THER)?\b/gi, '-L').trim();    // W/LEA → -L suffix
+  t = t.replace(/\bWITH\s+LEATHER\b/gi, '-L').trim();   // WITH LEATHER → -L
+  t = t.replace(/\bW\/NAV(I|IGATION)?\b/gi, '').trim(); // W/NAV → strip
+  t = t.replace(/\bW\/RES\b/gi, '').trim();              // W/RES → strip (rear entertainment)
+  t = t.replace(/\bWITH\s+RES\b/gi, '').trim();         // WITH RES → strip
+  t = t.replace(/\bWITH\s+NAV(IGATION)?\b/gi, '').trim();
+
+  // --- Collapse spacing artifacts: "EX -L" → "EX-L" ---
+  t = t.replace(/\s+\-/g, '-').replace(/\-\s+/g, '-').replace(/\s+/g, ' ').trim();
+
+  // --- Handle comma-separated NHTSA lists: "LE,CE" → pick premium ---
+  if (/,/.test(t)) {
+    const parts = t.split(',').map(p => p.trim()).filter(p => p.length > 0);
+    if (parts.length > 0) {
+      const premiumKeywords = ['limited','platinum','denali','laramie','overland','ltz','premier',
+        'titanium','sel','srt','gt','sport','touring','ex-l','exl','technology','premium',
+        'luxury','performance','navigation','navi'];
+      const premium = parts.find(p => premiumKeywords.some(k => p.toLowerCase().includes(k)));
+      t = premium || parts[0];
     }
-    return null;
   }
 
-  // Strip engine displacement prefixes ("2.5 SE" → "SE")
-  let clean = trim.replace(/^\d+\.\d+[LT]?\s+/i, '');
+  // --- Handle slash-separated NHTSA lists: "SE / SE NAVI / Limited" → pick premium ---
+  if (/\s*\/\s*/.test(t) && t.includes('/')) {
+    const parts = t.split('/').map(p => p.trim()).filter(p => p.length > 0);
+    if (parts.length > 1) {
+      const premiumKeywords = ['limited','platinum','denali','laramie','overland','ltz','premier',
+        'titanium','sel','srt','gt','sport','touring','ex-l','exl','technology','premium',
+        'luxury','performance','navigation','navi'];
+      const premium = parts.find(p => premiumKeywords.some(k => p.toLowerCase().includes(k)));
+      t = premium || parts[parts.length - 1];
+    }
+  }
 
-  const junkPatterns = ['NFA', 'NFB', 'NFC', 'N/A', 'UNKNOWN', 'STANDARD', 'UNSPECIFIED'];
-  if (junkPatterns.includes(clean.toUpperCase())) return null;
+  // --- Normalize common NHTSA verbose patterns ---
+  const NORMALIZATIONS = [
+    [/^ex[\s\-]*l$/i, 'EX-L'],
+    [/^ex\s+with\s+leather$/i, 'EX-L'],
+    [/^ex\s+with\s+navigation$/i, 'EX-L'],
+    [/^lt\s*\(?\s*1lt\s*\)?$/i, '1LT'],
+    [/^lt\s*\(?\s*2lt\s*\)?$/i, '2LT'],
+    [/^lt\s*\(?\s*3lt\s*\)?$/i, '3LT'],
+    [/^ls\s*\(?\s*1ls\s*\)?$/i, 'LS'],
+    [/^gls\s*popular$/i, 'GLS'],
+    [/^gls\s*preferred$/i, 'GLS'],
+    [/^gl\s*popular$/i, 'GL'],
+    [/^gl\s*preferred$/i, 'GL'],
+  ];
+  for (const [pattern, replacement] of NORMALIZATIONS) {
+    if (pattern.test(t)) {
+      t = replacement;
+      break;
+    }
+  }
 
-  if (clean.length > 30) return null;
+  // --- Mercedes/BMW/Lexus/Infiniti model numbers as trim → null ---
+  if (/^[A-Z]{0,3}\d{2,3}[A-Z]?$/i.test(t)) return null;  // C300, E320, 350, ES350, M35
+  if (/^\d\.\d[a-z]{1,2}$/i.test(t)) return null;          // 3.0si, 4.4i, 2.5i
 
-  return clean || null;
+  // --- Too long = NHTSA garbage ---
+  if (t.length > 30) return null;
+  // --- Too short (single char or empty after stripping) ---
+  if (t.length < 2) return null;
+
+  return t;
 }
 
 /**

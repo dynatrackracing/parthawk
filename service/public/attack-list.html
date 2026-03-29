@@ -260,6 +260,7 @@
   <button class="toggle-btn" id="filt-3d" onclick="setDateFilter('3d')">3 Days</button>
   <button class="toggle-btn" id="filt-7d" onclick="setDateFilter('7d')">7 Days</button>
   <button class="toggle-btn" id="filt-30d" onclick="setDateFilter('30d')">30 Days</button>
+  <button class="toggle-btn" id="filt-60d" onclick="setDateFilter('60d')">60 Days</button>
   <button class="toggle-btn" id="filt-all" onclick="setDateFilter('all')">All</button>
 </div>
 
@@ -312,14 +313,12 @@
   }
 
   function easternSinceDateISO(daysAgo) {
-    // Returns ISO string for midnight Eastern N days ago, for use as server-side `since` param
-    const fmt = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
     const now = new Date();
-    const target = new Date(now.getTime() - daysAgo * 86400000);
-    const dateStr = target.toLocaleDateString('en-CA', fmt); // YYYY-MM-DD in ET
-    // Convert back to UTC: create date at midnight ET
-    const etDate = new Date(dateStr + 'T00:00:00-04:00'); // EDT approximation
-    return etDate.toISOString();
+    const past = new Date(now);
+    past.setDate(past.getDate() - daysAgo);
+    const dateStr = past.toISOString().split('T')[0];
+    // 5am UTC = midnight EST (safe floor — in EDT this is 1am, still captures full day)
+    return dateStr + 'T05:00:00.000Z';
   }
 
   function filterSinceParam() {
@@ -327,6 +326,7 @@
     if (dateFilter === '3d') return easternSinceDateISO(3);
     if (dateFilter === '7d') return easternSinceDateISO(7);
     if (dateFilter === '30d') return easternSinceDateISO(30);
+    if (dateFilter === '60d') return easternSinceDateISO(60);
     return null; // 'all' = no filter
   }
 
@@ -386,7 +386,7 @@
   // Strip LKQ platform/body codes from display
   // Strips letter+digit codes (DS1, DS6, WK2, LA1, RT1) and known platform-only letter codes (JK, JL, JT, WK, XK, MK, KJ, KL, DJ, DT, DH, BK, WJ, ZJ, TJ, ND, WD, PF, UF, FK)
   // Preserves real trims: LX, SXT, SRT, GT, SE, LE, XLE, LTZ, etc.
-  const LKQ_PLATFORM_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH']);
+  const LKQ_PLATFORM_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH','RE','PT','LA','LD','BR','BE','AB','AY','PM','PG','DR','SA']);
   // Clean model name: strip LKQ codes, NHTSA trim junk, duplicate words
   function cleanModel(text, make) {
     if (!text) return text;
