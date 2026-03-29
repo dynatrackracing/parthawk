@@ -278,7 +278,7 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
           const inferredCult = (entry) => entry.cult === true || allCult;
 
           if (tiers.length === 1) {
-            const best = engineMatches.reduce((a, b) => a.tier > b.tier ? a : b);
+            const best = engineMatches.reduce((a, b) => a.tier < b.tier ? a : b);
             const result = formatResult(best, true, inferredCult(best));
             result.engineConfident = true;
             return result;
@@ -317,14 +317,14 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
 
     // === NO TRIM, NO ENGINE MATCH — check if entire model is cult ===
     if (allCult) {
-      const best = candidates.reduce((a, b) => a.tier > b.tier ? a : b);
-      return formatResult(best, false, true);
+      const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
+      return formatResult(lowest, false, true);
     }
 
-    // Return highest-tier reference (best-case) without cult
+    // Return lowest-tier reference (conservative) without cult
     if (!trimName) {
-      const best = candidates.reduce((a, b) => a.tier > b.tier ? a : b);
-      return formatResult(best, false, false);
+      const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
+      return formatResult(lowest, false, false);
     }
 
     return null;
