@@ -92,6 +92,25 @@ function cleanModelForLookup(model, make) {
     }
   }
 
+  // Suburban 1500/2500 → Suburban (LKQ adds the tonnage)
+  clean = clean.replace(/\bSUBURBAN\s+1500\b/gi, 'Suburban');
+  clean = clean.replace(/\bSUBURBAN\s+2500\b/gi, 'Suburban');
+
+  // Yukon XL 1500 → Yukon XL
+  clean = clean.replace(/\bYUKON\s+XL\s+1500\b/gi, 'Yukon XL');
+
+  // Avalanche 1500 → Avalanche
+  clean = clean.replace(/\bAVALANCHE\s+1500\b/gi, 'Avalanche');
+
+  // Mazda: LKQ stores model as just "3" or "6" but reference uses "Mazda3" or "Mazda6"
+  if (/mazda/i.test(make || '')) {
+    clean = clean.replace(/^3$/i, 'Mazda3');
+    clean = clean.replace(/^6$/i, 'Mazda6');
+    clean = clean.replace(/^5$/i, 'Mazda5');
+    clean = clean.replace(/^CX-?5$/i, 'CX-5');
+    clean = clean.replace(/^CX-?9$/i, 'CX-9');
+  }
+
   // Strip NHTSA trim lists stuffed into model names ("CAMRY LE/SE/XLE" → "CAMRY")
   clean = clean.replace(/\s+(LE|SE|XLE|XSE|LX|EX|LT|LS|SL|SV|SR|DX|SXT|SLT|XLT|SEL|Limited|Sport|Base|Premium|Luxury|Touring)(\/[A-Za-z]+)*\s*$/i, '');
   clean = clean.replace(/\s+[A-Z]{1,4}(\/[A-Z]{1,4}){2,}\s*$/i, '');
@@ -119,6 +138,7 @@ function formatResult(match, engineInferred, cultOverride) {
     audioBrand: match.audio_brand || null,
     expectedParts: match.expected_parts || null,
     cult: cultOverride !== undefined ? cultOverride : (match.cult === true),
+    transmission: match.transmission || null,
     topEngine: match.top_engine || null,
     notes: match.notes || null,
     tierNum: match.tier,

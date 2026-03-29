@@ -165,7 +165,7 @@ async function main() {
       const decodedTrim = r.Trim || null;
       const decodedEngine = r.DisplacementL ? `${r.DisplacementL}L` : null;
       const decodedDrivetrain = r.DriveType || null;
-      const decodedTransmission = r.TransmissionStyle || null;
+      let decodedTransmission = r.TransmissionStyle || null;
       const transmissionSpeeds = r.TransmissionSpeeds || null;
 
       // Look up trim tier
@@ -183,6 +183,10 @@ async function main() {
           audioBrand = result.extra.audioBrand;
           expectedParts = result.extra.expectedParts;
           cult = result.extra.cult;
+          // Use reference transmission when NHTSA didn't provide one
+          if (result.extra.transmission && !decodedTransmission) {
+            decodedTransmission = result.extra.transmission;
+          }
         }
         if (decodedTrim) withTrim++;
         else noTrim++;

@@ -85,6 +85,23 @@ router.get('/vehicle/:id/parts', async (req, res) => {
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await service.buildStockIndex();
     const platformIndex = await service.buildPlatformIndex();
 
+    // Enrich with reference transmission if NHTSA didn't provide one
+    if (!vehicle.decoded_transmission && vehicle.year && vehicle.make && vehicle.model) {
+      try {
+        const TrimTierService = require('../services/TrimTierService');
+        const trimName = vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || null;
+        const engine = vehicle.decoded_engine || vehicle.engine || null;
+        const refResult = await TrimTierService.lookup(
+          parseInt(vehicle.year) || 0,
+          vehicle.make, vehicle.model, trimName, engine,
+          null, vehicle.decoded_drivetrain || vehicle.drivetrain || null
+        );
+        if (refResult && refResult.transmission) {
+          vehicle.decoded_transmission = refResult.transmission;
+        }
+      } catch (e) { /* reference lookup optional */ }
+    }
+
     const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
 
     // Enrich with dead inventory warnings
