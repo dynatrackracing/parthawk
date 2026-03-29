@@ -187,6 +187,8 @@ function formatEngineDisplay(engine) {
   e = e.replace(/(\d+\.\d+)L/i, (match, num) => {
     return parseFloat(num).toFixed(1) + 'L';
   });
+  // Strip trailing horsepower numbers NHTSA appends: "1.6L 106." → "1.6L"
+  e = e.replace(/\s+\d{2,3}\.?\s*$/, '').trim();
   return e || null;
 }
 
