@@ -390,7 +390,7 @@
   // Clean model name: strip LKQ codes, NHTSA trim junk, duplicate words
   function cleanModel(text, make) {
     if (!text) return text;
-    var cleaned = stripLKQCodes(text);
+    var cleaned = stripLKQCodes(text, make);
     // Suburban 1500/2500 → Suburban, Yukon XL 1500 → Yukon XL, Avalanche 1500 → Avalanche
     cleaned = cleaned.replace(/\bSUBURBAN\s+1500\b/gi, 'Suburban');
     cleaned = cleaned.replace(/\bSUBURBAN\s+2500\b/gi, 'Suburban');
@@ -411,10 +411,14 @@
     return cleaned.trim();
   }
 
-  function stripLKQCodes(text) {
+  function stripLKQCodes(text, make) {
     if (!text) return text;
-    return text
-      .replace(/\b[A-Z]{1,2}\d{1,2}\b/g, '')  // letter(s)+digit(s): DS1, DS6, WK2, LA1
+    var clean = text;
+    // Only strip LKQ body codes (DS1, DS6, WK2, LA1) on Stellantis vehicles where they actually appear
+    if (/dodge|ram|chrysler|jeep/i.test(make || '')) {
+      clean = clean.replace(/\b[A-Z]{2}\d\b/g, '');  // Exactly 2 letters + 1 digit: DS1, DS6, WK2
+    }
+    return clean
       .replace(/\b([A-Z]{2})\b/g, (m, code) => LKQ_PLATFORM_CODES.has(code) ? '' : m) // known 2-letter platform codes
       .replace(/,\s*,/g, ',')
       .replace(/[, ]+,/g, ',')
