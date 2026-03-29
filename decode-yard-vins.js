@@ -61,12 +61,13 @@ async function decodeBatch(vins) {
   }
 }
 
-async function lookupTrimTier(year, make, model, trimName) {
-  if (!trimName) return { tier: null, extra: null };
+async function lookupTrimTier(year, make, model, trimName, engineDisplacement) {
+  if (!trimName && !engineDisplacement) return { tier: null, extra: null };
 
   // TIER 1: trim_tier_reference (1,049-row curated table — most accurate)
+  // Handles both trim-based and engine-based inference
   try {
-    const ref = await TrimTierService.lookup(year, make, model, trimName);
+    const ref = await TrimTierService.lookup(year, make, model, trimName, engineDisplacement);
     if (ref) return { tier: ref.tierString, extra: ref };
   } catch (e) {}
 
@@ -170,18 +171,19 @@ async function main() {
       let audioBrand = null;
       let expectedParts = null;
       let cult = false;
-      if (decodedTrim) {
-        const make = titleCase(row.make || r.Make || '');
-        const model = titleCase(row.model || r.Model || '');
-        const year = parseInt(r.ModelYear || row.year) || 0;
-        const result = await lookupTrimTier(year, make, model, decodedTrim);
+      const makeTc = titleCase(row.make || r.Make || '');
+      const modelTc = titleCase(row.model || r.Model || '');
+      const yearNum = parseInt(r.ModelYear || row.year) || 0;
+      if (decodedTrim || decodedEngine) {
+        const result = await lookupTrimTier(yearNum, makeTc, modelTc, decodedTrim, decodedEngine);
         trimTier = result.tier;
         if (result.extra) {
           audioBrand = result.extra.audioBrand;
           expectedParts = result.extra.expectedParts;
           cult = result.extra.cult;
         }
-        withTrim++;
+        if (decodedTrim) withTrim++;
+        else noTrim++;
       } else {
         noTrim++;
       }
