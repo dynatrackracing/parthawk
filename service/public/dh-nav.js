@@ -31,7 +31,6 @@ function dhNav(activePage) {
 
   const html = `
 <style>
-  @media (min-width: 769px) { #dh-field-row { display: none !important; } }
   @media (max-width: 768px) { #dh-intel-row { display: none !important; } }
   #dh-intel-row a[href="/admin/carcass"] { display: none !important; }
 </style>
