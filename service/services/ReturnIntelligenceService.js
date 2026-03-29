@@ -1,8 +1,8 @@
 'use strict';
 
 const { log } = require('../lib/logger');
-const { raw } = require('objection');
 const { database } = require('../database/database');
+const raw = (...args) => database.raw(...args);
 
 class ReturnIntelligenceService {
   constructor() {
@@ -94,8 +94,10 @@ class ReturnIntelligenceService {
 
     // INAD summary
     const inadAll = await database('return_transaction')
-      .sum(raw('CASE WHEN has_inad_fee THEN 1 ELSE 0 END as inad_count'))
-      .sum(raw('ABS(inad_fee) as total_inad_fees'))
+      .select(
+        database.raw('SUM(CASE WHEN has_inad_fee THEN 1 ELSE 0 END) as inad_count'),
+        database.raw('SUM(ABS(inad_fee)) as total_inad_fees')
+      )
       .first();
 
     return {
@@ -349,25 +351,31 @@ class ReturnIntelligenceService {
     const cutoffStr = cutoff.toISOString().split('T')[0];
 
     const overall = await database('return_transaction')
-      .count('* as total_returns')
-      .sum(raw('CASE WHEN has_inad_fee THEN 1 ELSE 0 END as inad_count'))
-      .sum(raw('ABS(inad_fee) as total_inad_fees'))
+      .select(
+        database.raw('COUNT(*) as total_returns'),
+        database.raw('SUM(CASE WHEN has_inad_fee THEN 1 ELSE 0 END) as inad_count'),
+        database.raw('SUM(ABS(inad_fee)) as total_inad_fees')
+      )
       .where('transaction_date', '>=', cutoffStr)
       .first();
 
     const quarterly = await database('return_transaction')
-      .select(raw(`TO_CHAR(transaction_date, 'YYYY-"Q"Q') as quarter`))
-      .count('* as total_returns')
-      .sum(raw('CASE WHEN has_inad_fee THEN 1 ELSE 0 END as inad_count'))
-      .sum(raw('ABS(inad_fee) as inad_fees'))
+      .select(
+        database.raw(`TO_CHAR(transaction_date, 'YYYY-"Q"Q') as quarter`),
+        database.raw('COUNT(*) as total_returns'),
+        database.raw('SUM(CASE WHEN has_inad_fee THEN 1 ELSE 0 END) as inad_count'),
+        database.raw('SUM(ABS(inad_fee)) as inad_fees')
+      )
       .where('transaction_date', '>=', cutoffStr)
-      .groupBy(raw(`TO_CHAR(transaction_date, 'YYYY-"Q"Q')`))
+      .groupBy(database.raw(`TO_CHAR(transaction_date, 'YYYY-"Q"Q')`))
       .orderBy('quarter', 'asc');
 
     const byPartType = await database('return_transaction')
-      .select('part_type')
-      .count('* as inad_count')
-      .sum(raw('ABS(inad_fee) as inad_fees'))
+      .select(
+        'part_type',
+        database.raw('COUNT(*) as inad_count'),
+        database.raw('SUM(ABS(inad_fee)) as inad_fees')
+      )
       .where('transaction_date', '>=', cutoffStr)
       .where('has_inad_fee', true)
       .groupBy('part_type')
