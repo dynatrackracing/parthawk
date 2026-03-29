@@ -43,10 +43,53 @@ function cleanModelForLookup(model, make) {
     clean = clean.replace(/\b[A-Z]{2}\d\b/gi, '');
   }
 
-  // Strip BMW standalone 2-letter option codes (keep real models)
+  // BMW: convert model numbers to series names (328I → 3 Series, X5 XDRIVE35I → X5)
   if (/bmw/i.test(make || '')) {
-    const realModels = new Set(['X1','X2','X3','X4','X5','X6','X7','M2','M3','M4','M5','M6','M8','Z3','Z4','I3','I4','I5','I7','I8']);
-    clean = clean.replace(/\b([A-Z]{2})\b/gi, (m, code) => realModels.has(code.toUpperCase()) ? code : '');
+    const bmwSeriesMap = [
+      { pattern: /\b3[0-9]{2}[A-Z]*\b/i, series: '3 Series' },
+      { pattern: /\bM3\b/i, series: '3 Series' },
+      { pattern: /\b5[0-9]{2}[A-Z]*\b/i, series: '5 Series' },
+      { pattern: /\bM5\b/i, series: '5 Series' },
+      { pattern: /\b4[0-9]{2}[A-Z]*\b/i, series: '4 Series' },
+      { pattern: /\bM4\b/i, series: '4 Series' },
+      { pattern: /\b7[0-9]{2}[A-Z]*\b/i, series: '7 Series' },
+      { pattern: /\b2[0-9]{2}[A-Z]*\b/i, series: '2 Series' },
+      { pattern: /\bM2\b/i, series: '2 Series' },
+      { pattern: /\b6[0-9]{2}[A-Z]*\b/i, series: '6 Series' },
+      { pattern: /\bM6\b/i, series: '6 Series' },
+      { pattern: /\b8[0-9]{2}[A-Z]*\b/i, series: '8 Series' },
+      { pattern: /\bM8\b/i, series: '8 Series' },
+    ];
+    let matched = false;
+    for (const { pattern, series } of bmwSeriesMap) {
+      if (pattern.test(clean)) { clean = series; matched = true; break; }
+    }
+    if (!matched) {
+      // X models: strip xDrive/sDrive suffixes — "X5 XDRIVE35I" → "X5"
+      clean = clean.replace(/\b(X[1-7])\s*[A-Z]*DRIVE\d*[A-Z]*/i, '$1');
+      // Strip standalone 2-letter option codes (keep real models)
+      const realModels = new Set(['X1','X2','X3','X4','X5','X6','X7','Z3','Z4','I3','I4','I5','I7','I8']);
+      clean = clean.replace(/\b([A-Z]{2})\b/gi, (m, code) => realModels.has(code.toUpperCase()) ? code : '');
+    }
+  }
+
+  // Mercedes-Benz: convert model numbers to class names (C300 → C-Class, ML350 → ML)
+  if (/mercedes/i.test(make || '')) {
+    const mbSeriesMap = [
+      { pattern: /\bC\s*\d{2,3}\b/i, series: 'C-Class' },
+      { pattern: /\bE\s*\d{2,3}\b/i, series: 'E-Class' },
+      { pattern: /\bS\s*\d{2,3}\b/i, series: 'S-Class' },
+      { pattern: /\bGLS\s*\d{2,3}\b/i, series: 'GLS' },
+      { pattern: /\bGLE\s*\d{2,3}\b/i, series: 'GLE' },
+      { pattern: /\bGLC\s*\d{2,3}\b/i, series: 'GLC' },
+      { pattern: /\bGLA\s*\d{2,3}\b/i, series: 'GLA' },
+      { pattern: /\bCLA\s*\d{2,3}\b/i, series: 'CLA' },
+      { pattern: /\bGL[A-Z]*\s*\d{2,3}\b/i, series: 'GLE' },
+      { pattern: /\bML\s*\d{2,3}\b/i, series: 'ML' },
+    ];
+    for (const { pattern, series } of mbSeriesMap) {
+      if (pattern.test(clean)) { clean = series; break; }
+    }
   }
 
   // Normalize common model name variations
