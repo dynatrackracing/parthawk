@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk - THE FLYWAY</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a;
+  --border: #2a2a2a; --red: #DC2626; --red-dim: #7f1d1d;
+  --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
+  --gray: #9ca3af; --text: #F0F0F0; --text-mid: #d1d5db;
+  --text-muted: #9CA3AF; --text-faint: #6B7280;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; padding-bottom: 60px; }
+
+/* Header */
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+.header-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; }
+.header-left p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+/* View Tabs */
+.view-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+.view-tab { flex: 1; padding: 11px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; text-align: center; border-bottom: 2px solid transparent; }
+.view-tab.active { color: var(--text); border-bottom-color: var(--red); }
+
+/* Yard Tabs */
+.yard-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.yard-tabs::-webkit-scrollbar { display: none; }
+.yard-tab { padding: 11px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; flex-shrink: 0; }
+.yard-tab.active { color: var(--text); border-bottom-color: var(--red); }
+
+/* Status Bar */
+.status-bar { padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+/* Toggle Bar */
+.toggle-bar { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.toggle-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+.toggle-btn.active { background: #064e3b; color: #22c55e; border-color: #22c55e; }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 8px 12px; }
+
+/* Spinner */
+.loading { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 12px; }
+.spinner { width: 28px; height: 28px; border: 2px solid #333; border-top-color: #DC2626; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Form */
+.form-group { margin-bottom: 12px; }
+.form-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.form-input, .form-textarea, .form-date { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--text); font-size: 14px; font-family: var(--font); outline: none; }
+.form-input:focus, .form-textarea:focus, .form-date:focus { border-color: var(--red); }
+.form-input::placeholder, .form-textarea::placeholder { color: var(--text-faint); }
+.form-textarea { min-height: 60px; resize: vertical; font-size: 13px; }
+.form-date { color-scheme: dark; }
+.form-row { display: flex; gap: 8px; }
+.form-row .form-group { flex: 1; }
+
+/* Buttons */
+.btn { padding: 10px 16px; border-radius: 8px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-red:active { opacity: 0.8; }
+.btn-green { background: var(--green); color: #000; }
+.btn-gray { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Yard Selector */
+.yard-group { margin: 8px 12px; }
+.yard-group-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 0 4px; }
+.yard-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 4px; cursor: pointer; }
+.yard-item.selected { border-color: var(--green); background: #064e3b22; }
+.yard-item.flagged { opacity: 0.4; cursor: not-allowed; }
+.yard-check { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.yard-item.selected .yard-check { border-color: var(--green); background: var(--green); color: #000; }
+.yard-info { flex: 1; min-width: 0; }
+.yard-name { font-size: 13px; font-weight: 600; }
+.yard-meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.yard-dist { font-size: 12px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+
+/* Chip */
+.chip { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; text-transform: uppercase; display: inline-block; }
+.chip-green { background: #064e3b; color: #22c55e; }
+.chip-yellow { background: #713f12; color: #eab308; }
+.chip-orange { background: #7c2d12; color: #f97316; }
+.chip-red { background: #7f1d1d; color: #ef4444; }
+.chip-gray { background: #1f2937; color: #6B7280; }
+.chip-blue { background: #1e3a5f; color: #3b82f6; }
+.chip-cyan { background: #164e63; color: #06b6d4; }
+.chip-magenta { background: #701a75; color: #d946ef; }
+
+/* Trip Cards */
+.trip-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 8px 12px; }
+.trip-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.trip-name { font-size: 15px; font-weight: 700; }
+.trip-dates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.trip-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* Vehicle Cards */
+.vehicle-row { border-bottom: 1px solid #1a1a1a; }
+.vehicle-row:last-child { border-bottom: none; }
+.v-collapsed { display: flex; align-items: center; padding: 10px 14px; gap: 10px; min-height: 48px; cursor: pointer; user-select: none; }
+.v-score { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; }
+.v-score.green { background: #064e3b; color: #22c55e; }
+.v-score.yellow { background: #713f12; color: #eab308; }
+.v-score.orange { background: #7c2d12; color: #f97316; }
+.v-score.red { background: #7f1d1d; color: #ef4444; }
+.v-score.gray { background: #1f2937; color: #6B7280; }
+.v-info { flex: 1; min-width: 0; }
+.v-title { font-size: 14px; font-weight: 600; }
+.v-badges { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
+.v-highvalue { margin-top: 3px; font-size: 11px; color: #eab308; font-weight: 600; }
+.v-chips { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.v-right { text-align: right; flex-shrink: 0; }
+.v-value { font-size: 13px; font-weight: 700; color: var(--green); }
+.v-parts-count { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.v-decay { font-size: 10px; margin-top: 1px; }
+.v-expanded { display: none; padding: 0 14px 14px; }
+.v-expanded.open { display: block; }
+
+/* Expanded Part List */
+.part-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 12px; }
+.part-row:last-child { border-bottom: none; }
+.part-type { font-weight: 600; }
+.part-price { font-weight: 700; }
+.part-meta { font-size: 10px; color: var(--text-muted); }
+
+/* Trip Header */
+.trip-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; }
+.trip-header-name { font-size: 16px; font-weight: 700; }
+.trip-header-dates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.trip-countdown { font-size: 11px; font-weight: 700; margin-top: 4px; }
+
+/* Empty State */
+.empty { text-align: center; padding: 40px 20px; color: var(--text-faint); font-size: 13px; line-height: 1.6; }
+
+/* Confirm Dialog */
+.confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+.confirm-overlay.open { display: flex; }
+.confirm-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-width: 320px; width: 100%; }
+.confirm-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.confirm-body { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.pulse { animation: pulse 1.5s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('flyway')</script>
+
+<header>
+  <div class="header-left">
+    <h1>THE FLYWAY</h1>
+    <p id="headerSub">Road Trip Intelligence</p>
+  </div>
+</header>
+
+<div class="view-tabs">
+  <div class="view-tab active" id="vtab-plan" onclick="switchView('plan')">PLAN</div>
+  <div class="view-tab" id="vtab-active" onclick="switchView('active')">ACTIVE</div>
+  <div class="view-tab" id="vtab-history" onclick="switchView('history')">HISTORY</div>
+</div>
+
+<div id="view-plan" style="display:block">
+  <!-- Trip Creation -->
+  <div class="card" style="margin-top:8px">
+    <div class="form-label" style="margin-bottom:8px;color:var(--red)">New Trip</div>
+    <div class="form-group">
+      <input class="form-input" id="tripName" placeholder="Charlotte Run, GA/FL Sweep..." autocomplete="off">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Start</div><input type="date" class="form-date" id="tripStart"></div>
+      <div class="form-group"><div class="form-label">End</div><input type="date" class="form-date" id="tripEnd"></div>
+    </div>
+    <div class="form-group">
+      <textarea class="form-textarea" id="tripNotes" placeholder="Budget, route notes, priorities..."></textarea>
+    </div>
+    <button class="btn btn-red" style="width:100%" onclick="handleCreateTrip()">Create Trip</button>
+  </div>
+
+  <!-- Planning Trips -->
+  <div id="planningTrips"></div>
+
+  <!-- Yard Selector (shown after selecting a trip) -->
+  <div id="yardSelectorWrap" style="display:none">
+    <div style="padding:8px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div class="form-label" style="color:var(--yellow);margin:0">Select Yards</div>
+      <div id="yardCount" style="font-size:11px;color:var(--text-muted)">0 selected</div>
+    </div>
+    <div id="yardSelector"></div>
+  </div>
+</div>
+
+<div id="view-active" style="display:none">
+  <div id="activeContent">
+    <div class="empty">No active trip. Go to Plan tab to create and activate one.</div>
+  </div>
+</div>
+
+<div id="view-history" style="display:none">
+  <div id="historyContent">
+    <div class="loading"><div class="spinner"></div><div>Loading...</div></div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitle"></div>
+    <div class="confirm-body" id="confirmBody"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-red btn-sm" id="confirmBtn" onclick="doConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ STATE ═══
+let currentView = 'plan';
+let allTrips = [];
+let activeTrip = null;
+let activeTripData = null;
+let editingTripId = null;
+let availableYards = [];
+let selectedYardIds = new Set();
+let activeYardFilter = 'all';
+let sortMode = 'score';
+let filterPremium = false;
+let filterHighValue = false;
+let confirmCallback = null;
+let refreshTimer = null;
+
+// ═══ HELPERS ═══
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function timeAgo(ds) { const d = new Date(ds); const diff = Date.now() - d.getTime(); const h = Math.floor(diff / 3600000); const dd = Math.floor(h / 24); if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now'; }
+function fmtDate(d) { if (!d) return ''; return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+function fmtDateRange(s, e) { return fmtDate(s) + ' - ' + fmtDate(e); }
+function daysUntil(d) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000); }
+
+const LKQ_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH','RE','PT','LA','LD','BR','BE','AB','AY','PM','PG','DR','SA']);
+function cleanModel(text, make) {
+  if (!text) return text;
+  var c = text;
+  if (/dodge|ram|chrysler|jeep/i.test(make || '')) c = c.replace(/\b[A-Z]{2}\d\b/g, '');
+  c = c.replace(/\b([A-Z]{2})\b/g, function(m, code) { return LKQ_CODES.has(code) ? '' : m; });
+  c = c.replace(/\bSUBURBAN\s+1500\b/gi, 'Suburban').replace(/\bYUKON\s+XL\s+1500\b/gi, 'Yukon XL').replace(/\bAVALANCHE\s+1500\b/gi, 'Avalanche');
+  if (/mazda/i.test(make || '')) { c = c.replace(/^3$/i, 'Mazda3').replace(/^6$/i, 'Mazda6').replace(/^5$/i, 'Mazda5'); }
+  c = c.replace(/\s+(LE|SE|XLE|XSE|LX|EX|LT|LS|SL|SV|SR|DX|SXT|SLT|XLT|SEL|Limited|Sport|Base|Premium|Luxury|Touring)(\/[A-Za-z]+)*\s*$/i, '');
+  c = c.replace(/\b(NFA|NFB|NFC)\b/gi, '');
+  c = c.replace(/\b(\w+)\s+\1\b/gi, '$1');
+  return c.replace(/\s{2,}/g, ' ').trim();
+}
+
+// ═══ API ═══
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  return res.json();
+}
+
+// ═══ VIEW SWITCHING ═══
+function switchView(view) {
+  currentView = view;
+  ['plan','active','history'].forEach(function(v) {
+    document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
+    document.getElementById('vtab-' + v).classList.toggle('active', v === view);
+  });
+  if (view === 'plan') loadPlanView();
+  if (view === 'active') loadActiveView();
+  if (view === 'history') loadHistoryView();
+  location.hash = view;
+}
+
+// ═══ PLAN VIEW ═══
+async function loadPlanView() {
+  var data = await api('/flyway/trips');
+  allTrips = data.trips || [];
+  var planning = allTrips.filter(function(t) { return t.status === 'planning'; });
+  renderPlanningTrips(planning);
+}
+
+function renderPlanningTrips(trips) {
+  var el = document.getElementById('planningTrips');
+  if (trips.length === 0) { el.innerHTML = ''; return; }
+  var h = '<div style="padding:12px 16px 4px"><div class="form-label" style="color:var(--text-muted)">Planning Trips</div></div>';
+  trips.forEach(function(t) {
+    var yardNames = (t.yards || []).map(function(y) { return esc(y.name); }).join(', ') || 'No yards';
+    h += '<div class="trip-card">';
+    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + '</div>';
+    h += '<div class="trip-dates">' + fmtDateRange(t.start_date, t.end_date) + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards: ' + yardNames + '</div>';
+    h += '</div><span class="chip chip-blue">PLANNING</span></div>';
+    h += '<div class="trip-actions">';
+    h += '<button class="btn btn-green btn-sm" onclick="confirmActivate(' + t.id + ')" ' + ((t.yards || []).length === 0 ? 'disabled title="Add yards first"' : '') + '>ACTIVATE</button>';
+    h += '<button class="btn btn-gray btn-sm" onclick="editTripYards(' + t.id + ')">YARDS</button>';
+    h += '<button class="btn btn-gray btn-sm" onclick="confirmDelete(' + t.id + ')">DELETE</button>';
+    h += '</div></div>';
+  });
+  el.innerHTML = h;
+}
+
+async function handleCreateTrip() {
+  var name = document.getElementById('tripName').value.trim();
+  var start = document.getElementById('tripStart').value;
+  var end = document.getElementById('tripEnd').value;
+  var notes = document.getElementById('tripNotes').value.trim();
+  if (!name || !start || !end) return;
+  var data = await api('/flyway/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, start_date: start, end_date: end, notes: notes || null }) });
+  if (data.success) {
+    document.getElementById('tripName').value = '';
+    document.getElementById('tripStart').value = '';
+    document.getElementById('tripEnd').value = '';
+    document.getElementById('tripNotes').value = '';
+    editTripYards(data.id);
+    loadPlanView();
+  }
+}
+
+// ═══ YARD SELECTOR ═══
+async function editTripYards(tripId) {
+  editingTripId = tripId;
+  document.getElementById('yardSelectorWrap').style.display = 'block';
+
+  if (availableYards.length === 0) {
+    var data = await api('/flyway/available-yards');
+    availableYards = data.yards || [];
+  }
+
+  // Get current trip yards
+  var trip = allTrips.find(function(t) { return t.id === tripId; });
+  selectedYardIds = new Set((trip && trip.yards || []).map(function(y) { return y.id; }));
+  renderYardSelector();
+}
+
+function renderYardSelector() {
+  var tiers = [
+    { label: 'Local', min: 0, max: 60, color: '#22c55e' },
+    { label: 'Day Trip', min: 60, max: 150, color: '#eab308' },
+    { label: 'Road Trip', min: 150, max: 500, color: '#f97316' },
+    { label: 'Expedition', min: 500, max: 99999, color: '#ef4444' },
+  ];
+  var h = '';
+  tiers.forEach(function(tier) {
+    var yards = availableYards.filter(function(y) {
+      var d = parseFloat(y.distance_from_base) || 0;
+      return d >= tier.min && d < tier.max && !y.flagged;
+    });
+    if (yards.length === 0) return;
+    h += '<div class="yard-group">';
+    h += '<div class="yard-group-label" style="color:' + tier.color + '">' + tier.label + ' (' + tier.min + '-' + tier.max + 'mi)</div>';
+    yards.forEach(function(y) {
+      var sel = selectedYardIds.has(y.id);
+      var scrapeIcon = y.scrape_method === 'automated' || y.scrape_method === 'lkq' ? '\u26A1' : y.scrape_method === 'on_demand' || y.scrape_method === 'pullapart' ? '\u{1F447}' : '\u270F';
+      h += '<div class="yard-item' + (sel ? ' selected' : '') + '" onclick="toggleYard(\'' + y.id + '\')" style="border-left:3px solid ' + tier.color + '">';
+      h += '<div class="yard-check">' + (sel ? '\u2713' : '') + '</div>';
+      h += '<div class="yard-info"><div class="yard-name">' + esc(y.name) + ' <span class="chip chip-gray" style="font-size:8px">' + esc(y.chain || '?') + '</span></div>';
+      h += '<div class="yard-meta">' + scrapeIcon + ' ' + (y.scrape_method || 'none') + (y.last_scraped ? ' \u00B7 scraped ' + timeAgo(y.last_scraped) : '') + '</div></div>';
+      h += '<div class="yard-dist">' + Math.round(y.distance_from_base) + 'mi</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  // Show flagged yards dimmed
+  var flagged = availableYards.filter(function(y) { return y.flagged; });
+  if (flagged.length > 0) {
+    h += '<div class="yard-group"><div class="yard-group-label" style="color:#ef4444">Flagged (unavailable)</div>';
+    flagged.forEach(function(y) {
+      h += '<div class="yard-item flagged"><div class="yard-check"></div><div class="yard-info"><div class="yard-name" style="color:var(--text-faint)">' + esc(y.name) + '</div><div class="yard-meta" style="color:#ef4444">' + esc(y.flag_reason || 'Flagged') + '</div></div></div>';
+    });
+    h += '</div>';
+  }
+  document.getElementById('yardSelector').innerHTML = h;
+  document.getElementById('yardCount').textContent = selectedYardIds.size + ' selected';
+}
+
+async function toggleYard(yardId) {
+  if (!editingTripId) return;
+  if (selectedYardIds.has(yardId)) {
+    await api('/flyway/trips/' + editingTripId + '/yards/' + yardId, { method: 'DELETE' });
+    selectedYardIds.delete(yardId);
+  } else {
+    await api('/flyway/trips/' + editingTripId + '/yards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ yard_id: yardId }) });
+    selectedYardIds.add(yardId);
+  }
+  renderYardSelector();
+  loadPlanView();
+}
+
+// ═══ CONFIRM DIALOGS ═══
+function showConfirm(title, body, callback) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmBody').textContent = body;
+  confirmCallback = callback;
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirmOverlay').classList.remove('open'); confirmCallback = null; }
+function doConfirm() { if (confirmCallback) confirmCallback(); closeConfirm(); }
+
+function confirmActivate(tripId) {
+  showConfirm('Activate Trip', 'This will mark the trip as active and enable scraping for selected yards. Continue?', async function() {
+    await api('/flyway/trips/' + tripId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
+    switchView('active');
+  });
+}
+
+function confirmDelete(tripId) {
+  showConfirm('Delete Trip', 'This will permanently delete this trip and remove all yard associations. Continue?', async function() {
+    await api('/flyway/trips/' + tripId, { method: 'DELETE' });
+    loadPlanView();
+  });
+}
+
+// ═══ ACTIVE VIEW ═══
+async function loadActiveView() {
+  var el = document.getElementById('activeContent');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading active trip...</div></div>';
+
+  var data = await api('/flyway/trips?status=active');
+  var trips = data.trips || [];
+  if (trips.length === 0) {
+    el.innerHTML = '<div class="empty">No active trip. Go to Plan tab to create and activate one.</div>';
+    return;
+  }
+
+  activeTrip = trips[0];
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
+
+  // Load attack list
+  activeTripData = await api('/flyway/trips/' + activeTrip.id + '/attack-list');
+  renderActiveTrip();
+
+  // Auto refresh every 5 min
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(function() { if (currentView === 'active') refreshActiveTrip(); }, 300000);
+}
+
+async function refreshActiveTrip() {
+  if (!activeTrip) return;
+  activeTripData = await api('/flyway/trips/' + activeTrip.id + '/attack-list');
+  renderActiveTrip();
+}
+
+function renderActiveTrip() {
+  if (!activeTrip || !activeTripData) return;
+  var el = document.getElementById('activeContent');
+  var trip = activeTripData.trip || activeTrip;
+  var yards = activeTripData.yards || [];
+
+  // Trip header
+  var daysLeft = daysUntil(trip.end_date);
+  var countdownText, countdownColor;
+  if (daysLeft <= 0) { countdownText = 'ENDS TODAY'; countdownColor = '#ef4444'; }
+  else if (daysLeft === 1) { countdownText = 'LAST DAY'; countdownColor = '#ef4444'; }
+  else { countdownText = daysLeft + ' DAYS LEFT'; countdownColor = daysLeft <= 3 ? '#eab308' : '#22c55e'; }
+
+  var h = '<div class="trip-header">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+  h += '<div><div class="trip-header-name">' + esc(trip.name) + '</div>';
+  h += '<div class="trip-header-dates">' + fmtDateRange(trip.start_date, trip.end_date) + '</div>';
+  h += '<div class="trip-countdown' + (daysLeft <= 0 ? ' pulse' : '') + '" style="color:' + countdownColor + '">' + countdownText + '</div></div>';
+  h += '<button class="btn btn-gray btn-sm" onclick="confirmComplete()">Complete</button>';
+  h += '</div></div>';
+
+  // Yard tabs
+  h += '<div class="yard-tabs">';
+  h += '<div class="yard-tab' + (activeYardFilter === 'all' ? ' active' : '') + '" onclick="setYardFilter(\'all\')">ALL</div>';
+  yards.forEach(function(y) {
+    var yid = y.yard.id;
+    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.yard.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + y.total_vehicles + '</span></div>';
+  });
+  h += '</div>';
+
+  // Sort/filter controls
+  h += '<div class="toggle-bar">';
+  h += '<button class="toggle-btn' + (sortMode === 'score' ? ' active' : '') + '" onclick="setSort(\'score\')">Score</button>';
+  h += '<button class="toggle-btn' + (sortMode === 'age' ? ' active' : '') + '" onclick="setSort(\'age\')">Newest</button>';
+  h += '<button class="toggle-btn' + (sortMode === 'value' ? ' active' : '') + '" onclick="setSort(\'value\')">Value</button>';
+  h += '<span style="color:#333">|</span>';
+  h += '<button class="toggle-btn' + (filterPremium ? ' active' : '') + '" onclick="toggleFilter(\'premium\')">Premium</button>';
+  h += '<button class="toggle-btn' + (filterHighValue ? ' active' : '') + '" onclick="toggleFilter(\'highvalue\')">$200+</button>';
+  h += '</div>';
+
+  // Collect all vehicles (or filter by yard)
+  var allVehicles = [];
+  yards.forEach(function(y) {
+    (y.vehicles || []).forEach(function(v) {
+      v._yardName = y.yard.name;
+      v._yardId = y.yard.id;
+      allVehicles.push(v);
+    });
+  });
+
+  var filtered = allVehicles;
+  if (activeYardFilter !== 'all') {
+    filtered = filtered.filter(function(v) { return v._yardId === activeYardFilter; });
+  }
+  if (filterPremium) filtered = filtered.filter(function(v) { return v.isPremiumVehicle; });
+  if (filterHighValue) filtered = filtered.filter(function(v) { return v.hasHighValuePart; });
+
+  // Sort
+  if (sortMode === 'score') filtered.sort(function(a, b) { return (b.flywayValue || 0) - (a.flywayValue || 0); });
+  else if (sortMode === 'age') filtered.sort(function(a, b) { return (a.daysInYard || 0) - (b.daysInYard || 0); });
+  else if (sortMode === 'value') filtered.sort(function(a, b) { return (b.est_value || 0) - (a.est_value || 0); });
+
+  // Status bar
+  h += '<div class="status-bar"><span>Showing ' + filtered.length + ' of ' + allVehicles.length + ' vehicles</span>';
+  h += '<span>Updated ' + (activeTripData.generated_at ? new Date(activeTripData.generated_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'now') + '</span></div>';
+
+  // Vehicle list
+  if (filtered.length === 0) {
+    h += '<div class="empty">No vehicles match your filters. Try adjusting sort and filter options above.</div>';
+  } else {
+    h += '<div style="margin:0 12px">';
+    filtered.forEach(function(v) { h += renderVehicleCard(v); });
+    h += '</div>';
+  }
+
+  el.innerHTML = h;
+}
+
+function renderVehicleCard(v) {
+  var fv = v.flywayValue || 0;
+  var sc = fv >= 800 ? 'green' : fv >= 500 ? 'yellow' : fv >= 250 ? 'orange' : fv > 0 ? 'red' : 'gray';
+  var scoreDisplay = '$' + fv;
+
+  // Title
+  var make = cleanModel(v.make || '', '');
+  var model = cleanModel(v.model || '', v.make || '');
+  var engine = v.engine ? ' <span style="font-size:12px;color:#b0b0b0;font-weight:600">' + esc(v.engine) + '</span>' : '';
+
+  // Trim badge
+  var trimBadge = '';
+  if (v.trimBadge) {
+    var tbColor = v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b';
+    var tbText = v.trimBadge.color === 'gray' ? '#9ca3af' : '#000';
+    trimBadge = ' <span class="chip" style="font-size:9px;padding:1px 6px;background:' + tbColor + ';color:' + tbText + ';font-weight:' + (v.trimBadge.color === 'gray' ? '500' : '700') + '">' + esc(v.trimBadge.decodedTrim || v.trimBadge.label) + '</span>';
+  }
+
+  // Row number
+  var rowNum = v.row_number ? '<span style="font-size:11px;color:var(--text-faint);float:right">Row ' + esc(v.row_number) + '</span>' : '';
+
+  // Badges row
+  var badges = '';
+  var pf = v.premiumFlags || [];
+  pf.forEach(function(f) {
+    if (f === 'PERFORMANCE') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#f97316;color:#000;font-weight:700">PERFORMANCE</span> ';
+    if (f === 'PREMIUM') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#eab308;color:#000;font-weight:700">PREMIUM</span> ';
+    if (f === 'CULT') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#d946ef;color:#000;font-weight:700">CULT</span> ';
+    if (f === 'MANUAL') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#06b6d4;color:#000;font-weight:700">MANUAL</span> ';
+    if (f === '4WD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">4WD</span> ';
+    if (f === 'AWD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">AWD</span> ';
+  });
+
+  // Age decay
+  var diy = v.daysInYard || 0;
+  var decay = v.ageDecay || 0;
+  var ageColor = diy <= 14 ? '#fff' : diy <= 30 ? '#eab308' : diy <= 60 ? '#f97316' : '#ef4444';
+  var ageText = diy + 'd';
+  if (decay > 0) ageText += ' (-' + decay + '%)';
+  if (badges || diy > 0) {
+    badges += '<span style="font-size:10px;color:' + ageColor + '">' + ageText + '</span>';
+  }
+
+  // High value callout
+  var hvLine = '';
+  if (v.hasHighValuePart && v.parts) {
+    var hvParts = v.parts.filter(function(p) { return (p.price || 0) >= 200; });
+    if (hvParts.length > 0) {
+      hvLine = '<div class="v-highvalue">\u2605 HIGH VALUE: ' + hvParts.map(function(p) { return esc(p.partType || p.title || '?') + ' $' + (p.price || 0); }).join(', ') + '</div>';
+    }
+  }
+
+  // Part chips
+  var chips = '';
+  var parts = (v.parts || []).slice().sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
+  var shown = parts.slice(0, 5);
+  var extra = parts.length - shown.length;
+  shown.forEach(function(p) {
+    var pr = p.price || 0;
+    var cc = pr >= 250 ? 'chip-green' : pr >= 150 ? 'chip-cyan' : pr >= 100 ? 'chip-yellow' : 'chip-gray';
+    chips += '<span class="chip ' + cc + '" style="font-size:9px">' + esc(p.partType || '?') + ' $' + pr + '</span> ';
+  });
+  if (extra > 0) chips += '<span class="chip chip-gray" style="font-size:9px;cursor:pointer" onclick="event.stopPropagation();toggleV(\'' + v.id + '\')">+' + extra + ' more</span>';
+
+  // Yard name (for "all" tab)
+  var yardLabel = activeYardFilter === 'all' && v._yardName ? '<span style="font-size:9px;color:var(--text-faint)">' + esc(v._yardName.replace(/^LKQ |^Pull-A-Part /, '')) + '</span> ' : '';
+
+  var h = '<div class="vehicle-row" id="vrow-' + v.id + '">';
+  h += '<div class="v-collapsed" onclick="toggleV(\'' + v.id + '\')">';
+  h += '<div class="v-score ' + sc + '">' + scoreDisplay + '</div>';
+  h += '<div class="v-info">';
+  h += '<div class="v-title"><strong style="color:#fff">' + esc(v.year) + ' ' + esc(make) + ' ' + esc(model) + '</strong>' + engine + trimBadge + ' ' + rowNum + '</div>';
+  if (badges) h += '<div class="v-badges">' + yardLabel + badges + '</div>';
+  if (hvLine) h += hvLine;
+  h += '<div class="v-chips">' + chips + '</div>';
+  h += '</div>';
+  h += '<div class="v-right">';
+  if (v.est_value > 0 && v.est_value !== fv) h += '<div style="font-size:10px;color:var(--text-faint);text-decoration:line-through">$' + v.est_value + '</div>';
+  h += '<div class="v-parts-count">' + (v.matched_parts || 0) + ' parts</div>';
+  h += '</div></div>';
+
+  // Expanded detail
+  h += '<div class="v-expanded" id="vexp-' + v.id + '">';
+  h += renderExpandedParts(v);
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderExpandedParts(v) {
+  var parts = v.parts || [];
+  if (parts.length === 0) return '<div style="padding:10px 0;color:var(--text-faint);font-size:12px">No matching parts found.</div>';
+
+  var h = '';
+
+  // Vehicle info
+  h += '<div style="padding:8px 10px;background:var(--surface2);border-radius:6px;margin-bottom:8px;font-size:11px;color:var(--text-muted)">';
+  if (v.vin) h += '<div>VIN: <span style="color:var(--text);font-family:monospace">' + esc(v.vin) + '</span></div>';
+  if (v._yardName) h += '<div>Yard: ' + esc(v._yardName) + '</div>';
+  var details = [];
+  if (v.engine) details.push(v.engine);
+  if (v.decoded_drivetrain || v.drivetrain) details.push(v.decoded_drivetrain || v.drivetrain);
+  if (v.decoded_transmission) details.push(v.decoded_transmission);
+  if (details.length > 0) h += '<div>' + details.map(esc).join(' / ') + '</div>';
+  if (v.expected_parts) h += '<div style="margin-top:4px;color:#d946ef">Expected: ' + esc(v.expected_parts) + '</div>';
+  if (v.audio_brand) h += '<div style="color:#d946ef">Audio: ' + esc(v.audio_brand) + '</div>';
+  h += '</div>';
+
+  // Parts list
+  parts.sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
+  parts.forEach(function(p) {
+    var pr = p.price || 0;
+    var pColor = pr >= 250 ? '#22c55e' : pr >= 150 ? '#06b6d4' : pr >= 100 ? '#eab308' : '#6B7280';
+    var verdictChip = '';
+    if (p.verdict === 'GREAT') verdictChip = '<span class="chip chip-green" style="font-size:8px">GREAT</span>';
+    else if (p.verdict === 'GOOD') verdictChip = '<span class="chip chip-cyan" style="font-size:8px">GOOD</span>';
+    else if (p.verdict === 'FAIR') verdictChip = '<span class="chip chip-yellow" style="font-size:8px">FAIR</span>';
+
+    // Price freshness
+    var freshness = '';
+    if (p.marketCheckedAt) {
+      var daysSince = Math.floor((Date.now() - new Date(p.marketCheckedAt).getTime()) / 86400000);
+      if (daysSince < 60) freshness = '<span style="color:#22c55e">\u2713</span>';
+      else if (daysSince < 90) freshness = '<span style="color:#eab308">\u26A0</span>';
+      else freshness = '<span style="color:#ef4444">\u2717</span>';
+    }
+
+    h += '<div class="part-row">';
+    h += '<div><span class="part-type">' + esc(p.partType || p.title || '?') + '</span> ' + verdictChip;
+    h += '<div class="part-meta">';
+    if (p.in_stock != null) h += 'Stock: ' + p.in_stock + ' ';
+    if (p.sold_90d != null) h += 'Sold 90d: ' + p.sold_90d + ' ';
+    if (p.trimMultiplier != null && p.trimMultiplier < 1) h += '<span style="color:#f97316">trim x' + p.trimMultiplier + '</span> ';
+    h += freshness;
+    if (p.deadWarning) h += ' <span style="color:#ef4444">\u2620 dead pattern</span>';
+    if (p.isMarked) h += ' <span style="color:#d946ef">MARKED</span>';
+    h += '</div></div>';
+    h += '<div class="part-price" style="color:' + pColor + '">$' + pr + '</div>';
+    h += '</div>';
+  });
+  return h;
+}
+
+function toggleV(id) {
+  var exp = document.getElementById('vexp-' + id);
+  if (exp) exp.classList.toggle('open');
+}
+
+function setYardFilter(yardId) {
+  activeYardFilter = yardId;
+  renderActiveTrip();
+}
+
+function setSort(mode) {
+  sortMode = mode;
+  renderActiveTrip();
+}
+
+function toggleFilter(which) {
+  if (which === 'premium') filterPremium = !filterPremium;
+  if (which === 'highvalue') filterHighValue = !filterHighValue;
+  renderActiveTrip();
+}
+
+function confirmComplete() {
+  if (!activeTrip) return;
+  showConfirm('Complete Trip', 'Mark "' + activeTrip.name + '" as complete? This cannot be undone.', async function() {
+    await api('/flyway/trips/' + activeTrip.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'complete' }) });
+    activeTrip = null;
+    activeTripData = null;
+    switchView('history');
+  });
+}
+
+// ═══ HISTORY VIEW ═══
+async function loadHistoryView() {
+  var el = document.getElementById('historyContent');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading...</div></div>';
+  var data = await api('/flyway/trips?status=complete');
+  var trips = data.trips || [];
+
+  if (trips.length === 0) {
+    el.innerHTML = '<div class="empty">No completed trips yet.</div>';
+    return;
+  }
+
+  var h = '';
+  trips.forEach(function(t) {
+    h += '<div class="trip-card">';
+    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + '</div>';
+    h += '<div class="trip-dates">' + fmtDateRange(t.start_date, t.end_date) + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards</div>';
+    h += '</div><span class="chip chip-gray">COMPLETE</span></div>';
+    h += '<div class="trip-actions">';
+    h += '<button class="btn btn-gray btn-sm" onclick="viewHistoryTrip(' + t.id + ')">View Report</button>';
+    h += '</div></div>';
+  });
+  el.innerHTML = h;
+}
+
+async function viewHistoryTrip(tripId) {
+  activeTrip = { id: tripId };
+  activeTripData = await api('/flyway/trips/' + tripId + '/attack-list');
+  activeTrip = activeTripData.trip;
+  activeYardFilter = 'all';
+  var el = document.getElementById('historyContent');
+  // Render as read-only active view
+  var container = document.createElement('div');
+  container.id = 'activeContent';
+  el.innerHTML = '';
+  el.appendChild(container);
+  document.getElementById('activeContent').id = 'historyActiveContent';
+
+  // Reuse active renderer into history
+  var saveEl = document.getElementById('activeContent');
+  var tempEl = document.createElement('div');
+  tempEl.id = 'activeContent';
+  el.innerHTML = '';
+  el.appendChild(tempEl);
+  renderActiveTrip();
+  // Swap back
+  tempEl.id = 'historyActiveContent';
+}
+
+// ═══ INIT ═══
+async function init() {
+  // Check hash
+  var hash = location.hash.replace('#', '') || '';
+
+  // Check for active trips first
+  var data = await api('/flyway/trips');
+  allTrips = data.trips || [];
+  var active = allTrips.find(function(t) { return t.status === 'active'; });
+
+  if (active && hash !== 'plan' && hash !== 'history') {
+    switchView('active');
+  } else if (hash === 'history') {
+    switchView('history');
+  } else {
+    switchView('plan');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

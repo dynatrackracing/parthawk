@@ -9,6 +9,7 @@ function dhNav(activePage) {
     { key: 'alerts', label: 'SCOUT ALERTS',     href: '/admin/scout-alerts' },
     { key: 'vin',    label: 'HAWK EYE',         href: '/admin/vin' },
     { key: 'gate',   label: 'NEST PROTECTOR',   href: '/admin/gate' },
+    { key: 'flyway', label: 'THE FLYWAY',       href: '/admin/flyway' },
   ];
   const intel = [
     { key: 'scour',  label: 'SCOUR STREAM',     href: '/admin/restock-list' },
