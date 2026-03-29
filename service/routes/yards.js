@@ -139,6 +139,12 @@ router.post('/scrape/:id', async (req, res) => {
     scraper.scrapeYard(yard).catch(err => {
       log.error({ err }, `U Pull & Save scrape failed for ${yard.name}`);
     });
+  } else if (yard.chain === 'chesterfield') {
+    const ChesterfieldScraper = require('../scrapers/ChesterfieldScraper');
+    const scraper = new ChesterfieldScraper();
+    scraper.scrapeYard(yard).catch(err => {
+      log.error({ err }, `Chesterfield scrape failed for ${yard.name}`);
+    });
   }
 
   res.json({ message: `Scrape started for ${yard.name}` });
