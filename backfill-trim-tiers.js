@@ -53,7 +53,7 @@ async function main() {
     const batch = await db('yard_vehicle')
       .select('id', 'year', 'make', 'model',
               'trim', 'trim_level', 'decoded_trim',
-              'engine', 'decoded_engine',
+              'engine', 'decoded_engine', 'engine_type',
               'drivetrain', 'decoded_drivetrain',
               'decoded_transmission', 'trim_tier')
       .orderBy('id')
@@ -102,6 +102,11 @@ async function main() {
         updateData.decoded_transmission = result.transmission;
         shouldUpdate = true;
       }
+      // Diesel detection: from reference, engine string, or engine_type
+      const isDiesel = result.diesel ||
+        /diesel|cummins|duramax|power.?stroke|tdi|cdi|ecodiesel/i.test(v.decoded_engine || v.engine || '') ||
+        /diesel/i.test(v.engine_type || '');
+      if (isDiesel) { updateData.diesel = true; shouldUpdate = true; }
 
       if (shouldUpdate) {
         await db('yard_vehicle').where('id', v.id).update(updateData);
