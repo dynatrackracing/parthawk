@@ -229,6 +229,9 @@ app.get('/admin/test', (req, res) => {
 app.get('/admin/listing-tool', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'listing-tool.html'));
 });
+app.get('/admin/flyway', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'flyway.html'));
+});
 // private routes for admin only
 app.use('/private', require('./routes/private'));
 app.get('/test', (req, res) => {
