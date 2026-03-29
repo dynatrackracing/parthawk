@@ -512,16 +512,26 @@ function renderActiveTrip() {
   else if (sortMode === 'age') filtered.sort(function(a, b) { return (a.daysInYard || 0) - (b.daysInYard || 0); });
   else if (sortMode === 'value') filtered.sort(function(a, b) { return (b.est_value || 0) - (a.est_value || 0); });
 
+  // Split into top vehicles and guaranteed (rare finds)
+  var topVehicles = filtered.filter(function(v) { return !v.isGuaranteedInclusion; });
+  var rareFinds = filtered.filter(function(v) { return v.isGuaranteedInclusion; });
+
   // Status bar
-  h += '<div class="status-bar"><span>Showing ' + filtered.length + ' of ' + allVehicles.length + ' vehicles</span>';
+  var countText = topVehicles.length + ' vehicles';
+  if (rareFinds.length > 0) countText += ' + ' + rareFinds.length + ' rare finds';
+  h += '<div class="status-bar"><span>' + countText + '</span>';
   h += '<span>Updated ' + (activeTripData.generated_at ? new Date(activeTripData.generated_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'now') + '</span></div>';
 
   // Vehicle list
   if (filtered.length === 0) {
-    h += '<div class="empty">No vehicles above threshold. Road trip floor: $1,000+. Day trip floor: $600+. Premium and high-value vehicles always shown.</div>';
+    h += '<div class="empty">No vehicles above threshold. Top 50 per yard shown plus rare finds (manual, diesel, 4x4, premium, performance, cult). Road trip floor: $1,000+. Day trip floor: $600+.</div>';
   } else {
     h += '<div style="margin:0 12px">';
-    filtered.forEach(function(v) { h += renderVehicleCard(v); });
+    topVehicles.forEach(function(v) { h += renderVehicleCard(v); });
+    if (rareFinds.length > 0) {
+      h += '<div style="text-align:center;padding:16px 0 8px;border-top:1px solid #2a2a2a;margin-top:8px"><span style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:#eab308;text-transform:uppercase">Rare Finds</span></div>';
+      rareFinds.forEach(function(v) { h += renderVehicleCard(v); });
+    }
     h += '</div>';
   }
 
@@ -557,9 +567,14 @@ function renderVehicleCard(v) {
     if (f === 'PREMIUM') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#eab308;color:#000;font-weight:700">PREMIUM</span> ';
     if (f === 'CULT') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#d946ef;color:#000;font-weight:700">CULT</span> ';
     if (f === 'MANUAL') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#06b6d4;color:#000;font-weight:700">MANUAL</span> ';
+    if (f === 'DIESEL') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#166534;color:#22c55e;font-weight:700">DIESEL</span> ';
     if (f === '4WD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">4WD</span> ';
     if (f === 'AWD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">AWD</span> ';
   });
+  // Show guaranteed reason badge
+  if (v.isGuaranteedInclusion && v.guaranteedReason) {
+    badges += '<span class="chip" style="font-size:8px;padding:1px 5px;background:#78350f;color:#fbbf24;font-weight:600;letter-spacing:0.05em">RARE: ' + esc(v.guaranteedReason) + '</span> ';
+  }
 
   // Age decay
   var diy = v.daysInYard || 0;
@@ -759,40 +774,15 @@ async function loadHistoryView() {
 
   var h = '';
   trips.forEach(function(t) {
+    var yardNames = (t.yards || []).map(function(y) { return esc(y.name); }).join(', ') || 'No yards';
     h += '<div class="trip-card">';
     h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + '</div>';
     h += '<div class="trip-dates">' + fmtDateRange(t.start_date, t.end_date) + '</div>';
-    h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards</div>';
+    h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards: ' + yardNames + '</div>';
     h += '</div><span class="chip chip-gray">COMPLETE</span></div>';
-    h += '<div class="trip-actions">';
-    h += '<button class="btn btn-gray btn-sm" onclick="viewHistoryTrip(' + t.id + ')">View Report</button>';
-    h += '</div></div>';
+    h += '</div>';
   });
   el.innerHTML = h;
-}
-
-async function viewHistoryTrip(tripId) {
-  activeTrip = { id: tripId };
-  activeTripData = await api('/flyway/trips/' + tripId + '/attack-list');
-  activeTrip = activeTripData.trip;
-  activeYardFilter = 'all';
-  var el = document.getElementById('historyContent');
-  // Render as read-only active view
-  var container = document.createElement('div');
-  container.id = 'activeContent';
-  el.innerHTML = '';
-  el.appendChild(container);
-  document.getElementById('activeContent').id = 'historyActiveContent';
-
-  // Reuse active renderer into history
-  var saveEl = document.getElementById('activeContent');
-  var tempEl = document.createElement('div');
-  tempEl.id = 'activeContent';
-  el.innerHTML = '';
-  el.appendChild(tempEl);
-  renderActiveTrip();
-  // Swap back
-  tempEl.id = 'historyActiveContent';
 }
 
 // ═══ INIT ═══

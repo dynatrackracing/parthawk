@@ -140,51 +140,45 @@ class FlywayService {
       }
     } catch (e) { /* the_mark may not exist */ }
 
-    // Group vehicles by yard for output
-    const yardMap = {};
-    for (const y of trip.yards) {
-      if (!y.scrape_enabled) continue;
-      yardMap[y.id] = { yard: y, vehicles: [] };
-    }
-
-    // Determine score floor based on trip distance
+    // Score floor tiered by trip distance
     const maxDistance = Math.max(...trip.yards.map(y => parseFloat(y.distance_from_base) || 0), 0);
-    const MINIMUM_VALUE = maxDistance >= 150 ? 1000 : 600;
-    const MAX_VEHICLES_PER_YARD = 25;
+    const SCORE_FLOOR = maxDistance >= 150 ? 1000 : 600;
+    const CULT_FLOOR = Math.floor(SCORE_FLOOR * 0.5);
+    const MAX_PER_YARD = 50;
 
-    // Score each vehicle
+    // Score all vehicles
+    const allScored = [];
     for (const vehicle of vehicles) {
       try {
         const result = attackService.scoreVehicle(
           vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex
         );
 
-        // Flyway part filtering: exclude OTHER parts without proven sales from scoring
+        // Flyway part filtering: exclude OTHER parts without proven sales
         const qualifiedParts = (result.parts || []).filter(p => {
           const pt = (p.partType || '').toUpperCase();
           if (pt && pt !== 'OTHER') return true;
-          // OTHER parts only count if they have actual sales history
           if ((p.sold_90d || 0) > 0) return true;
           if (p.isMarked) return true;
           return false;
         });
         const qualifiedValue = qualifiedParts.reduce((sum, p) => sum + (p.price || 0), 0);
 
-        // Apply Flyway age decay to the qualified (non-OTHER) value
+        // Age decay
         const daysInYard = this.calculateDaysInYard(vehicle.date_added);
         const ageDecay = this.calculateAgeDecay(daysInYard);
         const decayedValue = Math.round(qualifiedValue * (1 - ageDecay));
 
-        // Premium flags
+        // Premium flags (includes DIESEL detection)
         const premiumFlags = this.getPremiumFlags(vehicle);
 
-        // High-value individual parts ($200+) -- only identified types, not OTHER
+        // High-value parts: only identified types, not OTHER
         const highValueParts = qualifiedParts.filter(p => {
           const pt = (p.partType || '').toUpperCase();
           return (p.price || 0) >= 200 && pt !== 'OTHER';
         });
 
-        const flywayResult = {
+        allScored.push({
           ...result,
           parts: qualifiedParts,
           matched_parts: qualifiedParts.length,
@@ -195,42 +189,73 @@ class FlywayService {
           highValueParts: highValueParts.length,
           hasHighValuePart: highValueParts.length > 0,
           isPremiumVehicle: premiumFlags.length > 0,
-        };
-
-        // Filter: minimum flyway value OR has high-value identified part OR is premium
-        if (decayedValue >= MINIMUM_VALUE || highValueParts.length > 0 || premiumFlags.length > 0) {
-          if (yardMap[vehicle.yard_id]) {
-            yardMap[vehicle.yard_id].vehicles.push(flywayResult);
-          }
-        }
+          _yardId: vehicle.yard_id,
+          _vehicleId: vehicle.id,
+          _scoreFloor: SCORE_FLOOR,
+        });
       } catch (e) {
         // Skip vehicles that fail scoring
       }
     }
 
-    // Sort vehicles within each yard, then cap at MAX_VEHICLES_PER_YARD
-    const yards = [];
-    for (const entry of Object.values(yardMap)) {
-      entry.vehicles.sort((a, b) => {
-        if (a.isPremiumVehicle && !b.isPremiumVehicle) return -1;
-        if (!a.isPremiumVehicle && b.isPremiumVehicle) return 1;
-        return (b.flywayValue || 0) - (a.flywayValue || 0);
-      });
+    // ── Two-pass filtering ──────────────────────────────────
 
-      // Cap results per yard
-      const capped = entry.vehicles.slice(0, MAX_VEHICLES_PER_YARD);
+    // Group by yard
+    const byYard = {};
+    for (const v of allScored) {
+      if (!byYard[v._yardId]) byYard[v._yardId] = [];
+      byYard[v._yardId].push(v);
+    }
+
+    // Build yard output
+    const yards = [];
+    for (const y of trip.yards) {
+      if (!y.scrape_enabled) continue;
+      const yardVehicles = byYard[y.id] || [];
+      if (yardVehicles.length === 0) continue;
+
+      // Sort by flyway value descending
+      yardVehicles.sort((a, b) => (b.flywayValue || 0) - (a.flywayValue || 0));
+
+      // Pass 1: Top vehicles above score floor OR with high-value identified parts
+      const top = yardVehicles
+        .filter(v => v.flywayValue >= SCORE_FLOOR || v.hasHighValuePart)
+        .slice(0, MAX_PER_YARD);
+      const topIds = new Set(top.map(v => v._vehicleId));
+
+      // Pass 2: Guaranteed vehicles not already in top list
+      const guaranteed = [];
+      for (const v of yardVehicles) {
+        if (topIds.has(v._vehicleId)) continue;
+        if (v.flywayValue <= 0 && !v.hasHighValuePart) continue;
+
+        const reason = this.getGuaranteedReason(v);
+        if (reason) {
+          v.isGuaranteedInclusion = true;
+          v.guaranteedReason = reason;
+          guaranteed.push(v);
+        }
+      }
+
+      // Tag top vehicles
+      for (const v of top) {
+        v.isGuaranteedInclusion = false;
+      }
+
+      const combined = [...top, ...guaranteed];
 
       yards.push({
-        yard: entry.yard,
-        total_vehicles: capped.length,
-        total_scored: entry.vehicles.length,
-        hot_vehicles: capped.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
-        est_total_value: capped.reduce((sum, v) => sum + (v.flywayValue || 0), 0),
-        vehicles: capped,
+        yard: y,
+        total_vehicles: combined.length,
+        total_top: top.length,
+        total_guaranteed: guaranteed.length,
+        total_scored: yardVehicles.length,
+        hot_vehicles: combined.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
+        est_total_value: combined.reduce((sum, v) => sum + (v.flywayValue || 0), 0),
+        vehicles: combined,
       });
     }
 
-    // Sort yards by total value descending
     yards.sort((a, b) => b.est_total_value - a.est_total_value);
 
     return { trip, yards, generated_at: new Date().toISOString() };
@@ -272,11 +297,33 @@ class FlywayService {
     if (trans.includes('MANUAL')) flags.push('MANUAL');
     if (trans === 'CHECK_MT') flags.push('MANUAL');
 
+    // Diesel detection: boolean column OR engine_type field
+    if (vehicle.diesel === true || (vehicle.engine_type || '').toUpperCase() === 'DIESEL') {
+      flags.push('DIESEL');
+    }
+
     const drive = (vehicle.decoded_drivetrain || vehicle.drivetrain || '').toUpperCase();
     if (drive.includes('4WD') || drive.includes('4X4')) flags.push('4WD');
     if (drive.includes('AWD')) flags.push('AWD');
 
     return flags;
+  }
+
+  /**
+   * Determine if a vehicle qualifies for guaranteed inclusion (rare finds).
+   * Returns the reason string or null if not guaranteed.
+   */
+  static getGuaranteedReason(v) {
+    const flags = v.premiumFlags || [];
+    if (flags.includes('MANUAL')) return 'MANUAL';
+    if (flags.includes('DIESEL')) return 'DIESEL';
+    if (flags.includes('4WD')) return '4WD';
+    if (flags.includes('AWD')) return 'AWD';
+    if (flags.includes('PERFORMANCE')) return 'PERFORMANCE';
+    if (flags.includes('PREMIUM')) return 'PREMIUM';
+    // Cult needs at least half the score floor
+    if (flags.includes('CULT') && (v.flywayValue || 0) >= Math.floor((v._scoreFloor || 500) * 0.5)) return 'CULT';
+    return null;
   }
 
   // ============================================================
