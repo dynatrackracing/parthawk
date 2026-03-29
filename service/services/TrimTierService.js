@@ -251,6 +251,29 @@ async function lookup(year, make, model, trimName, engineDisplacement, transmiss
       }
     }
 
+    // === ENGINE CONTRADICTION: engine provided but matched nothing ===
+    // If we had engine data and it didn't match any candidate's top_engine,
+    // don't fall through to "best case" — that would give PERFORMANCE to a base vehicle
+    if (engineDisplacement && !trimName) {
+      const engineNum = (engineDisplacement || '').replace(/[^0-9.]/g, '');
+      if (engineNum && engineNum.length >= 2) {
+        const anyEngineMatch = candidates.some(c => {
+          if (!c.top_engine) return false;
+          const refNum = c.top_engine.replace(/[^0-9.]/g, '');
+          if (!refNum || refNum.length < 2) return false;
+          return refNum.startsWith(engineNum) || engineNum.startsWith(refNum);
+        });
+        if (!anyEngineMatch) {
+          // Engine doesn't match any known trim — only return if entire model is cult
+          if (allCult) {
+            const lowest = candidates.reduce((a, b) => a.tier < b.tier ? a : b);
+            return formatResult(lowest, false, true);
+          }
+          return null; // No match — don't guess
+        }
+      }
+    }
+
     // === NO TRIM, NO ENGINE MATCH — check if entire model is cult ===
     if (allCult) {
       const best = candidates.reduce((a, b) => a.tier > b.tier ? a : b);
