@@ -8,6 +8,14 @@ const { getPartScoreMultiplier } = require('../config/trim-tier-config');
 const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
+let _inventoryIndexCache = null;
+let _inventoryIndexCacheTime = 0;
+let _salesIndexCache = null;
+let _salesIndexCacheTime = 0;
+let _stockIndexCache = null;
+let _stockIndexCacheTime = 0;
+const INDEX_CACHE_TTL = 10 * 60 * 1000;
+
 function isExcludedPart(title) {
   const t = title.toUpperCase();
   const excluded = [
@@ -258,6 +266,10 @@ class AttackListService {
    * Build inventory index keyed by "make|model|year".
    */
   async buildInventoryIndex() {
+    const _now = Date.now();
+    if (_inventoryIndexCache && (_now - _inventoryIndexCacheTime) < INDEX_CACHE_TTL) {
+      return _inventoryIndexCache;
+    }
     const index = {};
     try {
       const rows = await database('Auto')
@@ -312,6 +324,8 @@ class AttackListService {
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildInventoryIndex: tables not ready');
     }
+    _inventoryIndexCache = index;
+    _inventoryIndexCacheTime = Date.now();
     return index;
   }
 
@@ -328,6 +342,10 @@ class AttackListService {
    *   "2005-2010 Chrysler 300" → yearStart=2005, yearEnd=2010
    */
   async buildSalesIndex(cutoff) {
+    const _now = Date.now();
+    if (_salesIndexCache && (_now - _salesIndexCacheTime) < INDEX_CACHE_TTL) {
+      return _salesIndexCache;
+    }
     const index = {};
     try {
       const sales = await database('YourSale')
@@ -369,6 +387,8 @@ class AttackListService {
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildSalesIndex: YourSale table not ready');
     }
+    _salesIndexCache = index;
+    _salesIndexCacheTime = Date.now();
     return index;
   }
 
@@ -466,6 +486,10 @@ class AttackListService {
    * 2. byPartNumber: keyed by normalized base part number — counts per PN
    */
   async buildStockIndex() {
+    const _now = Date.now();
+    if (_stockIndexCache && (_now - _stockIndexCacheTime) < INDEX_CACHE_TTL) {
+      return _stockIndexCache;
+    }
     const byMakeModel = {};
     const byPartNumber = {};
     try {
@@ -509,6 +533,8 @@ class AttackListService {
     } catch (err) {
       this.log.warn({ err: err.message }, 'buildStockIndex: YourListing table not ready');
     }
+    _stockIndexCache = { byMakeModel, byPartNumber };
+    _stockIndexCacheTime = Date.now();
     return { byMakeModel, byPartNumber };
   }
 
