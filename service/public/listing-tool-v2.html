@@ -1127,6 +1127,7 @@ IMPORTANT FORMATTING RULES:
     TITLE: Dodge Ram 1500 5.9L 1997 Programmed ECU ECM PCM Engine Control 56040440AC
 - Part number always goes at the end before any condition/mileage/test notes
 - End notes only when relevant: "Programmed" for pre-programmed ECUs, drivetrain if specific (AWD/2WD)
+- BRAND NAMES IN TITLE: Use ONLY the vehicle brand, never the parent company. Lexus is "Lexus" not "Toyota Lexus". Acura is "Acura" not "Honda Acura". Infiniti is "Infiniti" not "Nissan Infiniti". Lincoln is "Lincoln" not "Ford Lincoln". Mini is "Mini" not "BMW Mini". Scion is "Scion" not "Toyota Scion".
 ${isTested && testedSuffix ? `- This is a TESTED item - append the following at the very end of the title: ${testedSuffix}` : ''}
 - Title must be 80 characters or under - cut filler words to fit, never exceed 80
 - After the TITLE: line, leave one blank line then output the listing body exactly as templated
@@ -1190,7 +1191,8 @@ ${isTested && testedSuffix ? `- This is a TESTED item - append the following at 
       },
       amplifier: {
         query: `"${partNum}" amplifier OEM audio fitment application`,
-        fitmentFields: 'Year/make/model and audio package (e.g. Bose, Harman Kardon, premium audio). Engine and drivetrain are NOT relevant for amplifiers.',
+        fitmentFields: 'Year/make/model and audio package (e.g. Bose, Harman Kardon, Mark Levinson, Alpine, Bang & Olufsen, JBL, Infinity, Rockford Fosgate, premium audio). Engine and drivetrain are NOT relevant for amplifiers. IMPORTANT: If the part name includes an audio brand (Mark Levinson, Bose, etc.), include that brand name in BOTH the title and the Fits line. Example: "Fits: 2007-2011 Lexus GS350 with Mark Levinson audio system".',
+        programmingRule: 'Amplifiers are direct replacement. Omit programming note entirely.',
       },
       cluster: {
         query: `"${partNum}" instrument cluster speedometer fitment`,
@@ -1284,10 +1286,14 @@ Use this trim data to enrich the listing where relevant:
 ` : ''}
 ${lastIntelligence && lastIntelligence.fitment && lastIntelligence.fitment.allVehicles ? `
 ═══ CONFIRMED FITMENT (from DynaTrack database - ${lastIntelligence.fitment.allVehicles.length} vehicles matched) ═══
-Primary: ${lastIntelligence.fitment.year || ''} ${lastIntelligence.fitment.make || ''} ${lastIntelligence.fitment.model || ''} ${lastIntelligence.fitment.engine || ''}
+${lastIntelligence.fitment.allVehicles.map(v => (v.year || '') + ' ' + (v.make || '') + ' ' + (v.model || '') + ' ' + (v.engine || '')).join(', ')}
 Does not fit: ${lastIntelligence.fitment.doesNotFit || 'No confirmed exclusions'}
 
-This fitment is confirmed from our database. Use it as-is. Only add to it if web search finds ADDITIONAL confirmed vehicles.
+CRITICAL: This fitment is from our verified database. The Fits line MUST include these vehicles.
+Web search may find the same vehicles - that confirms our data.
+Web search may find DIFFERENT vehicles - IGNORE those unless they are clearly the same platform (same generation, shared chassis).
+Do NOT add vehicles from web search that are a different make or model family than what the database shows.
+For example: if database shows Lexus GS350, do NOT add Toyota Avalon even if web search says it fits - different model family.
 ` : ''}
 FORMATTING RULE: Never use em dashes (the long dash character) anywhere in the output. Use regular hyphens/dashes (-) only. This is a hard requirement.
 

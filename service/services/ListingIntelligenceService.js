@@ -42,12 +42,18 @@ function buildPnVariants(pnBase, pnExact) {
   const baseNoDash = pnBase.replace(/-/g, '');
   if (baseNoDash !== pnBase) variants.add(baseNoDash);
 
+  // Add space-stripped versions (BMW PNs sometimes stored with spaces: "3451 6769162-01")
+  const exactNoSpace = pnExact.replace(/[\s-]/g, '');
+  if (exactNoSpace !== pnExact && exactNoSpace !== exactNoDash) variants.add(exactNoSpace);
+
   // For multi-dash PNs (BMW: 3451-6769162-03), add without last segment (revision)
   const dashParts = pnExact.split('-');
   if (dashParts.length >= 3) {
     const withoutRevision = dashParts.slice(0, -1).join('-');
     variants.add(withoutRevision);
     variants.add(withoutRevision.replace(/-/g, ''));
+    // Also add with space separator (BMW format: "3451 6769162")
+    variants.add(dashParts.slice(0, -1).join(' '));
   }
 
   // Remove empties
