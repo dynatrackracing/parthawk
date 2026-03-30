@@ -28,6 +28,33 @@ const MODULE_MAP = {
   'radio': 'RADIO_BASE',
 };
 
+/**
+ * Build search variants for a part number.
+ * Handles BMW (3451-6769162-03), Mopar (56040440AC), Ford (AL3T-15604-BD), etc.
+ * Returns a Set of unique search strings.
+ */
+function buildPnVariants(pnBase, pnExact) {
+  const variants = new Set([pnBase, pnExact]);
+
+  // Add dash-stripped versions
+  const exactNoDash = pnExact.replace(/-/g, '');
+  if (exactNoDash !== pnExact) variants.add(exactNoDash);
+  const baseNoDash = pnBase.replace(/-/g, '');
+  if (baseNoDash !== pnBase) variants.add(baseNoDash);
+
+  // For multi-dash PNs (BMW: 3451-6769162-03), add without last segment (revision)
+  const dashParts = pnExact.split('-');
+  if (dashParts.length >= 3) {
+    const withoutRevision = dashParts.slice(0, -1).join('-');
+    variants.add(withoutRevision);
+    variants.add(withoutRevision.replace(/-/g, ''));
+  }
+
+  // Remove empties
+  variants.delete('');
+  return variants;
+}
+
 class ListingIntelligenceService {
 
   async getIntelligence({ partNumber, year, make, model, engine, trim, partType }) {
@@ -122,18 +149,25 @@ class ListingIntelligenceService {
   // ── Fitment cache lookup ────────────────────────────────
 
   async lookupFitmentCache(pnBase, pnExact) {
+    const variants = buildPnVariants(pnBase, pnExact);
     let cached = null;
     try {
       cached = await database('part_fitment_cache')
-        .where('part_number_base', pnBase)
-        .orWhere('part_number_exact', pnExact)
+        .where(function() {
+          for (const v of variants) {
+            this.orWhere('part_number_base', v).orWhere('part_number_exact', v);
+          }
+        })
         .first();
     } catch (e) { /* table may not exist */ }
     if (!cached) {
       try {
         cached = await database('fitment_data')
-          .where('part_number', pnExact)
-          .orWhere('part_number_base', pnBase)
+          .where(function() {
+            for (const v of variants) {
+              this.orWhere('part_number', v).orWhere('part_number_base', v);
+            }
+          })
           .first();
       } catch (e) { /* table may not exist */ }
     }
@@ -155,12 +189,14 @@ class ListingIntelligenceService {
   // ── Item + AIC fitment lookup ───────────────────────────
 
   async lookupItemFitment(pnBase, pnExact) {
+    const variants = buildPnVariants(pnBase, pnExact);
     const rows = await database('Item as i')
       .join('AutoItemCompatibility as aic', 'aic.itemId', 'i.id')
       .join('Auto as a', 'a.id', 'aic.autoId')
       .where(function() {
-        this.where('i.manufacturerPartNumber', 'ilike', `%${pnBase}%`)
-          .orWhere('i.manufacturerPartNumber', 'ilike', `%${pnExact}%`);
+        for (const v of variants) {
+          this.orWhere('i.manufacturerPartNumber', 'ilike', `%${v}%`);
+        }
       })
       .select('a.year', 'a.make', 'a.model', 'a.engine', 'a.trim')
       .limit(50);
@@ -194,10 +230,12 @@ class ListingIntelligenceService {
   // ── Sales history lookup ────────────────────────────────
 
   async lookupSalesHistory(pnBase, pnExact) {
+    const variants = buildPnVariants(pnBase, pnExact);
     const sales = await database('YourSale')
       .where(function() {
-        this.where('title', 'ilike', `%${pnBase}%`)
-          .orWhere('title', 'ilike', `%${pnExact}%`);
+        for (const v of variants) {
+          this.orWhere('title', 'ilike', `%${v}%`);
+        }
       })
       .whereNotNull('soldDate')
       .orderBy('soldDate', 'desc')
