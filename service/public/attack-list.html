@@ -245,8 +245,6 @@
   <div class="tab" onclick="showTab('yard:LKQ Tampa')" id="tab-yard:LKQ Tampa">Tampa</div>
   <div class="tab" onclick="showTab('yard:LKQ Largo')" id="tab-yard:LKQ Largo">Largo</div>
   <div class="tab" onclick="showTab('yard:LKQ Clearwater')" id="tab-yard:LKQ Clearwater">Clearwater</div>
-  <div class="tab" onclick="showTab('day_trip')" id="tab-day_trip">Day Trip</div>
-  <div class="tab" onclick="showTab('road_trip')" id="tab-road_trip">Road Trip</div>
   <div class="tab" id="tab-manual" onclick="showTab('manual')" style="display:none;border-left:1px solid var(--border);margin-left:4px;padding-left:12px;color:#ef4444;font-weight:700;">MANUAL</div>
 </div>
 
@@ -481,10 +479,6 @@
       yards = yards.filter(y => y.yard.name === yardName);
     } else if (currentTab === 'florida') {
       yards = yards.filter(y => ['LKQ Tampa','LKQ Largo','LKQ Clearwater'].includes(y.yard.name));
-    } else if (currentTab === 'day_trip') {
-      yards = yards.filter(y => y.yard.visit_frequency === 'day_trip');
-    } else if (currentTab === 'road_trip') {
-      yards = yards.filter(y => y.yard.visit_frequency === 'road_trip');
     }
 
     if (!yards.length || !yards.some(y => y.total_vehicles > 0)) {
