@@ -80,6 +80,32 @@ router.delete('/trips/:tripId/yards/:yardId', async (req, res) => {
   }
 });
 
+// Reinstate a completed trip (within 24-hour grace period)
+router.post('/trips/:id/reinstate', async (req, res) => {
+  try {
+    const trip = await FlywayService.getTrip(req.params.id);
+    if (!trip) return res.status(404).json({ success: false, error: 'Trip not found' });
+
+    if (trip.status !== 'complete') {
+      return res.status(400).json({ success: false, error: 'Only completed trips can be reinstated' });
+    }
+
+    if (trip.completed_at) {
+      const hoursSinceComplete = (Date.now() - new Date(trip.completed_at).getTime()) / (1000 * 60 * 60);
+      if (hoursSinceComplete > 24) {
+        return res.status(400).json({ success: false, error: 'Grace period expired. Trip was completed over 24 hours ago.' });
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Trip has no completion timestamp. Cannot reinstate.' });
+    }
+
+    const updated = await FlywayService.updateTrip(req.params.id, { status: 'active' });
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Get Flyway attack list for a trip
 router.get('/trips/:id/attack-list', async (req, res) => {
   try {

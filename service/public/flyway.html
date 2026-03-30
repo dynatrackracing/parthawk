@@ -854,12 +854,34 @@ function showToast(msg) {
 
 function confirmComplete() {
   if (!activeTrip) return;
-  showConfirm('Complete Trip', 'Mark "' + activeTrip.name + '" as complete? This cannot be undone.', async function() {
+  showConfirm('Complete Trip', 'Vehicle data will be kept for 24 hours. You can reinstate the trip during that window if you complete it by accident.', async function() {
     await api('/flyway/trips/' + activeTrip.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'complete' }) });
     activeTrip = null;
     activeTripData = null;
     switchView('history');
   });
+}
+
+// ═══ REINSTATE ═══
+async function reinstateTrip(tripId) {
+  var btn = document.querySelector('[data-reinstate="' + tripId + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reinstating...'; }
+  try {
+    var data = await api('/flyway/trips/' + tripId + '/reinstate', { method: 'POST' });
+    if (data.success) {
+      showToast('Trip reinstated! Switching to Active view.');
+      activeTrip = null;
+      activeTripData = null;
+      switchView('active');
+    } else {
+      showToast(data.error || 'Failed to reinstate trip');
+      loadHistoryView();
+    }
+  } catch (err) {
+    showToast('Failed to reinstate trip');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'REINSTATE TRIP'; }
+  }
 }
 
 // ═══ HISTORY VIEW ═══
@@ -883,7 +905,14 @@ async function loadHistoryView() {
     h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + ' ' + badge + '</div>';
     h += '<div class="trip-dates">' + dateDisplay + '</div>';
     h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards: ' + yardNames + '</div>';
+    if (t.canReinstate && t.gracePeriodRemaining > 0) {
+      var hoursAgo = Math.round((24 - t.gracePeriodRemaining) * 10) / 10;
+      h += '<div style="font-size:11px;color:#eab308;margin-top:6px">Completed ' + hoursAgo + 'h ago \u2014 ' + t.gracePeriodRemaining + 'h remaining</div>';
+    }
     h += '</div><span class="chip chip-gray">COMPLETE</span></div>';
+    if (t.canReinstate) {
+      h += '<div class="trip-actions"><button class="btn btn-green btn-sm" data-reinstate="' + t.id + '" onclick="reinstateTrip(' + t.id + ')">REINSTATE TRIP</button></div>';
+    }
     h += '</div>';
   });
   el.innerHTML = h;

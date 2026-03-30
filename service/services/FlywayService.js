@@ -21,6 +21,7 @@ class FlywayService {
         .select('yard.id', 'yard.name', 'yard.chain', 'yard.address',
                 'yard.distance_from_base', 'yard.scrape_url', 'yard.scrape_method',
                 'flyway_trip_yard.scrape_enabled', 'flyway_trip_yard.id as pivot_id');
+      this.addGracePeriodInfo(trip);
     }
     return trips;
   }
@@ -35,6 +36,7 @@ class FlywayService {
       .select('yard.id', 'yard.name', 'yard.chain', 'yard.address',
               'yard.distance_from_base', 'yard.scrape_url', 'yard.scrape_method',
               'flyway_trip_yard.scrape_enabled', 'flyway_trip_yard.id as pivot_id');
+    this.addGracePeriodInfo(trip);
     return trip;
   }
 
@@ -52,11 +54,21 @@ class FlywayService {
   }
 
   static async updateTrip(id, updates) {
+    const trip = await database('flyway_trip').where({ id }).first();
+    if (!trip) throw new Error('Trip not found');
+
     if (updates.status === 'active') {
-      const trip = await database('flyway_trip').where({ id }).first();
-      if (!trip) throw new Error('Trip not found');
       const yards = await database('flyway_trip_yard').where({ trip_id: id });
       if (yards.length === 0) throw new Error('Cannot activate trip with no yards');
+      // Reinstating from complete: clear completed_at
+      if (trip.status === 'complete') {
+        updates.completed_at = null;
+      }
+    }
+
+    // Completing: stamp completed_at
+    if (updates.status === 'complete' && trip.status !== 'complete') {
+      updates.completed_at = new Date();
     }
 
     updates.updated_at = new Date();
@@ -327,15 +339,31 @@ class FlywayService {
   }
 
   // ============================================================
+  // GRACE PERIOD
+  // ============================================================
+
+  static addGracePeriodInfo(trip) {
+    if (trip.status === 'complete' && trip.completed_at) {
+      const hoursSinceComplete = (Date.now() - new Date(trip.completed_at).getTime()) / (1000 * 60 * 60);
+      trip.gracePeriodRemaining = Math.max(0, Math.round((24 - hoursSinceComplete) * 10) / 10);
+      trip.canReinstate = hoursSinceComplete <= 24;
+    } else if (trip.status === 'complete') {
+      trip.gracePeriodRemaining = 0;
+      trip.canReinstate = false;
+    }
+  }
+
+  // ============================================================
   // AUTO-COMPLETE TRIPS
   // ============================================================
 
   static async autoCompleteExpiredTrips() {
     const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
     const count = await database('flyway_trip')
       .where('status', 'active')
       .where('end_date', '<', today)
-      .update({ status: 'complete', updated_at: new Date() });
+      .update({ status: 'complete', completed_at: now, updated_at: now });
     return count;
   }
 }
