@@ -408,12 +408,6 @@
       <div style="font-size:11px; color:#b91c1c; margin-top:4px;">This will appear in the listing. Clear the field to omit it.</div>
     </div>
 
-    <div class="field" id="partNumberWarningField" style="margin-top:12px; display:none;">
-      <label style="color:#b45309; font-weight:600;">⚠ Part Number Match Required <span style="font-weight:400; color:var(--text-faint)">(auto-filled - edit if needed)</span></label>
-      <input type="text" id="partNumberWarning" placeholder="" style="border-color:#fcd34d;" />
-      <div style="font-size:11px; color:#b45309; margin-top:4px;" id="partNumberWarningSource"></div>
-    </div>
-
     <hr class="divider">
     <div class="card-title">Sale type &amp; programming</div>
 
@@ -537,6 +531,10 @@
 <footer>Dynatrack Racing internal tool &nbsp;·&nbsp; Powered by Claude AI</footer>
 
 <script>
+  const DARKHAWK_API = window.location.hostname.includes('railway.app')
+    ? ''
+    : 'https://parthawk-production.up.railway.app';
+
   const API_KEY_STORAGE = 'dt_anthropic_key';
 
   const PROGRAMMED_SALE_TYPES = ['chrysler_programmed', 'combo_ign', 'combo_ign_bcm', 'honda_key'];
@@ -692,7 +690,7 @@
 
     // ── STEP 0: Check DarkHawk fitment intelligence (free, instant) ───
     try {
-      const fitmentUrl = `/api/fitment/lookup?partNumber=${encodeURIComponent(partNum)}`;
+      const fitmentUrl = `${DARKHAWK_API}/api/fitment/lookup?partNumber=${encodeURIComponent(partNum)}`;
       const fitmentRes = await fetch(fitmentUrl, { signal: AbortSignal.timeout(5000) });
       if (fitmentRes.ok) {
         const fitment = await fitmentRes.json();
@@ -703,18 +701,6 @@
           if (fitment.negationText) {
             doesNotFitField.style.display = 'block';
             doesNotFitInput.value = fitment.negationText;
-          }
-          // Auto-populate part number warning
-          const pnWarnField = document.getElementById('partNumberWarningField');
-          const pnWarnInput = document.getElementById('partNumberWarning');
-          const pnWarnSource = document.getElementById('partNumberWarningSource');
-          if (fitment.partNumberWarning) {
-            pnWarnField.style.display = 'block';
-            pnWarnInput.value = fitment.partNumberWarning;
-            pnWarnSource.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ From DarkHawk fitment intelligence</span>';
-          } else {
-            pnWarnField.style.display = 'none';
-            pnWarnInput.value = '';
           }
           // If high confidence, populate vehicle fields too and skip Claude
           if (fitment.confidence === 'high' && fitment.fits) {
@@ -733,35 +719,6 @@
     } catch (e) {
       // DarkHawk unavailable - fall through silently to Claude web search
     }
-
-    // ── STEP 0.5: DarkHawk Intelligence (programming + trim + sales) ───
-    statusEl.innerHTML = '<span style="color:var(--text-muted);">Checking DarkHawk intelligence...</span>';
-    try {
-      const donorVehicle = document.getElementById('donorVehicle').value.trim();
-      const donorParts = donorVehicle.split(/\s+/);
-      const intelMake = donorParts[0] || '';
-      const intelModel = donorParts.slice(1).join(' ') || '';
-      const intelYear = document.getElementById('donorYear').value.trim();
-      const intelEngine = document.getElementById('donorEngine').value.trim();
-      const intel = await fetchIntelligence(partNum, intelYear, intelMake, intelModel, intelEngine, null);
-      if (intel) {
-        renderIntelPanel(intel);
-        // Auto-populate fitment from intelligence if fields are empty
-        if (intel.fitment) {
-          const f = intel.fitment;
-          if (f.year && !document.getElementById('donorYear').value) document.getElementById('donorYear').value = f.year;
-          if (f.make && !document.getElementById('donorVehicle').value) {
-            document.getElementById('donorVehicle').value = [f.make, f.model].filter(Boolean).join(' ');
-          }
-          if (f.engine && !document.getElementById('donorEngine').value) document.getElementById('donorEngine').value = f.engine;
-          if (f.partName && !document.getElementById('partName').value) document.getElementById('partName').value = f.partName;
-          if (f.doesNotFit) {
-            document.getElementById('doesNotFit').value = f.doesNotFit;
-            document.getElementById('doesNotFitField').style.display = 'block';
-          }
-        }
-      }
-    } catch (e) { /* intelligence unavailable */ }
 
     statusEl.innerHTML = '<span style="color:var(--text-muted);">Identifying part...</span>';
 
@@ -886,6 +843,40 @@ Replace null with confirmed values.`
       const category = (step1.category || 'OTHER').toUpperCase();
       const needsProgrammingResearch = ['ECU','BCM','TCM','TIPM','ABS','CLUSTER','RADIO'].includes(category);
       const needsIncompatibilityResearch = ['ECU','BCM','TCM','TIPM','ABS','CLUSTER','RADIO','THROTTLE'].includes(category);
+
+      // ── STEP 1.5: DarkHawk Intelligence (now we have year/make/model/category) ───
+      const categoryToPartType = {
+        'ECU': 'ecu', 'BCM': 'bcm', 'TCM': 'tcm', 'TIPM': 'tipm',
+        'ABS': 'abs', 'CLUSTER': 'cluster', 'RADIO': 'radio',
+        'THROTTLE': 'throttle', 'MECHANICAL': 'mechanical', 'OTHER': 'generic'
+      };
+      const detectedPartType = categoryToPartType[category] || 'generic';
+      statusEl.innerHTML = '<span style="color:var(--text-muted);">Checking DarkHawk intelligence...</span>';
+      try {
+        const intel = await fetchIntelligence(
+          partNum,
+          step1.year || document.getElementById('donorYear').value.trim(),
+          step1.make || '',
+          step1.model || '',
+          document.getElementById('donorEngine').value.trim(),
+          detectedPartType
+        );
+        if (intel) {
+          renderIntelPanel(intel);
+          if (intel.fitment) {
+            const f = intel.fitment;
+            if (f.year && !step1.year) step1.year = f.year;
+            if (f.make && !step1.make) step1.make = f.make;
+            if (f.model && !step1.model) step1.model = f.model;
+            if (f.engine && !document.getElementById('donorEngine').value) document.getElementById('donorEngine').value = f.engine;
+            if (f.partName && !document.getElementById('partName').value) document.getElementById('partName').value = f.partName;
+            if (f.doesNotFit) {
+              document.getElementById('doesNotFit').value = f.doesNotFit;
+              document.getElementById('doesNotFitField').style.display = 'block';
+            }
+          }
+        }
+      } catch (e) { /* intelligence unavailable */ }
 
       // Small delay between steps to avoid token rate limit burst
       await new Promise(r => setTimeout(r, 600));
@@ -1075,7 +1066,7 @@ Replace null values with confirmed data where found. Keep null where unconfirmed
       : `Cleaned and visually inspected. Damage noted${notes ? ': ' + notes : ''}. Removed from a running donor vehicle.`;
 
     const saleTypeInstructions = {
-      part: `Standard used part. Programming Note: if ECU/ECM/BCM/TCM or programmable module write "May require VIN-specific programming. Professional installation recommended." For non-programmable parts write "Direct replacement - no programming required."`,
+      part: `Standard used part. Use the programming note field if it was pre-filled from the database. If the programming note field is empty, omit the Programming Note bullet entirely.`,
       chrysler_programmed: `Chrysler/Jeep/Dodge ECM/PCM programmed by Dynatrack Racing (JTEC, NGC, GPEC only - no diesel/Cummins). Use Chrysler template.`,
       combo_ign: `ECU + Ignition Switch plug and play set. Part name: "[MAKE] ECU + IGNITION SWITCH COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch". Programming Note: "Plug and play set - must be installed together. No additional programming required."`,
       combo_ign_bcm: `ECU + Ignition Switch + BCM full set. Part name: "[MAKE] ECU + IGNITION SWITCH + BCM COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch + Body Control Module (BCM)". Programming Note: "Plug and play set - all three components must be installed together. No additional programming required."`,
@@ -1090,9 +1081,9 @@ Item Specifics
 • Part Number: ${partNum}
 • Fits: [year range make model engine/trim - confirmed fitment only]
 [DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
-[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
 • Condition: Inspected for Damage
-• Shipping: Ships within 1 Business Day (North Carolina, USA). Hawaii/Alaska residents - please message for a quote prior to purchase.
+• Warranty: 30-Day Hassle-Free Returns
+• Shipping: Ships within 1 Business Day (North Carolina, USA)
 
 CUSTOM PROGRAMMING INCLUDED - To ensure a seamless "Plug & Play" experience, we require your VIN and Mileage during checkout.
 Note: Providing this info immediately prevents shipping delays and ensures 100% compatibility with your vehicle.
@@ -1101,7 +1092,7 @@ Note: Providing this info immediately prevents shipping delays and ensures 100% 
 About Dynatrack Racing
 We are dismantlers based in North Carolina, specializing in high-quality OEM components.
 • Support: Available Mon-Fri for any questions.
-• Returns: 30-Day Hassle-Free.`;
+• Shipping: Fast domestic shipping. (Hawaii/Alaska residents: please message for a quote prior to purchase).`;
 
     const standardTemplate = `[PART NAME IN ALL CAPS - e.g. Kia Sportage 2010-2014 Fuse Box Junction Relay Interior OEM]
 
@@ -1109,16 +1100,16 @@ Item Specifics
 • Part Number: ${partNum}
 • Fits: [year range make model - confirmed fitment only, e.g. 2010-2014 Kia Sportage]
 [DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
-[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
 [WHATS INCLUDED LINE - only if sale type requires it, otherwise omit]
-• Programming Note: [per sale type instructions - one short sentence]
+[PROGRAMMING NOTE LINE - only if programming note field is filled, otherwise omit entirely]
 • Condition: ${conditionLine}
-• Shipping: Ships within 1 Business Day (North Carolina, USA). Hawaii/Alaska residents - please message for a quote prior to purchase.
+• Warranty: 30-Day Hassle-Free Returns
+• Shipping: Ships within 1 Business Day (North Carolina, USA)
 
 About Dynatrack Racing
 We are dismantlers based in North Carolina, specializing in high-quality OEM components.
 • Support: Available Mon-Fri for any questions.
-• Returns: 30-Day Hassle-Free.
+• Shipping: Fast domestic shipping. (Hawaii/Alaska residents: please message for a quote prior to purchase).
 
 IMPORTANT FORMATTING RULES:
 - Your FIRST LINE must be the eBay title prefixed with "TITLE:"
@@ -1142,7 +1133,10 @@ ${isTested && testedSuffix ? `- This is a TESTED item - append the following at 
 - Do NOT include a "Removed From" bullet - omit it entirely
 - Keep each bullet to one line
 - No extra blank lines between bullets
-- Do not add any fields not shown in the template above`;
+- Do not add any fields not shown in the template above
+- The About section must be EXACTLY as templated - do not add a "Returns:" bullet to the About section (returns are in the Warranty bullet)
+- Do not merge "About Dynatrack Racing" with the description on the same line
+- Do not add any bullets, lines, or sections not shown in the template`;
 
     // ── Part type detection ──────────────────────────────────────────
     // Infer from partName field first, fall back to saleType context
@@ -1239,7 +1233,6 @@ ${isTested && testedSuffix ? `- This is a TESTED item - append the following at 
     const confirmedProgrammingNote = document.getElementById('programmingNote').value.trim();
     const programmingNoteFieldVisible = document.getElementById('programmingNoteField').style.display !== 'none';
     const confirmedDoesNotFit = document.getElementById('doesNotFit').value.trim();
-    const confirmedPartNumberWarning = document.getElementById('partNumberWarning').value.trim();
 
     const prompt = `You are an eBay listing writer for Dynatrack Racing, a used OEM auto parts dismantler in North Carolina. They offer 30-day hassle-free returns. All parts are sourced from North American vehicles and sold to North American buyers.
 
@@ -1263,12 +1256,6 @@ ${strategy.fitmentFields}
 ${confirmedDoesNotFit
   ? `CONFIRMED EXCLUSION - include this line exactly: "• Does NOT fit: ${confirmedDoesNotFit}"`
   : 'No confirmed exclusions - omit the Does NOT fit line entirely. Do not guess or invent exclusions.'
-}
-
-═══ PART NUMBER WARNING ═══
-${confirmedPartNumberWarning
-  ? `INCLUDE THIS LINE after the Does NOT fit line (or after Fits if no exclusions): "• ⚠ IMPORTANT: ${confirmedPartNumberWarning}"`
-  : 'No part number warning needed - omit entirely.'
 }
 
 ═══ PROGRAMMING NOTE ═══
@@ -1519,7 +1506,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
     statusEl.innerHTML = '<span style="color:var(--text-muted);">Fetching listing data...</span>';
 
     try {
-      const res = await fetch(`/api/listing-tool/ebay-lookup?url=${encodeURIComponent(url)}`);
+      const res = await fetch(`${DARKHAWK_API}/api/listing-tool/ebay-lookup?url=${encodeURIComponent(url)}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Lookup failed');
       const r = json.data;
@@ -1588,8 +1575,6 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
     document.getElementById('notes').value = '';
     document.getElementById('condition').selectedIndex = 0;
     document.getElementById('saleType').selectedIndex = 0;
-    document.getElementById('partNumberWarningField').style.display = 'none';
-    document.getElementById('partNumberWarning').value = '';
     document.getElementById('testedSpeed').value = '';
     document.getElementById('testedMileage').value = '';
     document.getElementById('testedNotes').value = '';
@@ -1607,7 +1592,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
 
   // ── Programming DB ─────────────────────────────────────────
   let programmingDB = null;
-  fetch('/admin/programming_db.json')
+  fetch(`${DARKHAWK_API}/admin/programming_db.json`)
     .then(r => r.json())
     .then(data => { programmingDB = data.rules || data; console.log('Programming DB loaded:', Object.keys(programmingDB).length, 'entries'); })
     .catch(() => { console.log('Programming DB not available'); });
@@ -1623,7 +1608,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
       if (model) params.set('model', model);
       if (engine) params.set('engine', engine);
       if (partType) params.set('partType', partType);
-      const res = await fetch('/api/listing-tool/intelligence?' + params.toString(), { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`${DARKHAWK_API}/api/listing-tool/intelligence?` + params.toString(), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) return null;
       const data = await res.json();
       if (!data.success) return null;
@@ -1655,18 +1640,20 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
       const progField = document.getElementById('programmingNoteField');
       const progInput = document.getElementById('programmingNote');
       const progSource = document.getElementById('programmingNoteSource');
-      if (p.programmingRequired === 'YES' && p.notes) {
+      if (p.programmingRequired === 'YES') {
         progField.style.display = 'block';
-        progInput.value = p.notes;
-        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk programming database</span>';
+        progInput.value = 'Requires VIN-specific programming. Professional installation recommended.';
+        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">FROM DATABASE</span>'
+          + (p.notes ? '<br><span style="font-size:11px; color:#6B7280;">Tech note: ' + p.notes + '</span>' : '');
       } else if (p.programmingRequired === 'NO') {
         progField.style.display = 'block';
         progInput.value = 'Direct replacement - no programming required.';
-        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk programming database</span>';
+        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">FROM DATABASE</span>';
       } else if (p.programmingRequired === 'VERIFY') {
         progField.style.display = 'block';
-        progInput.value = p.notes || '';
-        progSource.innerHTML = '<span style="color:#b45309; font-weight:500;">VERIFY - DB says verify for this year/make/module</span>';
+        progInput.value = 'May require programming. Verify with your installer before purchase.';
+        progSource.innerHTML = '<span style="color:#b45309; font-weight:500;">VERIFY</span>'
+          + (p.notes ? '<br><span style="font-size:11px; color:#6B7280;">Tech note: ' + p.notes + '</span>' : '');
       }
     } else { progEl.style.display = 'none'; }
 
@@ -1728,7 +1715,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
   async function checkDarkHawkFitment(partNumber) {
     if (!partNumber || partNumber.length < 5) return;
     try {
-      const res = await fetch(`/api/listing-tool/parts-lookup?partNumber=${encodeURIComponent(partNumber)}`);
+      const res = await fetch(`${DARKHAWK_API}/api/listing-tool/parts-lookup?partNumber=${encodeURIComponent(partNumber)}`);
       const json = await res.json();
       if (!json.success || !json.data) return;
 
@@ -1775,7 +1762,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
     if (!make) return;
 
     try {
-      await fetch('/api/listing-tool/save-fitment', {
+      await fetch(`${DARKHAWK_API}/api/listing-tool/save-fitment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1794,7 +1781,7 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
 
     // Also save via intelligence endpoint for richer data
     try {
-      await fetch('/api/listing-tool/save-listing-intel', {
+      await fetch(`${DARKHAWK_API}/api/listing-tool/save-listing-intel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
