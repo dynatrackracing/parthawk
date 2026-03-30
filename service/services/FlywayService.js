@@ -2,6 +2,7 @@
 
 const { database } = require('../database/database');
 const AttackListService = require('./AttackListService');
+const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('./MarketPricingService');
 
 class FlywayService {
 
@@ -165,6 +166,32 @@ class FlywayService {
         const result = attackService.scoreVehicle(
           vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex
         );
+
+        // Market enrichment: same pipeline as Daily Feed on-demand parts
+        const vYear = parseInt(vehicle.year) || 0;
+        for (const p of (result.parts || [])) {
+          try {
+            const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
+            const sq = buildMktQuery({
+              title: p.title || '',
+              make: result.make || vehicle.make,
+              model: result.model || vehicle.model,
+              year: vYear,
+              partType: p.partType,
+            });
+            const cached = await getCachedPrice(sq.cacheKey);
+            if (cached) {
+              p.marketMedian = cached.median;
+              p.marketCount = cached.count;
+              p.marketVelocity = cached.velocity;
+              p.marketCheckedAt = cached.checkedAt;
+              // Use market median as display price when we lack our own sales
+              if (!hasOurSales && cached.median > 0) {
+                p.price = cached.median;
+              }
+            }
+          } catch (e) { /* market enrichment optional */ }
+        }
 
         // Flyway part filtering: exclude OTHER parts without proven sales
         const qualifiedParts = (result.parts || []).filter(p => {
