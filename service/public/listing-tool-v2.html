@@ -1561,12 +1561,13 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
       .trim();
   }
 
-    function clearOutput() {
+  function clearOutput() {
+    // Output card
     document.getElementById('outputCard').classList.remove('visible');
     document.getElementById('titleText').textContent = '';
     document.getElementById('titleCharCount').textContent = '';
-    document.getElementById('ebayRefRow').style.display = 'none';
-    document.getElementById('ebayRefUrl').value = '';
+
+    // Input fields
     document.getElementById('partNum').value = '';
     document.getElementById('partName').value = '';
     document.getElementById('donorYear').value = '';
@@ -1575,12 +1576,45 @@ ${isChrysler ? chryslerTemplate : standardTemplate}`;
     document.getElementById('notes').value = '';
     document.getElementById('condition').selectedIndex = 0;
     document.getElementById('saleType').selectedIndex = 0;
+
+    // Tested fields
     document.getElementById('testedSpeed').value = '';
     document.getElementById('testedMileage').value = '';
     document.getElementById('testedNotes').value = '';
     document.getElementById('testedFields').style.display = 'none';
     document.getElementById('testedNote').style.display = 'none';
+
+    // Does NOT fit
+    document.getElementById('doesNotFit').value = '';
+    document.getElementById('doesNotFitField').style.display = 'none';
+
+    // Programming note
+    document.getElementById('programmingNote').value = '';
+    document.getElementById('programmingNoteField').style.display = 'none';
+    document.getElementById('programmingNoteSource').innerHTML = '';
+
+    // DarkHawk Intelligence panel
+    document.getElementById('intelPanel').style.display = 'none';
+    document.getElementById('intelProgramming').style.display = 'none';
+    document.getElementById('intelTrimTier').style.display = 'none';
+    document.getElementById('intelFitment').style.display = 'none';
+    document.getElementById('intelSales').style.display = 'none';
+    lastIntelligence = null;
+
+    // eBay reference row
+    document.getElementById('ebayRefRow').style.display = 'none';
+    document.getElementById('ebayRefUrl').value = '';
+
+    // Status and lookup
     document.getElementById('status').textContent = '';
+    document.getElementById('lookupStatus').innerHTML = '';
+
+    // Sale type UI reset
+    document.getElementById('chryslerNote').style.display = 'none';
+    document.getElementById('comboNote').style.display = 'none';
+    document.getElementById('hondaNote').style.display = 'none';
+
+    // Focus back to part number
     document.getElementById('partNum').focus();
   }
 

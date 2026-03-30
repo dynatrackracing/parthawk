@@ -62,7 +62,19 @@ class ListingIntelligenceService {
   async lookupProgramming(make, year, partType, trim) {
     if (!make || !year) return null;
 
-    const brandGroup = BRAND_MAP[(make || '').toLowerCase().trim()];
+    const makeLower = (make || '').toLowerCase().trim();
+
+    // Try direct match first
+    let brandGroup = BRAND_MAP[makeLower];
+
+    // If no match, try splitting on / (handles "BMW/MINI", "Chrysler/Dodge", etc.)
+    if (!brandGroup && makeLower.includes('/')) {
+      for (const part of makeLower.split('/')) {
+        brandGroup = BRAND_MAP[part.trim()];
+        if (brandGroup) break;
+      }
+    }
+
     if (!brandGroup) return null;
 
     let moduleType = MODULE_MAP[(partType || '').toLowerCase().trim()];
