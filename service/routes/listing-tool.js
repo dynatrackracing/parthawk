@@ -7,6 +7,8 @@ const { database } = require('../database/database');
 const { normalizePartNumber } = require('../lib/partNumberUtils');
 const { v4: uuidv4 } = require('uuid');
 
+const ListingIntelligenceService = require('../services/ListingIntelligenceService');
+
 const EBAY_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml',
@@ -270,6 +272,76 @@ router.post('/save-fitment', async (req, res) => {
     }
 
     res.json({ success: true, message: 'Fitment saved' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/listing-tool/intelligence?partNumber=56040440AC&year=2006&make=Dodge&model=Ram+1500&engine=5.7L+V8&partType=ecu
+ * Aggregated intelligence from all DB sources for the listing tool.
+ */
+router.get('/intelligence', async (req, res) => {
+  const { partNumber, year, make, model, engine, trim, partType } = req.query;
+  if (!partNumber) return res.status(400).json({ success: false, error: 'partNumber required' });
+
+  try {
+    const service = new ListingIntelligenceService();
+    const result = await service.getIntelligence({ partNumber, year, make, model, engine, trim, partType });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/listing-tool/save-listing-intel
+ * Persist new fitment/programming data discovered during listing generation.
+ */
+router.post('/save-listing-intel', async (req, res) => {
+  const {
+    partNumber, partName, partType, year, yearRange,
+    make, model, engine, trim, drivetrain,
+    doesNotFit, programmingRequired, programmingNote,
+  } = req.body;
+
+  if (!partNumber) return res.status(400).json({ success: false, error: 'partNumber required' });
+
+  const pnExact = partNumber.trim().toUpperCase();
+  const pnBase = normalizePartNumber(pnExact);
+
+  try {
+    await database.raw(`
+      INSERT INTO part_fitment_cache (
+        part_number_exact, part_number_base, part_name, part_type,
+        year, year_range, make, model, engine, trim, drivetrain,
+        does_not_fit, programming_required, programming_note,
+        source, confirmed_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listing_tool', NOW(), NOW())
+      ON CONFLICT (part_number_base) DO UPDATE SET
+        part_number_exact = EXCLUDED.part_number_exact,
+        part_name = COALESCE(EXCLUDED.part_name, part_fitment_cache.part_name),
+        part_type = COALESCE(EXCLUDED.part_type, part_fitment_cache.part_type),
+        year = COALESCE(EXCLUDED.year, part_fitment_cache.year),
+        year_range = COALESCE(EXCLUDED.year_range, part_fitment_cache.year_range),
+        make = COALESCE(EXCLUDED.make, part_fitment_cache.make),
+        model = COALESCE(EXCLUDED.model, part_fitment_cache.model),
+        engine = COALESCE(EXCLUDED.engine, part_fitment_cache.engine),
+        trim = COALESCE(EXCLUDED.trim, part_fitment_cache.trim),
+        drivetrain = COALESCE(EXCLUDED.drivetrain, part_fitment_cache.drivetrain),
+        does_not_fit = COALESCE(EXCLUDED.does_not_fit, part_fitment_cache.does_not_fit),
+        programming_required = COALESCE(EXCLUDED.programming_required, part_fitment_cache.programming_required),
+        programming_note = COALESCE(EXCLUDED.programming_note, part_fitment_cache.programming_note),
+        source = 'listing_tool',
+        confirmed_at = NOW()
+    `, [
+      pnExact, pnBase, partName || null, partType || null,
+      year ? parseInt(year) : null, yearRange || null,
+      make || null, model || null, engine || null, trim || null, drivetrain || null,
+      doesNotFit || null, programmingRequired || null, programmingNote || null,
+    ]);
+
+    res.json({ success: true, message: 'Intelligence saved' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

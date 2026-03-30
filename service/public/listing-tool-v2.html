@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynatrack Racing - Listing Generator v2</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #B91C1C;
+    --red-dark: #7F1D1D;
+    --red-light: #FEE2E2;
+    --red-mid: #DC2626;
+    --bg: #F9FAFB;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+    --border-strong: #D1D5DB;
+    --text: #111827;
+    --text-mid: #374151;
+    --text-muted: #6B7280;
+    --text-faint: #9CA3AF;
+    --green: #15803D;
+    --green-light: #DCFCE7;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    background: var(--red-dark);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-icon svg { width: 18px; height: 18px; fill: white; }
+
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 1px;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 1rem;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .field-row.two { grid-template-columns: 1fr 1fr; }
+  .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field-row.solo { grid-template-columns: 1fr; }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mid);
+    margin-bottom: 5px;
+  }
+
+  .field label .req {
+    color: var(--red-mid);
+    margin-left: 2px;
+  }
+
+  input[type="text"], select {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  input[type="text"]:focus, select:focus {
+    border-color: var(--red-mid);
+    box-shadow: 0 0 0 3px rgba(220,38,38,0.12);
+  }
+
+  input::placeholder { color: var(--text-faint); }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.25rem 0;
+  }
+
+  .generate-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--red-dark);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    letter-spacing: 0.01em;
+  }
+
+  .generate-btn:hover { background: var(--red-mid); }
+  .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; background: var(--red-dark); }
+
+  .thinking {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .thinking.visible { display: flex; }
+
+  .dots { display: flex; gap: 4px; }
+  .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+
+  .output-card { display: none; }
+  .output-card.visible { display: block; }
+
+  .output-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 10px;
+  }
+
+  .output-text {
+    background: #F9FAFB;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: inherit;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .action-btn:hover { background: var(--bg); }
+
+  .action-btn.copied {
+    background: var(--green-light);
+    border-color: #86EFAC;
+    color: var(--green);
+  }
+
+  .status {
+    font-size: 13px;
+    color: var(--red-mid);
+    margin-top: 8px;
+    min-height: 18px;
+  }
+
+  .api-section {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .api-section h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #92400E;
+    margin-bottom: 6px;
+  }
+
+  .api-section p {
+    font-size: 13px;
+    color: #78350F;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  .api-section input {
+    border-color: #FCD34D;
+  }
+
+  .api-section input:focus {
+    border-color: #F59E0B;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+  }
+
+  .api-key-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .api-key-row input { flex: 1; }
+
+  .save-btn {
+    padding: 8px 14px;
+    background: #92400E;
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .save-btn:hover { background: #78350F; }
+
+  .key-saved {
+    display: none;
+    font-size: 12px;
+    color: var(--green);
+    margin-top: 6px;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .key-saved.visible { display: flex; }
+
+  .info-box {
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #1E40AF;
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+
+  footer {
+    text-align: center;
+    padding: 2rem;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 500px) {
+    .field-row.three { grid-template-columns: 1fr 1fr; }
+    .container { padding: 1.25rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-icon">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Dynatrack Racing</h1>
+    <p>eBay Listing Description Generator</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="api-section" id="apiSection">
+    <h3>One-time setup - Anthropic API key</h3>
+    <p>This tool uses Claude AI to generate descriptions. Enter your Anthropic API key below. It's saved in your browser only and never sent anywhere except Anthropic's servers.</p>
+    <div class="api-key-row">
+      <input type="text" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" />
+      <button class="save-btn" onclick="saveKey()">Save key</button>
+    </div>
+    <div class="key-saved" id="keySaved">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#15803D"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+      API key saved
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Part information</div>
+    <div class="field-row two">
+      <div class="field">
+        <label>OEM part number <span class="req">*</span></label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="partNum" placeholder="e.g. 22030-65010" style="flex:1;" onblur="checkDarkHawkFitment(this.value)" />
+          <button id="lookupBtn" onclick="lookupPartNumber()" title="Look up fitment by part number" style="white-space:nowrap; padding:8px 14px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); border:none; background:var(--gold); color:#1a1a1a; cursor:pointer; transition:opacity 0.12s; flex-shrink:0;">
+            🔍 Look up
+          </button>
+        </div>
+        <div id="lookupStatus" style="font-size:11px; color:var(--text-muted); margin-top:5px; min-height:16px;"></div>
+        <div id="ebayRefRow" style="display:none; margin-top:8px; display:none;">
+          <div style="font-size:11px; color:#b45309; font-weight:500; margin-bottom:4px;">⚠ Lookup couldn't confirm fitment - paste a reference eBay listing URL to extract details:</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="ebayRefUrl" placeholder="https://www.ebay.com/itm/..." style="flex:1; font-size:12px;" />
+            <button onclick="lookupFromEbay()" style="white-space:nowrap; padding:8px 12px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); border:none; background:#1a5276; color:#fff; cursor:pointer; flex-shrink:0;">Use listing</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Part name <span style="font-weight:400;color:var(--text-faint)">(auto-filled or enter manually)</span></label>
+        <input type="text" id="partName" placeholder="e.g. Throttle Body" />
+      </div>
+    </div>
+    <div class="field-row three">
+      <div class="field">
+        <label>Donor year</label>
+        <input type="text" id="donorYear" placeholder="e.g. 1993" maxlength="4" />
+      </div>
+      <div class="field">
+        <label>Donor make / model</label>
+        <input type="text" id="donorVehicle" placeholder="e.g. Toyota 4Runner" />
+      </div>
+      <div class="field">
+        <label>Engine</label>
+        <input type="text" id="donorEngine" placeholder="e.g. 3.0L V6" />
+      </div>
+    </div>
+
+    <div class="field" id="doesNotFitField" style="margin-top:12px; display:none;">
+      <label style="color:#b91c1c; font-weight:600;">⚠ Does NOT fit <span style="font-weight:400; color:var(--text-faint)">(auto-filled by Look up - edit or clear if needed)</span></label>
+      <input type="text" id="doesNotFit" placeholder="e.g. 2WD models, manual transmission" style="border-color:#fca5a5;" />
+      <div style="font-size:11px; color:#b91c1c; margin-top:4px;">This will appear in the listing. Clear the field to omit it.</div>
+    </div>
+
+    <div class="field" id="partNumberWarningField" style="margin-top:12px; display:none;">
+      <label style="color:#b45309; font-weight:600;">⚠ Part Number Match Required <span style="font-weight:400; color:var(--text-faint)">(auto-filled - edit if needed)</span></label>
+      <input type="text" id="partNumberWarning" placeholder="" style="border-color:#fcd34d;" />
+      <div style="font-size:11px; color:#b45309; margin-top:4px;" id="partNumberWarningSource"></div>
+    </div>
+
+    <hr class="divider">
+    <div class="card-title">Sale type &amp; programming</div>
+
+    <div class="field-row solo" style="margin-bottom:10px;">
+      <div class="field">
+        <label>What is being sold?</label>
+        <select id="saleType" onchange="updateSaleUI()">
+          <option value="part">Part only - standard listing</option>
+          <option value="chrysler_programmed">Chrysler / Jeep / Dodge - programmed by Dynatrack (JTEC / NGC / GPEC)</option>
+          <option value="combo_ign">ECU Combo - ECU + Ignition Switch (plug and play set)</option>
+          <option value="combo_ign_bcm">ECU Combo - ECU + Ignition Switch + BCM (full plug and play set)</option>
+          <option value="honda_key">Honda ECU + Immobilizer + Key blank (plug and play)</option>
+          <option value="needs_programming">Computer - requires buyer programming (not serviced by Dynatrack)</option>
+          <option value="tested">Tested item - include test results in listing and title</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="chryslerNote" class="info-box" style="display:none;">
+      <strong>Chrysler programmed unit.</strong> The AI will note this is programmed by Dynatrack and plug and play for the listed vehicle. Confirm the donor year/make/model/engine above matches the programmed VIN.
+    </div>
+
+    <div id="comboNote" class="info-box" style="display:none;">
+      <strong>Combo set.</strong> The AI will list all included components and explain that the set must be installed together for plug and play operation.
+    </div>
+
+    <div id="hondaNote" class="info-box" style="display:none;">
+      <strong>Honda plug and play set.</strong> The AI will explain the immobilizer/key blank setup and that the key must be cut to the buyer's vehicle.
+    </div>
+
+    <div id="testedNote" class="info-box" style="display:none;">
+      <strong>Tested item.</strong> Test results will be included in the listing description and title automatically.
+    </div>
+    <div id="testedFields" style="display:none; margin-top:10px;">
+      <div class="field-row two">
+        <div class="field">
+          <label>Tested speed (MPH) <span style="font-weight:400;color:var(--text-faint)">(clusters)</span></label>
+          <input type="text" id="testedSpeed" placeholder="e.g. 120" />
+        </div>
+        <div class="field">
+          <label>Mileage at test <span style="font-weight:400;color:var(--text-faint)">(e.g. 105K)</span></label>
+          <input type="text" id="testedMileage" placeholder="e.g. 105K" />
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <label>Test notes <span style="font-weight:400;color:var(--text-faint)">(optional - e.g. all gauges functional, no warning lights)</span></label>
+        <input type="text" id="testedNotes" placeholder="e.g. All gauges functional, no warning lights" />
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="card-title">Condition</div>
+
+    <div class="field-row two">
+      <div class="field">
+        <label>Visual condition</label>
+        <select id="condition">
+          <option value="good">Good - no visible damage</option>
+          <option value="minor">Minor cosmetic wear</option>
+          <option value="damage">Damage noted</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Damage / notes <span style="font-weight:400;color:var(--text-faint)">(if any)</span></label>
+        <input type="text" id="notes" placeholder="e.g. cracked bracket" />
+      </div>
+    </div>
+
+    <div class="field" id="programmingNoteField" style="margin-top:12px; display:none;">
+      <label>Programming note <span style="font-weight:400;color:var(--text-faint)">(auto-filled by Look up - edit if needed)</span></label>
+      <input type="text" id="programmingNote" placeholder="e.g. Direct replacement - no programming required." />
+      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;" id="programmingNoteSource"></div>
+    </div>
+
+    <!-- DarkHawk Intelligence Panel -->
+    <div id="intelPanel" style="display:none; margin-top:16px; padding:14px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px;">
+      <div style="font-size:11px; font-weight:600; color:#15803D; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:8px;">DarkHawk Intelligence</div>
+      <div id="intelProgramming" style="display:none; margin-bottom:6px; font-size:13px;"></div>
+      <div id="intelTrimTier" style="display:none; margin-bottom:6px; font-size:13px;"></div>
+      <div id="intelFitment" style="display:none; margin-bottom:6px; font-size:13px;"></div>
+      <div id="intelSales" style="display:none; font-size:12px; color:#374151;"></div>
+    </div>
+
+    <button class="generate-btn" id="generateBtn" onclick="generate()">Generate listing description</button>
+
+    <div class="thinking" id="thinking">
+      <div class="dots">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <span id="thinkingText">Researching part number...</span>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card output-card" id="outputCard">
+    <div id="verifyBanner" style="display:none; align-items:flex-start; gap:10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; padding:10px 12px; margin-bottom:12px;">
+      <span style="font-size:16px; line-height:1;">⚠️</span>
+      <div>
+        <div style="font-size:13px; font-weight:600; color:#991B1B; margin-bottom:2px;">Fields require verification before publishing</div>
+        <div style="font-size:12px; color:#B91C1C;">Lines marked in red could not be confirmed across multiple sources. Research those fields before this listing goes live.</div>
+      </div>
+    </div>
+    <div class="output-label">eBay listing title - copy and paste into the title field</div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px;">
+      <div id="titleText" style="flex:1; font-size:15px; font-weight:600; background:var(--bg); border:1.5px solid var(--border); border-radius:6px; padding:10px 12px; min-height:2.4em; line-height:1.4; word-break:break-word;"></div>
+      <button class="action-btn" id="copyTitleBtn" onclick="copyTitle()" style="white-space:nowrap; flex-shrink:0;">Copy title</button>
+    </div>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:-12px; margin-bottom:16px;" id="titleCharCount"></div>
+    <div class="output-label">Generated description - review, then copy and paste into eBay</div>
+    <div class="output-text" id="outputText"></div>
+    <div class="action-row">
+      <button class="action-btn" id="copyBtn" onclick="copyText()">Copy description</button>
+      <button class="action-btn" onclick="clearOutput()">Clear and start over</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>Dynatrack Racing internal tool &nbsp;·&nbsp; Powered by Claude AI</footer>
+
+<script>
+  const API_KEY_STORAGE = 'dt_anthropic_key';
+
+  const PROGRAMMED_SALE_TYPES = ['chrysler_programmed', 'combo_ign', 'combo_ign_bcm', 'honda_key'];
+
+  function updateSaleUI() {
+    const val = document.getElementById('saleType').value;
+    document.getElementById('chryslerNote').style.display = val === 'chrysler_programmed' ? 'block' : 'none';
+    document.getElementById('comboNote').style.display = (val === 'combo_ign' || val === 'combo_ign_bcm') ? 'block' : 'none';
+    document.getElementById('hondaNote').style.display = val === 'honda_key' ? 'block' : 'none';
+    document.getElementById('testedNote').style.display = val === 'tested' ? 'block' : 'none';
+    document.getElementById('testedFields').style.display = val === 'tested' ? 'block' : 'none';
+
+    // Hide programming note for pre-programmed sale types - DynaTrack provides programming
+    if (PROGRAMMED_SALE_TYPES.includes(val)) {
+      document.getElementById('programmingNoteField').style.display = 'none';
+      document.getElementById('programmingNote').value = '';
+    }
+  }
+
+  // ── OEM Catalog lookup ───────────────────────────────────────────
+  const catalogs = [
+    {
+      name: 'Mopar (Chrysler/Jeep/Dodge/Ram)',
+      color: '#7F1D1D',
+      detect: p => /^(04|05|0[0-9][0-9][0-9][0-9][0-9][0-9][0-9])/i.test(p) || /^[0-9]{8}[A-Z]{2}$/i.test(p),
+      url: p => `https://store.mopar.com/search#q=${encodeURIComponent(p)}&t=All`,
+      hint: 'Mopar eStore - official Chrysler/Jeep/Dodge/Ram catalog'
+    },
+    {
+      name: 'Toyota / Lexus',
+      color: '#1E3A5F',
+      detect: p => /^\d{5}-\d{5}$/i.test(p) || /^\d{8}$/i.test(p) && /^9/.test(p),
+      url: p => `https://parts.toyota.com/search?q=${encodeURIComponent(p)}`,
+      hint: 'Toyota Parts - official OEM catalog'
+    },
+    {
+      name: 'Ford / Lincoln / Motorcraft',
+      color: '#003087',
+      detect: p => /^[A-Z]{1,3}[0-9]{1,2}[A-Z]-/i.test(p) || /^[0-9][A-Z][0-9]{1,2}[A-Z]-/i.test(p) || /^[A-Z]{2}[0-9]{2}-/i.test(p),
+      url: p => `https://www.fordparts.com/en/search?searchterm=${encodeURIComponent(p)}`,
+      hint: 'Ford Parts - official OEM catalog'
+    },
+    {
+      name: 'GM / Chevy / GMC / Buick / Cadillac',
+      color: '#003087',
+      detect: p => /^\d{8}$/.test(p) && !/^9/.test(p) || /^\d{5}[A-Z]{2}$/.test(p),
+      url: p => `https://www.gmpartsdirect.com/search?q=${encodeURIComponent(p)}`,
+      hint: 'GM Parts Direct - official GM catalog'
+    },
+    {
+      name: 'Honda / Acura',
+      color: '#CC0000',
+      detect: p => /^\d{5}-[A-Z0-9]{3,5}-[A-Z0-9]{2,4}$/i.test(p),
+      url: p => `https://parts.honda.com/#/parts/search?q=${encodeURIComponent(p)}`,
+      hint: 'Honda Parts - official OEM catalog'
+    },
+    {
+      name: 'Nissan / Infiniti',
+      color: '#C3002F',
+      detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) || /^[A-Z]{2}\d{3}-[A-Z0-9]{5}$/i.test(p),
+      url: p => `https://www.nissanparts.cc/search?keywords=${encodeURIComponent(p)}`,
+      hint: 'Nissan Parts - OEM catalog'
+    },
+    {
+      name: 'BMW',
+      color: '#1C69D4',
+      detect: p => /^\d{2}\s?\d{2}\s?\d{1,2}\s?\d{3}\s?\d{3}$/i.test(p.replace(/[-\s]/g,'')),
+      url: p => `https://www.realoem.com/bmw/enUS/showparts?q=${encodeURIComponent(p)}`,
+      hint: 'RealOEM - BMW parts catalog'
+    },
+    {
+      name: 'Mercedes-Benz',
+      color: '#222222',
+      detect: p => /^[A-Z]\s?\d{3}\s?\d{3}\s?\d{2,3}\s?\d{2,3}$/i.test(p.replace(/[-\s]/g,'')),
+      url: p => `https://www.mbusa.com/en/owner/parts?partNumber=${encodeURIComponent(p)}`,
+      hint: 'Mercedes-Benz - OEM parts'
+    },
+    {
+      name: 'Subaru',
+      color: '#003087',
+      detect: p => /^\d{5}[A-Z]{2}\d{3}$/i.test(p) || /^\d{4}[A-Z]\d{4}$/i.test(p),
+      url: p => `https://parts.subaru.com/search?q=${encodeURIComponent(p)}`,
+      hint: 'Subaru Parts - official OEM catalog'
+    },
+    {
+      name: 'Hyundai',
+      color: '#002C5F',
+      detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) && /^[^9]/.test(p),
+      url: p => `https://www.hyundaipartsdeal.com/genuine/hyundai-${p.toLowerCase()}.html`,
+      hint: 'Hyundai Parts Deal - OEM catalog'
+    },
+    {
+      name: 'Kia',
+      color: '#BB162B',
+      detect: p => /^\d{5}-[A-Z0-9]{5}$/i.test(p) && /^[9]/.test(p),
+      url: p => `https://www.kiapartsnow.com/genuine/kia-${p.toLowerCase()}.html`,
+      hint: 'Kia Parts Now - OEM catalog'
+    }
+  ];
+
+  // Fallback: RockAuto search works for almost everything
+  const rockAutoUrl = p => `https://www.rockauto.com/en/partsearch/?romsite=1&q=${encodeURIComponent(p)}`;
+
+  function detectCatalog(partNum) {
+    const p = (partNum || '').trim();
+    if (!p) return null;
+    // Also check donor vehicle for make hints
+    const donor = (document.getElementById('donorVehicle')?.value || '').toLowerCase();
+    if (donor.includes('jeep') || donor.includes('dodge') || donor.includes('chrysler') || donor.includes('ram')) {
+      return catalogs[0]; // Mopar
+    }
+    if (donor.includes('toyota') || donor.includes('lexus') || donor.includes('4runner') || donor.includes('tacoma') || donor.includes('tundra')) {
+      return catalogs[1]; // Toyota
+    }
+    if (donor.includes('ford') || donor.includes('lincoln') || donor.includes('mustang') || donor.includes('f-150') || donor.includes('f150') || donor.includes('explorer')) {
+      return catalogs[2]; // Ford
+    }
+    if (donor.includes('chevy') || donor.includes('chevrolet') || donor.includes('gmc') || donor.includes('buick') || donor.includes('cadillac') || donor.includes('silverado')) {
+      return catalogs[3]; // GM
+    }
+    if (donor.includes('honda') || donor.includes('acura')) return catalogs[4];
+    if (donor.includes('nissan') || donor.includes('infiniti')) return catalogs[5];
+    if (donor.includes('bmw')) return catalogs[6];
+    if (donor.includes('mercedes') || donor.includes('benz')) return catalogs[7];
+    if (donor.includes('subaru')) return catalogs[8];
+    if (donor.includes('hyundai')) return catalogs[9];
+    if (donor.includes('kia')) return catalogs[10];
+    // Fall back to part number pattern detection
+    for (const cat of catalogs) {
+      if (cat.detect(p)) return cat;
+    }
+    return null; // Will use RockAuto
+  }
+
+  async function lookupPartNumber() {
+    const partNum = document.getElementById('partNum').value.trim();
+    const apiKey = localStorage.getItem('dt_anthropic_key') || document.getElementById('apiKeyInput').value.trim();
+    const statusEl = document.getElementById('lookupStatus');
+    const btn = document.getElementById('lookupBtn');
+
+    if (!partNum) {
+      statusEl.innerHTML = '<span style="color:#b91c1c;">Enter a part number first.</span>';
+      return;
+    }
+    if (!apiKey) {
+      statusEl.innerHTML = '<span style="color:#b91c1c;">Save your API key first.</span>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Looking up...';
+    statusEl.innerHTML = '<span style="color:var(--text-muted);">Checking DarkHawk fitment database...</span>';
+
+    // ── STEP 0: Check DarkHawk fitment intelligence (free, instant) ───
+    try {
+      const fitmentUrl = `/api/fitment/lookup?partNumber=${encodeURIComponent(partNum)}`;
+      const fitmentRes = await fetch(fitmentUrl, { signal: AbortSignal.timeout(5000) });
+      if (fitmentRes.ok) {
+        const fitment = await fitmentRes.json();
+        if (fitment && fitment.confidence && fitment.confidence !== 'none') {
+          // Auto-populate doesNotFit from DarkHawk
+          const doesNotFitField = document.getElementById('doesNotFitField');
+          const doesNotFitInput = document.getElementById('doesNotFit');
+          if (fitment.negationText) {
+            doesNotFitField.style.display = 'block';
+            doesNotFitInput.value = fitment.negationText;
+          }
+          // Auto-populate part number warning
+          const pnWarnField = document.getElementById('partNumberWarningField');
+          const pnWarnInput = document.getElementById('partNumberWarning');
+          const pnWarnSource = document.getElementById('partNumberWarningSource');
+          if (fitment.partNumberWarning) {
+            pnWarnField.style.display = 'block';
+            pnWarnInput.value = fitment.partNumberWarning;
+            pnWarnSource.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ From DarkHawk fitment intelligence</span>';
+          } else {
+            pnWarnField.style.display = 'none';
+            pnWarnInput.value = '';
+          }
+          // If high confidence, populate vehicle fields too and skip Claude
+          if (fitment.confidence === 'high' && fitment.fits) {
+            const engines = fitment.fits.engines || [];
+            const trims = fitment.fits.trims || [];
+            if (engines.length) document.getElementById('donorEngine').value = engines.join(', ');
+            statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fitment loaded from DarkHawk - high confidence</span>';
+            btn.disabled = false;
+            btn.textContent = '🔍 Look up';
+            return; // Skip Claude web search entirely
+          }
+          // Medium confidence - continue to Claude for full lookup but keep DarkHawk data
+          statusEl.innerHTML = '<span style="color:var(--text-muted);">DarkHawk data found - verifying with web search...</span>';
+        }
+      }
+    } catch (e) {
+      // DarkHawk unavailable - fall through silently to Claude web search
+    }
+
+    // ── STEP 0.5: DarkHawk Intelligence (programming + trim + sales) ───
+    statusEl.innerHTML = '<span style="color:var(--text-muted);">Checking DarkHawk intelligence...</span>';
+    try {
+      const donorVehicle = document.getElementById('donorVehicle').value.trim();
+      const donorParts = donorVehicle.split(/\s+/);
+      const intelMake = donorParts[0] || '';
+      const intelModel = donorParts.slice(1).join(' ') || '';
+      const intelYear = document.getElementById('donorYear').value.trim();
+      const intelEngine = document.getElementById('donorEngine').value.trim();
+      const intel = await fetchIntelligence(partNum, intelYear, intelMake, intelModel, intelEngine, null);
+      if (intel) {
+        renderIntelPanel(intel);
+        // Auto-populate fitment from intelligence if fields are empty
+        if (intel.fitment) {
+          const f = intel.fitment;
+          if (f.year && !document.getElementById('donorYear').value) document.getElementById('donorYear').value = f.year;
+          if (f.make && !document.getElementById('donorVehicle').value) {
+            document.getElementById('donorVehicle').value = [f.make, f.model].filter(Boolean).join(' ');
+          }
+          if (f.engine && !document.getElementById('donorEngine').value) document.getElementById('donorEngine').value = f.engine;
+          if (f.partName && !document.getElementById('partName').value) document.getElementById('partName').value = f.partName;
+          if (f.doesNotFit) {
+            document.getElementById('doesNotFit').value = f.doesNotFit;
+            document.getElementById('doesNotFitField').style.display = 'block';
+          }
+        }
+      }
+    } catch (e) { /* intelligence unavailable */ }
+
+    statusEl.innerHTML = '<span style="color:var(--text-muted);">Identifying part...</span>';
+
+    // Helper: run one agentic search loop, return parsed JSON or null
+    async function runAgentic(userMsg, headers, statusText) {
+      statusEl.innerHTML = `<span style="color:var(--text-muted);">${statusText}</span>`;
+      let messages = [userMsg];
+      let fullText = '';
+
+      const deadline = Date.now() + 18000; // 18 second hard timeout per step
+      for (let i = 0; i < 1; i++) { // single search only - keeps token usage low
+        if (Date.now() > deadline) break;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), deadline - Date.now());
+        let res, data;
+        try {
+          res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 400,
+              tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+              messages
+            })
+          });
+          data = await res.json();
+        } catch (fetchErr) {
+          break; // timeout or network - exit loop with whatever we have
+        } finally {
+          clearTimeout(timer);
+        }
+        if (data.error) throw new Error(data.error.message);
+
+        const texts = data.content.filter(b => b.type === 'text').map(b => b.text);
+        if (texts.length) fullText += texts.join('');
+        if (data.stop_reason !== 'tool_use') break;
+
+        const toolResults = data.content
+          .filter(b => b.type === 'tool_use')
+          .map(b => ({ type: 'tool_result', tool_use_id: b.id, content: b.input ? JSON.stringify(b.input) : 'done' }));
+        messages = [...messages, { role: 'assistant', content: data.content }, { role: 'user', content: toolResults }];
+      }
+
+      // If no text yet, force a final no-tools call
+      if (!fullText.trim()) {
+        const finalRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 500,
+            messages: [...messages, { role: 'user', content: 'Return the JSON now based on your search results. Use null for unknown fields.' }]
+          })
+        });
+        const fd = await finalRes.json();
+        if (!fd.error) fullText = fd.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      }
+
+      // Parse JSON from response
+      const cleaned = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const matches = [...cleaned.matchAll(/\{[\s\S]*\}/g)];
+      if (!matches.length) return null;
+      const raw = matches[matches.length - 1][0];
+      try {
+        return JSON.parse(raw);
+      } catch {
+        const fixed = raw.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/:\s*undefined/g, ': null');
+        return JSON.parse(fixed);
+      }
+    }
+
+    try {
+      const apiHeaders = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      };
+
+      const searchPartNum = partNum.replace(/-[A-Z]{2}$/, '') || partNum;
+
+      // ── STEP 1: Identify the part ───────────────────────────────────
+      const step1 = await runAgentic({
+        role: 'user',
+        content: `Search the web for OEM part number "${partNum}" or "${searchPartNum}".
+
+Your ONLY job: confirm what this part is and what vehicle it fits.
+
+Rules:
+- Use the part name exactly as shown in search results. Do NOT guess from the part number pattern.
+- North American vehicles only (US/Canada sold). Use Ford Escape not Ford Kuga. Use Chevy not Holden.
+- If results are ambiguous or part not found, set confidence to "low" and use null for unknown fields.
+
+For the "category" field, pick exactly one word from this list based on what the part is:
+ECU (engine control module/PCM/ECM), BCM (body control module), TCM (transmission control module),
+TIPM (totally integrated power module/fuse box/junction box), ABS (ABS module/pump),
+CLUSTER (instrument cluster/gauge cluster), RADIO (radio/head unit/infotainment),
+THROTTLE (throttle body), MECHANICAL (mechanical part with no electronics), OTHER (anything else)
+
+Return ONLY valid JSON - no markdown, no explanation:
+{
+  "partName": null,
+  "category": null,
+  "year": null,
+  "make": null,
+  "model": null,
+  "confidence": null
+}
+Replace null with confirmed values.`
+      }, apiHeaders, 'Identifying part...');
+
+      if (!step1 || !step1.partName || step1.confidence === 'low') {
+        statusEl.innerHTML = '';
+        document.getElementById('ebayRefRow').style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '🔍 Look up';
+        return;
+      }
+
+      const category = (step1.category || 'OTHER').toUpperCase();
+      const needsProgrammingResearch = ['ECU','BCM','TCM','TIPM','ABS','CLUSTER','RADIO'].includes(category);
+      const needsIncompatibilityResearch = ['ECU','BCM','TCM','TIPM','ABS','CLUSTER','RADIO','THROTTLE'].includes(category);
+
+      // Small delay between steps to avoid token rate limit burst
+      await new Promise(r => setTimeout(r, 600));
+
+      // ── STEP 2: Research fitment specifics ─────────────────────────
+      const categoryInstructions = {
+        ECU:       'Confirm exact engine size and transmission type. Research what engine/transmission configs it does NOT fit.',
+        BCM:       'Confirm trim level. Research which trims it does NOT fit.',
+        TCM:       'Confirm exact transmission type/code. Research what it does NOT fit.',
+        TIPM:      'Confirm exact year/model. Research any year or sub-model exclusions.',
+        ABS:       'CRITICAL: Is this 2WD/FWD or AWD/4WD specific? ABS modules almost always differ by drivetrain. Confirm which drivetrain it fits and which it does NOT fit. For ABS modules: Research whether this specific ABS unit requires any programming, calibration, or initialization after installation. Many 2015+ ABS modules require dealer calibration. Be specific - do not guess.',
+        CLUSTER:   'Confirm trim and display type. Research exclusions. Does this German vehicle cluster require coding?',
+        RADIO:     'Confirm trim and option package. Research which packages it does NOT fit.',
+        THROTTLE:  'Confirm exact engine size/code. Research what engines it does NOT fit.',
+        MECHANICAL:'Confirm year/make/model. Note any relevant exclusions.',
+        OTHER:     'Confirm year/make/model fitment range.'
+      };
+
+      const progJsonFields = needsProgrammingResearch
+        ? `"programmingRequired": "yes or no or unknown",
+  "programmingNote": "one definitive sentence, or null if unknown"`
+        : `"programmingRequired": null,
+  "programmingNote": null`;
+
+      const step2 = await runAgentic({
+        role: 'user',
+        content: `Part confirmed: "${step1.partName}" - Category: ${category}
+Vehicle: ${step1.year} ${step1.make} ${step1.model}
+Part number: ${partNum}
+
+Task: ${categoryInstructions[category] || categoryInstructions.OTHER}
+${needsProgrammingResearch ? 'Also confirm: Does this specific part require programming to the vehicle, or is it plug-and-play? Search for a definitive answer - do not guess.' : ''}
+
+Rules: North American market only. Only report confirmed facts from search results. Use JSON null (not the string "null") for anything not confirmed.
+
+Return ONLY valid JSON - no markdown fences, no explanation:
+{
+  "engine": null,
+  "drivetrain": null,
+  "trim": null,
+  "doesNotFit": null,
+  ${progJsonFields}
+}
+Replace null values with confirmed data where found. Keep null where unconfirmed.`
+      }, apiHeaders, 'Researching fitment details...');
+
+      // ── Populate fields ─────────────────────────────────────────────
+      document.getElementById('partName').value = step1.partName;
+      if (step1.year) document.getElementById('donorYear').value = String(step1.year).split('-')[0];
+
+      let vehicleStr = [step1.make, step1.model].filter(Boolean).join(' ');
+      if (step2?.drivetrain && step2.drivetrain !== 'All Drivetrains') vehicleStr += ` - ${step2.drivetrain}`;
+      if (step2?.trim) vehicleStr += ` (${step2.trim})`;
+      if (vehicleStr) document.getElementById('donorVehicle').value = vehicleStr;
+      if (step2?.engine) document.getElementById('donorEngine').value = step2.engine;
+
+      // Does NOT fit
+      const doesNotFitField = document.getElementById('doesNotFitField');
+      const doesNotFitInput = document.getElementById('doesNotFit');
+      if (step2?.doesNotFit) {
+        doesNotFitField.style.display = 'block';
+        doesNotFitInput.value = step2.doesNotFit;
+      } else {
+        doesNotFitField.style.display = 'none';
+        doesNotFitInput.value = '';
+      }
+
+      // Programming note - skip entirely for pre-programmed sale types
+      const currentSaleType = document.getElementById('saleType').value;
+      const skipProgramming = PROGRAMMED_SALE_TYPES.includes(currentSaleType);
+
+      // Priority: 1) skip if pre-programmed 2) programming_db.json 3) Claude research 4) ABS default
+      const progField = document.getElementById('programmingNoteField');
+      const progInput = document.getElementById('programmingNote');
+      const progSource = document.getElementById('programmingNoteSource');
+
+      if (skipProgramming) {
+        // Pre-programmed sale type - DynaTrack provides programming, hide field
+        progField.style.display = 'none';
+        progInput.value = '';
+      } else if (needsProgrammingResearch) {
+        // Priority 1: Check programming_db.json
+        const make = step1.make || '';
+        const year = step1.year || '';
+        const dbLookup = lookupProgramming(make, year, category.toLowerCase());
+
+        if (dbLookup.found) {
+          progField.style.display = 'block';
+          progInput.value = dbLookup.notes;
+          const isRequired = dbLookup.required === 'YES' || dbLookup.required === 'VERIFY';
+          const color = dbLookup.required === 'YES' ? '#b91c1c' : dbLookup.required === 'VERIFY' ? '#b45309' : '#15803d';
+          const label = dbLookup.required === 'YES' ? '⚠ Programming required' : dbLookup.required === 'VERIFY' ? '⚠ Verify programming' : '✓ No programming required';
+          progSource.innerHTML = `<span style="color:${color}; font-weight:500;">${label} - from programming database</span>`;
+        } else if (step2?.programmingNote && step2?.programmingRequired !== 'unknown') {
+          // Priority 2: Claude research result
+          progField.style.display = 'block';
+          progInput.value = step2.programmingNote;
+          const isYes = step2.programmingRequired === 'yes';
+          progSource.innerHTML = `<span style="color:${isYes ? '#b45309' : '#15803d'}; font-weight:500;">${isYes ? '⚠ Programming required - confirmed by search' : '✓ No programming required - confirmed by search'}</span>`;
+        } else if (category === 'ABS') {
+          // Priority 3: ABS default when no data
+          progField.style.display = 'block';
+          progInput.value = 'May require ABS module initialization or calibration after installation. Consult a qualified technician.';
+          progSource.innerHTML = '<span style="color:#b45309; font-weight:500;">⚠ ABS programming unknown - using default caution</span>';
+        } else {
+          progField.style.display = 'none';
+          progInput.value = '';
+        }
+      } else {
+        // Non-programmable part types - hide programming note entirely
+        progField.style.display = 'none';
+        progInput.value = '';
+      }
+
+      // Confidence indicator
+      document.getElementById('ebayRefRow').style.display = 'none';
+      document.getElementById('ebayRefUrl').value = '';
+      const conf = step1.confidence;
+      const confColor = conf === 'high' ? '#15803d' : conf === 'medium' ? '#b45309' : '#b91c1c';
+      const confText = conf === 'high' ? '✓ Fitment confirmed' : conf === 'medium' ? '⚠ Verify fitment before listing' : '✗ Could not confirm - fill in manually';
+      statusEl.innerHTML = `<span style="color:${confColor}; font-weight:500;">${confText}</span>`;
+
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:#b91c1c;">Lookup failed: ${err.message}</span>`;
+      document.getElementById('ebayRefRow').style.display = 'block';
+      console.error(err);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🔍 Look up';
+  }
+
+  function loadKey() {
+    const key = localStorage.getItem(API_KEY_STORAGE);
+    if (key) {
+      document.getElementById('apiKeyInput').value = key;
+      document.getElementById('keySaved').classList.add('visible');
+    }
+  }
+
+  function saveKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) return;
+    localStorage.setItem(API_KEY_STORAGE, key);
+    document.getElementById('keySaved').classList.add('visible');
+    document.getElementById('status').textContent = '';
+  }
+
+  function getKey() {
+    return localStorage.getItem(API_KEY_STORAGE) || document.getElementById('apiKeyInput').value.trim();
+  }
+
+  async function generate() {
+    const apiKey = getKey();
+    if (!apiKey) {
+      document.getElementById('status').textContent = 'Please enter your Anthropic API key above first.';
+      document.getElementById('apiKeyInput').focus();
+      return;
+    }
+
+    const partNum = document.getElementById('partNum').value.trim();
+    if (!partNum) {
+      document.getElementById('status').textContent = 'Part number is required.';
+      document.getElementById('partNum').focus();
+      return;
+    }
+
+    const partName = document.getElementById('partName').value.trim();
+    const donorYear = document.getElementById('donorYear').value.trim();
+    const donorVehicle = document.getElementById('donorVehicle').value.trim();
+    const donorEngine = document.getElementById('donorEngine').value.trim();
+    const condition = document.getElementById('condition').value;
+    const notes = document.getElementById('notes').value.trim();
+    const donorInfo = [donorYear, donorVehicle, donorEngine].filter(Boolean).join(' ');
+    const saleType = document.getElementById('saleType').value;
+    const isChrysler = saleType === 'chrysler_programmed';
+    const isTested = saleType === 'tested';
+    const testedSpeed = document.getElementById('testedSpeed').value.trim();
+    const testedMileage = document.getElementById('testedMileage').value.trim();
+    const testedNotes = document.getElementById('testedNotes').value.trim();
+    const testedSuffix = [testedSpeed ? `Tested ${testedSpeed}MPH` : '', testedMileage ? testedMileage : '', testedNotes].filter(Boolean).join(' - ');
+
+    const conditionLine = condition === 'good'
+      ? 'Cleaned and visually inspected. Removed from a running donor vehicle.'
+      : condition === 'minor'
+      ? 'Cleaned and visually inspected. Minor cosmetic wear consistent with normal use. Removed from a running donor vehicle.'
+      : `Cleaned and visually inspected. Damage noted${notes ? ': ' + notes : ''}. Removed from a running donor vehicle.`;
+
+    const saleTypeInstructions = {
+      part: `Standard used part. Programming Note: if ECU/ECM/BCM/TCM or programmable module write "May require VIN-specific programming. Professional installation recommended." For non-programmable parts write "Direct replacement - no programming required."`,
+      chrysler_programmed: `Chrysler/Jeep/Dodge ECM/PCM programmed by Dynatrack Racing (JTEC, NGC, GPEC only - no diesel/Cummins). Use Chrysler template.`,
+      combo_ign: `ECU + Ignition Switch plug and play set. Part name: "[MAKE] ECU + IGNITION SWITCH COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch". Programming Note: "Plug and play set - must be installed together. No additional programming required."`,
+      combo_ign_bcm: `ECU + Ignition Switch + BCM full set. Part name: "[MAKE] ECU + IGNITION SWITCH + BCM COMBO - PLUG AND PLAY SET". Add: "• What's Included: ECU/ECM + Matching Ignition Switch + Body Control Module (BCM)". Programming Note: "Plug and play set - all three components must be installed together. No additional programming required."`,
+      honda_key: `Honda ECU + immobilizer + key blank set. Part name: "HONDA ECU + IMMOBILIZER + KEY BLANK - PLUG AND PLAY SET". Add: "• What's Included: Honda ECU + Immobilizer Unit + Key Blank(s)". Programming Note: "Plug and play set - key blank must be cut to buyer's ignition. No dealer programming required once key is cut and full set is installed."`,
+      needs_programming: `Computer requiring buyer programming - Dynatrack does NOT program this. Programming Note: "Requires VIN-specific programming before use. Not included - take to dealer or qualified shop after purchase."`,
+      tested: `This item has been tested and confirmed working. Include a "• Tested:" bullet in Item Specifics after the Fits line with the test results. Keep it factual and concise e.g. "Tested: All gauges functional - 120MPH - 105K miles" or "Tested: Unit powers on, all functions verified". Do not use Programming Note for tested items unless the part separately requires programming.`
+    };
+
+    const chryslerTemplate = `Programmed ECU ECM PCM [YEAR RANGE] [MAKE] [MODEL] [ENGINE]
+
+Item Specifics
+• Part Number: ${partNum}
+• Fits: [year range make model engine/trim - confirmed fitment only]
+[DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
+[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
+• Condition: Inspected for Damage
+• Shipping: Ships within 1 Business Day (North Carolina, USA). Hawaii/Alaska residents - please message for a quote prior to purchase.
+
+CUSTOM PROGRAMMING INCLUDED - To ensure a seamless "Plug & Play" experience, we require your VIN and Mileage during checkout.
+Note: Providing this info immediately prevents shipping delays and ensures 100% compatibility with your vehicle.
+
+
+About Dynatrack Racing
+We are dismantlers based in North Carolina, specializing in high-quality OEM components.
+• Support: Available Mon-Fri for any questions.
+• Returns: 30-Day Hassle-Free.`;
+
+    const standardTemplate = `[PART NAME IN ALL CAPS - e.g. Kia Sportage 2010-2014 Fuse Box Junction Relay Interior OEM]
+
+Item Specifics
+• Part Number: ${partNum}
+• Fits: [year range make model - confirmed fitment only, e.g. 2010-2014 Kia Sportage]
+[DOES NOT FIT LINE - only if exclusions are explicitly confirmed from search results, otherwise omit entirely]
+[PART NUMBER WARNING LINE - only if part number warning is provided above, otherwise omit entirely]
+[WHATS INCLUDED LINE - only if sale type requires it, otherwise omit]
+• Programming Note: [per sale type instructions - one short sentence]
+• Condition: ${conditionLine}
+• Shipping: Ships within 1 Business Day (North Carolina, USA). Hawaii/Alaska residents - please message for a quote prior to purchase.
+
+About Dynatrack Racing
+We are dismantlers based in North Carolina, specializing in high-quality OEM components.
+• Support: Available Mon-Fri for any questions.
+• Returns: 30-Day Hassle-Free.
+
+IMPORTANT FORMATTING RULES:
+- Your FIRST LINE must be the eBay title prefixed with "TITLE:"
+- Title word order is STRICT: [Make] [Model] [Year Range] [Part Name + most relevant keywords] [Part Number] [optional end notes]
+- Examples from our store:
+    TITLE: Mercedes-Benz ML350 GL-Class R-Class 2006-2012 Rear SAM Control Module A 164 900 54 01
+    TITLE: Infiniti G35 G37 2007-2008 Body Control Module BCM OEM 284B1-JK600
+    TITLE: Chevrolet Express Van 1500 2500 3500 2008-2009 Engine Fuse Box 25888289
+    TITLE: Ford Escape 1.6L 2013-2016 Coolant Level Sensor Pipe Assembly GV61-8C045-AB
+    TITLE: Toyota Sienna 3.5L 2011-2016 Engine Fuse Box Junction Relay OEM
+    TITLE: Volkswagen Jetta Sedan Wagon 2011-2014 ABS Anti Lock Brake Pump 1K0 614 517 DL
+    TITLE: Lincoln MKX Ford Edge 2011-2013 ABS Anti Lock Brake Pump Assembly CT43-2C405-BB
+    TITLE: Mazda 3 2.3L 2007-2009 Transmission Control Module TCU TCM OEM L34T 18 9E1A
+    TITLE: Ford Mustang V6 1998 Instrument Gauge Cluster Speedometer Tested 120MPH 105K
+    TITLE: Dodge Ram 1500 5.9L 1997 Programmed ECU ECM PCM Engine Control 56040440AC
+- Part number always goes at the end before any condition/mileage/test notes
+- End notes only when relevant: "Programmed" for pre-programmed ECUs, drivetrain if specific (AWD/2WD)
+${isTested && testedSuffix ? `- This is a TESTED item - append the following at the very end of the title: ${testedSuffix}` : ''}
+- Title must be 80 characters or under - cut filler words to fit, never exceed 80
+- After the TITLE: line, leave one blank line then output the listing body exactly as templated
+- Do NOT include a "Removed From" bullet - omit it entirely
+- Keep each bullet to one line
+- No extra blank lines between bullets
+- Do not add any fields not shown in the template above`;
+
+    // ── Part type detection ──────────────────────────────────────────
+    // Infer from partName field first, fall back to saleType context
+    const partNameLower = (partName || '').toLowerCase();
+    const donorLower = (donorVehicle || '').toLowerCase();
+
+    function detectPartType() {
+      if (/\b(ecu|ecm|pcm|engine control)\b/.test(partNameLower)) return 'ecu';
+      if (/\b(bcm|body control)\b/.test(partNameLower)) return 'bcm';
+      if (/\b(tipm|totally integrated|fuse box|fuse relay|junction box)\b/.test(partNameLower)) return 'tipm';
+      if (/\b(tcm|tcu|transmission control)\b/.test(partNameLower)) return 'tcm';
+      if (/\b(abs|anti.?lock|brake pump|brake module)\b/.test(partNameLower)) return 'abs';
+      if (/\b(amp|amplifier)\b/.test(partNameLower)) return 'amplifier';
+      if (/\b(cluster|speedometer|gauge|instrument panel)\b/.test(partNameLower)) return 'cluster';
+      if (/\b(throttle body|throttle)\b/.test(partNameLower)) return 'throttle';
+      if (/\b(radio|audio|infotainment|receiver|head unit)\b/.test(partNameLower)) return 'radio';
+      if (/\b(idm|injector driver)\b/.test(partNameLower)) return 'idm';
+      if (/\b(multiair|vvt|valve actuator|camshaft)\b/.test(partNameLower)) return 'mechanical';
+      if (saleType === 'chrysler_programmed' || isChrysler) return 'ecu';
+      return 'generic';
+    }
+
+    const partType = detectPartType();
+
+    // ── Per-part-type rules: fitment specificity + programming ───────
+    const partTypeRules = {
+      ecu: {
+        query: `"${partNum}" ECM PCM engine control module fitment application`,
+        fitmentFields: 'MUST include exact engine size and code (e.g. 2.4L 4-cyl, 3.5L V6). ECUs are engine AND transmission specific - include trans type if confirmed (auto/manual). Year range must be exact.',
+        programmingRule: 'ECUs ALWAYS require VIN-specific programming. Write exactly: "Requires VIN-specific programming - must be programmed to your vehicle before use."',
+      },
+      bcm: {
+        query: `"${partNum}" body control module BCM compatibility fitment`,
+        fitmentFields: 'Year/make/model/trim. BCMs are often trim-specific - include trim level if confirmed. Engine is usually NOT relevant for BCMs.',
+        programmingRule: 'BCMs require programming to VIN. Write exactly: "Requires VIN-specific programming - must be paired to your vehicle."',
+      },
+      tipm: {
+        query: `"${partNum}" TIPM fuse box integrated power module fitment`,
+        fitmentFields: 'Exact year/make/model. Engine is sometimes relevant on TIPMs - include if confirmed. TIPMs are highly specific.',
+        programmingRule: 'TIPMs require programming. Write exactly: "VIN-specific - requires dealer or professional programming before use."',
+      },
+      tcm: {
+        query: `"${partNum}" transmission control module TCM fitment application`,
+        fitmentFields: 'Year/make/model AND transmission type (e.g. 6-speed automatic, 5-speed manual). TCMs are transmission-specific - this is the most important field.',
+        programmingRule: 'TCMs require programming. Write exactly: "Requires VIN-specific programming - must be programmed to your vehicle and transmission."',
+      },
+      abs: {
+        query: `"${partNum}" ABS pump module anti-lock brake fitment`,
+        fitmentFields: 'Year/make/model. CRITICAL: check if part is 2WD or 4WD specific - many ABS units differ. If it fits all drivetrains, write "All Drivetrains". Engine is NOT relevant for ABS.',
+        programmingRule: null, // Determined by programming_db.json lookup or Claude research
+      },
+      amplifier: {
+        query: `"${partNum}" amplifier OEM audio fitment application`,
+        fitmentFields: 'Year/make/model and audio package (e.g. Bose, Harman Kardon, premium audio). Engine and drivetrain are NOT relevant for amplifiers.',
+      },
+      cluster: {
+        query: `"${partNum}" instrument cluster speedometer fitment`,
+        fitmentFields: 'Year/make/model/trim. Note if analog vs digital display. Engine may matter on clusters - include if confirmed. Trim level often determines cluster type.',
+        programmingRule: 'Clusters are direct replacement. Write exactly: "Direct replacement - no programming required."',
+      },
+      throttle: {
+        query: `"${partNum}" throttle body fitment engine application`,
+        fitmentFields: 'Year/make/model AND exact engine (e.g. 2.4L 4-cyl, 3.5L V6). Throttle bodies are engine-specific - engine is the most critical field. Drivetrain is NOT relevant.',
+      },
+      radio: {
+        query: `"${partNum}" radio head unit OEM fitment application`,
+        fitmentFields: 'Year/make/model and trim/option package. Engine and drivetrain are NOT relevant for radios.',
+        programmingRule: 'Radios are direct replacement. Write exactly: "Direct replacement - no programming required."',
+      },
+      idm: {
+        query: `"${partNum}" IDM injector driver module diesel fitment`,
+        fitmentFields: 'Year/make/model/engine. IDMs are engine and calibration specific - include exact diesel engine code.',
+        programmingRule: 'IDMs are direct replacement. Write exactly: "Direct replacement - no programming required."',
+      },
+      mechanical: {
+        query: `"${partNum}" OEM part fitment application`,
+        fitmentFields: 'Year/make/model. Include engine only if the part is engine-specific. Drivetrain only if relevant.',
+      },
+      generic: {
+        query: `"${partNum}" OEM part fitment application vehicle`,
+        fitmentFields: 'Year/make/model. Include engine and drivetrain only if the search results show the part is specific to them.',
+      }
+    };
+
+    const strategy = partTypeRules[partType];
+
+    // Catalog-aware search
+    const detectedCat = detectCatalog(partNum);
+    const catalogHint = detectedCat ? `Search ${detectedCat.name.split('/')[0]} OEM catalog for this part.` : 'Search RockAuto or manufacturer catalog for this part.';
+    const enrichedQuery = detectedCat
+      ? `${strategy.query} ${detectedCat.name.split('/')[0]}`
+      : strategy.query;
+
+    const confirmedProgrammingNote = document.getElementById('programmingNote').value.trim();
+    const programmingNoteFieldVisible = document.getElementById('programmingNoteField').style.display !== 'none';
+    const confirmedDoesNotFit = document.getElementById('doesNotFit').value.trim();
+    const confirmedPartNumberWarning = document.getElementById('partNumberWarning').value.trim();
+
+    const prompt = `You are an eBay listing writer for Dynatrack Racing, a used OEM auto parts dismantler in North Carolina. They offer 30-day hassle-free returns. All parts are sourced from North American vehicles and sold to North American buyers.
+
+IMPORTANT: Use North American vehicle names only. If search results show both a North American model and a foreign-market equivalent (e.g. Ford Escape vs Ford Kuga, Chevy Cruze vs Holden Cruze), always use the North American name in the listing.
+
+PART TYPE: ${partType.toUpperCase()}
+DETECTED MAKE: ${detectedCat ? detectedCat.name : 'Unknown - use RockAuto'}
+
+Do ONE web search using this query: ${enrichedQuery}
+${catalogHint}
+
+═══ FITMENT RULES ═══
+${strategy.fitmentFields}
+
+- Write the Fits line with ONLY fields confirmed by search results.
+- If engine/drivetrain is NOT relevant to this part type, do NOT include it in the Fits line.
+- If engine/drivetrain IS relevant but you cannot confirm it, write ⚠️ VERIFY FITMENT BEFORE LISTING.
+- Never invent or guess fitment data.
+
+═══ DOES NOT FIT ═══
+${confirmedDoesNotFit
+  ? `CONFIRMED EXCLUSION - include this line exactly: "• Does NOT fit: ${confirmedDoesNotFit}"`
+  : 'No confirmed exclusions - omit the Does NOT fit line entirely. Do not guess or invent exclusions.'
+}
+
+═══ PART NUMBER WARNING ═══
+${confirmedPartNumberWarning
+  ? `INCLUDE THIS LINE after the Does NOT fit line (or after Fits if no exclusions): "• ⚠ IMPORTANT: ${confirmedPartNumberWarning}"`
+  : 'No part number warning needed - omit entirely.'
+}
+
+═══ PROGRAMMING NOTE ═══
+PROGRAMMING NOTE RULES:
+- ONLY include a "Programming Note:" bullet for these part types: ECU, BCM, TCM, TIPM, ABS, Radio, Cluster, Immobilizer
+- For amplifiers, throttle bodies, mechanical parts, and all other part types: do NOT include any programming note bullet at all. Omit it entirely.
+- Never write "Direct replacement - no programming required" for parts that obviously don't need programming. Buyers know an amplifier doesn't need programming.
+${confirmedProgrammingNote
+  ? `USE THIS EXACT PROGRAMMING NOTE - do not change it: "${confirmedProgrammingNote}"`
+  : programmingNoteFieldVisible
+    ? 'Programming note field was shown but left blank - omit the Programming Note bullet entirely.'
+    : 'This part type does not require a programming note - omit the Programming Note bullet entirely.'
+}
+
+${lastIntelligence && lastIntelligence.trimTier ? `
+═══ TRIM INTELLIGENCE (from DarkHawk database) ═══
+Vehicle trim tier: ${lastIntelligence.trimTier.tier}
+${lastIntelligence.trimTier.audioBrand ? 'Audio system: ' + lastIntelligence.trimTier.audioBrand : ''}
+${lastIntelligence.trimTier.expectedParts ? 'Expected parts for this trim: ' + lastIntelligence.trimTier.expectedParts : ''}
+${lastIntelligence.trimTier.cultFlag ? 'Cult vehicle: Yes - note desirability if relevant' : ''}
+
+Use this trim data to enrich the listing where relevant:
+- For amplifiers: mention the specific audio brand
+- For radios: mention if this is a base or navigation unit based on trim
+- For BCMs: note trim-specific features this BCM controls
+` : ''}
+${lastIntelligence && lastIntelligence.fitment && lastIntelligence.fitment.allVehicles ? `
+═══ CONFIRMED FITMENT (from DynaTrack database - ${lastIntelligence.fitment.allVehicles.length} vehicles matched) ═══
+Primary: ${lastIntelligence.fitment.year || ''} ${lastIntelligence.fitment.make || ''} ${lastIntelligence.fitment.model || ''} ${lastIntelligence.fitment.engine || ''}
+Does not fit: ${lastIntelligence.fitment.doesNotFit || 'No confirmed exclusions'}
+
+This fitment is confirmed from our database. Use it as-is. Only add to it if web search finds ADDITIONAL confirmed vehicles.
+` : ''}
+FORMATTING RULE: Never use em dashes (the long dash character) anywhere in the output. Use regular hyphens/dashes (-) only. This is a hard requirement.
+
+SALE TYPE OVERRIDE: When the sale type is chrysler_programmed, combo_ign, combo_ign_bcm, or honda_key, do NOT include any "Programming Note:" bullet. DynaTrack provides the programming for these listings. The template already includes the correct buyer-facing language.
+
+═══ SALE TYPE ═══
+${saleTypeInstructions[saleType]}
+${partName ? 'Part name hint: ' + partName : ''}
+${donorInfo ? 'Donor vehicle: ' + donorInfo : ''}
+
+OUTPUT only the completed listing - no preamble, no explanation:
+
+${isChrysler ? chryslerTemplate : standardTemplate}`;
+
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('thinking').classList.add('visible');
+    document.getElementById('thinkingText').textContent = `Searching ${detectedCat ? detectedCat.name.split('/')[0] : 'RockAuto'} for ${partType === 'generic' ? 'part' : partType.toUpperCase()} fitment...`;
+    document.getElementById('status').textContent = '';
+    document.getElementById('outputCard').classList.remove('visible');
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        document.getElementById('status').textContent = 'API error: ' + (data.error.message || 'Unknown error. Check your API key.');
+        document.getElementById('generateBtn').disabled = false;
+        document.getElementById('thinking').classList.remove('visible');
+        return;
+      }
+
+      document.getElementById('thinkingText').textContent = 'Writing listing...';
+
+      let finalText = '';
+
+      if (data.stop_reason === 'tool_use') {
+        const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
+        const toolResults = toolUseBlocks.map(b => ({
+          type: 'tool_result',
+          tool_use_id: b.id,
+          content: 'Search completed - use the results already retrieved to write the listing now.'
+        }));
+
+        const followUp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            tool_choice: { type: 'none' },
+            messages: [
+              { role: 'user', content: prompt },
+              { role: 'assistant', content: data.content },
+              { role: 'user', content: toolResults }
+            ]
+          })
+        });
+
+        const followData = await followUp.json();
+        finalText = followData.content?.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      } else {
+        finalText = data.content?.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      }
+
+      if (finalText) {
+        const outputEl = document.getElementById('outputText');
+        outputEl.innerHTML = '';
+
+        // Extract TITLE: line and strip from body
+        let titleValue = '';
+        let bodyText = finalText;
+        const titleMatch = finalText.match(/^TITLE:\s*(.+)/m);
+        if (titleMatch) {
+          titleValue = titleMatch[1].trim();
+          bodyText = finalText.replace(/^TITLE:\s*.+\n?/m, '').replace(/^\n/, '');
+        }
+        const titleEl = document.getElementById('titleText');
+        titleEl.textContent = titleValue;
+        const charCount = titleValue.length;
+        const countEl = document.getElementById('titleCharCount');
+        countEl.textContent = charCount + ' / 80 characters';
+        countEl.style.color = charCount > 80 ? '#b91c1c' : charCount > 70 ? '#b45309' : '#6b7280';
+
+        const lines = bodyText.split('\n');
+        let skipNext = false;
+        lines.forEach((line, idx) => {
+          if (skipNext) { skipNext = false; return; }
+          const lineEl = document.createElement('div');
+          lineEl.style.minHeight = '1.2em';
+
+          if (line.includes('⚠️ VERIFY')) {
+            lineEl.style.color = '#DC2626';
+            lineEl.style.fontWeight = '600';
+            lineEl.style.background = '#FEE2E2';
+            lineEl.style.padding = '2px 6px';
+            lineEl.style.borderRadius = '4px';
+            lineEl.style.margin = '2px 0';
+            lineEl.textContent = line;
+          } else if (idx === 0 && line.trim() !== '') {
+            // Title line - bold
+            lineEl.style.fontWeight = '700';
+            lineEl.style.fontSize = '17px';
+            lineEl.textContent = line;
+          } else if (line === 'About Dynatrack Racing' || line === 'About Dynatrack') {
+            // Insert a visual divider before the About section
+            const hr = document.createElement('hr');
+            hr.style.cssText = 'border:none; border-top:2px solid #e5e7eb; margin:10px 0 8px 0;';
+            outputEl.appendChild(hr);
+            // Bold header + dash + next line description inline
+            const nextLine = lines[idx + 1] || '';
+            const bold = document.createElement('strong');
+            bold.textContent = 'About Dynatrack Racing';
+            lineEl.appendChild(bold);
+            if (nextLine && !nextLine.startsWith('•')) {
+              lineEl.appendChild(document.createTextNode(' - ' + nextLine));
+              skipNext = true;
+            }
+          } else if (line === 'Item Specifics') {
+            // Section headers - bold
+            lineEl.style.fontWeight = '700';
+            lineEl.textContent = line;
+          } else if (line.startsWith('•')) {
+            // Bullet lines - bold the label (text before first colon)
+            const colonIdx = line.indexOf(':');
+            if (colonIdx !== -1) {
+              const label = line.substring(0, colonIdx + 1); // "• Part Number:"
+              const value = line.substring(colonIdx + 1);    // " 91950-3W010"
+              const bold = document.createElement('strong');
+              bold.textContent = label;
+              lineEl.appendChild(bold);
+              lineEl.appendChild(document.createTextNode(value));
+            } else {
+              lineEl.textContent = line;
+            }
+          } else {
+            lineEl.textContent = line;
+          }
+
+          outputEl.appendChild(lineEl);
+        });
+
+        const hasWarnings = finalText.includes('⚠️ VERIFY');
+        document.getElementById('verifyBanner').style.display = hasWarnings ? 'flex' : 'none';
+        document.getElementById('outputCard').classList.add('visible');
+        document.getElementById('outputCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        // Fire-and-forget write-back to DarkHawk
+        saveFitmentToDarkHawk();
+      } else {
+        document.getElementById('status').textContent = 'No response received. Please try again.';
+      }
+
+    } catch (err) {
+      document.getElementById('status').textContent = 'Connection error. Check your internet and try again.';
+    }
+
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('thinking').classList.remove('visible');
+  }
+
+  function copyText() {
+    const el = document.getElementById('outputText');
+    const lines = Array.from(el.children).map(d => d.textContent);
+    const text = lines.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy description';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  function copyTitle() {
+    const text = document.getElementById('titleText').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyTitleBtn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy title';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  async function lookupFromEbay() {
+    const url = document.getElementById('ebayRefUrl').value.trim();
+    const statusEl = document.getElementById('lookupStatus');
+    if (!url) { statusEl.innerHTML = '<span style="color:#b91c1c;">Paste an eBay URL first.</span>'; return; }
+    if (!url.includes('ebay.com/itm/')) { statusEl.innerHTML = '<span style="color:#b91c1c;">Must be an eBay item URL (ebay.com/itm/...)</span>'; return; }
+
+    statusEl.innerHTML = '<span style="color:var(--text-muted);">Fetching listing data...</span>';
+
+    try {
+      const res = await fetch(`/api/listing-tool/ebay-lookup?url=${encodeURIComponent(url)}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Lookup failed');
+      const r = json.data;
+
+      // Part name from title
+      if (r.title) document.getElementById('partName').value = extractPartNameFromTitle(r.title);
+
+      // Part number
+      if (r.partNumber && !document.getElementById('partNum').value) {
+        document.getElementById('partNum').value = r.partNumber;
+      }
+
+      // Year/make/model from compatibility table or item specifics
+      if (r.compatibility && r.compatibility.length > 0) {
+        const first = r.compatibility[0];
+        document.getElementById('donorYear').value = first.year || '';
+        document.getElementById('donorVehicle').value = [first.make, first.model].filter(Boolean).join(' ');
+        if (first.engine) document.getElementById('donorEngine').value = first.engine;
+      } else if (r.title) {
+        const yearMatch = r.title.match(/\b((?:19|20)\d{2})\b/);
+        if (yearMatch) document.getElementById('donorYear').value = yearMatch[0];
+      }
+
+      // Donor vehicle from item specifics
+      const specMake = r.itemSpecifics?.['Brand'] || '';
+      const specModel = r.itemSpecifics?.['Fitment Type'] || '';
+      const donorVehicle = r.itemSpecifics?.['Donor Vehicle'];
+      if (donorVehicle && !document.getElementById('donorVehicle').value) {
+        document.getElementById('donorVehicle').value = donorVehicle;
+      }
+
+      const sellerNote = r.seller ? ` (from ${r.seller}'s listing)` : '';
+      document.getElementById('ebayRefRow').style.display = 'none';
+      statusEl.innerHTML = `<span style="color:#15803d; font-weight:500;">✓ Fields populated from eBay listing${sellerNote} - verify before generating</span>`;
+
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:#b91c1c;">Failed: ${err.message} - fill in fields manually.</span>`;
+    }
+  }
+
+  function extractPartNameFromTitle(title) {
+    return title
+      .replace(/\bOEM\b/gi, '')
+      .replace(/\bNEW\b/gi, '')
+      .replace(/\bGENUINE\b/gi, '')
+      .replace(/\bTESTED\b/gi, '')
+      .replace(/\bWORKING\b/gi, '')
+      .replace(/\bPROGRAMMED\b/gi, '')
+      .replace(/\bFAST SHIP\w*/gi, '')
+      .replace(/\bFREE SHIP\w*/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+    function clearOutput() {
+    document.getElementById('outputCard').classList.remove('visible');
+    document.getElementById('titleText').textContent = '';
+    document.getElementById('titleCharCount').textContent = '';
+    document.getElementById('ebayRefRow').style.display = 'none';
+    document.getElementById('ebayRefUrl').value = '';
+    document.getElementById('partNum').value = '';
+    document.getElementById('partName').value = '';
+    document.getElementById('donorYear').value = '';
+    document.getElementById('donorVehicle').value = '';
+    document.getElementById('donorEngine').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('condition').selectedIndex = 0;
+    document.getElementById('saleType').selectedIndex = 0;
+    document.getElementById('partNumberWarningField').style.display = 'none';
+    document.getElementById('partNumberWarning').value = '';
+    document.getElementById('testedSpeed').value = '';
+    document.getElementById('testedMileage').value = '';
+    document.getElementById('testedNotes').value = '';
+    document.getElementById('testedFields').style.display = 'none';
+    document.getElementById('testedNote').style.display = 'none';
+    document.getElementById('status').textContent = '';
+    document.getElementById('partNum').focus();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') generate();
+  });
+
+  loadKey();
+
+  // ── Programming DB ─────────────────────────────────────────
+  let programmingDB = null;
+  fetch('/admin/programming_db.json')
+    .then(r => r.json())
+    .then(data => { programmingDB = data.rules || data; console.log('Programming DB loaded:', Object.keys(programmingDB).length, 'entries'); })
+    .catch(() => { console.log('Programming DB not available'); });
+
+  // ── DarkHawk Intelligence state ─────────────────────────────
+  let lastIntelligence = null;
+
+  async function fetchIntelligence(partNumber, year, make, model, engine, partType) {
+    try {
+      const params = new URLSearchParams({ partNumber });
+      if (year) params.set('year', year);
+      if (make) params.set('make', make);
+      if (model) params.set('model', model);
+      if (engine) params.set('engine', engine);
+      if (partType) params.set('partType', partType);
+      const res = await fetch('/api/listing-tool/intelligence?' + params.toString(), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.success) return null;
+      lastIntelligence = data;
+      return data;
+    } catch (e) { return null; }
+  }
+
+  function renderIntelPanel(intel) {
+    const panel = document.getElementById('intelPanel');
+    if (!intel || (!intel.programming && !intel.trimTier && !intel.fitment && !intel.salesHistory)) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+
+    // Programming
+    const progEl = document.getElementById('intelProgramming');
+    if (intel.programming) {
+      const p = intel.programming;
+      const badge = p.source === 'database'
+        ? '<span style="background:#DCFCE7;color:#15803D;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;">FROM DATABASE</span>'
+        : '<span style="background:#FEF3C7;color:#92400E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;">FROM SEARCH</span>';
+      const reqColor = p.programmingRequired === 'YES' ? '#B91C1C' : p.programmingRequired === 'NO' ? '#15803D' : '#B45309';
+      progEl.innerHTML = badge + ' <strong style="color:' + reqColor + '">Programming: ' + p.programmingRequired + '</strong>' + (p.notes ? ' - ' + p.notes : '');
+      progEl.style.display = 'block';
+
+      // Auto-fill programming note from DB
+      const progField = document.getElementById('programmingNoteField');
+      const progInput = document.getElementById('programmingNote');
+      const progSource = document.getElementById('programmingNoteSource');
+      if (p.programmingRequired === 'YES' && p.notes) {
+        progField.style.display = 'block';
+        progInput.value = p.notes;
+        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk programming database</span>';
+      } else if (p.programmingRequired === 'NO') {
+        progField.style.display = 'block';
+        progInput.value = 'Direct replacement - no programming required.';
+        progSource.innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk programming database</span>';
+      } else if (p.programmingRequired === 'VERIFY') {
+        progField.style.display = 'block';
+        progInput.value = p.notes || '';
+        progSource.innerHTML = '<span style="color:#b45309; font-weight:500;">VERIFY - DB says verify for this year/make/module</span>';
+      }
+    } else { progEl.style.display = 'none'; }
+
+    // Trim tier
+    const trimEl = document.getElementById('intelTrimTier');
+    if (intel.trimTier) {
+      const t = intel.trimTier;
+      const tierColors = { PERFORMANCE: '#F97316', PREMIUM: '#EAB308', CHECK: '#6B7280', BASE: '#374151' };
+      const tierColor = tierColors[t.tier] || '#6B7280';
+      let html = '<span style="background:' + tierColor + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">' + t.tier + '</span>';
+      if (t.audioBrand) html += ' <strong>' + t.audioBrand + ' Audio</strong>';
+      if (t.expectedParts) html += ' - Expected: ' + t.expectedParts;
+      if (t.cultFlag) html += ' <span style="background:#D946EF;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;">CULT</span>';
+      trimEl.innerHTML = html;
+      trimEl.style.display = 'block';
+    } else { trimEl.style.display = 'none'; }
+
+    // Fitment
+    const fitEl = document.getElementById('intelFitment');
+    if (intel.fitment) {
+      const f = intel.fitment;
+      const src = intel.fitmentSource === 'cache' ? 'DarkHawk cache' : intel.fitmentSource === 'item_aic' ? 'DynaTrack database' : 'search';
+      const vehicleCount = f.allVehicles ? f.allVehicles.length : 1;
+      fitEl.innerHTML = '<span style="color:#15803D; font-weight:500;">Fitment found in ' + src + '</span>' + (vehicleCount > 1 ? ' (' + vehicleCount + ' vehicles)' : '');
+      fitEl.style.display = 'block';
+    } else { fitEl.style.display = 'none'; }
+
+    // Sales
+    const salesEl = document.getElementById('intelSales');
+    if (intel.salesHistory) {
+      const s = intel.salesHistory;
+      const lastDate = s.lastSoldDate ? new Date(s.lastSoldDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      salesEl.innerHTML = 'Your Sales: ' + s.count + ' sold - Avg $' + s.avgPrice.toFixed(2) + (lastDate ? ' - Last sold ' + lastDate : '');
+      salesEl.style.display = 'block';
+    } else { salesEl.style.display = 'none'; }
+  }
+
+  function lookupProgramming(brand, year, moduleType) {
+    if (!programmingDB) return { found: false };
+    const typeMap = { 'ecu': 'ECM', 'bcm': 'BCM', 'tcm': 'TCM', 'tipm': 'TIPM', 'abs': 'ABS', 'radio': 'Radio', 'cluster': 'Cluster', 'idm': 'IDM' };
+    const dbType = typeMap[moduleType] || moduleType.toUpperCase();
+    // Brand normalization
+    const brandMap = {
+      'ford': 'Ford', 'toyota': 'Toyota', 'honda': 'Honda', 'dodge': 'Chrysler', 'chrysler': 'Chrysler',
+      'jeep': 'Chrysler', 'ram': 'Chrysler', 'chevrolet': 'GM', 'gmc': 'GM', 'buick': 'GM', 'cadillac': 'GM',
+      'pontiac': 'GM', 'saturn': 'GM', 'nissan': 'Nissan', 'infiniti': 'Nissan', 'bmw': 'BMW',
+      'mercedes': 'Mercedes', 'mazda': 'Mazda', 'kia': 'Hyundai/Kia', 'hyundai': 'Hyundai/Kia',
+      'subaru': 'Subaru', 'volkswagen': 'VW/Audi', 'audi': 'VW/Audi', 'volvo': 'Volvo',
+      'lexus': 'Toyota', 'acura': 'Honda', 'lincoln': 'Ford', 'mercury': 'Ford',
+    };
+    const brandGroup = brandMap[(brand || '').toLowerCase()] || brand;
+    const key = brandGroup + '|' + dbType + '|' + parseInt(year);
+    const match = programmingDB[key];
+    if (match) return { found: true, required: match.r, notes: match.n };
+    return { found: false };
+  }
+
+  // ── DarkHawk fitment check (on part number blur) ─────────────
+  async function checkDarkHawkFitment(partNumber) {
+    if (!partNumber || partNumber.length < 5) return;
+    try {
+      const res = await fetch(`/api/listing-tool/parts-lookup?partNumber=${encodeURIComponent(partNumber)}`);
+      const json = await res.json();
+      if (!json.success || !json.data) return;
+
+      const statusEl = document.getElementById('lookupStatus');
+
+      if (json.source === 'cache') {
+        const d = json.data;
+        if (d.part_name) document.getElementById('partName').value = d.part_name;
+        if (d.year) document.getElementById('donorYear').value = d.year;
+        if (d.make || d.model) document.getElementById('donorVehicle').value = [d.make, d.model].filter(Boolean).join(' ');
+        if (d.engine) document.getElementById('donorEngine').value = d.engine;
+        if (d.does_not_fit) {
+          document.getElementById('doesNotFit').value = d.does_not_fit;
+          document.getElementById('doesNotFitField').style.display = 'block';
+        }
+        if (d.programming_note) {
+          document.getElementById('programmingNote').value = d.programming_note;
+          document.getElementById('programmingNoteField').style.display = 'block';
+          document.getElementById('programmingNoteSource').innerHTML = '<span style="color:#15803d; font-weight:500;">From DarkHawk cache (lister-confirmed)</span>';
+        }
+        statusEl.innerHTML = '<span style="color:#15803d; font-weight:500;">✓ Fitment loaded from DarkHawk - verify before generating</span>';
+        return;
+      }
+
+      if (json.source === 'database' && json.data.compatibility?.length > 0) {
+        const c = json.data.compatibility[0];
+        if (c.year) document.getElementById('donorYear').value = c.year;
+        if (c.make || c.model) document.getElementById('donorVehicle').value = [c.make, c.model].filter(Boolean).join(' ');
+        if (c.engine) document.getElementById('donorEngine').value = c.engine;
+        statusEl.innerHTML = '<span style="color:#15803d;">✓ Partial fitment from database - generate to save complete data</span>';
+      }
+    } catch (e) { /* DarkHawk unavailable - silent */ }
+  }
+
+  // ── Write fitment + intelligence back to DarkHawk (fire-and-forget after generate) ──
+  async function saveFitmentToDarkHawk() {
+    const partNumber = document.getElementById('partNum').value.trim();
+    if (!partNumber || partNumber.length < 5) return;
+
+    const vehicleStr = document.getElementById('donorVehicle').value.trim();
+    const parts = vehicleStr.split(/\s+/);
+    const make = parts[0] || '';
+    const model = parts.slice(1).join(' ').split(' - ')[0].split(' (')[0].trim();
+    if (!make) return;
+
+    try {
+      await fetch('/api/listing-tool/save-fitment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partNumber,
+          partName: document.getElementById('partName').value.trim() || null,
+          partType: detectPartType() || null,
+          year: document.getElementById('donorYear').value.trim() || null,
+          make, model: model || null,
+          engine: document.getElementById('donorEngine').value.trim() || null,
+          doesNotFit: document.getElementById('doesNotFit').value.trim() || null,
+          programmingRequired: document.getElementById('programmingNote').value ? 'yes' : null,
+          programmingNote: document.getElementById('programmingNote').value.trim() || null,
+        }),
+      });
+    } catch (e) { /* non-blocking */ }
+
+    // Also save via intelligence endpoint for richer data
+    try {
+      await fetch('/api/listing-tool/save-listing-intel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partNumber,
+          partName: document.getElementById('partName').value.trim() || null,
+          partType: detectPartType() || null,
+          year: document.getElementById('donorYear').value.trim() || null,
+          make, model: model || null,
+          engine: document.getElementById('donorEngine').value.trim() || null,
+          doesNotFit: document.getElementById('doesNotFit').value.trim() || null,
+          programmingRequired: document.getElementById('programmingNote').value ? 'yes' : null,
+          programmingNote: document.getElementById('programmingNote').value.trim() || null,
+        }),
+      });
+    } catch (e) { /* non-blocking */ }
+  }
+</script>
+</body>
+</html>
