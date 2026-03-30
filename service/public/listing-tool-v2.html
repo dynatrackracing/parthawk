@@ -1128,6 +1128,7 @@ IMPORTANT FORMATTING RULES:
 - Part number always goes at the end before any condition/mileage/test notes
 - End notes only when relevant: "Programmed" for pre-programmed ECUs, drivetrain if specific (AWD/2WD)
 - BRAND NAMES IN TITLE: Use ONLY the vehicle brand, never the parent company. Lexus is "Lexus" not "Toyota Lexus". Acura is "Acura" not "Honda Acura". Infiniti is "Infiniti" not "Nissan Infiniti". Lincoln is "Lincoln" not "Ford Lincoln". Mini is "Mini" not "BMW Mini". Scion is "Scion" not "Toyota Scion".
+- Exception: For DRIVETRAIN parts that genuinely fit both brands (e.g., ECU fits both Toyota Camry and Lexus ES), list both brands separately: "Toyota Camry Lexus ES 2012-2017 ECM PCM..."
 ${isTested && testedSuffix ? `- This is a TESTED item - append the following at the very end of the title: ${testedSuffix}` : ''}
 - Title must be 80 characters or under - cut filler words to fit, never exceed 80
 - After the TITLE: line, leave one blank line then output the listing body exactly as templated
@@ -1205,8 +1206,8 @@ ${isTested && testedSuffix ? `- This is a TESTED item - append the following at 
       },
       radio: {
         query: `"${partNum}" radio head unit OEM fitment application`,
-        fitmentFields: 'Year/make/model and trim/option package. Engine and drivetrain are NOT relevant for radios.',
-        programmingRule: 'Radios are direct replacement. Write exactly: "Direct replacement - no programming required."',
+        fitmentFields: 'Year/make/model and trim/option package. Engine and drivetrain are NOT relevant for radios. If trim data shows a specific audio brand, mention it. Distinguish between base radio and navigation unit if possible.',
+        programmingRule: 'Radios are direct replacement. Omit programming note entirely.',
       },
       idm: {
         query: `"${partNum}" IDM injector driver module diesel fitment`,
@@ -1231,6 +1232,10 @@ ${isTested && testedSuffix ? `- This is a TESTED item - append the following at 
     const enrichedQuery = detectedCat
       ? `${strategy.query} ${detectedCat.name.split('/')[0]}`
       : strategy.query;
+
+    // Cross-brand fitment: drivetrain parts can span Toyota/Lexus, Honda/Acura, etc.
+    const CROSS_BRAND_ALLOWED = ['ecu', 'ecm', 'pcm', 'tcm', 'abs', 'throttle', 'tipm', 'idm', 'mechanical', 'generic'];
+    const allowsCrossBrand = CROSS_BRAND_ALLOWED.includes(partType);
 
     const confirmedProgrammingNote = document.getElementById('programmingNote').value.trim();
     const programmingNoteFieldVisible = document.getElementById('programmingNoteField').style.display !== 'none';
@@ -1290,10 +1295,9 @@ ${lastIntelligence.fitment.allVehicles.map(v => (v.year || '') + ' ' + (v.make |
 Does not fit: ${lastIntelligence.fitment.doesNotFit || 'No confirmed exclusions'}
 
 CRITICAL: This fitment is from our verified database. The Fits line MUST include these vehicles.
-Web search may find the same vehicles - that confirms our data.
-Web search may find DIFFERENT vehicles - IGNORE those unless they are clearly the same platform (same generation, shared chassis).
-Do NOT add vehicles from web search that are a different make or model family than what the database shows.
-For example: if database shows Lexus GS350, do NOT add Toyota Avalon even if web search says it fits - different model family.
+${allowsCrossBrand
+  ? 'This is a DRIVETRAIN part (' + partType + '). Cross-brand fitment IS expected - for example, a Lexus and Toyota may share this part if they use the same engine/transmission platform. Include all confirmed vehicles from both the database and web search, across brands.'
+  : 'This is a BODY/INTERIOR ELECTRONICS part (' + partType + '). Cross-brand fitment is NOT expected. A Lexus amplifier does NOT fit a Toyota even if they share a platform. An Acura radio does NOT fit a Honda. ONLY include vehicles that match the SAME BRAND as shown in the database. Ignore cross-brand results from web search entirely.'}
 ` : ''}
 FORMATTING RULE: Never use em dashes (the long dash character) anywhere in the output. Use regular hyphens/dashes (-) only. This is a hard requirement.
 
