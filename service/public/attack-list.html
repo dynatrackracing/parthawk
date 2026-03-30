@@ -674,10 +674,12 @@
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
       // OUR sold price is primary when we have recent sales; market data fills gaps
       const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
+      const isEst = p.priceSource === 'estimate';
       const displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
-      const badgeVerdict = displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
-      const vc = badgeVerdict === 'GREAT' ? 'verdict-great' : badgeVerdict === 'GOOD' ? 'verdict-good' : badgeVerdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
+      const badgeVerdict = isEst ? 'EST' : displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
+      const vc = badgeVerdict === 'EST' ? 'verdict-poor' : badgeVerdict === 'GREAT' ? 'verdict-great' : badgeVerdict === 'GOOD' ? 'verdict-good' : badgeVerdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
       const price = displayPrice;
+      const pricePrefix = isEst ? '~$' : '$';
       const inStock = p.in_stock != null ? p.in_stock : 0;
       const sold90d = p.sold_90d != null ? p.sold_90d : 0;
       // Price freshness indicator
@@ -699,13 +701,13 @@
       html += `<div class="part-detail" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.isMarked ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
-          <div class="pd-verdict ${vc}">${p.verdict} $${price} ${freshness}</div>
+          <div class="pd-verdict ${vc}">${badgeVerdict} ${pricePrefix}${price} ${freshness}</div>
         </div>
         <div class="pd-stats">
           <span>${inStock} in stock</span>
           <span>${sold90d} sold/90d</span>
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
-          ${p.priceSource === 'item_reference' ? '<span style="color:#6B7280;font-size:9px" title="Price from frozen Item table — may be outdated">ref</span>' : ''}
+          ${isEst ? '<span style="color:#6B7280;font-size:9px" title="Conservative estimate — no market data available">est</span>' : ''}
         </div>
         <div class="pd-reason">${p.reason || ''}${p.trimMultiplier !== undefined && p.trimMultiplier < 1.0 ? (p.trimMultiplier === 0 ? ' <span style="color:#ef4444;font-weight:600">· Not expected on this trim</span>' : ' <span style="color:#f59e0b;font-weight:600">· ⚠️ Verify on vehicle</span>') : ''}</div>
         ${p.marketMedian > 0 ? `<div style="font-size:11px;margin-top:2px;display:flex;gap:8px;align-items:center">

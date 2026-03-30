@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
         for (const vehicle of (yard.vehicles || [])) {
           // Keep only chip-display data: part type + price for each part
           vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
-            partType: p.partType, price: p.price, verdict: p.verdict,
+            partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
           }));
           delete vehicle.parts;
           delete vehicle.rebuild_parts;

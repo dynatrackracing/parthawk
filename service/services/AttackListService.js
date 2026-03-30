@@ -50,6 +50,17 @@ function partRequiresExactYear(title) {
   return false;
 }
 
+// Conservative sell-price estimates by part type.
+// Based on DynaTrack actual sold averages — used when market cache has no data.
+// NEVER fall back to Item.price (frozen competitor/programmed listing prices).
+const CONSERVATIVE_SELL_ESTIMATES = {
+  'ECM': 175, 'BCM': 125, 'TCM': 150, 'ABS': 200,
+  'TIPM': 140, 'CLUSTER': 110, 'RADIO': 100, 'AMP': 130,
+  'THROTTLE': 130, 'STEERING': 190, 'REGULATOR': 60,
+  'MIRROR': 110, 'SUNROOF': 160, 'FUEL_MODULE': 90,
+  'OTHER': 100,
+};
+
 function cleanNHTSATrim(raw) {
   if (!raw) return null;
   let t = raw.trim();
@@ -394,10 +405,18 @@ class AttackListService {
         const entry = index[key];
         if (!entry.items.some(i => i.itemId === row.itemId)) {
           const isRebuild = row.seller === 'pro-rebuild' || row.isRepair === true;
-          // Use cache price when available, fall back to frozen Item.price
+          // Use cache price when available; NEVER fall back to Item.price (frozen listing data)
           const resolved = row.manufacturerPartNumber ? cacheIndex.get(row.manufacturerPartNumber) : null;
-          const effectivePrice = (resolved && resolved.price > 0 && resolved.source !== 'none') ? resolved.price : (parseFloat(row.price) || 0);
-          const priceSource = resolved ? resolved.source : 'item_reference';
+          let effectivePrice, priceSource;
+          if (resolved && resolved.price > 0 && resolved.source !== 'none') {
+            effectivePrice = resolved.price;
+            priceSource = resolved.source; // 'market_cache'
+          } else {
+            // Conservative sell estimate by part type — replaces stale Item.price fallback
+            const pt = detectPartType(row.title + ' ' + (row.categoryTitle || '')) || 'OTHER';
+            effectivePrice = CONSERVATIVE_SELL_ESTIMATES[pt] || CONSERVATIVE_SELL_ESTIMATES['OTHER'];
+            priceSource = 'estimate';
+          }
           entry.items.push({
             itemId: row.itemId,
             title: row.title,
@@ -897,7 +916,7 @@ class AttackListService {
       parts.push({
         itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
         category: null, partNumber: null, partType,
-        price: ptWeightedAvg, in_stock: ptStock,
+        price: ptWeightedAvg, priceSource: 'sold', in_stock: ptStock,
         sold_90d: ptData.count, verdict, lastSoldDate: lastSold,
         reason: `Sold ${ptData.count}x @ $${ptWeightedAvg} avg (recency-weighted)`,
         deadWarning: null,
@@ -940,6 +959,7 @@ class AttackListService {
         if (p.price > existing._rawPrice) {
           existing._rawPrice = p.price;
           existing.price = Math.round(p.price);
+          existing.priceSource = p.priceSource || 'estimate';
           existing.title = p.title;
           existing.itemId = p.itemId;
         }
@@ -958,7 +978,8 @@ class AttackListService {
         mergedByBase[key] = {
           itemId: p.itemId, title: p.title, category: p.category,
           partNumber: p.partNumber, partType: p.partType,
-          price: Math.round(p.price), in_stock: ptStock, sold_90d: 0,
+          price: Math.round(p.price), priceSource: p.priceSource || 'estimate',
+          in_stock: ptStock, sold_90d: 0,
           verdict: 'SKIP', seller: p.seller || null,
           reason: 'Competitor listed, check YourSale for demand',
           isRebuild: false, deadWarning: null,

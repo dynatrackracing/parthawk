@@ -724,15 +724,12 @@ function renderVehicleCard(v) {
   if (v.hasHighValuePart && v.parts) {
     var hvParts = v.parts.filter(function(p) {
       var pt = (p.partType || '').toUpperCase();
-      var hasOwn = (p.sold_90d || 0) > 0 && p.price > 0;
-      var dp = hasOwn ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
-      return dp >= 200 && pt !== 'OTHER' && pt !== '';
+      // Only show high value for parts with real data (sold or market), not estimates
+      return (p.price || 0) >= 200 && pt !== 'OTHER' && pt !== '' && p.priceSource !== 'estimate';
     });
     if (hvParts.length > 0) {
       hvLine = '<div class="v-highvalue">\u2605 HIGH VALUE: ' + hvParts.map(function(p) {
-        var hasOwn = (p.sold_90d || 0) > 0 && p.price > 0;
-        var dp = hasOwn ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
-        return esc(p.partType || p.title || '?') + ' $' + dp;
+        return esc(p.partType || p.title || '?') + ' $' + (p.price || 0);
       }).join(', ') + '</div>';
     }
   }
@@ -742,10 +739,11 @@ function renderVehicleCard(v) {
   var shown = parts.slice(0, 5);
   var extra = parts.length - shown.length;
   shown.forEach(function(p) {
-    var hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
-    var pr = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
-    var cc = pr >= 250 ? 'chip-green' : pr >= 150 ? 'chip-cyan' : pr >= 100 ? 'chip-yellow' : 'chip-gray';
-    chips += '<span class="chip ' + cc + '" style="font-size:9px">' + esc(p.partType || '?') + ' $' + pr + '</span> ';
+    var pr = p.price || 0;
+    var isEst = p.priceSource === 'estimate';
+    var cc = isEst ? 'chip-gray' : pr >= 250 ? 'chip-green' : pr >= 150 ? 'chip-cyan' : pr >= 100 ? 'chip-yellow' : 'chip-gray';
+    var prefix = isEst ? '~$' : '$';
+    chips += '<span class="chip ' + cc + '" style="font-size:9px">' + esc(p.partType || '?') + ' ' + prefix + pr + '</span> ';
   });
   if (extra > 0) chips += '<span class="chip chip-gray" style="font-size:9px;cursor:pointer" onclick="event.stopPropagation();toggleV(\'' + v.id + '\')">+' + extra + ' more</span>';
 
@@ -790,25 +788,26 @@ function renderExpandedParts(v) {
   h += '</div>';
 
   parts.sort(function(a, b) {
-    var soldA = (a.sold_90d || 0) > 0 ? 1 : (a.marketMedian > 0 ? 2 : 3);
-    var soldB = (b.sold_90d || 0) > 0 ? 1 : (b.marketMedian > 0 ? 2 : 3);
-    if (soldA !== soldB) return soldA - soldB;
-    var pA = (a.sold_90d > 0 && a.price > 0) ? a.price : (a.marketMedian > 0 ? a.marketMedian : a.price || 0);
-    var pB = (b.sold_90d > 0 && b.price > 0) ? b.price : (b.marketMedian > 0 ? b.marketMedian : b.price || 0);
-    return pB - pA;
+    // Sold data first, then market cache, then estimates last
+    var rankA = a.priceSource === 'sold' ? 1 : a.priceSource === 'market_cache' ? 2 : 3;
+    var rankB = b.priceSource === 'sold' ? 1 : b.priceSource === 'market_cache' ? 2 : 3;
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.price || 0) - (a.price || 0);
   });
   parts.forEach(function(p) {
-    var hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
-    var pr = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
-    var pColor = pr >= 250 ? '#22c55e' : pr >= 150 ? '#06b6d4' : pr >= 100 ? '#eab308' : '#6B7280';
-    var badgeVerdict = pr >= 250 ? 'GREAT' : pr >= 150 ? 'GOOD' : pr >= 100 ? 'FAIR' : 'POOR';
+    var pr = p.price || 0;
+    var isEst = p.priceSource === 'estimate';
+    var isSold = p.priceSource === 'sold';
+    var pColor = isEst ? '#6B7280' : pr >= 250 ? '#22c55e' : pr >= 150 ? '#06b6d4' : pr >= 100 ? '#eab308' : '#6B7280';
+    var badgeVerdict = isEst ? 'EST' : pr >= 250 ? 'GREAT' : pr >= 150 ? 'GOOD' : pr >= 100 ? 'FAIR' : 'POOR';
     var verdictChip = '';
     if (badgeVerdict === 'GREAT') verdictChip = '<span class="chip chip-green" style="font-size:8px">GREAT</span>';
     else if (badgeVerdict === 'GOOD') verdictChip = '<span class="chip chip-cyan" style="font-size:8px">GOOD</span>';
     else if (badgeVerdict === 'FAIR') verdictChip = '<span class="chip chip-yellow" style="font-size:8px">FAIR</span>';
+    else if (badgeVerdict === 'EST') verdictChip = '<span class="chip chip-gray" style="font-size:8px">EST</span>';
 
     var freshness = '';
-    if (hasOurSales) {
+    if (isSold) {
       if (p.lastSoldDate) {
         var daysAgo = Math.floor((Date.now() - new Date(p.lastSoldDate).getTime()) / 86400000);
         freshness = daysAgo <= 30 ? '<span style="color:#22c55e">\u2713</span>' : daysAgo <= 60 ? '<span style="color:#eab308">\u26A0</span>' : '<span style="color:#ef4444">\u2717</span>';
@@ -822,6 +821,7 @@ function renderExpandedParts(v) {
       else freshness = '<span style="color:#ef4444">\u2717</span>';
     }
 
+    var prefix = isEst ? '~$' : '$';
     h += '<div class="part-row">';
     h += '<div><span class="part-type">' + esc(p.partType || p.title || '?') + '</span> ' + verdictChip;
     h += '<div class="part-meta">';
@@ -829,20 +829,12 @@ function renderExpandedParts(v) {
     if (p.sold_90d != null) h += 'Sold 90d: ' + p.sold_90d + ' ';
     if (p.trimMultiplier != null && p.trimMultiplier < 1) h += '<span style="color:#f97316">trim x' + p.trimMultiplier + '</span> ';
     h += freshness;
+    if (isEst) h += ' <span style="color:#6B7280">est</span>';
     if (p.deadWarning) h += ' <span style="color:#ef4444">\u2620 dead pattern</span>';
     if (p.isMarked) h += ' <span style="color:#d946ef">MARKED</span>';
     h += '</div></div>';
-    h += '<div class="part-price" style="color:' + pColor + '">$' + pr + '</div>';
+    h += '<div class="part-price" style="color:' + pColor + '">' + prefix + pr + '</div>';
     h += '</div>';
-    if (p.marketMedian > 0) {
-      var mColor = hasOurSales ? '#6B7280' : (Math.abs(pr - p.marketMedian) / p.marketMedian > 0.2 ? (pr > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981');
-      h += '<div style="font-size:10px;padding:0 0 4px 0;display:flex;gap:6px;color:#6B7280">';
-      h += '<span>' + (hasOurSales ? 'Mkt ref' : 'Market') + '</span>';
-      h += '<span style="color:' + mColor + ';font-weight:600">$' + p.marketMedian + ' med</span>';
-      h += '<span>' + (p.marketCount || 0) + ' sold</span>';
-      if (p.marketVelocity) h += '<span>' + p.marketVelocity.toFixed(1) + '/wk</span>';
-      h += '</div>';
-    }
   });
   return h;
 }
