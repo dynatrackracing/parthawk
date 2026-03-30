@@ -354,6 +354,87 @@ class FlywayService {
   }
 
   // ============================================================
+  // CLEANUP — deactivate road trip yard vehicles after grace period
+  // ============================================================
+
+  /**
+   * Get core yard IDs — yards scraped daily by scrape-local.js regardless of Flyway.
+   * These must NEVER have their vehicles deactivated.
+   */
+  static async getCoreYardIds() {
+    // These match the LOCATIONS array in scrape-local.js (4 NC + 3 FL LKQ yards)
+    const coreNames = [
+      'LKQ Raleigh', 'LKQ Durham', 'LKQ Greensboro', 'LKQ East NC',
+      'LKQ Tampa', 'LKQ Largo', 'LKQ Clearwater',
+    ];
+    const coreYards = await database('yard')
+      .whereIn('name', coreNames)
+      .select('id');
+    return coreYards.map(y => y.id);
+  }
+
+  /**
+   * Cleanup yard_vehicle records for completed trips past the 24-hour grace period.
+   *
+   * Rules:
+   * 1. Only trips with status='complete' AND completed_at older than 24 hours
+   * 2. Only trips not already cleaned up (cleaned_up = false or null)
+   * 3. Skip core yards (scraped daily by scrape-local.js)
+   * 4. Skip yards still referenced by another active trip
+   * 5. Mark yard_vehicle records as active=false for qualifying yards
+   */
+  static async cleanupExpiredTripVehicles() {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const expiredTrips = await database('flyway_trip')
+      .where('status', 'complete')
+      .whereNotNull('completed_at')
+      .where('completed_at', '<', cutoff)
+      .where(function() {
+        this.whereNull('cleaned_up').orWhere('cleaned_up', false);
+      })
+      .select('id', 'name', 'completed_at');
+
+    if (expiredTrips.length === 0) return 0;
+
+    const coreYardIds = await this.getCoreYardIds();
+
+    const activeYardIds = await database('flyway_trip_yard')
+      .join('flyway_trip', 'flyway_trip.id', 'flyway_trip_yard.trip_id')
+      .where('flyway_trip.status', 'active')
+      .select('flyway_trip_yard.yard_id')
+      .then(rows => rows.map(r => r.yard_id));
+
+    const protectedYardIds = new Set([...coreYardIds, ...activeYardIds]);
+
+    let totalDeactivated = 0;
+
+    for (const trip of expiredTrips) {
+      const tripYardIds = await database('flyway_trip_yard')
+        .where('trip_id', trip.id)
+        .select('yard_id')
+        .then(rows => rows.map(r => r.yard_id));
+
+      const yardsToClean = tripYardIds.filter(id => !protectedYardIds.has(id));
+
+      if (yardsToClean.length > 0) {
+        const deactivated = await database('yard_vehicle')
+          .whereIn('yard_id', yardsToClean)
+          .where('active', true)
+          .update({ active: false, updatedAt: new Date() });
+
+        totalDeactivated += deactivated;
+      }
+
+      await database('flyway_trip')
+        .where({ id: trip.id })
+        .update({ cleaned_up: true, updated_at: new Date() });
+    }
+
+    return totalDeactivated;
+  }
+
+  // ============================================================
   // AUTO-COMPLETE TRIPS
   // ============================================================
 

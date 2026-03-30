@@ -29,7 +29,17 @@ class FlywayScrapeRunner {
         this.log.info({ completed }, 'Auto-completed expired Flyway trips');
       }
 
-      // Step 2: Get active scrapable yards (non-LKQ only)
+      // Step 2: Cleanup vehicle data for trips past 24-hour grace period
+      try {
+        const deactivated = await FlywayService.cleanupExpiredTripVehicles();
+        if (deactivated > 0) {
+          this.log.info({ deactivated }, 'Cleaned up expired trip vehicle data');
+        }
+      } catch (err) {
+        this.log.error({ err: err.message }, 'Flyway cleanup failed (non-fatal)');
+      }
+
+      // Step 3: Get active scrapable yards (non-LKQ only)
       const allYards = await FlywayService.getActiveScrapableYards();
 
       const nonLkqYards = allYards.filter(y => {

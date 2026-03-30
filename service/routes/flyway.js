@@ -106,6 +106,72 @@ router.post('/trips/:id/reinstate', async (req, res) => {
   }
 });
 
+// Dry-run preview: show what cleanup would deactivate
+router.get('/cleanup-preview', async (req, res) => {
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const expiredTrips = await database('flyway_trip')
+      .where('status', 'complete')
+      .whereNotNull('completed_at')
+      .where('completed_at', '<', cutoff)
+      .where(function() {
+        this.whereNull('cleaned_up').orWhere('cleaned_up', false);
+      })
+      .select('id', 'name', 'completed_at');
+
+    const coreYardIds = await FlywayService.getCoreYardIds();
+
+    const activeYardIds = await database('flyway_trip_yard')
+      .join('flyway_trip', 'flyway_trip.id', 'flyway_trip_yard.trip_id')
+      .where('flyway_trip.status', 'active')
+      .select('flyway_trip_yard.yard_id')
+      .then(rows => rows.map(r => r.yard_id));
+
+    const protectedYardIds = new Set([...coreYardIds, ...activeYardIds]);
+
+    const preview = [];
+    for (const trip of expiredTrips) {
+      const tripYardIds = await database('flyway_trip_yard')
+        .where('trip_id', trip.id)
+        .select('yard_id')
+        .then(rows => rows.map(r => r.yard_id));
+
+      const yardsToClean = tripYardIds.filter(id => !protectedYardIds.has(id));
+
+      let vehicleCount = 0;
+      if (yardsToClean.length > 0) {
+        const result = await database('yard_vehicle')
+          .whereIn('yard_id', yardsToClean)
+          .where('active', true)
+          .count('id as count')
+          .first();
+        vehicleCount = parseInt(result.count);
+      }
+
+      const yardNames = await database('yard')
+        .whereIn('id', yardsToClean)
+        .select('id', 'name', 'chain');
+
+      preview.push({
+        trip: trip.name,
+        completed_at: trip.completed_at,
+        yardsToClean: yardNames,
+        yardsProtected: tripYardIds.filter(id => protectedYardIds.has(id)).length,
+        vehiclesToDeactivate: vehicleCount,
+      });
+    }
+
+    res.json({
+      coreYardIds,
+      activeYardIdsProtected: [...new Set(activeYardIds)],
+      trips: preview,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Get Flyway attack list for a trip
 router.get('/trips/:id/attack-list', async (req, res) => {
   try {
