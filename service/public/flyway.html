@@ -586,13 +586,18 @@ function renderActiveTrip() {
   h += '<button class="btn btn-gray btn-sm" onclick="confirmComplete()">Complete</button>';
   h += '</div></div></div>';
 
-  // Yard tabs
+  // Build vehicle count map from scored yards
+  var yardVehicleCounts = {};
+  yards.forEach(function(y) { yardVehicleCounts[y.yard.id] = y.total_vehicles || 0; });
+
+  // Yard tabs — built from trip.yards (always complete, even with 0 vehicles)
+  var tripYards = (trip.yards || []).filter(function(y) { return y.scrape_enabled !== false; });
   h += '<div class="yard-tabs">';
   h += '<div class="yard-tab' + (activeYardFilter === 'all' ? ' active' : '') + '" onclick="setYardFilter(\'all\')">ALL</div>';
-  yards.forEach(function(y) {
-    var yid = y.yard.id;
-    var capLabel = (y.total_scored && y.total_scored > y.total_vehicles) ? y.total_vehicles + '/' + y.total_scored : '' + y.total_vehicles;
-    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.yard.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + capLabel + '</span></div>';
+  tripYards.forEach(function(y) {
+    var yid = y.id;
+    var count = yardVehicleCounts[yid] || 0;
+    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + count + '</span></div>';
   });
   h += '</div>';
 
@@ -640,7 +645,26 @@ function renderActiveTrip() {
 
   // Vehicle list
   if (filtered.length === 0) {
-    h += '<div class="empty">No vehicles above threshold. Top 50 per yard shown plus rare finds (manual, diesel, 4x4, premium, performance, cult). Road trip floor: $1,000+. Day trip floor: $600+.</div>';
+    // If filtering by a specific yard, show yard metadata
+    var emptyYard = activeYardFilter !== 'all' ? tripYards.find(function(y) { return y.id === activeYardFilter; }) : null;
+    if (emptyYard) {
+      var methodMap = { lkq: 'Local scrape (nightly)', pullapart: 'Server scrape (daily 6am UTC)', on_demand: 'Server scrape (daily 6am UTC)', carolina: 'Server scrape (daily 6am UTC)', chesterfield: 'Server scrape (daily 6am UTC)', upullandsave: 'Server scrape (daily 6am UTC)', pickapartva: 'Server scrape (daily 6am UTC)', manual: 'Manual paste only' };
+      var methodDisplay = methodMap[(emptyYard.scrape_method || '').toLowerCase()] || (emptyYard.scrape_method || 'unknown');
+      var lastScraped = emptyYard.last_scraped ? timeAgo(emptyYard.last_scraped) : 'Never';
+      var dist = Math.round(parseFloat(emptyYard.distance_from_base) || 0);
+      h += '<div class="card" style="margin-top:8px">';
+      h += '<div style="font-size:15px;font-weight:700;margin-bottom:8px">' + esc(emptyYard.name) + '</div>';
+      h += '<div style="font-size:12px;color:var(--text-muted);line-height:1.8">';
+      h += 'Chain: ' + esc(emptyYard.chain || '?') + '<br>';
+      h += 'Method: ' + esc(methodDisplay) + '<br>';
+      h += 'Last scraped: ' + esc(lastScraped) + '<br>';
+      h += 'Distance: ' + dist + 'mi</div>';
+      h += '<div style="margin-top:12px;font-size:12px;color:var(--text-faint);line-height:1.6">No vehicles scored for this yard yet.<br>';
+      h += 'Tap SCRAPE to trigger a manual scrape for non-LKQ yards.</div>';
+      h += '</div>';
+    } else {
+      h += '<div class="empty">No vehicles above threshold. Top 50 per yard shown plus rare finds (manual, diesel, 4x4, premium, performance, cult). Road trip floor: $1,000+. Day trip floor: $600+.</div>';
+    }
   } else {
     h += '<div style="margin:0 12px">';
     topVehicles.forEach(function(v) { h += renderVehicleCard(v); });
