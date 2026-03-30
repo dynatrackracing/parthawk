@@ -38,9 +38,9 @@ class FlywayService {
     return trip;
   }
 
-  static async createTrip({ name, start_date, end_date, notes, yard_ids }) {
+  static async createTrip({ name, start_date, end_date, notes, yard_ids, trip_type }) {
     const [trip] = await database('flyway_trip')
-      .insert({ name, start_date, end_date, notes, status: 'planning' })
+      .insert({ name, start_date, end_date, notes, status: 'planning', trip_type: trip_type || 'road_trip' })
       .returning('*');
 
     if (yard_ids && yard_ids.length > 0) {

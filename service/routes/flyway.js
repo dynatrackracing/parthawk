@@ -28,11 +28,11 @@ router.get('/trips/:id', async (req, res) => {
 // Create trip
 router.post('/trips', async (req, res) => {
   try {
-    const { name, start_date, end_date, notes, yard_ids } = req.body;
+    const { name, start_date, end_date, notes, yard_ids, trip_type } = req.body;
     if (!name || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: 'name, start_date, end_date required' });
     }
-    const trip = await FlywayService.createTrip({ name, start_date, end_date, notes, yard_ids });
+    const trip = await FlywayService.createTrip({ name, start_date, end_date, notes, yard_ids, trip_type });
     res.status(201).json({ success: true, ...trip });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

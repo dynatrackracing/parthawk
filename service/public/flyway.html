@@ -15,6 +15,7 @@
   --yellow: #eab308; --yellow-dim: #713f12; --green: #22c55e;
   --gray: #9ca3af; --text: #F0F0F0; --text-mid: #d1d5db;
   --text-muted: #9CA3AF; --text-faint: #6B7280;
+  --teal: #06b6d4; --teal-bg: #164e63; --orange: #f97316; --orange-bg: #7c2d12;
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; padding-bottom: 60px; }
@@ -59,6 +60,7 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
 .form-input::placeholder, .form-textarea::placeholder { color: var(--text-faint); }
 .form-textarea { min-height: 60px; resize: vertical; font-size: 13px; }
 .form-date { color-scheme: dark; }
+.form-date:disabled { opacity: 0.4; }
 .form-row { display: flex; gap: 8px; }
 .form-row .form-group { flex: 1; }
 
@@ -70,6 +72,26 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
 .btn-gray { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
 .btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Trip Type Toggle */
+.trip-type-toggle { display: flex; gap: 0; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.trip-type-btn { flex: 1; padding: 10px 16px; font-size: 12px; font-weight: 700; cursor: pointer; text-align: center; background: var(--surface2); color: var(--text-faint); border: none; font-family: var(--font); letter-spacing: 0.04em; }
+.trip-type-btn.active-day { background: var(--teal-bg); color: var(--teal); }
+.trip-type-btn.active-road { background: var(--orange-bg); color: var(--orange); }
+
+/* Trip Type Badge */
+.badge-day { background: var(--teal-bg); color: var(--teal); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; display: inline-block; vertical-align: middle; }
+.badge-road { background: var(--orange-bg); color: var(--orange); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; display: inline-block; vertical-align: middle; }
+
+/* Trip Picker */
+.trip-picker { padding: 20px 12px; }
+.trip-picker-title { text-align: center; font-size: 14px; font-weight: 700; color: var(--text-muted); margin-bottom: 16px; }
+.trip-pick-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 10px; cursor: pointer; }
+.trip-pick-card:active { opacity: 0.8; }
+.trip-pick-card .pick-name { font-size: 15px; font-weight: 700; }
+.trip-pick-card .pick-dates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.trip-pick-card .pick-meta { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.trip-pick-card .pick-tap { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 10px; text-align: center; }
 
 /* Yard Selector */
 .yard-group { margin: 8px 12px; }
@@ -173,11 +195,15 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
   <!-- Trip Creation -->
   <div class="card" style="margin-top:8px">
     <div class="form-label" style="margin-bottom:8px;color:var(--red)">New Trip</div>
+    <div class="trip-type-toggle">
+      <button class="trip-type-btn" id="btnDayTrip" onclick="setTripType('day_trip')">DAY TRIP</button>
+      <button class="trip-type-btn active-road" id="btnRoadTrip" onclick="setTripType('road_trip')">ROAD TRIP</button>
+    </div>
     <div class="form-group">
       <input class="form-input" id="tripName" placeholder="Charlotte Run, GA/FL Sweep..." autocomplete="off">
     </div>
     <div class="form-row">
-      <div class="form-group"><div class="form-label">Start</div><input type="date" class="form-date" id="tripStart"></div>
+      <div class="form-group"><div class="form-label">Start</div><input type="date" class="form-date" id="tripStart" onchange="onStartDateChange()"></div>
       <div class="form-group"><div class="form-label">End</div><input type="date" class="form-date" id="tripEnd"></div>
     </div>
     <div class="form-group">
@@ -225,28 +251,33 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
 
 <script>
 // ═══ STATE ═══
-let currentView = 'plan';
-let allTrips = [];
-let activeTrip = null;
-let activeTripData = null;
-let editingTripId = null;
-let availableYards = [];
-let selectedYardIds = new Set();
-let activeYardFilter = 'all';
-let sortMode = 'score';
-let filterPremium = false;
-let filterHighValue = false;
-let confirmCallback = null;
-let refreshTimer = null;
+var currentView = 'plan';
+var allTrips = [];
+var activeTrip = null;
+var activeTripData = null;
+var editingTripId = null;
+var editingTripType = null;
+var availableYards = [];
+var selectedYardIds = new Set();
+var activeYardFilter = 'all';
+var sortMode = 'score';
+var filterPremium = false;
+var filterHighValue = false;
+var confirmCallback = null;
+var refreshTimer = null;
+var newTripType = 'road_trip';
+var multipleActiveTrips = [];
 
 // ═══ HELPERS ═══
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function timeAgo(ds) { const d = new Date(ds); const diff = Date.now() - d.getTime(); const h = Math.floor(diff / 3600000); const dd = Math.floor(h / 24); if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now'; }
+function timeAgo(ds) { var d = new Date(ds); var diff = Date.now() - d.getTime(); var h = Math.floor(diff / 3600000); var dd = Math.floor(h / 24); if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now'; }
 function fmtDate(d) { if (!d) return ''; return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-function fmtDateRange(s, e) { return fmtDate(s) + ' - ' + fmtDate(e); }
+function fmtDateRange(s, e) { if (s === e) return fmtDate(s); return fmtDate(s) + ' - ' + fmtDate(e); }
 function daysUntil(d) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000); }
+function tripTypeBadge(t) { var tt = t.trip_type || 'road_trip'; return tt === 'day_trip' ? '<span class="badge-day">DAY TRIP</span>' : '<span class="badge-road">ROAD TRIP</span>'; }
+function tripTypeAccent(t) { return (t.trip_type || 'road_trip') === 'day_trip' ? 'var(--teal)' : 'var(--orange)'; }
 
-const LKQ_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH','RE','PT','LA','LD','BR','BE','AB','AY','PM','PG','DR','SA']);
+var LKQ_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH','RE','PT','LA','LD','BR','BE','AB','AY','PM','PG','DR','SA']);
 function cleanModel(text, make) {
   if (!text) return text;
   var c = text;
@@ -262,8 +293,38 @@ function cleanModel(text, make) {
 
 // ═══ API ═══
 async function api(url, opts) {
-  const res = await fetch(url, opts);
+  var res = await fetch(url, opts);
   return res.json();
+}
+
+// ═══ TRIP TYPE TOGGLE ═══
+function setTripType(type) {
+  newTripType = type;
+  var dayBtn = document.getElementById('btnDayTrip');
+  var roadBtn = document.getElementById('btnRoadTrip');
+  dayBtn.className = 'trip-type-btn' + (type === 'day_trip' ? ' active-day' : '');
+  roadBtn.className = 'trip-type-btn' + (type === 'road_trip' ? ' active-road' : '');
+
+  var nameInput = document.getElementById('tripName');
+  var endInput = document.getElementById('tripEnd');
+  if (type === 'day_trip') {
+    nameInput.placeholder = 'Foss Run, Charlotte Day Trip...';
+    endInput.disabled = true;
+    var startVal = document.getElementById('tripStart').value;
+    if (startVal) endInput.value = startVal;
+  } else {
+    nameInput.placeholder = 'Charlotte Run, GA/FL Sweep...';
+    endInput.disabled = false;
+  }
+
+  // Re-render yard selector if open
+  if (editingTripId) renderYardSelector();
+}
+
+function onStartDateChange() {
+  if (newTripType === 'day_trip') {
+    document.getElementById('tripEnd').value = document.getElementById('tripStart').value;
+  }
 }
 
 // ═══ VIEW SWITCHING ═══
@@ -293,9 +354,11 @@ function renderPlanningTrips(trips) {
   var h = '<div style="padding:12px 16px 4px"><div class="form-label" style="color:var(--text-muted)">Planning Trips</div></div>';
   trips.forEach(function(t) {
     var yardNames = (t.yards || []).map(function(y) { return esc(y.name); }).join(', ') || 'No yards';
+    var badge = tripTypeBadge(t);
+    var dateDisplay = (t.trip_type === 'day_trip' || t.start_date === t.end_date) ? fmtDate(t.start_date) : fmtDateRange(t.start_date, t.end_date);
     h += '<div class="trip-card">';
-    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + '</div>';
-    h += '<div class="trip-dates">' + fmtDateRange(t.start_date, t.end_date) + '</div>';
+    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + ' ' + badge + '</div>';
+    h += '<div class="trip-dates">' + dateDisplay + '</div>';
     h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards: ' + yardNames + '</div>';
     h += '</div><span class="chip chip-blue">PLANNING</span></div>';
     h += '<div class="trip-actions">';
@@ -310,10 +373,10 @@ function renderPlanningTrips(trips) {
 async function handleCreateTrip() {
   var name = document.getElementById('tripName').value.trim();
   var start = document.getElementById('tripStart').value;
-  var end = document.getElementById('tripEnd').value;
+  var end = newTripType === 'day_trip' ? start : document.getElementById('tripEnd').value;
   var notes = document.getElementById('tripNotes').value.trim();
   if (!name || !start || !end) return;
-  var data = await api('/flyway/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, start_date: start, end_date: end, notes: notes || null }) });
+  var data = await api('/flyway/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, start_date: start, end_date: end, notes: notes || null, trip_type: newTripType }) });
   if (data.success) {
     document.getElementById('tripName').value = '';
     document.getElementById('tripStart').value = '';
@@ -327,6 +390,9 @@ async function handleCreateTrip() {
 // ═══ YARD SELECTOR ═══
 async function editTripYards(tripId) {
   editingTripId = tripId;
+  // Determine trip type for this specific trip
+  var trip = allTrips.find(function(t) { return t.id === tripId; });
+  editingTripType = (trip && trip.trip_type) || newTripType;
   document.getElementById('yardSelectorWrap').style.display = 'block';
 
   if (availableYards.length === 0) {
@@ -334,14 +400,16 @@ async function editTripYards(tripId) {
     availableYards = data.yards || [];
   }
 
-  // Get current trip yards
-  var trip = allTrips.find(function(t) { return t.id === tripId; });
   selectedYardIds = new Set((trip && trip.yards || []).map(function(y) { return y.id; }));
   renderYardSelector();
 }
 
 function renderYardSelector() {
-  var tiers = [
+  var isDayTrip = editingTripType === 'day_trip';
+  var tiers = isDayTrip ? [
+    { label: 'Local', min: 0, max: 60, color: '#22c55e' },
+    { label: 'Nearby', min: 60, max: 120, color: '#eab308' },
+  ] : [
     { label: 'Local', min: 0, max: 60, color: '#22c55e' },
     { label: 'Day Trip', min: 60, max: 150, color: '#eab308' },
     { label: 'Road Trip', min: 150, max: 500, color: '#f97316' },
@@ -368,14 +436,16 @@ function renderYardSelector() {
     });
     h += '</div>';
   });
-  // Show flagged yards dimmed
-  var flagged = availableYards.filter(function(y) { return y.flagged; });
-  if (flagged.length > 0) {
-    h += '<div class="yard-group"><div class="yard-group-label" style="color:#ef4444">Flagged (unavailable)</div>';
-    flagged.forEach(function(y) {
-      h += '<div class="yard-item flagged"><div class="yard-check"></div><div class="yard-info"><div class="yard-name" style="color:var(--text-faint)">' + esc(y.name) + '</div><div class="yard-meta" style="color:#ef4444">' + esc(y.flag_reason || 'Flagged') + '</div></div></div>';
-    });
-    h += '</div>';
+  // Show flagged yards dimmed (not for day trips — keep it clean)
+  if (!isDayTrip) {
+    var flagged = availableYards.filter(function(y) { return y.flagged; });
+    if (flagged.length > 0) {
+      h += '<div class="yard-group"><div class="yard-group-label" style="color:#ef4444">Flagged (unavailable)</div>';
+      flagged.forEach(function(y) {
+        h += '<div class="yard-item flagged"><div class="yard-check"></div><div class="yard-info"><div class="yard-name" style="color:var(--text-faint)">' + esc(y.name) + '</div><div class="yard-meta" style="color:#ef4444">' + esc(y.flag_reason || 'Flagged') + '</div></div></div>';
+      });
+      h += '</div>';
+    }
   }
   document.getElementById('yardSelector').innerHTML = h;
   document.getElementById('yardCount').textContent = selectedYardIds.size + ' selected';
@@ -430,16 +500,53 @@ async function loadActiveView() {
     return;
   }
 
-  activeTrip = trips[0];
+  multipleActiveTrips = trips;
+
+  // Multiple active trips: show picker
+  if (trips.length > 1 && !activeTrip) {
+    renderTripPicker(trips);
+    return;
+  }
+
+  // Single active trip or already selected
+  if (!activeTrip) activeTrip = trips[0];
   el.innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
 
-  // Load attack list
   activeTripData = await api('/flyway/trips/' + activeTrip.id + '/attack-list');
   renderActiveTrip();
 
-  // Auto refresh every 5 min
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(function() { if (currentView === 'active') refreshActiveTrip(); }, 300000);
+}
+
+function renderTripPicker(trips) {
+  var el = document.getElementById('activeContent');
+  var h = '<div class="trip-picker">';
+  h += '<div class="trip-picker-title">Which trip are you on?</div>';
+  trips.forEach(function(t) {
+    var badge = tripTypeBadge(t);
+    var dateDisplay = (t.trip_type === 'day_trip' || t.start_date === t.end_date) ? fmtDate(t.start_date) : fmtDateRange(t.start_date, t.end_date);
+    var accentColor = tripTypeAccent(t);
+    h += '<div class="trip-pick-card" onclick="selectActiveTrip(' + t.id + ')" style="border-left:3px solid ' + accentColor + '">';
+    h += '<div class="pick-name">' + esc(t.name) + '</div>';
+    h += '<div class="pick-dates">' + dateDisplay + '</div>';
+    h += '<div class="pick-meta">' + badge + ' <span style="font-size:11px;color:var(--text-muted)">' + (t.yards || []).length + ' yards</span></div>';
+    h += '<div class="pick-tap">TAP TO LOAD</div>';
+    h += '</div>';
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+function selectActiveTrip(tripId) {
+  activeTrip = multipleActiveTrips.find(function(t) { return t.id === tripId; });
+  loadActiveView();
+}
+
+function switchTrip() {
+  activeTrip = null;
+  activeTripData = null;
+  loadActiveView();
 }
 
 async function refreshActiveTrip() {
@@ -453,6 +560,8 @@ function renderActiveTrip() {
   var el = document.getElementById('activeContent');
   var trip = activeTripData.trip || activeTrip;
   var yards = activeTripData.yards || [];
+  var accentColor = tripTypeAccent(trip);
+  var badge = tripTypeBadge(trip);
 
   // Trip header
   var daysLeft = daysUntil(trip.end_date);
@@ -461,14 +570,21 @@ function renderActiveTrip() {
   else if (daysLeft === 1) { countdownText = 'LAST DAY'; countdownColor = '#ef4444'; }
   else { countdownText = daysLeft + ' DAYS LEFT'; countdownColor = daysLeft <= 3 ? '#eab308' : '#22c55e'; }
 
-  var h = '<div class="trip-header">';
+  var dateDisplay = (trip.trip_type === 'day_trip' || trip.start_date === trip.end_date) ? fmtDate(trip.start_date) : fmtDateRange(trip.start_date, trip.end_date);
+
+  var h = '<div class="trip-header" style="border-left:3px solid ' + accentColor + '">';
   h += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
-  h += '<div><div class="trip-header-name">' + esc(trip.name) + '</div>';
-  h += '<div class="trip-header-dates">' + fmtDateRange(trip.start_date, trip.end_date) + '</div>';
-  h += '<div class="trip-countdown' + (daysLeft <= 0 ? ' pulse' : '') + '" style="color:' + countdownColor + '">' + countdownText + '</div></div>';
-  h += '<button class="btn btn-gray btn-sm" id="scrapeBtn" onclick="triggerFlywayScrape(' + trip.id + ')" style="margin-right:4px">SCRAPE YARDS</button>';
+  h += '<div><div class="trip-header-name">' + esc(trip.name) + ' ' + badge + '</div>';
+  h += '<div class="trip-header-dates">' + dateDisplay + '</div>';
+  h += '<div class="trip-countdown' + (daysLeft <= 0 ? ' pulse' : '') + '" style="color:' + countdownColor + '">' + countdownText + '</div>';
+  if (multipleActiveTrips.length > 1) {
+    h += '<div style="margin-top:4px"><a href="#" onclick="event.preventDefault();switchTrip()" style="font-size:11px;color:var(--text-faint);text-decoration:underline">Switch Trip</a></div>';
+  }
+  h += '</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px">';
+  h += '<button class="btn btn-gray btn-sm" id="scrapeBtn" onclick="triggerFlywayScrape(' + trip.id + ')">SCRAPE</button>';
   h += '<button class="btn btn-gray btn-sm" onclick="confirmComplete()">Complete</button>';
-  h += '</div></div>';
+  h += '</div></div></div>';
 
   // Yard tabs
   h += '<div class="yard-tabs">';
@@ -543,12 +659,10 @@ function renderVehicleCard(v) {
   var sc = fv >= 800 ? 'green' : fv >= 500 ? 'yellow' : fv >= 250 ? 'orange' : fv > 0 ? 'red' : 'gray';
   var scoreDisplay = '$' + fv;
 
-  // Title
   var make = cleanModel(v.make || '', '');
   var model = cleanModel(v.model || '', v.make || '');
   var engine = v.engine ? ' <span style="font-size:12px;color:#b0b0b0;font-weight:600">' + esc(v.engine) + '</span>' : '';
 
-  // Trim badge
   var trimBadge = '';
   if (v.trimBadge) {
     var tbColor = v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b';
@@ -556,10 +670,8 @@ function renderVehicleCard(v) {
     trimBadge = ' <span class="chip" style="font-size:9px;padding:1px 6px;background:' + tbColor + ';color:' + tbText + ';font-weight:' + (v.trimBadge.color === 'gray' ? '500' : '700') + '">' + esc(v.trimBadge.decodedTrim || v.trimBadge.label) + '</span>';
   }
 
-  // Row number
   var rowNum = v.row_number ? '<span style="font-size:11px;color:var(--text-faint);float:right">Row ' + esc(v.row_number) + '</span>' : '';
 
-  // Badges row
   var badges = '';
   var pf = v.premiumFlags || [];
   pf.forEach(function(f) {
@@ -571,12 +683,10 @@ function renderVehicleCard(v) {
     if (f === '4WD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">4WD</span> ';
     if (f === 'AWD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">AWD</span> ';
   });
-  // Show guaranteed reason badge
   if (v.isGuaranteedInclusion && v.guaranteedReason) {
     badges += '<span class="chip" style="font-size:8px;padding:1px 5px;background:#78350f;color:#fbbf24;font-weight:600;letter-spacing:0.05em">RARE: ' + esc(v.guaranteedReason) + '</span> ';
   }
 
-  // Age decay
   var diy = v.daysInYard || 0;
   var decay = v.ageDecay || 0;
   var ageColor = diy <= 14 ? '#fff' : diy <= 30 ? '#eab308' : diy <= 60 ? '#f97316' : '#ef4444';
@@ -586,7 +696,6 @@ function renderVehicleCard(v) {
     badges += '<span style="font-size:10px;color:' + ageColor + '">' + ageText + '</span>';
   }
 
-  // High value callout (only identified part types, not OTHER)
   var hvLine = '';
   if (v.hasHighValuePart && v.parts) {
     var hvParts = v.parts.filter(function(p) {
@@ -598,7 +707,6 @@ function renderVehicleCard(v) {
     }
   }
 
-  // Part chips
   var chips = '';
   var parts = (v.parts || []).slice().sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
   var shown = parts.slice(0, 5);
@@ -610,7 +718,6 @@ function renderVehicleCard(v) {
   });
   if (extra > 0) chips += '<span class="chip chip-gray" style="font-size:9px;cursor:pointer" onclick="event.stopPropagation();toggleV(\'' + v.id + '\')">+' + extra + ' more</span>';
 
-  // Yard name (for "all" tab)
   var yardLabel = activeYardFilter === 'all' && v._yardName ? '<span style="font-size:9px;color:var(--text-faint)">' + esc(v._yardName.replace(/^LKQ |^Pull-A-Part /, '')) + '</span> ' : '';
 
   var h = '<div class="vehicle-row" id="vrow-' + v.id + '">';
@@ -627,7 +734,6 @@ function renderVehicleCard(v) {
   h += '<div class="v-parts-count">' + (v.matched_parts || 0) + ' parts</div>';
   h += '</div></div>';
 
-  // Expanded detail
   h += '<div class="v-expanded" id="vexp-' + v.id + '">';
   h += renderExpandedParts(v);
   h += '</div>';
@@ -640,8 +746,6 @@ function renderExpandedParts(v) {
   if (parts.length === 0) return '<div style="padding:10px 0;color:var(--text-faint);font-size:12px">No matching parts found.</div>';
 
   var h = '';
-
-  // Vehicle info
   h += '<div style="padding:8px 10px;background:var(--surface2);border-radius:6px;margin-bottom:8px;font-size:11px;color:var(--text-muted)">';
   if (v.vin) h += '<div>VIN: <span style="color:var(--text);font-family:monospace">' + esc(v.vin) + '</span></div>';
   if (v._yardName) h += '<div>Yard: ' + esc(v._yardName) + '</div>';
@@ -654,7 +758,6 @@ function renderExpandedParts(v) {
   if (v.audio_brand) h += '<div style="color:#d946ef">Audio: ' + esc(v.audio_brand) + '</div>';
   h += '</div>';
 
-  // Parts list
   parts.sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
   parts.forEach(function(p) {
     var pr = p.price || 0;
@@ -664,7 +767,6 @@ function renderExpandedParts(v) {
     else if (p.verdict === 'GOOD') verdictChip = '<span class="chip chip-cyan" style="font-size:8px">GOOD</span>';
     else if (p.verdict === 'FAIR') verdictChip = '<span class="chip chip-yellow" style="font-size:8px">FAIR</span>';
 
-    // Price freshness
     var freshness = '';
     if (p.marketCheckedAt) {
       var daysSince = Math.floor((Date.now() - new Date(p.marketCheckedAt).getTime()) / 86400000);
@@ -725,7 +827,7 @@ async function triggerFlywayScrape(tripId) {
   } catch (err) {
     showToast('Scrape request failed');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'SCRAPE YARDS'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'SCRAPE'; }
   }
 }
 
@@ -775,9 +877,11 @@ async function loadHistoryView() {
   var h = '';
   trips.forEach(function(t) {
     var yardNames = (t.yards || []).map(function(y) { return esc(y.name); }).join(', ') || 'No yards';
+    var badge = tripTypeBadge(t);
+    var dateDisplay = (t.trip_type === 'day_trip' || t.start_date === t.end_date) ? fmtDate(t.start_date) : fmtDateRange(t.start_date, t.end_date);
     h += '<div class="trip-card">';
-    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + '</div>';
-    h += '<div class="trip-dates">' + fmtDateRange(t.start_date, t.end_date) + '</div>';
+    h += '<div class="trip-card-header"><div><div class="trip-name">' + esc(t.name) + ' ' + badge + '</div>';
+    h += '<div class="trip-dates">' + dateDisplay + '</div>';
     h += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">' + (t.yards || []).length + ' yards: ' + yardNames + '</div>';
     h += '</div><span class="chip chip-gray">COMPLETE</span></div>';
     h += '</div>';
@@ -787,15 +891,13 @@ async function loadHistoryView() {
 
 // ═══ INIT ═══
 async function init() {
-  // Check hash
   var hash = location.hash.replace('#', '') || '';
 
-  // Check for active trips first
   var data = await api('/flyway/trips');
   allTrips = data.trips || [];
-  var active = allTrips.find(function(t) { return t.status === 'active'; });
+  var active = allTrips.filter(function(t) { return t.status === 'active'; });
 
-  if (active && hash !== 'plan' && hash !== 'history') {
+  if (active.length > 0 && hash !== 'plan' && hash !== 'history') {
     switchView('active');
   } else if (hash === 'history') {
     switchView('history');
