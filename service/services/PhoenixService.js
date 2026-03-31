@@ -46,6 +46,31 @@ function extractPartTypeFromTitle(title) {
   return 'OTHER';
 }
 
+// ── Make/Model extraction for fallback grouping ──────────
+
+const KNOWN_MAKES = ['FORD','CHEVROLET','CHEVY','DODGE','RAM','CHRYSLER','JEEP','TOYOTA','HONDA','NISSAN','HYUNDAI','KIA','SUBARU','MAZDA','MITSUBISHI','BMW','MERCEDES','AUDI','VOLKSWAGEN','VOLVO','MINI','PORSCHE','LEXUS','ACURA','INFINITI','GENESIS','CADILLAC','BUICK','GMC','LINCOLN','PONTIAC','SATURN','JAGUAR','FIAT','SCION','SUZUKI'];
+const STOP_WORDS = new Set(['OEM','GENUINE','PROGRAMMED','REBUILT','PLUG','PLAY','ASSEMBLY','MODULE','UNIT','REMAN','NEW','USED','TESTED','ENGINE','CONTROL','COMPUTER','ELECTRONIC','ANTI','LOCK','BRAKE','PUMP','FUSE','POWER','BOX','BODY','TRANSMISSION','ECU','ECM','PCM','BCM','TCM','ABS','TIPM','SRS','HVAC','INSTRUMENT','CLUSTER','SPEEDOMETER','RADIO','HEAD','STEREO','AMPLIFIER','THROTTLE','INTAKE','ALTERNATOR','STARTER','TURBO','CAMERA','SENSOR','WORKING','FAST','FREE','SHIPPING']);
+
+function extractMakeModelFromTitle(title) {
+  if (!title) return { make: null, model: null };
+  const upper = title.toUpperCase();
+  let make = null;
+  for (const m of KNOWN_MAKES) {
+    if (upper.includes(m)) { make = m; break; }
+  }
+  if (!make) return { make: null, model: null };
+
+  const afterMake = upper.substring(upper.indexOf(make) + make.length).trim();
+  const words = afterMake.replace(/[^A-Z0-9\s]/g, '').split(/\s+/);
+  const modelWords = [];
+  for (const w of words) {
+    if (!w || w.length < 2 || /^\d{4}$/.test(w) || STOP_WORDS.has(w)) continue;
+    modelWords.push(w);
+    if (modelWords.length >= 2) break;
+  }
+  return { make, model: modelWords.join(' ') || null };
+}
+
 // ── Seller name mapping ───────────────────────────────────
 // Item.seller uses 'pro-rebuild', SoldItemSeller uses 'prorebuild'
 function getItemSellerVariants(soldItemName) {
@@ -251,16 +276,23 @@ class PhoenixService {
       }
 
       // Fallback: create standalone group from SoldItem title
+      // Use partType + make + model for granular grouping (not just partType + seller)
       if (!matched) {
         const pt = extractPartTypeFromTitle(sold.title);
-        // Only create standalone groups for identified part types
         if (pt !== 'OTHER') {
-          const fallbackKey = 'SOLD|' + pt + '|' + sold.seller;
+          const { make, model } = extractMakeModelFromTitle(sold.title);
+          // Include make/model when available for granular groups; fall back to seller-only
+          const fallbackKey = make
+            ? 'SOLD|' + pt + '|' + make + '|' + (model || 'UNK')
+            : 'SOLD|' + pt + '|' + sold.seller;
           if (!groups.has(fallbackKey)) {
             groups.set(fallbackKey, {
               groupKey: fallbackKey, groupType: 'sold_only', partNumberBase: null,
               manufacturerPartNumber: null, partType: pt,
-              fitment: [], fitmentSet: new Set(), makes: new Set(), models: new Set(), years: [],
+              fitment: [], fitmentSet: new Set(),
+              makes: make ? new Set([make]) : new Set(),
+              models: model ? new Set([model]) : new Set(),
+              years: [],
               catalogCount: 0, catalogItemIds: new Set(), catalogImage: null,
               sampleTitles: [sold.title], listingPrice: null,
               salesCount: 0, soldPrices: [], lastSoldDate: null, soldSellers: new Set(), sellerCounts: {},
@@ -274,37 +306,35 @@ class PhoenixService {
           g.soldSellers.add(sold.seller);
           g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
           if (g.sampleTitles.length < 3) g.sampleTitles.push(sold.title);
+          if (make) g.makes.add(make);
+          if (model) g.models.add(model);
         }
       }
     }
 
-    // ── Layer 3: market_demand_cache (keyed by YEAR|MAKE|MODEL|PARTTYPE) ──
-    // Build lookup keys from fitment data
-    const marketKeys = new Set();
-    const keyToGroup = new Map();
+    // ── Layer 3: market_demand_cache (keyed by real part numbers) ──
+    // Collect partNumberBase values from groups that have them
+    const pnToGroups = new Map(); // partNumberBase → [groupKey, ...]
     for (const [gKey, g] of groups) {
-      if (g.fitment.length > 0 && g.partType !== 'OTHER') {
-        for (const f of g.fitment) {
-          const mKey = `${f.year}|${(f.make || '').toUpperCase()}|${(f.model || '').toUpperCase()}|${g.partType}`;
-          marketKeys.add(mKey);
-          if (!keyToGroup.has(mKey)) keyToGroup.set(mKey, []);
-          keyToGroup.get(mKey).push(gKey);
-        }
+      if (g.partNumberBase) {
+        const pn = g.partNumberBase;
+        if (!pnToGroups.has(pn)) pnToGroups.set(pn, []);
+        pnToGroups.get(pn).push(gKey);
       }
     }
 
-    if (marketKeys.size > 0) {
+    if (pnToGroups.size > 0) {
       try {
         const marketRows = await database('market_demand_cache')
-          .whereIn('part_number_base', [...marketKeys])
-          .select('part_number_base', 'ebay_avg_price', 'ebay_sold_90d', 'market_score');
+          .whereIn('part_number_base', [...pnToGroups.keys()])
+          .select('part_number_base', 'ebay_avg_price', 'ebay_sold_90d', 'ebay_median_price', 'market_score');
 
         for (const mr of marketRows) {
-          const gKeys = keyToGroup.get(mr.part_number_base) || [];
+          const gKeys = pnToGroups.get(mr.part_number_base) || [];
           for (const gKey of gKeys) {
             const g = groups.get(gKey);
             if (g && !g.marketAvgPrice) {
-              g.marketAvgPrice = parseFloat(mr.ebay_avg_price) || null;
+              g.marketAvgPrice = parseFloat(mr.ebay_median_price || mr.ebay_avg_price) || null;
               g.marketSold90d = parseInt(mr.ebay_sold_90d) || 0;
               g.marketScore = mr.market_score ? parseInt(mr.market_score) : null;
             }

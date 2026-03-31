@@ -1,6 +1,8 @@
 'use strict';
 
 const router = require('express-promise-router')();
+const { log } = require('../lib/logger');
+const { database } = require('../database/database');
 const PhoenixService = require('../services/PhoenixService');
 const SoldItemsManager = require('../managers/SoldItemsManager');
 
@@ -71,18 +73,34 @@ router.delete('/sellers/:name', async (req, res) => {
   }
 });
 
-// POST /phoenix/sellers/:name/scrape — Trigger scrape
+// POST /phoenix/sellers/:name/scrape — Trigger scrape (non-blocking)
 router.post('/sellers/:name/scrape', async (req, res) => {
+  const sellerName = req.params.name;
+  const maxPages = parseInt(req.body.maxPages) || 5;
+  res.json({ success: true, message: 'Scrape started for ' + sellerName, started: true });
+
+  // Run in background — don't block the request
+  const manager = new SoldItemsManager();
   try {
-    const manager = new SoldItemsManager();
     const result = await manager.scrapeCompetitor({
-      seller: req.params.name,
+      seller: sellerName,
       categoryId: '6030',
-      maxPages: parseInt(req.body.maxPages) || 5,
+      maxPages,
     });
-    res.json({ success: true, message: 'Scrape complete', results: result });
+    log.info({ seller: sellerName, result }, 'Phoenix seller scrape complete');
+
+    // Update seller stats so UI and auto-scrape skip window stay current
+    try {
+      await database('SoldItemSeller').where('name', sellerName).update({
+        lastScrapedAt: new Date(),
+        itemsScraped: database.raw('"itemsScraped" + ?', [result.stored]),
+        updatedAt: new Date(),
+      });
+    } catch (e) { log.warn({ err: e.message, seller: sellerName }, 'Could not update seller stats'); }
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    log.error({ err: err.message, seller: sellerName }, 'Phoenix seller scrape failed');
+  } finally {
+    try { await manager.scraper.closeBrowser(); } catch (e) {}
   }
 });
 

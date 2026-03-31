@@ -64,12 +64,20 @@ router.get('/gap-intel', async (req, res) => {
   const sellerFilter = req.query.seller || null;
 
   try {
+    // Exclude rebuild sellers — their data is reference intel, not competitive
+    const rebuildSellers = await database('SoldItemSeller').where('type', 'rebuild').select('name');
+    const rebuildNames = rebuildSellers.map(s => s.name);
+
     // Get competitor sold items (capped at 5000, $100+ only)
     let competitorQuery = database('SoldItem')
       .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${days} days'`))
       .where('soldPrice', '>=', 100)
       .whereNot('seller', 'dynatrack')
       .whereNot('seller', 'dynatrackracing');
+
+    if (rebuildNames.length > 0) {
+      competitorQuery = competitorQuery.whereNotIn('seller', rebuildNames);
+    }
 
     if (sellerFilter) {
       competitorQuery = competitorQuery.where('seller', sellerFilter);
@@ -223,11 +231,19 @@ router.get('/emerging', async (req, res) => {
     const midpoint = new Date(now - (days / 2) * 24 * 60 * 60 * 1000);
     const recentWindow = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
+    // Exclude rebuild sellers — their data is reference intel, not competitive
+    const rebuildSellers = await database('SoldItemSeller').where('type', 'rebuild').select('name');
+    const rebuildNames = rebuildSellers.map(s => s.name);
+
     let emergingQuery = database('SoldItem')
       .where('soldDate', '>=', cutoff)
       .where('soldPrice', '>=', 100)
       .whereNot('seller', 'dynatrack')
       .whereNot('seller', 'dynatrackracing');
+
+    if (rebuildNames.length > 0) {
+      emergingQuery = emergingQuery.whereNotIn('seller', rebuildNames);
+    }
 
     if (sellerFilter) {
       emergingQuery = emergingQuery.where('seller', sellerFilter);
@@ -514,13 +530,13 @@ router.post('/auto-scrape', async (req, res) => {
         continue;
       }
 
+      const manager = new SoldItemsManager();
       try {
-        const manager = new SoldItemsManager();
         const result = await manager.scrapeCompetitor({
           seller: seller.name,
           categoryId: '6030',
           maxPages: 3,
-            });
+        });
 
         await database('SoldItemSeller').where('name', seller.name).update({
           lastScrapedAt: new Date(),
@@ -532,6 +548,8 @@ router.post('/auto-scrape', async (req, res) => {
       } catch (err) {
         log.error({ err: err.message, seller: seller.name }, 'Auto-scrape failed for seller');
         results.push({ seller: seller.name, error: err.message });
+      } finally {
+        try { await manager.scraper.closeBrowser(); } catch (e) {}
       }
     }
 
@@ -814,16 +832,27 @@ router.post('/:sellerId/scrape', async (req, res) => {
   res.json({ started: true, seller: sellerName, maxPages: parseInt(pages) });
 
   // Run in background
+  const manager = new SoldItemsManager();
   try {
-    const manager = new SoldItemsManager();
     const result = await manager.scrapeCompetitor({
       seller: sellerName,
       categoryId: '6030',
       maxPages: parseInt(pages),
     });
     log.info({ seller: sellerName, result }, 'Manual competitor scrape complete');
+
+    // Update seller stats (was missing — #7)
+    try {
+      await database('SoldItemSeller').where('name', sellerName).update({
+        lastScrapedAt: new Date(),
+        itemsScraped: database.raw('"itemsScraped" + ?', [result.stored]),
+        updatedAt: new Date(),
+      });
+    } catch (e) { log.warn({ err: e.message, seller: sellerName }, 'Could not update seller stats'); }
   } catch (err) {
     log.error({ err: err.message, seller: sellerName }, 'Manual competitor scrape failed');
+  } finally {
+    try { await manager.scraper.closeBrowser(); } catch (e) {}
   }
 });
 

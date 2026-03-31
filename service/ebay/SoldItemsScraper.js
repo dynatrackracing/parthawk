@@ -367,13 +367,34 @@ class SoldItemsScraper {
                         listing.querySelector('img');
           const pictureUrl = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
 
-          // Sold date — try to extract from listing text (e.g. "Sold Mar 15, 2026")
+          // Sold date — try multiple patterns eBay uses across layouts
           let soldDate = null;
           const listingText = listing.textContent || '';
-          const soldDateMatch = listingText.match(/Sold\s+([A-Za-z]{3}\s+\d{1,2},?\s+\d{4})/);
-          if (soldDateMatch) {
-            const parsed = new Date(soldDateMatch[1]);
-            if (!isNaN(parsed.getTime())) soldDate = parsed.toISOString();
+          // Pattern 1: "Sold Mar 15, 2026" or "Sold Mar 15 2026"
+          // Pattern 2: "Sold 15 Mar 2026" (international format)
+          // Pattern 3: "Sold 03/15/2026" or "Sold 3/15/2026"
+          const datePatterns = [
+            /Sold\s+([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/,
+            /Sold\s+(\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4})/,
+            /Sold\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+          ];
+          for (const pat of datePatterns) {
+            const m = listingText.match(pat);
+            if (m) {
+              const parsed = new Date(m[1]);
+              if (!isNaN(parsed.getTime())) { soldDate = parsed.toISOString(); break; }
+            }
+          }
+          // Fallback: check for date-like elements (eBay sometimes puts date in a span)
+          if (!soldDate) {
+            const dateEl = listing.querySelector('.s-card__endedDate') ||
+                           listing.querySelector('.s-item__endedDate') ||
+                           listing.querySelector('[class*="endedDate"]') ||
+                           listing.querySelector('[class*="sold-date"]');
+            if (dateEl) {
+              const parsed = new Date(dateEl.textContent.replace(/^Sold\s*/i, '').trim());
+              if (!isNaN(parsed.getTime())) soldDate = parsed.toISOString();
+            }
           }
 
           // Seller info — extract from listing if scraping keyword search (no seller filter)

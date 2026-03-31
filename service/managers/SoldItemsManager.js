@@ -140,20 +140,25 @@ class SoldItemsManager {
             return;
           }
 
+          const now = new Date();
           const toInsert = {
             id: uuidv4(),
             ebayItemId: item.ebayItemId,
             title: item.title,
             soldPrice: item.soldPrice,
-            soldDate: item.soldDate ? new Date(item.soldDate) : new Date(),
+            // Only use real soldDate from scraper — don't fake it with today's date.
+            // If null, use scrapedAt so NOT NULL constraint is satisfied, but scrapedAt
+            // matching soldDate signals "estimated" to downstream consumers.
+            soldDate: item.soldDate ? new Date(item.soldDate) : now,
             categoryId: categoryId,
-            categoryTitle: null, // Could be filled from scrape if available
+            categoryTitle: null,
             seller: item.seller || seller,
             condition: item.condition,
             pictureUrl: item.pictureUrl,
-            compatibility: null, // Filled by enrichment if enabled
+            compatibility: null,
             manufacturerPartNumber: null,
             interchangeNumbers: null,
+            scrapedAt: now,
           };
 
           // Enrich with compatibility data if enabled (slow - makes API call per item)
@@ -308,12 +313,13 @@ class SoldItemsManager {
             return;
           }
 
+          const now = new Date();
           const toInsert = {
             id: uuidv4(),
             ebayItemId: item.ebayItemId,
             title: item.title,
             soldPrice: item.soldPrice,
-            soldDate: item.soldDate ? new Date(item.soldDate) : new Date(),
+            soldDate: item.soldDate ? new Date(item.soldDate) : now,
             categoryId: categoryId,
             categoryTitle: null,
             seller: item.seller,
@@ -322,6 +328,7 @@ class SoldItemsManager {
             compatibility: null,
             manufacturerPartNumber: null,
             interchangeNumbers: null,
+            scrapedAt: now,
           };
 
           await SoldItem.query()
