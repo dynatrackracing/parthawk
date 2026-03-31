@@ -96,6 +96,7 @@ class SoldItemsScraper {
 
     params.set('LH_Sold', '1'); // Sold items only
     params.set('LH_Complete', '1'); // Completed listings
+    params.set('_sop', '13'); // Sort by end date: recent first
 
     // Only add category if it's a real category (not '0' or empty)
     if (categoryId && categoryId !== '0') {
