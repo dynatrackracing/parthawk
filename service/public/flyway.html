@@ -608,7 +608,7 @@ function renderActiveTrip() {
   h += '<button class="toggle-btn' + (sortMode === 'value' ? ' active' : '') + '" onclick="setSort(\'value\')">Value</button>';
   h += '<span style="color:#333">|</span>';
   h += '<button class="toggle-btn' + (filterPremium ? ' active' : '') + '" onclick="toggleFilter(\'premium\')">Premium</button>';
-  h += '<button class="toggle-btn' + (filterHighValue ? ' active' : '') + '" onclick="toggleFilter(\'highvalue\')">$200+</button>';
+  h += '<button class="toggle-btn' + (filterHighValue ? ' active' : '') + '" onclick="toggleFilter(\'highvalue\')">$500+</button>';
   h += '</div>';
 
   // Collect all vehicles (or filter by yard)
@@ -625,11 +625,11 @@ function renderActiveTrip() {
   if (activeYardFilter !== 'all') {
     filtered = filtered.filter(function(v) { return v._yardId === activeYardFilter; });
   }
-  if (filterPremium) filtered = filtered.filter(function(v) { return v.isPremiumVehicle; });
-  if (filterHighValue) filtered = filtered.filter(function(v) { return v.hasHighValuePart; });
+  if (filterPremium) filtered = filtered.filter(function(v) { return (v.premiumFlags || []).length > 0; });
+  if (filterHighValue) filtered = filtered.filter(function(v) { return (v.est_value || 0) >= 500; });
 
   // Sort
-  if (sortMode === 'score') filtered.sort(function(a, b) { return (b.flywayValue || 0) - (a.flywayValue || 0); });
+  if (sortMode === 'score') filtered.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
   else if (sortMode === 'age') filtered.sort(function(a, b) { return (a.daysInYard || 0) - (b.daysInYard || 0); });
   else if (sortMode === 'value') filtered.sort(function(a, b) { return (b.est_value || 0) - (a.est_value || 0); });
 
@@ -679,10 +679,7 @@ function renderActiveTrip() {
 }
 
 function renderVehicleCard(v) {
-  var fv = v.flywayValue || 0;
-  var sc = fv >= 800 ? 'green' : fv >= 500 ? 'yellow' : fv >= 250 ? 'orange' : fv > 0 ? 'red' : 'gray';
-  var scoreDisplay = '$' + fv;
-
+  var sc = v.color_code || 'gray';
   var make = cleanModel(v.make || '', '');
   var model = cleanModel(v.model || '', v.make || '');
   var engine = v.engine ? ' <span style="font-size:12px;color:#b0b0b0;font-weight:600">' + esc(v.engine) + '</span>' : '';
@@ -696,6 +693,7 @@ function renderVehicleCard(v) {
 
   var rowNum = v.row_number ? '<span style="font-size:11px;color:var(--text-faint);float:right">Row ' + esc(v.row_number) + '</span>' : '';
 
+  // Premium flag badges
   var badges = '';
   var pf = v.premiumFlags || [];
   pf.forEach(function(f) {
@@ -711,137 +709,167 @@ function renderVehicleCard(v) {
     badges += '<span class="chip" style="font-size:8px;padding:1px 5px;background:#78350f;color:#fbbf24;font-weight:600;letter-spacing:0.05em">RARE: ' + esc(v.guaranteedReason) + '</span> ';
   }
 
+  // Days in yard badge
   var diy = v.daysInYard || 0;
-  var decay = v.ageDecay || 0;
-  var ageColor = diy <= 14 ? '#fff' : diy <= 30 ? '#eab308' : diy <= 60 ? '#f97316' : '#ef4444';
-  var ageText = diy + 'd';
-  if (decay > 0) ageText += ' (-' + decay + '%)';
-  if (badges || diy > 0) {
-    badges += '<span style="font-size:10px;color:' + ageColor + '">' + ageText + '</span>';
+  if (diy > 0) {
+    var ageColor = diy <= 3 ? '#22c55e' : diy <= 7 ? '#eab308' : diy <= 14 ? '#f97316' : '#6B7280';
+    badges += '<span style="font-size:10px;color:' + ageColor + '">' + diy + 'd</span>';
   }
 
-  var hvLine = '';
-  if (v.hasHighValuePart && v.parts) {
-    var hvParts = v.parts.filter(function(p) {
-      var pt = (p.partType || '').toUpperCase();
-      // Only show high value for parts with real data (sold or market), not estimates
-      return (p.price || 0) >= 200 && pt !== 'OTHER' && pt !== '' && p.priceSource !== 'estimate';
-    });
-    if (hvParts.length > 0) {
-      hvLine = '<div class="v-highvalue">\u2605 HIGH VALUE: ' + hvParts.map(function(p) {
-        return esc(p.partType || p.title || '?') + ' $' + (p.price || 0);
-      }).join(', ') + '</div>';
-    }
-  }
-
+  // Part type chips — names only, no dollar amounts (matches Daily Feed)
+  var chipSource = v.part_chips || [];
+  var chipTypes = {};
   var chips = '';
-  var parts = (v.parts || []).slice().sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
-  var shown = parts.slice(0, 5);
-  var extra = parts.length - shown.length;
-  shown.forEach(function(p) {
-    var pr = p.price || 0;
-    var isEst = p.priceSource === 'estimate';
-    var cc = isEst ? 'chip-gray' : pr >= 250 ? 'chip-green' : pr >= 150 ? 'chip-cyan' : pr >= 100 ? 'chip-yellow' : 'chip-gray';
-    var prefix = isEst ? '~$' : '$';
-    chips += '<span class="chip ' + cc + '" style="font-size:9px">' + esc(p.partType || '?') + ' ' + prefix + pr + '</span> ';
+  chipSource.filter(function(p) {
+    var t = p.partType || '?';
+    if (chipTypes[t]) return false;
+    chipTypes[t] = true;
+    return true;
+  }).sort(function(a, b) { return (b.price || 0) - (a.price || 0); }).slice(0, 4).forEach(function(p) {
+    var price = p.price || 0;
+    var cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
+    chips += '<span class="chip ' + cc + '">' + esc(p.partType || '?') + '</span> ';
   });
-  if (extra > 0) chips += '<span class="chip chip-gray" style="font-size:9px;cursor:pointer" onclick="event.stopPropagation();toggleV(\'' + v.id + '\')">+' + extra + ' more</span>';
 
   var yardLabel = activeYardFilter === 'all' && v._yardName ? '<span style="font-size:9px;color:var(--text-faint)">' + esc(v._yardName.replace(/^LKQ |^Pull-A-Part /, '')) + '</span> ' : '';
 
   var h = '<div class="vehicle-row" id="vrow-' + v.id + '">';
   h += '<div class="v-collapsed" onclick="toggleV(\'' + v.id + '\')">';
-  h += '<div class="v-score ' + sc + '">' + scoreDisplay + '</div>';
+  h += '<div class="v-score ' + sc + '">' + (v.score || 0) + '</div>';
   h += '<div class="v-info">';
   h += '<div class="v-title"><strong style="color:#fff">' + esc(v.year) + ' ' + esc(make) + ' ' + esc(model) + '</strong>' + engine + trimBadge + ' ' + rowNum + '</div>';
   if (badges) h += '<div class="v-badges">' + yardLabel + badges + '</div>';
-  if (hvLine) h += hvLine;
-  h += '<div class="v-chips">' + chips + '</div>';
+  h += '<div class="v-chips">' + (chips || '<span class="chip chip-gray">No data</span>') + '</div>';
   h += '</div>';
   h += '<div class="v-right">';
-  if (v.est_value > 0 && v.est_value !== fv) h += '<div style="font-size:10px;color:var(--text-faint);text-decoration:line-through">$' + v.est_value + '</div>';
-  h += '<div class="v-parts-count">' + (v.matched_parts || 0) + ' parts</div>';
+  if (v.est_value > 0) h += '<div class="v-value">$' + v.est_value + '</div>';
+  if (v.matched_parts > 0) h += '<div class="v-parts-count">' + v.matched_parts + ' parts</div>';
   h += '</div></div>';
 
+  // Expanded view — loaded on demand via API
   h += '<div class="v-expanded" id="vexp-' + v.id + '">';
-  h += renderExpandedParts(v);
+  h += '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;">Tap to load parts...</div>';
   h += '</div>';
   h += '</div>';
   return h;
 }
 
-function renderExpandedParts(v) {
-  var parts = v.parts || [];
+async function toggleV(id) {
+  var exp = document.getElementById('vexp-' + id);
+  if (!exp) return;
+
+  if (exp.classList.contains('open')) {
+    exp.classList.remove('open');
+    return;
+  }
+
+  // Load parts on-demand via API — same as Daily Feed
+  if (exp.dataset.loaded !== 'true') {
+    exp.innerHTML = '<div style="padding:12px 0;color:#9CA3AF;font-size:12px;">Loading parts...</div>';
+    exp.classList.add('open');
+
+    try {
+      var res = await fetch('/flyway/vehicle/' + id + '/parts');
+      var data = await res.json();
+      if (data.success) {
+        exp.innerHTML = renderExpandedParts(id, data);
+        exp.dataset.loaded = 'true';
+      } else {
+        exp.innerHTML = '<div style="padding:12px 0;color:#ef4444;font-size:12px;">Failed to load parts</div>';
+      }
+    } catch (e) {
+      exp.innerHTML = '<div style="padding:12px 0;color:#ef4444;font-size:12px;">Failed to load parts</div>';
+    }
+  } else {
+    exp.classList.add('open');
+  }
+}
+
+function renderExpandedParts(vehicleId, data) {
+  var parts = data.parts || [];
   if (parts.length === 0) return '<div style="padding:10px 0;color:var(--text-faint);font-size:12px">No matching parts found.</div>';
 
   var h = '';
-  h += '<div style="padding:8px 10px;background:var(--surface2);border-radius:6px;margin-bottom:8px;font-size:11px;color:var(--text-muted)">';
-  if (v.vin) h += '<div>VIN: <span style="color:var(--text);font-family:monospace">' + esc(v.vin) + '</span></div>';
-  if (v._yardName) h += '<div>Yard: ' + esc(v._yardName) + '</div>';
-  var details = [];
-  if (v.engine) details.push(v.engine);
-  if (v.decoded_drivetrain || v.drivetrain) details.push(v.decoded_drivetrain || v.drivetrain);
-  if (v.decoded_transmission) details.push(v.decoded_transmission);
-  if (details.length > 0) h += '<div>' + details.map(esc).join(' / ') + '</div>';
-  if (v.expected_parts) h += '<div style="margin-top:4px;color:#d946ef">Expected: ' + esc(v.expected_parts) + '</div>';
-  if (v.audio_brand) h += '<div style="color:#d946ef">Audio: ' + esc(v.audio_brand) + '</div>';
-  h += '</div>';
 
+  // Sort: sold first, then market, then estimates — then by display price DESC
   parts.sort(function(a, b) {
-    // Sold data first, then market cache, then estimates last
-    var rankA = a.priceSource === 'sold' ? 1 : a.priceSource === 'market_cache' ? 2 : 3;
-    var rankB = b.priceSource === 'sold' ? 1 : b.priceSource === 'market_cache' ? 2 : 3;
-    if (rankA !== rankB) return rankA - rankB;
-    return (b.price || 0) - (a.price || 0);
+    var soldA = (a.sold_90d || 0) > 0 ? 1 : (a.marketMedian > 0 ? 2 : 3);
+    var soldB = (b.sold_90d || 0) > 0 ? 1 : (b.marketMedian > 0 ? 2 : 3);
+    if (soldA !== soldB) return soldA - soldB;
+    var pA = (a.sold_90d > 0 && a.price > 0) ? a.price : (a.marketMedian > 0 ? a.marketMedian : a.price || 0);
+    var pB = (b.sold_90d > 0 && b.price > 0) ? b.price : (b.marketMedian > 0 ? b.marketMedian : b.price || 0);
+    return pB - pA;
   });
+
   parts.forEach(function(p) {
-    var pr = p.price || 0;
+    var hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
     var isEst = p.priceSource === 'estimate';
-    var isSold = p.priceSource === 'sold';
-    var pColor = isEst ? '#6B7280' : pr >= 250 ? '#22c55e' : pr >= 150 ? '#06b6d4' : pr >= 100 ? '#eab308' : '#6B7280';
-    var badgeVerdict = isEst ? 'EST' : pr >= 250 ? 'GREAT' : pr >= 150 ? 'GOOD' : pr >= 100 ? 'FAIR' : 'POOR';
-    var verdictChip = '';
-    if (badgeVerdict === 'GREAT') verdictChip = '<span class="chip chip-green" style="font-size:8px">GREAT</span>';
-    else if (badgeVerdict === 'GOOD') verdictChip = '<span class="chip chip-cyan" style="font-size:8px">GOOD</span>';
-    else if (badgeVerdict === 'FAIR') verdictChip = '<span class="chip chip-yellow" style="font-size:8px">FAIR</span>';
-    else if (badgeVerdict === 'EST') verdictChip = '<span class="chip chip-gray" style="font-size:8px">EST</span>';
+    var displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
+    var badgeVerdict = isEst && !hasOurSales && !p.marketMedian ? 'EST' : displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
+    var vc = badgeVerdict === 'EST' ? 'chip-gray' : badgeVerdict === 'GREAT' ? 'chip-green' : badgeVerdict === 'GOOD' ? 'chip-cyan' : badgeVerdict === 'FAIR' ? 'chip-yellow' : 'chip-gray';
+    var pricePrefix = isEst && !hasOurSales && !p.marketMedian ? '~$' : '$';
 
     var freshness = '';
-    if (isSold) {
+    if (hasOurSales) {
       if (p.lastSoldDate) {
         var daysAgo = Math.floor((Date.now() - new Date(p.lastSoldDate).getTime()) / 86400000);
-        freshness = daysAgo <= 30 ? '<span style="color:#22c55e">\u2713</span>' : daysAgo <= 60 ? '<span style="color:#eab308">\u26A0</span>' : '<span style="color:#ef4444">\u2717</span>';
+        freshness = daysAgo <= 30 ? '\u2705' : daysAgo <= 60 ? '\u26A0\uFE0F' : '\u274C';
       } else {
-        freshness = '<span style="color:#22c55e">\u2713</span>';
+        freshness = '\u2705';
       }
     } else if (p.marketCheckedAt) {
       var daysSince = Math.floor((Date.now() - new Date(p.marketCheckedAt).getTime()) / 86400000);
-      if (daysSince < 60) freshness = '<span style="color:#22c55e">\u2713</span>';
-      else if (daysSince < 90) freshness = '<span style="color:#eab308">\u26A0</span>';
-      else freshness = '<span style="color:#ef4444">\u2717</span>';
+      freshness = daysSince <= 60 ? '\u2705' : daysSince <= 90 ? '\u26A0\uFE0F' : '\u274C';
+    } else if (p.marketMedian > 0) {
+      freshness = '\u2705';
+    } else {
+      freshness = '\u2753';
     }
 
-    var prefix = isEst ? '~$' : '$';
-    h += '<div class="part-row">';
-    h += '<div><span class="part-type">' + esc(p.partType || p.title || '?') + '</span> ' + verdictChip;
-    h += '<div class="part-meta">';
-    if (p.in_stock != null) h += 'Stock: ' + p.in_stock + ' ';
-    if (p.sold_90d != null) h += 'Sold 90d: ' + p.sold_90d + ' ';
-    if (p.trimMultiplier != null && p.trimMultiplier < 1) h += '<span style="color:#f97316">trim x' + p.trimMultiplier + '</span> ';
-    h += freshness;
-    if (isEst) h += ' <span style="color:#6B7280">est</span>';
-    if (p.deadWarning) h += ' <span style="color:#ef4444">\u2620 dead pattern</span>';
-    if (p.isMarked) h += ' <span style="color:#d946ef">MARKED</span>';
-    h += '</div></div>';
-    h += '<div class="part-price" style="color:' + pColor + '">' + prefix + pr + '</div>';
+    h += '<div class="part-row" style="flex-direction:column;align-items:stretch;padding:10px 0">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    h += '<div style="font-size:13px;font-weight:600">' + (p.isMarked ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px">MARKED</span>' : '') + (p.partType ? '[' + esc(p.partType) + '] ' : '') + esc(p.title || p.category || 'Part') + '</div>';
+    h += '<div><span class="chip ' + vc + '" style="font-size:10px">' + badgeVerdict + ' ' + pricePrefix + displayPrice + ' ' + freshness + '</span></div>';
+    h += '</div>';
+    h += '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">';
+    h += '<span>' + (p.in_stock || 0) + ' in stock</span>';
+    h += '<span>' + (p.sold_90d || 0) + ' sold/90d</span>';
+    if (p.partNumber) h += '<span>' + esc(p.partNumber) + '</span>';
+    if (isEst && !hasOurSales && !p.marketMedian) h += '<span style="color:#6B7280">est</span>';
+    h += '</div>';
+    if (p.reason) h += '<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:3px">' + esc(p.reason) + '</div>';
+    if (p.marketMedian > 0) {
+      var mColor = hasOurSales ? '#6B7280' : (Math.abs(displayPrice - p.marketMedian) / p.marketMedian > 0.2 ? (displayPrice > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981');
+      h += '<div style="font-size:11px;margin-top:3px;display:flex;gap:8px;color:#6B7280">';
+      h += '<span>' + (hasOurSales ? 'Market ref' : 'Market') + '</span>';
+      h += '<span style="color:' + mColor + ';font-weight:600">$' + p.marketMedian + ' med</span>';
+      h += '<span>' + (p.marketCount || 0) + ' sold</span>';
+      if (p.marketVelocity) h += '<span>' + p.marketVelocity.toFixed(1) + '/wk</span>';
+      h += '</div>';
+    }
+    if (p.deadWarning && p.deadWarning.failureReason && p.deadWarning.failureReason !== 'unknown') {
+      var dwText = p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold \u2014 was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold \u2014 low demand for this part' : esc(p.deadWarning.failureReason);
+      h += '<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">' + dwText + '</div>';
+    }
     h += '</div>';
   });
-  return h;
-}
 
-function toggleV(id) {
-  var exp = document.getElementById('vexp-' + id);
-  if (exp) exp.classList.toggle('open');
+  // Rebuild reference
+  var rebuildParts = data.rebuild_parts || [];
+  if (rebuildParts.length > 0) {
+    h += '<div style="margin-top:10px;padding-top:8px;border-top:2px dashed var(--border)">';
+    h += '<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Rebuild Reference</div>';
+    rebuildParts.forEach(function(p) {
+      var pd = p.priceRange || ('$' + p.price);
+      h += '<div style="padding:4px 0;opacity:0.6;display:flex;justify-content:space-between;font-size:11px;color:#9ca3af">';
+      h += '<span>[REBUILD] ' + esc(p.seller || 'pro-rebuild') + ' \u2014 ' + esc(p.partType || 'Part') + '</span>';
+      h += '<span style="font-weight:600">' + pd + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  return h;
 }
 
 function setYardFilter(yardId) {

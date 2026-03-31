@@ -2,7 +2,10 @@
 
 const router = require('express-promise-router')();
 const FlywayService = require('../services/FlywayService');
+const AttackListService = require('../services/AttackListService');
+const DeadInventoryService = require('../services/DeadInventoryService');
 const { database } = require('../database/database');
+const { log } = require('../lib/logger');
 
 // List trips (optional ?status=active|planning|complete)
 router.get('/trips', async (req, res) => {
@@ -178,6 +181,88 @@ router.get('/trips/:id/attack-list', async (req, res) => {
     const result = await FlywayService.getFlywayAttackList(req.params.id);
     res.json({ success: true, ...result });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Load parts for a single vehicle on-demand (matches Daily Feed expand behavior)
+router.get('/vehicle/:vehicleId/parts', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const service = new AttackListService();
+
+    const vehicle = await database('yard_vehicle').where('id', vehicleId).first();
+    if (!vehicle) return res.status(404).json({ success: false, error: 'Vehicle not found' });
+
+    const inventoryIndex = await service.buildInventoryIndex();
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const salesIndex = await service.buildSalesIndex(cutoff);
+    const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await service.buildStockIndex();
+    const platformIndex = await service.buildPlatformIndex();
+
+    // Enrich with reference transmission if NHTSA didn't provide one
+    if (!vehicle.decoded_transmission && vehicle.year && vehicle.make && vehicle.model) {
+      try {
+        const TrimTierService = require('../services/TrimTierService');
+        const trimName = vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || null;
+        const engine = vehicle.decoded_engine || vehicle.engine || null;
+        const refResult = await TrimTierService.lookup(
+          parseInt(vehicle.year) || 0,
+          vehicle.make, vehicle.model, trimName, engine,
+          null, vehicle.decoded_drivetrain || vehicle.drivetrain || null
+        );
+        if (refResult && refResult.transmission) {
+          vehicle.decoded_transmission = refResult.transmission;
+        }
+      } catch (e) { /* reference lookup optional */ }
+    }
+
+    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
+
+    // Enrich with dead inventory warnings
+    const deadService = new DeadInventoryService();
+    for (const part of (scored.parts || [])) {
+      if (part.partNumber) {
+        try {
+          const warning = await deadService.getWarning(part.partNumber);
+          if (warning) part.deadWarning = warning;
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    // Enrich with cached market data — same as Daily Feed
+    try {
+      const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('../services/MarketPricingService');
+      const vYear = parseInt(vehicle.year) || 0;
+      for (const p of (scored.parts || [])) {
+        const sq = buildMktQuery({
+          title: p.title || '',
+          make: scored.make || vehicle.make,
+          model: scored.model || vehicle.model,
+          year: vYear,
+          partType: p.partType,
+        });
+        const cached = await getCachedPrice(sq.cacheKey);
+        if (cached) {
+          p.marketMedian = cached.median;
+          p.marketCount = cached.count;
+          p.marketVelocity = cached.velocity;
+          p.marketCheckedAt = cached.checkedAt;
+        }
+      }
+    } catch (e) {
+      log.warn({ err: e.message }, 'Flyway market enrichment failed');
+    }
+
+    res.json({
+      success: true,
+      id: vehicleId,
+      parts: scored.parts || [],
+      rebuild_parts: scored.rebuild_parts || null,
+      platform_siblings: scored.platform_siblings || null,
+    });
+  } catch (err) {
+    log.error({ err }, 'Error loading flyway vehicle parts');
     res.status(500).json({ success: false, error: err.message });
   }
 });

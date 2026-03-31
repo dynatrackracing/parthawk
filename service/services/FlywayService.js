@@ -130,7 +130,7 @@ class FlywayService {
 
     if (vehicles.length === 0) return { trip, yards: [], generated_at: new Date().toISOString() };
 
-    // Build indexes using AttackListService instance
+    // Build indexes using AttackListService instance — same as Daily Feed
     const attackService = new AttackListService();
     const inventoryIndex = await attackService.buildInventoryIndex();
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
@@ -142,7 +142,6 @@ class FlywayService {
       platformIndex = await attackService.buildPlatformIndex();
     } catch (e) { /* platform tables may not exist */ }
 
-    // Build mark index
     let markIndex = { byPN: new Map(), byTitle: new Set() };
     try {
       const marks = await database('the_mark').where('active', true).select('normalizedTitle', 'partNumber');
@@ -155,10 +154,9 @@ class FlywayService {
     // Score floor tiered by trip distance
     const maxDistance = Math.max(...trip.yards.map(y => parseFloat(y.distance_from_base) || 0), 0);
     const SCORE_FLOOR = maxDistance >= 150 ? 1000 : 600;
-    const CULT_FLOOR = Math.floor(SCORE_FLOOR * 0.5);
     const MAX_PER_YARD = 50;
 
-    // Score all vehicles
+    // Score all vehicles — identical to Daily Feed's scoreVehicle, no post-processing
     const allScored = [];
     for (const vehicle of vehicles) {
       try {
@@ -166,81 +164,50 @@ class FlywayService {
           vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex
         );
 
-        // Flyway part filtering: exclude OTHER parts without proven sales
-        const qualifiedParts = (result.parts || []).filter(p => {
-          const pt = (p.partType || '').toUpperCase();
-          if (pt && pt !== 'OTHER') return true;
-          if ((p.sold_90d || 0) > 0) return true;
-          if (p.isMarked) return true;
-          return false;
-        });
-        const qualifiedValue = qualifiedParts.reduce((sum, p) => sum + (p.price || 0), 0);
-
-        // Age decay
         const daysInYard = this.calculateDaysInYard(vehicle.date_added);
-        const ageDecay = this.calculateAgeDecay(daysInYard);
-        const decayedValue = Math.round(qualifiedValue * (1 - ageDecay));
-
-        // Premium flags (includes DIESEL detection)
         const premiumFlags = this.getPremiumFlags(vehicle);
-
-        // High-value parts: only identified types, not OTHER
-        const highValueParts = qualifiedParts.filter(p => {
-          const pt = (p.partType || '').toUpperCase();
-          return (p.price || 0) >= 200 && pt !== 'OTHER';
-        });
 
         allScored.push({
           ...result,
-          parts: qualifiedParts,
-          matched_parts: qualifiedParts.length,
           daysInYard,
-          ageDecay: Math.round(ageDecay * 100),
-          flywayValue: decayedValue,
           premiumFlags,
-          highValueParts: highValueParts.length,
-          hasHighValuePart: highValueParts.length > 0,
           isPremiumVehicle: premiumFlags.length > 0,
           _yardId: vehicle.yard_id,
           _vehicleId: vehicle.id,
-          _scoreFloor: SCORE_FLOOR,
         });
       } catch (e) {
         // Skip vehicles that fail scoring
       }
     }
 
-    // ── Two-pass filtering ──────────────────────────────────
+    // ── Two-pass filtering: top 50 + rare finds ────────────
 
-    // Group by yard
     const byYard = {};
     for (const v of allScored) {
       if (!byYard[v._yardId]) byYard[v._yardId] = [];
       byYard[v._yardId].push(v);
     }
 
-    // Build yard output
     const yards = [];
     for (const y of trip.yards) {
       if (!y.scrape_enabled) continue;
       const yardVehicles = byYard[y.id] || [];
       if (yardVehicles.length === 0) continue;
 
-      // Sort by flyway value descending
-      yardVehicles.sort((a, b) => (b.flywayValue || 0) - (a.flywayValue || 0));
+      // Sort by est_value DESC — same ranking as Daily Feed
+      yardVehicles.sort((a, b) => (b.est_value || 0) - (a.est_value || 0));
 
-      // Pass 1: Top vehicles above score floor OR with high-value identified parts
+      // Pass 1: Top vehicles above score floor
       const top = yardVehicles
-        .filter(v => v.flywayValue >= SCORE_FLOOR || v.hasHighValuePart)
+        .filter(v => (v.est_value || 0) >= SCORE_FLOOR)
         .slice(0, MAX_PER_YARD);
       const topIds = new Set(top.map(v => v._vehicleId));
 
-      // Pass 2: Guaranteed vehicles not already in top list
+      // Pass 2: Guaranteed vehicles (rare finds) not already in top list
       const guaranteed = [];
       for (const v of yardVehicles) {
         if (topIds.has(v._vehicleId)) continue;
-        if (v.flywayValue <= 0 && !v.hasHighValuePart) continue;
-
+        if ((v.est_value || 0) <= 0) continue;
         const reason = this.getGuaranteedReason(v);
         if (reason) {
           v.isGuaranteedInclusion = true;
@@ -249,12 +216,21 @@ class FlywayService {
         }
       }
 
-      // Tag top vehicles
       for (const v of top) {
         v.isGuaranteedInclusion = false;
       }
 
       const combined = [...top, ...guaranteed];
+
+      // Slim mode: strip parts, create part_chips — same as Daily Feed route
+      for (const vehicle of combined) {
+        vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
+          partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
+        }));
+        delete vehicle.parts;
+        delete vehicle.rebuild_parts;
+        delete vehicle.platform_siblings;
+      }
 
       yards.push({
         yard: y,
@@ -263,7 +239,7 @@ class FlywayService {
         total_guaranteed: guaranteed.length,
         total_scored: yardVehicles.length,
         hot_vehicles: combined.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
-        est_total_value: combined.reduce((sum, v) => sum + (v.flywayValue || 0), 0),
+        est_total_value: combined.reduce((sum, v) => sum + (v.est_value || 0), 0),
         vehicles: combined,
       });
     }
@@ -274,26 +250,13 @@ class FlywayService {
   }
 
   // ============================================================
-  // FLYWAY-SPECIFIC SCORING HELPERS
+  // FLYWAY-SPECIFIC HELPERS
   // ============================================================
 
   static calculateDaysInYard(dateAdded) {
     if (!dateAdded) return 0;
     const added = new Date(dateAdded);
     return Math.floor((Date.now() - added.getTime()) / (1000 * 60 * 60 * 24));
-  }
-
-  static calculateAgeDecay(daysInYard) {
-    // 0-14 days: no penalty (fresh)
-    // 14-30 days: linear ramp 0% to 25%
-    // 30-60 days: linear ramp 25% to 50%
-    // 60-90 days: linear ramp 50% to 75%
-    // 90+ days: capped at 75%
-    if (daysInYard <= 14) return 0;
-    if (daysInYard <= 30) return 0.25 * ((daysInYard - 14) / 16);
-    if (daysInYard <= 60) return 0.25 + 0.25 * ((daysInYard - 30) / 30);
-    if (daysInYard <= 90) return 0.50 + 0.25 * ((daysInYard - 60) / 30);
-    return 0.75;
   }
 
   static getPremiumFlags(vehicle) {
@@ -333,8 +296,8 @@ class FlywayService {
     if (flags.includes('AWD')) return 'AWD';
     if (flags.includes('PERFORMANCE')) return 'PERFORMANCE';
     if (flags.includes('PREMIUM')) return 'PREMIUM';
-    // Cult needs at least half the score floor
-    if (flags.includes('CULT') && (v.flywayValue || 0) >= Math.floor((v._scoreFloor || 500) * 0.5)) return 'CULT';
+    // Cult needs at least $300 value
+    if (flags.includes('CULT') && (v.est_value || 0) >= 300) return 'CULT';
     return null;
   }
 
