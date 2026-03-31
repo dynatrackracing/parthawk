@@ -30,6 +30,7 @@ nav a.active{color:#DC2626;font-weight:700}
 .b-low{background:#7c2d12;color:#ea580c}
 .b-bone{background:#dc2626;color:#fff;font-size:8px;letter-spacing:0.05em}
 .b-perch{background:#ea580c;color:#fff;font-size:8px;letter-spacing:0.05em}
+.b-mark{background:#eab308;color:#78350f;font-size:8px;letter-spacing:0.05em;font-weight:800}
 .b-sold{background:#16a34a;color:#fff;font-size:8px;letter-spacing:0.05em}
 .yard-header{padding:10px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #dc2626;margin-bottom:8px}
 .yard-name{font-size:15px;font-weight:800;color:#F0F0F0}
@@ -163,8 +164,9 @@ function load(page) {
 
       // Summary cards — filtered counts
       var sh = '<div class="summary-bar">';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#eab308">' + (d.markCount || 0) + '</div><div class="summary-label">★ MARK</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">QUARRY</div></div>';
-      sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">PERCH</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">STREAM</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
       sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
       sh += '</div>';
@@ -187,8 +189,8 @@ function load(page) {
 
         alerts.forEach(function(a) {
           var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
-          var srcClass = a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
-          var srcLabel = a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
+          var srcClass = a.source === 'PERCH' ? 'b-mark' : a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
+          var srcLabel = a.source === 'PERCH' ? '★ MARK' : a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
           var soldTag = a.justSold ? '<span class="badge b-sold">SOLD ' + a.justSold.toUpperCase() + '</span>' : '';
           var priceStr = a.part_value ? '$' + a.part_value : '';
           var setStr = '';

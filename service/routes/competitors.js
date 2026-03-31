@@ -602,6 +602,7 @@ router.post('/mark', async (req, res) => {
       sourceSignal: sourceSignal || 'gap-intel',
       sourceSellers: sourceSellers || null,
       scoreAtMark: score || null,
+      source: 'PERCH',
       active: true,
       markedAt: new Date(),
       createdAt: new Date(),
@@ -954,19 +955,19 @@ function titleMatchesYard(title, yardMakes) {
 async function graduateMarks() {
   try {
     const activeMarks = await database('the_mark').where('active', true);
-    const ySales = await database('YourSale').select('title').limit(25000);
-    const ySoldTitles = new Set(ySales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
+    const yListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(25000);
+    const yListingTitles = new Set(yListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
 
     let graduated = 0;
     for (const mark of activeMarks) {
-      if (matchesAny(mark.normalizedTitle, ySoldTitles)) {
+      if (matchesAny(mark.normalizedTitle, yListingTitles)) {
         await database('the_mark').where('id', mark.id).update({
           active: false,
           graduatedAt: new Date(),
-          graduatedReason: 'Sold - entered normal restock cycle',
+          graduatedReason: 'Listed - part sourced and in inventory',
           updatedAt: new Date(),
         });
-        log.info({ mark: mark.originalTitle }, 'Auto-graduated mark - sold');
+        log.info({ mark: mark.originalTitle }, 'Auto-graduated mark - listed');
         graduated++;
       }
     }

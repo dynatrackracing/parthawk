@@ -24,6 +24,42 @@ router.get('/', async (req, res) => {
       lastSeenSince: since || null,
     });
 
+    // Load active scout alerts and index by vehicle make+model+year+yard
+    let alertsByVehicle = {};
+    try {
+      const alerts = await database('scout_alerts')
+        .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
+        .select('id', 'source', 'source_title', 'part_value', 'confidence', 'yard_name',
+                'vehicle_year', 'vehicle_make', 'vehicle_model');
+      for (const a of alerts) {
+        const key = [a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|');
+        if (!alertsByVehicle[key]) alertsByVehicle[key] = [];
+        alertsByVehicle[key].push({
+          id: a.id,
+          source: a.source,
+          title: a.source_title,
+          value: a.part_value,
+          confidence: a.confidence,
+        });
+      }
+    } catch (e) { /* scout_alerts may not exist */ }
+
+    // Attach alert badges to vehicles
+    for (const yard of results) {
+      for (const vehicle of (yard.vehicles || [])) {
+        const key = [vehicle.year, (vehicle.make || '').toLowerCase(), (vehicle.model || '').toLowerCase(), (yard.yard_name || '').toLowerCase()].join('|');
+        const va = alertsByVehicle[key];
+        if (va && va.length > 0) {
+          // Separate mark alerts (highest priority) from stream alerts
+          vehicle.alertBadges = va.sort((a, b) => {
+            if (a.source === 'PERCH' && b.source !== 'PERCH') return -1;
+            if (a.source !== 'PERCH' && b.source === 'PERCH') return 1;
+            return 0;
+          });
+        }
+      }
+    }
+
     // Strip parts arrays for slim mode (default) — huge memory savings on mobile
     if (full !== 'true') {
       for (const yard of results) {

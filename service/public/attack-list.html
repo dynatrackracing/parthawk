@@ -97,6 +97,11 @@
   .age-today { background: #064e3b; color: #22c55e; }
   .age-recent { background: #713f12; color: #eab308; }
   .age-old { background: #1f2937; color: #6B7280; }
+  .alert-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .alert-badge-mark { background: #eab308; color: #78350f; }
+  .alert-badge-mark.claimed { background: #064e3b; color: #22c55e; }
+  .alert-badge-stream { background: #1e3a5f; color: #3b82f6; font-size: 8px; }
+  .alert-badge-stream.claimed { background: #064e3b; color: #22c55e; }
   .vehicle-stale { opacity: 0.45; }
   .vehicle-gone .v-score { border: 1px dashed var(--border); }
   .v-right { text-align: right; flex-shrink: 0; }
@@ -616,6 +621,7 @@
         <div class="v-score ${sc}">${v.score}</div>
         <div class="v-info">
           <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:13px;color:#b0b0b0;font-weight:600">${v.engine}</span>` : ''}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:${v.trimBadge.color === 'gray' ? '500' : '700'};padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b'};color:${v.trimBadge.color === 'gray' ? '#9ca3af' : '#000'}">${v.trimBadge.decodedTrim || v.trimBadge.label}</span>` : ''}${v.cult ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>' : ''}${v.diesel ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>' : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); if (/4WD|4X4|AWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>'; if (/FWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">FWD</span>'; return ''; })()}${v.decoded_transmission ? (/manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT' ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>' : v.decoded_transmission === 'CHECK_MT' ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>' : /cvt/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>' : '') : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); const is4x4 = /4WD|4X4|AWD/i.test(dt); const isMT = v.decoded_transmission && (/manual/i.test(v.decoded_transmission) || v.decoded_transmission === 'CHECK_MT'); return is4x4 && isMT ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">4\u00d74+MT</span>' : ''; })()} ${aBadge}${goneLabel}</div>
+          ${renderAlertBadges(v)}
           <div class="v-meta">
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
@@ -1069,6 +1075,33 @@
     const d = new Date(ds); const diff = Date.now() - d.getTime();
     const h = Math.floor(diff / 3600000); const dd = Math.floor(h / 24);
     if (dd > 0) return dd + 'd ago'; if (h > 0) return h + 'h ago'; return 'now';
+  }
+
+  function renderAlertBadges(v) {
+    if (!v.alertBadges || v.alertBadges.length === 0) return '';
+    let html = '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;align-items:center">';
+    for (const ab of v.alertBadges) {
+      if (ab.source === 'PERCH') {
+        // Gold star badge — Mark signal (highest priority)
+        const conf = ab.confidence === 'high' ? '★' : '☆';
+        html += `<span class="alert-badge alert-badge-mark" onclick="event.stopPropagation();claimAlertFromFeed(${ab.id},this)" title="${ab.title || 'Marked part'}">${conf} MARKED</span>`;
+      } else {
+        // Blue badge — Scour Stream signal
+        html += `<span class="alert-badge alert-badge-stream" onclick="event.stopPropagation();claimAlertFromFeed(${ab.id},this)" title="${ab.title || 'Restock'}">Restock</span>`;
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function claimAlertFromFeed(alertId, el) {
+    el.classList.add('claimed');
+    el.innerHTML = '✓ Got it';
+    fetch('/scout-alerts/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: alertId, claimed: true }),
+    }).catch(() => {});
   }
 
   // === Manual Set List ===

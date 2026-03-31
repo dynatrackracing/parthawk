@@ -58,6 +58,9 @@ router.get('/list', async (req, res) => {
           this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days > 0 ? Math.min(days, PERCH_MAX_DAYS) : PERCH_MAX_DAYS} days'`))
             .orWhereNull('vehicle_set_date');
         });
+      }).orWhere(function() {
+        // PERCH (The Mark) alerts — no hard age ceiling, always show active marks
+        this.where('source', 'PERCH');
       });
     });
     if (yard && yard !== 'all') {
@@ -76,13 +79,15 @@ router.get('/list', async (req, res) => {
     .orderByRaw(`CASE WHEN claimed = true THEN 1 ELSE 0 END`)
     .orderByRaw(`
       CASE
-        WHEN source = 'bone_pile' AND confidence = 'high' THEN 0
-        WHEN source = 'bone_pile' AND confidence = 'medium' THEN 1
-        WHEN source = 'bone_pile' AND confidence = 'low' THEN 2
-        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 3
-        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 4
-        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 5
-        ELSE 6
+        WHEN source = 'PERCH' AND confidence = 'high' THEN 0
+        WHEN source = 'PERCH' AND confidence = 'medium' THEN 1
+        WHEN source = 'bone_pile' AND confidence = 'high' THEN 2
+        WHEN source = 'bone_pile' AND confidence = 'medium' THEN 3
+        WHEN source = 'bone_pile' AND confidence = 'low' THEN 4
+        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 5
+        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 6
+        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 7
+        ELSE 8
       END
     `)
     .orderBy('part_value', 'desc')
@@ -119,6 +124,7 @@ router.get('/list', async (req, res) => {
   const sourceCounts = await srcQuery.select('source').count('* as count').groupBy('source');
   const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
   const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
+  const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).count) || 0;
 
   // Tag perch alerts with recent sales
   let justSoldCount = 0;
@@ -150,7 +156,7 @@ router.get('/list', async (req, res) => {
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
-    boneCount, perchCount, justSoldCount,
+    boneCount, perchCount, markCount, justSoldCount,
     total, page, totalPages: Math.ceil(total / perPage),
     lastGenerated
   });
