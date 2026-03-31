@@ -168,6 +168,7 @@ app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));
+app.use('/ebay-messaging', require('./routes/ebay-messaging'));
 // Serve static admin tools with cache headers
 app.use('/admin', express.static(path.resolve(__dirname, 'public'), {
   maxAge: '10m',  // Cache static files for 10 minutes
@@ -903,6 +904,27 @@ async function start() {
         await runner.work();
       } catch (err) {
         log.error({ err }, 'Flyway scrape run failed');
+      }
+    });
+
+    // eBay Messaging — poll for new orders every 15 minutes, process queue every 2 minutes
+    const EbayMessagingService = require('./services/EbayMessagingService');
+    const messagingService = new EbayMessagingService();
+
+    const messagingPollJob = schedule.scheduleJob('*/15 * * * *', async function () {
+      log.info('Cron: Polling for new orders to message');
+      try {
+        await messagingService.pollNewOrders();
+      } catch (err) {
+        log.error({ err }, 'Cron: Order polling failed');
+      }
+    });
+
+    const messagingProcessJob = schedule.scheduleJob('*/2 * * * *', async function () {
+      try {
+        await messagingService.processQueue();
+      } catch (err) {
+        log.error({ err }, 'Cron: Message queue processing failed');
       }
     });
 

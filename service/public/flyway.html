@@ -606,6 +606,7 @@ function renderActiveTrip() {
   h += '<button class="toggle-btn' + (sortMode === 'score' ? ' active' : '') + '" onclick="setSort(\'score\')">Score</button>';
   h += '<button class="toggle-btn' + (sortMode === 'age' ? ' active' : '') + '" onclick="setSort(\'age\')">Newest</button>';
   h += '<button class="toggle-btn' + (sortMode === 'value' ? ' active' : '') + '" onclick="setSort(\'value\')">Value</button>';
+  h += '<button class="toggle-btn' + (sortMode === 'row' ? ' active' : '') + '" onclick="setSort(\'row\')" style="' + (sortMode === 'row' ? '' : '') + '">Row</button>';
   h += '<span style="color:#333">|</span>';
   h += '<button class="toggle-btn' + (filterPremium ? ' active' : '') + '" onclick="toggleFilter(\'premium\')">Premium</button>';
   h += '<button class="toggle-btn' + (filterHighValue ? ' active' : '') + '" onclick="toggleFilter(\'highvalue\')">$500+</button>';
@@ -632,6 +633,13 @@ function renderActiveTrip() {
   if (sortMode === 'score') filtered.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
   else if (sortMode === 'age') filtered.sort(function(a, b) { return (a.daysInYard || 0) - (b.daysInYard || 0); });
   else if (sortMode === 'value') filtered.sort(function(a, b) { return (b.est_value || 0) - (a.est_value || 0); });
+  else if (sortMode === 'row') filtered.sort(function(a, b) {
+    var aRow = a.row_number != null ? parseInt(a.row_number, 10) : Infinity;
+    var bRow = b.row_number != null ? parseInt(b.row_number, 10) : Infinity;
+    if (isNaN(aRow)) aRow = Infinity;
+    if (isNaN(bRow)) bRow = Infinity;
+    return aRow - bRow;
+  });
 
   // Split into top vehicles and guaranteed (rare finds)
   var topVehicles = filtered.filter(function(v) { return !v.isGuaranteedInclusion; });

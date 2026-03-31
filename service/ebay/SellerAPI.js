@@ -289,6 +289,71 @@ class SellerAPI {
       viewItemUrl: item.ListingDetails?.ViewItemURL || '',
     }));
   }
+
+  /**
+   * Send a message to a buyer via eBay's AddMemberMessageAAQToPartner
+   * Message appears in buyer's My eBay Messages inbox.
+   *
+   * @param {Object} params
+   * @param {string} params.itemId - eBay Item ID from the order
+   * @param {string} params.buyerUserId - Buyer's eBay username
+   * @param {string} params.subject - Message subject line
+   * @param {string} params.body - Message body text
+   * @returns {Object} { success, ack, errorCode, errorMessage, rawResponse }
+   */
+  async sendMessageToPartner({ itemId, buyerUserId, subject, body }) {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <AddMemberMessageAAQToPartnerRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+        <RequesterCredentials>
+          <eBayAuthToken>${this.getAuthToken()}</eBayAuthToken>
+        </RequesterCredentials>
+        <ItemID>${itemId}</ItemID>
+        <MemberMessage>
+          <Subject>${this._escapeXml(subject)}</Subject>
+          <Body>${this._escapeXml(body)}</Body>
+          <QuestionType>CustomizedSubject</QuestionType>
+          <RecipientID>${this._escapeXml(buyerUserId)}</RecipientID>
+        </MemberMessage>
+      </AddMemberMessageAAQToPartnerRequest>`;
+
+    try {
+      const response = await axios.post(this.url, xml, {
+        headers: this.createHeaders('AddMemberMessageAAQToPartner'),
+        timeout: 15000,
+      });
+
+      const parsed = await xml2js.parseStringPromise(response.data, { explicitArray: false });
+      const ack = parsed.AddMemberMessageAAQToPartnerResponse?.Ack;
+      const errors = parsed.AddMemberMessageAAQToPartnerResponse?.Errors;
+
+      if (ack === 'Success' || ack === 'Warning') {
+        this.log.info({ itemId, buyerUserId }, 'Message sent to buyer');
+        return { success: true, ack, rawResponse: response.data };
+      }
+
+      const errorCode = errors?.ErrorCode || 'UNKNOWN';
+      const errorMessage = errors?.ShortMessage || errors?.LongMessage || 'Unknown error';
+      this.log.warn({ itemId, buyerUserId, errorCode, errorMessage }, 'Message send failed');
+      return { success: false, ack, errorCode, errorMessage, rawResponse: response.data };
+
+    } catch (err) {
+      this.log.error({ err, itemId, buyerUserId }, 'Message send request failed');
+      return { success: false, errorCode: 'REQUEST_FAILED', errorMessage: err.message };
+    }
+  }
+
+  /**
+   * XML-escape a string to prevent injection in SOAP requests
+   */
+  _escapeXml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
 }
 
 module.exports = SellerAPI;
