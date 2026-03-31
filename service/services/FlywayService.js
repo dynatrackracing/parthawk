@@ -287,17 +287,22 @@ class FlywayService {
   /**
    * Determine if a vehicle qualifies for guaranteed inclusion (rare finds).
    * Returns the reason string or null if not guaranteed.
+   *
+   * Always include: PERFORMANCE, PREMIUM, DIESEL, MANUAL, 4x4+MT combo
+   * With threshold: CULT (score > 50)
+   * Plain 4WD/AWD without manual does NOT qualify (too common)
    */
   static getGuaranteedReason(v) {
     const flags = v.premiumFlags || [];
-    if (flags.includes('MANUAL')) return 'MANUAL';
-    if (flags.includes('DIESEL')) return 'DIESEL';
-    if (flags.includes('4WD')) return '4WD';
-    if (flags.includes('AWD')) return 'AWD';
+    const isManual = flags.includes('MANUAL');
+    const is4x4 = flags.includes('4WD') || flags.includes('AWD');
+
     if (flags.includes('PERFORMANCE')) return 'PERFORMANCE';
     if (flags.includes('PREMIUM')) return 'PREMIUM';
-    // Cult needs at least $300 value
-    if (flags.includes('CULT') && (v.est_value || 0) >= 300) return 'CULT';
+    if (flags.includes('DIESEL')) return 'DIESEL';
+    if (is4x4 && isManual) return '4x4+MT';
+    if (isManual) return 'MANUAL';
+    if (flags.includes('CULT') && (v.score || 0) > 50) return 'CULT';
     return null;
   }
 
