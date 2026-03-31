@@ -42,8 +42,8 @@ class ApifyResearchService {
     // Rate limit: one at a time
     if (this._running) throw new Error('Research already running — please wait');
 
-    // Check 7-day cache first
-    const cacheKey = `${vehicle.year}|${vehicle.make}|${vehicle.model}|${vehicle.engine || 'any'}`.toLowerCase();
+    // Check 7-day cache first — apify| prefix prevents collision with database-only cache
+    const cacheKey = `apify|${vehicle.year}|${vehicle.make}|${vehicle.model}|${vehicle.engine || 'any'}`.toLowerCase();
     try {
       const cached = await database('instant_research_cache')
         .where('vehicle_key', cacheKey)
