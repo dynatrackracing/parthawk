@@ -158,7 +158,7 @@ class LearningsService {
     try {
       const actions = await database('stale_inventory_action')
         .where('executed', true)
-        .where('action_type', 'REDUCE_PRICE')
+        .where('action_type', 'price_reduction')
         .select('ebay_item_id', 'old_price', 'new_price', 'executed_at');
 
       if (actions.length === 0) {

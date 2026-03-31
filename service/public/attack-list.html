@@ -131,8 +131,11 @@
   .verdict-poor { background: #7f1d1d; color: #ef4444; }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
   .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
-  .pd-actions { display: none; }
-  .btn-pull, .btn-skip, .btn-note { display: none; }
+  .pd-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .btn-pull { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #22c55e; background: transparent; color: #22c55e; cursor: pointer; font-family: var(--font); }
+  .btn-pull:active { opacity: 0.7; }
+  .btn-skip { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: var(--font); }
+  .btn-note { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: var(--font); }
   .skip-dropdown { display: none; }
   .note-input { display: none; }
 
@@ -768,6 +771,21 @@
           ${p.marketVelocity ? `<span style="color:#6B7280">${p.marketVelocity.toFixed(1)}/wk</span>` : ''}
         </div>` : ''}
         ${p.deadWarning && p.deadWarning.failureReason && p.deadWarning.failureReason !== 'unknown' ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">${p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold — was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold — low demand for this part' : p.deadWarning.failureReason}</div>` : ''}
+        <div class="pd-actions">
+          <button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>
+          <button class="btn-skip" onclick="toggleSkip('${v.id}','${pid}')">Skip</button>
+          <button class="btn-note" onclick="toggleNote('${v.id}','${pid}')">Note</button>
+        </div>
+        <div class="skip-dropdown" id="skip-${v.id}-${pid}">
+          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','already_have')">Already have</div>
+          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','too_low_value')">Too low value</div>
+          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','hard_to_pull')">Hard to pull</div>
+          <div style="padding:6px 10px;font-size:11px;cursor:pointer" onclick="logSkip('${v.id}','${pid}','other')">Other</div>
+        </div>
+        <div class="note-input" id="note-${v.id}-${pid}">
+          <input type="text" id="noteval-${v.id}-${pid}" placeholder="Add note..." style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;font-family:var(--font);outline:none;">
+          <button onclick="saveNote('${v.id}','${pid}')" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Save</button>
+        </div>
       </div>`;
     }
 

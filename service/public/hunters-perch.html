@@ -409,10 +409,18 @@ function markItem(title, partNumber, partType, medianPrice, sourceSignal, seller
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.success) {
-        btn.textContent = '✓';
-        btn.style.color = '#22c55e';
-        btn.style.borderColor = '#22c55e';
-        btn.disabled = true;
+        // Remove the card from DOM — marked items are filtered from gap-intel
+        var row = btn.closest('.item-row');
+        if (row) {
+          row.style.transition = 'opacity 0.3s';
+          row.style.opacity = '0';
+          setTimeout(function() { row.remove(); }, 300);
+        } else {
+          btn.textContent = '✓';
+          btn.style.color = '#22c55e';
+          btn.style.borderColor = '#22c55e';
+          btn.disabled = true;
+        }
       } else { btn.disabled = false; btn.textContent = '+ Mark'; }
     })
     .catch(function() { btn.disabled = false; btn.textContent = '+ Mark'; });

@@ -122,6 +122,13 @@ router.get('/gap-intel', async (req, res) => {
       dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
     } catch (e) { /* table may not exist yet */ }
 
+    // Exclude items already in the_mark (actively tracked)
+    let markedTitles = new Set();
+    try {
+      const marks = await database('the_mark').where('active', true).select('normalizedTitle');
+      markedTitles = new Set(marks.map(function(m) { return m.normalizedTitle; }));
+    } catch (e) { /* table may not exist yet */ }
+
     // Check yard_vehicle for local matches (moved BEFORE gap loop)
     let yardMakes = new Set();
     try {
@@ -136,6 +143,7 @@ router.get('/gap-intel', async (req, res) => {
     for (const [key, group] of Object.entries(compGroups)) {
       if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
+      if (markedTitles.has(key)) continue;
 
       // Calculate median price
       const sorted = group.prices.sort((a, b) => a - b);
@@ -912,6 +920,24 @@ router.get('/sellers', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Check if a normalized title matches any title in a Set (word overlap >= 80%)
+function matchesAny(normalizedTitle, titleSet) {
+  if (!normalizedTitle || titleSet.size === 0) return false;
+  const words = normalizedTitle.split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) return false;
+  for (const candidate of titleSet) {
+    const cWords = candidate.split(/\s+/).filter(w => w.length > 2);
+    if (cWords.length === 0) continue;
+    let matches = 0;
+    for (const w of words) {
+      if (cWords.includes(w)) matches++;
+    }
+    const overlap = matches / Math.max(words.length, 1);
+    if (overlap >= 0.8) return true;
+  }
+  return false;
+}
 
 function titleMatchesYard(title, yardMakes) {
   if (!title || yardMakes.size === 0) return false;

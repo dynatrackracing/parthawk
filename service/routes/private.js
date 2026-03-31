@@ -26,8 +26,9 @@ router.post('/ebay-challenger-api', async (req, res, next) => {
 
 router.get('/cache/flush', authMiddleware, isAdmin, async (req, res, next) => {
   console.log('!FLUSHING CACHE!')
-  cacheManager = new CacheManager();
+  const cacheManager = new CacheManager();
   cacheManager.flush();
+  res.json({ success: true, message: 'Cache flushed' });
 });
 
 router.get('/cache/stats', authMiddleware, isAdmin, async (req, res, next) => {

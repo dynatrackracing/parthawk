@@ -10,11 +10,12 @@ router.get('/', authMiddleware, isAdmin, async (req, res, next) => {
   log.info('Running cron route manually!');
   const cronRunner = new CronWorkRunner();
   try {
-    cronRunner.work();
+    await cronRunner.work();
+    res.json({ success: true, message: 'Cron executed successfully' });
   } catch (err) {
     log.error({ err }, 'There was an error executing manual cron');
+    res.status(500).json({ success: false, error: err.message });
   }
-
 });
 
 module.exports = router;

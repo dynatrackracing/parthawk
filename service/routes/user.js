@@ -49,12 +49,12 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
 
   res.sendStatus(200);
 });
-router.delete(':/id', authMiddleware, isAdmin, async (req, res, next) => {
+router.delete('/:id', authMiddleware, isAdmin, async (req, res, next) => {
   const userManager = new UserManager();
 
   const response = await userManager.deleteUser({ user: req.params.id });
 
-  return res.status(204);
+  return res.status(204).send();
 });
 
 module.exports = router;
