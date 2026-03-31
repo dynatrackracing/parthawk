@@ -194,8 +194,12 @@ class FlywayService {
       const yardVehicles = byYard[y.id] || [];
       if (yardVehicles.length === 0) continue;
 
-      // Sort by est_value DESC — same ranking as Daily Feed
-      yardVehicles.sort((a, b) => (b.est_value || 0) - (a.est_value || 0));
+      // Sort: score DESC, then date_added DESC (fresh arrivals surface first at same score)
+      yardVehicles.sort((a, b) => {
+        const scoreDiff = (b.score || 0) - (a.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return new Date(b.date_added || 0) - new Date(a.date_added || 0);
+      });
 
       // Pass 1: Top vehicles above score floor
       const top = yardVehicles
@@ -288,8 +292,8 @@ class FlywayService {
    * Determine if a vehicle qualifies for guaranteed inclusion (rare finds).
    * Returns the reason string or null if not guaranteed.
    *
-   * Always include: PERFORMANCE, PREMIUM, DIESEL, MANUAL, 4x4+MT combo
-   * With threshold: CULT (score > 50)
+   * Always include: PERFORMANCE, DIESEL, MANUAL, 4x4+MT combo
+   * With threshold (score > 50): PREMIUM, CULT
    * Plain 4WD/AWD without manual does NOT qualify (too common)
    */
   static getGuaranteedReason(v) {
@@ -298,10 +302,10 @@ class FlywayService {
     const is4x4 = flags.includes('4WD') || flags.includes('AWD');
 
     if (flags.includes('PERFORMANCE')) return 'PERFORMANCE';
-    if (flags.includes('PREMIUM')) return 'PREMIUM';
     if (flags.includes('DIESEL')) return 'DIESEL';
     if (is4x4 && isManual) return '4x4+MT';
     if (isManual) return 'MANUAL';
+    if (flags.includes('PREMIUM') && (v.score || 0) > 50) return 'PREMIUM';
     if (flags.includes('CULT') && (v.score || 0) > 50) return 'CULT';
     return null;
   }
