@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk - THE PHOENIX</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh;padding-bottom:40px}
+.container{padding:12px;max-width:800px;margin:0 auto}
+header{background:#141414;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+.h-title{font-size:18px;font-weight:700;letter-spacing:-0.03em}
+.h-sub{font-size:11px;color:#9CA3AF;margin-top:1px}
+.controls{display:flex;gap:8px;align-items:center;padding:10px 12px;background:#141414;border-bottom:1px solid #2a2a2a;flex-wrap:wrap}
+.pill{padding:6px 12px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:11px;font-weight:600;cursor:pointer}
+.pill.active{background:#7f1d1d;color:#dc2626;border-color:#dc2626}
+select{padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:11px;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px}
+.stat-box{background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:10px;text-align:center}
+.stat-val{font-size:16px;font-weight:700;color:#F0F0F0}
+.stat-label{font-size:9px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:10px}
+.ph-card{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid #1f1f1f}
+.ph-card:last-child{border-bottom:none}
+.ph-thumb{width:44px;height:44px;border-radius:8px;background:#1f2937;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden}
+.ph-thumb img{width:100%;height:100%;object-fit:cover}
+.ph-score{width:36px;height:36px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:800;line-height:1}
+.ph-score .lbl{font-size:7px;font-weight:600;letter-spacing:.04em;margin-top:1px}
+.sc-prime{background:#064e3b;color:#22c55e}
+.sc-solid{background:#713f12;color:#eab308}
+.sc-watch{background:#7c2d12;color:#f97316}
+.sc-low{background:#7f1d1d;color:#ef4444}
+.ph-info{flex:1;min-width:0}
+.ph-top{display:flex;justify-content:space-between;align-items:flex-start}
+.ph-type{font-size:13px;font-weight:700}
+.ph-year{font-size:11px;color:#6B7280}
+.ph-stats{font-size:11px;color:#9CA3AF;margin-top:2px}
+.ph-range{font-size:10px;color:#6B7280;margin-top:1px}
+.ph-sellers{font-size:10px;color:#4B5563;margin-top:2px}
+.ph-sample{font-size:10px;color:#374151;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.manage-toggle{padding:8px 14px;font-size:11px;font-weight:600;color:#6B7280;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.manage-panel{display:none;padding:0 12px 12px}
+.manage-panel.open{display:block}
+.seller-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1f1f1f;font-size:12px}
+.seller-row:last-child{border-bottom:none}
+.add-row{display:flex;gap:8px;margin-top:8px}
+.add-input{flex:1;padding:8px 10px;border:1px solid #333;border-radius:6px;font-size:12px;background:#0a0a0a;color:#F0F0F0;outline:none}
+.add-input:focus{border-color:#dc2626}
+.btn{padding:8px 14px;border-radius:6px;border:none;font-size:12px;font-weight:700;cursor:pointer}
+.btn-red{background:#dc2626;color:#fff}
+.btn-sm{padding:5px 8px;font-size:10px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;cursor:pointer}
+.btn-sm:disabled{opacity:.3}
+.spinner{width:14px;height:14px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:#6B7280;padding:30px;font-size:13px;line-height:1.6}
+.count-header{font-size:11px;color:#6B7280;padding:6px 12px;font-weight:600}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#141414;border:1px solid #2a2a2a;color:#F0F0F0;padding:8px 16px;border-radius:8px;font-size:12px;z-index:300}
+@media(max-width:500px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('phoenix')</script>
+
+<header>
+  <div>
+    <div class="h-title">THE PHOENIX</div>
+    <div class="h-sub">Rebuild Candidate Intelligence</div>
+  </div>
+</header>
+
+<div class="controls" id="controls">
+  <button class="pill" data-days="90" onclick="setDays(90)">90d</button>
+  <button class="pill active" data-days="180" onclick="setDays(180)">180d</button>
+  <button class="pill" data-days="365" onclick="setDays(365)">365d</button>
+  <button class="pill" data-days="9999" onclick="setDays(9999)">All</button>
+  <select id="sellerFilter" onchange="loadData()"><option value="">All Sellers</option></select>
+</div>
+
+<div class="stats-row" id="statsRow">
+  <div class="stat-box"><div class="stat-val" id="statParts">-</div><div class="stat-label">Part Groups</div></div>
+  <div class="stat-box"><div class="stat-val" id="statSales">-</div><div class="stat-label">Total Sales</div></div>
+  <div class="stat-box"><div class="stat-val" id="statAvg">-</div><div class="stat-label">Avg Price</div></div>
+  <div class="stat-box"><div class="stat-val" id="statTop">-</div><div class="stat-label">Top Category</div></div>
+</div>
+
+<div class="container">
+  <!-- Seller Management -->
+  <div class="card" style="padding:0;margin-bottom:12px">
+    <button class="manage-toggle" id="manageBtn" onclick="toggleManage()">Manage Sellers ▼</button>
+    <div class="manage-panel" id="managePanel">
+      <div id="sellerList"></div>
+      <div class="add-row">
+        <input class="add-input" id="newSeller" placeholder="eBay seller name..." />
+        <button class="btn btn-red" id="addBtn" onclick="addSeller()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="listContent"><div class="empty"><div class="spinner"></div><br>Loading Phoenix data...</div></div>
+</div>
+
+<script>
+var currentDays = 180;
+var allSellers = [];
+
+function setDays(d) {
+  currentDays = d;
+  document.querySelectorAll('.pill').forEach(function(b) { b.classList.toggle('active', parseInt(b.dataset.days) === d); });
+  loadData();
+}
+
+function toggleManage() {
+  var p = document.getElementById('managePanel');
+  var b = document.getElementById('manageBtn');
+  var open = p.classList.toggle('open');
+  b.textContent = open ? 'Manage Sellers ▲' : 'Manage Sellers ▼';
+}
+
+function toast(msg) {
+  var el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 3000);
+}
+
+async function loadSellers() {
+  try {
+    var res = await fetch('/phoenix/sellers');
+    var data = await res.json();
+    allSellers = data.sellers || [];
+    renderSellers();
+    var sel = document.getElementById('sellerFilter');
+    sel.innerHTML = '<option value="">All Sellers</option>';
+    allSellers.filter(function(s) { return s.enabled; }).forEach(function(s) {
+      sel.innerHTML += '<option value="' + s.name + '">' + s.name + '</option>';
+    });
+  } catch (e) { /* silent */ }
+}
+
+function renderSellers() {
+  var el = document.getElementById('sellerList');
+  if (allSellers.length === 0) { el.innerHTML = '<div class="empty" style="padding:12px">No rebuild sellers configured.</div>'; return; }
+  var h = '';
+  allSellers.forEach(function(s) {
+    var scraped = s.lastScrapedAt ? new Date(s.lastScrapedAt).toLocaleDateString() : 'Never';
+    h += '<div class="seller-row">';
+    h += '<span style="font-weight:600">' + s.name + '</span>';
+    h += '<span style="color:#6B7280;font-size:10px">' + (s.itemsScraped || 0) + ' items · ' + scraped + '</span>';
+    h += '<span>';
+    h += '<button class="btn-sm" onclick="scrapeSeller(\'' + s.name + '\',this)">Scrape</button> ';
+    h += '<button class="btn-sm" style="color:#ef4444" onclick="removeSeller(\'' + s.name + '\')">Remove</button>';
+    h += '</span></div>';
+  });
+  el.innerHTML = h;
+}
+
+async function addSeller() {
+  var input = document.getElementById('newSeller');
+  var name = input.value.trim();
+  if (!name) return;
+  var btn = document.getElementById('addBtn');
+  btn.disabled = true;
+  try {
+    var res = await fetch('/phoenix/sellers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) });
+    var data = await res.json();
+    if (data.success) { input.value = ''; toast('Added ' + name); await loadSellers(); loadData(); }
+    else toast(data.message || 'Failed');
+  } catch (e) { toast('Error adding seller'); }
+  btn.disabled = false;
+}
+
+async function removeSeller(name) {
+  if (!confirm('Remove ' + name + ' from rebuild sellers?')) return;
+  try {
+    await fetch('/phoenix/sellers/' + name, { method: 'DELETE' });
+    toast('Removed ' + name);
+    await loadSellers();
+    loadData();
+  } catch (e) { toast('Error removing seller'); }
+}
+
+async function scrapeSeller(name, btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  try {
+    var res = await fetch('/phoenix/sellers/' + name + '/scrape', { method: 'POST' });
+    var data = await res.json();
+    toast(data.success ? 'Scrape complete for ' + name : (data.error || 'Scrape failed'));
+    await loadSellers();
+    loadData();
+  } catch (e) { toast('Scrape error'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Scrape'; }
+}
+
+async function loadData() {
+  var seller = document.getElementById('sellerFilter').value;
+  var params = 'days=' + currentDays + '&limit=100' + (seller ? '&seller=' + seller : '');
+
+  // Stats
+  try {
+    var sr = await fetch('/phoenix/stats?' + params);
+    var sd = await sr.json();
+    if (sd.success) {
+      var st = sd.stats;
+      document.getElementById('statSales').textContent = st.totalSales || 0;
+      document.getElementById('statAvg').textContent = st.avgPrice ? '$' + st.avgPrice : '-';
+      document.getElementById('statTop').textContent = st.topPartType || '-';
+    }
+  } catch (e) { /* silent */ }
+
+  // List
+  var el = document.getElementById('listContent');
+  try {
+    var res = await fetch('/phoenix?' + params);
+    var data = await res.json();
+    if (!data.success) { el.innerHTML = '<div class="empty">Error: ' + (data.error || 'unknown') + '</div>'; return; }
+    var items = data.data || [];
+    document.getElementById('statParts').textContent = items.length;
+
+    if (items.length === 0) {
+      if (allSellers.length === 0) { el.innerHTML = '<div class="empty">No rebuild sellers configured. Expand "Manage Sellers" to add one.</div>'; }
+      else { el.innerHTML = '<div class="empty">No sold data found. Scrape your rebuild sellers to populate the list.</div>'; }
+      return;
+    }
+
+    var sellerLabel = seller ? 'from ' + seller : '';
+    var h = '<div class="count-header">Showing ' + items.length + ' rebuild candidates ' + sellerLabel + '</div>';
+    h += '<div class="card" style="padding:0">';
+    items.forEach(function(it) {
+      var sc = it.phoenixScore >= 75 ? 'sc-prime' : it.phoenixScore >= 50 ? 'sc-solid' : it.phoenixScore >= 25 ? 'sc-watch' : 'sc-low';
+      var lbl = it.phoenixScore >= 75 ? 'PRIME' : it.phoenixScore >= 50 ? 'SOLID' : it.phoenixScore >= 25 ? 'WATCH' : 'LOW';
+      var thumb = it.sampleImage ? '<img src="' + it.sampleImage + '" alt="">' : '🔥';
+
+      h += '<div class="ph-card">';
+      h += '<div class="ph-thumb">' + thumb + '</div>';
+      h += '<div class="ph-score ' + sc + '">' + it.phoenixScore + '<span class="lbl">' + lbl + '</span></div>';
+      h += '<div class="ph-info">';
+      h += '<div class="ph-top"><div><span class="ph-type">' + esc(it.partType) + '</span> · ' + esc(it.make) + ' · ' + esc(it.model) + '</div><span class="ph-year">' + (it.yearRange || '') + '</span></div>';
+      h += '<div class="ph-stats">Avg $' + it.avgPrice + ' · ' + it.salesCount + ' sold · $' + it.totalRevenue + ' revenue</div>';
+      h += '<div class="ph-range">Range $' + it.minPrice + ' - $' + it.maxPrice + (it.lastSoldDate ? ' · Last ' + new Date(it.lastSoldDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '') + '</div>';
+      if (it.sellers && it.sellers.length > 1) {
+        h += '<div class="ph-sellers">' + it.sellers.map(function(s) { return s + ' (' + (it.sellerBreakdown[s] || 0) + ')'; }).join(' · ') + '</div>';
+      }
+      if (it.sampleTitles && it.sampleTitles[0]) {
+        var sample = it.sampleTitles[0];
+        h += '<div class="ph-sample">' + esc(sample.length > 80 ? sample.substring(0, 80) + '...' : sample) + '</div>';
+      }
+      h += '</div></div>';
+    });
+    h += '</div>';
+    el.innerHTML = h;
+  } catch (e) {
+    el.innerHTML = '<div class="empty" style="color:#ef4444">Failed to load data: ' + e.message + '</div>';
+  }
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// Init
+loadSellers().then(function() { loadData(); });
+</script>
+</body>
+</html>

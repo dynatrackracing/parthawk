@@ -21,6 +21,7 @@ function dhNav(activePage) {
     { key: 'instincts', label: 'INSTINCTS',     href: '/admin/instincts' },
     { key: 'prey-cycle', label: 'PREY-CYCLE',   href: '/admin/prey-cycle' },
     { key: 'carcass',  label: 'CARCASS',         href: '/admin/carcass' },
+    { key: 'phoenix', label: '\uD83D\uDD25 PHOENIX',     href: '/admin/phoenix' },
   ];
 
   function linkHTML(item, isField) {

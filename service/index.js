@@ -168,6 +168,7 @@ app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));
+app.use('/trim-validation', require('./routes/trim-validation'));
 // Serve static admin tools with cache headers
 app.use('/admin', express.static(path.resolve(__dirname, 'public'), {
   maxAge: '10m',  // Cache static files for 10 minutes
@@ -195,6 +196,9 @@ app.get('/admin/vin', (req, res) => {
 });
 app.get('/admin/hunters-perch', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'hunters-perch.html'));
+});
+app.get('/admin/phoenix', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'phoenix.html'));
 });
 app.get('/admin/the-mark', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'the-mark.html'));
@@ -746,6 +750,7 @@ app.get('/api/market-price/status', async (req, res) => {
 
 app.use('/return-intelligence', require('./routes/return-intelligence'));
 app.use('/flyway', require('./routes/flyway'));
+app.use('/phoenix', require('./routes/phoenix'));
 
 // ═══ SPA CATCH-ALL — MUST BE LAST ═══
 // All API routes are registered above this point.
