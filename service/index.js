@@ -907,6 +907,40 @@ async function start() {
       }
     });
 
+    // Competitor drip scraping — 4x daily with random 0-45min startup jitter
+    // Each run: picks 1 least-recently-scraped seller, scrapes 1-2 pages
+    // Replaces old Sunday 8pm blast-all-sellers cron (removed from competitors.js)
+    const CompetitorDripRunner = require('./lib/CompetitorDripRunner');
+
+    const dripJob5am = schedule.scheduleJob('0 5 * * *', async function () {
+      log.info('Competitor drip cron fired (5am UTC window)');
+      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip 5am failed'); }
+    });
+
+    const dripJobNoon = schedule.scheduleJob('0 12 * * *', async function () {
+      log.info('Competitor drip cron fired (noon UTC window)');
+      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip noon failed'); }
+    });
+
+    const dripJob6pm = schedule.scheduleJob('0 18 * * *', async function () {
+      log.info('Competitor drip cron fired (6pm UTC window)');
+      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip 6pm failed'); }
+    });
+
+    const dripJobMidnight = schedule.scheduleJob('0 0 * * *', async function () {
+      log.info('Competitor drip cron fired (midnight UTC window)');
+      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip midnight failed'); }
+
+      // Graduate marks once daily (moved from old Sunday-only cron in competitors.js)
+      try {
+        const axios = require('axios');
+        await axios.post('http://localhost:' + (process.env.PORT || 9000) + '/competitors/mark/graduate');
+        log.info('Daily mark graduation complete');
+      } catch (err) {
+        log.error({ err: err.message }, 'Daily mark graduation failed');
+      }
+    });
+
     // eBay Messaging — poll for new orders every 15 minutes, process queue every 2 minutes
     const EbayMessagingService = require('./services/EbayMessagingService');
     const messagingService = new EbayMessagingService();

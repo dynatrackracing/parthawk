@@ -515,10 +515,12 @@ router.post('/cleanup', async (req, res) => {
 
 /**
  * POST /competitors/auto-scrape
- * Auto-scrape all enabled sellers. Called by daily cron.
+ * Emergency override — scrapes ALL enabled sellers at once.
+ * Prefer drip cron (CompetitorDripRunner, 4x daily) for normal operations.
  * Skips sellers scraped in the last 20 hours.
  */
 router.post('/auto-scrape', async (req, res) => {
+  log.warn('Manual auto-scrape triggered — prefer drip cron for rate limiting');
   try {
     const sellers = await database('SoldItemSeller').where('enabled', true);
     const results = [];
@@ -1007,29 +1009,8 @@ async function graduateMarks() {
   }
 }
 
-try {
-  const cron = require('node-cron');
-  cron.schedule('0 20 * * 0', async () => {
-    log.info('Starting weekly competitor scrape (Playwright)');
-    try {
-      const manager = new SoldItemsManager();
-      const results = await manager.scrapeAllCompetitors({
-        categoryId: '0',
-        maxPagesPerSeller: 3,
-        enrichCompatibility: false,
-      });
-      log.info({ results }, 'Weekly competitor scrape complete');
-    } catch (err) {
-      log.error({ err: err.message }, 'Weekly competitor scrape failed');
-    }
-
-    // Graduate marks after fresh competitor data
-    const graduated = await graduateMarks();
-    log.info({ graduated }, 'Mark graduation complete');
-  });
-  log.info('Weekly competitor scrape cron scheduled for Sunday 8pm UTC');
-} catch (e) {
-  log.warn('node-cron not available, competitor scrape cron not scheduled');
-}
+// REMOVED: Sunday 8pm blast-all-sellers cron.
+// Replaced by CompetitorDripRunner (4x daily, 1 seller per run, registered in index.js).
+// graduateMarks() runs daily at midnight via index.js drip cron.
 
 module.exports = router;
