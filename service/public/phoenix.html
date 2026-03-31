@@ -80,10 +80,10 @@ select{padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a
 </div>
 
 <div class="stats-row" id="statsRow">
-  <div class="stat-box"><div class="stat-val" id="statParts">-</div><div class="stat-label">Part Groups</div></div>
-  <div class="stat-box"><div class="stat-val" id="statSales">-</div><div class="stat-label">Total Sales</div></div>
-  <div class="stat-box"><div class="stat-val" id="statAvg">-</div><div class="stat-label">Avg Price</div></div>
-  <div class="stat-box"><div class="stat-val" id="statTop">-</div><div class="stat-label">Top Category</div></div>
+  <div class="stat-box"><div class="stat-val" id="statCatalog">-</div><div class="stat-label">Catalog Parts</div></div>
+  <div class="stat-box"><div class="stat-val" id="statPNs">-</div><div class="stat-label">Part Numbers</div></div>
+  <div class="stat-box"><div class="stat-val" id="statFitment">-</div><div class="stat-label">With Fitment</div></div>
+  <div class="stat-box"><div class="stat-val" id="statSales">-</div><div class="stat-label">Sold Items</div></div>
 </div>
 
 <div class="container">
@@ -205,9 +205,10 @@ async function loadData() {
     var sd = await sr.json();
     if (sd.success) {
       var st = sd.stats;
+      document.getElementById('statCatalog').textContent = st.catalogItems || 0;
+      document.getElementById('statPNs').textContent = st.itemsWithPartNumber || 0;
+      document.getElementById('statFitment').textContent = st.itemsWithFitment || 0;
       document.getElementById('statSales').textContent = st.totalSales || 0;
-      document.getElementById('statAvg').textContent = st.avgPrice ? '$' + st.avgPrice : '-';
-      document.getElementById('statTop').textContent = st.topPartType || '-';
     }
   } catch (e) { /* silent */ }
 
@@ -218,7 +219,7 @@ async function loadData() {
     var data = await res.json();
     if (!data.success) { el.innerHTML = '<div class="empty">Error: ' + (data.error || 'unknown') + '</div>'; return; }
     var items = data.data || [];
-    document.getElementById('statParts').textContent = items.length;
+    // statParts removed — stats come from /stats endpoint
 
     if (items.length === 0) {
       if (allSellers.length === 0) { el.innerHTML = '<div class="empty">No rebuild sellers configured. Expand "Manage Sellers" to add one.</div>'; }
@@ -232,22 +233,54 @@ async function loadData() {
     items.forEach(function(it) {
       var sc = it.phoenixScore >= 75 ? 'sc-prime' : it.phoenixScore >= 50 ? 'sc-solid' : it.phoenixScore >= 25 ? 'sc-watch' : 'sc-low';
       var lbl = it.phoenixScore >= 75 ? 'PRIME' : it.phoenixScore >= 50 ? 'SOLID' : it.phoenixScore >= 25 ? 'WATCH' : 'LOW';
-      var thumb = it.sampleImage ? '<img src="' + it.sampleImage + '" alt="">' : '🔥';
+      var thumb = it.catalogImage ? '<img src="' + it.catalogImage + '" alt="">' : '🔥';
+      var pnDisplay = it.partNumberBase ? it.partNumberBase : '';
 
       h += '<div class="ph-card">';
       h += '<div class="ph-thumb">' + thumb + '</div>';
       h += '<div class="ph-score ' + sc + '">' + it.phoenixScore + '<span class="lbl">' + lbl + '</span></div>';
       h += '<div class="ph-info">';
-      h += '<div class="ph-top"><div><span class="ph-type">' + esc(it.partType) + '</span> · ' + esc(it.make) + ' · ' + esc(it.model) + '</div><span class="ph-year">' + (it.yearRange || '') + '</span></div>';
-      h += '<div class="ph-stats">Avg $' + it.avgPrice + ' · ' + it.salesCount + ' sold · $' + it.totalRevenue + ' revenue</div>';
-      h += '<div class="ph-range">Range $' + it.minPrice + ' - $' + it.maxPrice + (it.lastSoldDate ? ' · Last ' + new Date(it.lastSoldDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '') + '</div>';
-      if (it.sellers && it.sellers.length > 1) {
-        h += '<div class="ph-sellers">' + it.sellers.map(function(s) { return s + ' (' + (it.sellerBreakdown[s] || 0) + ')'; }).join(' · ') + '</div>';
+
+      // Line 1: Part type + PN
+      h += '<div class="ph-top"><div><span class="ph-type">' + esc(it.partType) + '</span>';
+      if (pnDisplay) h += ' <span style="color:#6B7280;font-size:11px">' + esc(pnDisplay) + '</span>';
+      if (it.salesCount === 0 && it.catalogCount > 0) h += ' <span style="background:#1f2937;color:#6B7280;font-size:8px;padding:1px 4px;border-radius:3px">CATALOG</span>';
+      h += '</div><span class="ph-year">' + (it.yearRange || '') + '</span></div>';
+
+      // Line 2: Fitment (from AIC)
+      if (it.fitmentSummary) {
+        h += '<div style="font-size:12px;color:#d1d5db;margin-top:1px">' + esc(it.fitmentSummary);
+        if (it.fitment && it.fitment[0] && it.fitment[0].engine) h += ' · ' + esc(it.fitment[0].engine);
+        h += '</div>';
       }
+
+      // Line 3: Market data
+      if (it.marketAvgPrice || it.marketSold90d) {
+        h += '<div style="font-size:11px;color:#06b6d4;margin-top:2px">Market $' + (it.marketAvgPrice || '?') + ' avg · ' + (it.marketSold90d || 0) + ' sold/90d';
+        if (it.marketScore) h += ' · Score ' + it.marketScore;
+        h += '</div>';
+      }
+
+      // Line 4: Sales velocity
+      if (it.salesCount > 0) {
+        h += '<div class="ph-stats">Sold ' + it.salesCount + 'x @ avg $' + it.avgSoldPrice + ' · $' + it.totalRevenue + ' revenue';
+        if (it.lastSoldDate) h += ' · Last ' + new Date(it.lastSoldDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:10px;color:#4B5563;margin-top:2px">No sales data yet</div>';
+      }
+
+      // Line 5: Seller breakdown
+      if (it.soldSellers && it.soldSellers.length > 1) {
+        h += '<div class="ph-sellers">' + it.soldSellers.map(function(s) { return s + ' (' + (it.sellerBreakdown[s] || 0) + ')'; }).join(' · ') + '</div>';
+      }
+
+      // Line 6: Sample title
       if (it.sampleTitles && it.sampleTitles[0]) {
         var sample = it.sampleTitles[0];
         h += '<div class="ph-sample">' + esc(sample.length > 80 ? sample.substring(0, 80) + '...' : sample) + '</div>';
       }
+
       h += '</div></div>';
     });
     h += '</div>';

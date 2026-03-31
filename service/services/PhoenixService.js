@@ -15,8 +15,8 @@ const PART_TYPE_PATTERNS = [
   { pattern: /\b(Radio|Head\s*Unit|Stereo|CD\s*Player|Navigation)\b/i, type: 'RADIO' },
   { pattern: /\b(Cluster|Instrument\s*Cluster|Speedometer)\b/i, type: 'CLUSTER' },
   { pattern: /\b(Throttle\s*Body)\b/i, type: 'THROTTLE BODY' },
-  { pattern: /\b(Steering\s*(?:Control\s*)?Module|EPS\s*Module|Power\s*Steering\s*Module)\b/i, type: 'STEERING MODULE' },
-  { pattern: /\b(HVAC\s*(?:Control\s*)?Module|Climate\s*Control\s*Module)\b/i, type: 'HVAC MODULE' },
+  { pattern: /\b(Steering\s*(?:Control\s*)?Module|EPS\s*Module)\b/i, type: 'STEERING MODULE' },
+  { pattern: /\b(HVAC\s*(?:Control\s*)?Module|Climate\s*Control)\b/i, type: 'HVAC MODULE' },
   { pattern: /\b(Airbag\s*Module|SRS\s*Module|Restraint)\b/i, type: 'AIRBAG MODULE' },
   { pattern: /\b(Transfer\s*Case\s*(?:Control\s*)?Module)\b/i, type: 'TRANSFER CASE MODULE' },
   { pattern: /\b(Liftgate\s*Module|Tailgate\s*Module)\b/i, type: 'LIFTGATE MODULE' },
@@ -46,85 +46,41 @@ function extractPartTypeFromTitle(title) {
   return 'OTHER';
 }
 
-// ── Make/model extraction ─────────────────────────────────
-
-const KNOWN_MAKES = [
-  'Ford', 'Chevrolet', 'Chevy', 'Dodge', 'Ram', 'Chrysler', 'Jeep',
-  'Toyota', 'Honda', 'Nissan', 'Hyundai', 'Kia', 'Subaru', 'Mazda', 'Mitsubishi',
-  'BMW', 'Mercedes', 'Mercedes-Benz', 'Audi', 'Volkswagen', 'VW', 'Mini', 'Porsche',
-  'Lexus', 'Acura', 'Infiniti', 'Genesis',
-  'Cadillac', 'Buick', 'GMC', 'Lincoln', 'Pontiac', 'Saturn', 'Oldsmobile',
-  'Jaguar', 'Land Rover', 'Fiat', 'Alfa Romeo', 'Saab', 'Suzuki', 'Scion',
-];
-
-const MAKE_NORMALIZE = { 'chevy': 'Chevrolet', 'vw': 'Volkswagen', 'mercedes-benz': 'Mercedes' };
-
-const MODEL_STOP_WORDS = new Set([
-  'oem', 'genuine', 'programmed', 'assembly', 'module', 'control', 'computer',
-  'unit', 'electronic', 'anti', 'lock', 'brake', 'engine', 'pump', 'fuse',
-  'box', 'power', 'new', 'used', 'tested', 'rebuilt', 'remanufactured',
-  'replacement', 'original', 'factory', 'stock', 'body', 'ecm', 'ecu', 'pcm',
-  'bcm', 'tcm', 'abs', 'tipm', 'srs', 'hvac',
-]);
-
-function extractMakeModel(title) {
-  if (!title) return { make: 'UNKNOWN', model: 'UNKNOWN' };
-  const titleLower = title.toLowerCase();
-  let foundMake = null;
-  let makeIndex = -1;
-
-  for (const make of KNOWN_MAKES) {
-    const idx = titleLower.indexOf(make.toLowerCase());
-    if (idx !== -1 && (makeIndex === -1 || idx < makeIndex)) {
-      foundMake = make;
-      makeIndex = idx;
-    }
-  }
-
-  if (!foundMake) return { make: 'UNKNOWN', model: 'UNKNOWN' };
-  const normalizedMake = MAKE_NORMALIZE[foundMake.toLowerCase()] || foundMake;
-
-  const afterMake = title.substring(makeIndex + foundMake.length).trim();
-  const words = afterMake.split(/\s+/);
-  const modelWords = [];
-  for (const word of words) {
-    const clean = word.replace(/[^a-zA-Z0-9-]/g, '');
-    if (!clean) continue;
-    if (MODEL_STOP_WORDS.has(clean.toLowerCase())) break;
-    if (/^\d{4}$/.test(clean)) continue;
-    if (clean.length < 2) continue;
-    modelWords.push(clean);
-    if (modelWords.length >= 3) break;
-  }
-
-  return { make: normalizedMake, model: modelWords.length > 0 ? modelWords.join(' ') : 'UNKNOWN' };
-}
-
-function extractYearRange(title) {
-  const years = [];
-  const yearPattern = /\b(19[89]\d|20[0-2]\d)\b/g;
-  let match;
-  while ((match = yearPattern.exec(title)) !== null) years.push(parseInt(match[1], 10));
-  if (years.length === 0) return null;
-  const min = Math.min(...years);
-  const max = Math.max(...years);
-  return min === max ? `${min}` : `${min}-${max}`;
+// ── Seller name mapping ───────────────────────────────────
+// Item.seller uses 'pro-rebuild', SoldItemSeller uses 'prorebuild'
+function getItemSellerVariants(soldItemName) {
+  const variants = [soldItemName];
+  if (!soldItemName.includes('-')) variants.push(soldItemName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase());
+  // prorebuild → pro-rebuild
+  if (soldItemName === 'prorebuild') variants.push('pro-rebuild');
+  // pro-rebuild → prorebuild
+  if (soldItemName === 'pro-rebuild') variants.push('prorebuild');
+  return [...new Set(variants)];
 }
 
 // ── Scoring ───────────────────────────────────────────────
 
-function calcPhoenixScore(salesCount, avgPrice) {
-  // Velocity (40pts)
-  let velocity = salesCount >= 10 ? 40 : salesCount >= 7 ? 32 : salesCount >= 5 ? 24 : salesCount >= 3 ? 16 : salesCount >= 2 ? 10 : 5;
+function calcPhoenixScore(salesCount, avgPrice, marketSold90d) {
+  // Velocity (35pts) — from SoldItem
+  let velocity = salesCount >= 10 ? 35 : salesCount >= 7 ? 28 : salesCount >= 5 ? 21 : salesCount >= 3 ? 14 : salesCount >= 2 ? 8 : salesCount >= 1 ? 4 : 0;
 
-  // Revenue potential (35pts)
+  // Revenue (25pts)
   const totalRevenue = salesCount * avgPrice;
-  let revenue = totalRevenue >= 2000 ? 35 : totalRevenue >= 1000 ? 28 : totalRevenue >= 500 ? 21 : totalRevenue >= 200 ? 14 : 7;
+  let revenue = totalRevenue >= 2000 ? 25 : totalRevenue >= 1000 ? 20 : totalRevenue >= 500 ? 15 : totalRevenue >= 200 ? 10 : totalRevenue > 0 ? 5 : 0;
 
-  // Price sweet spot (25pts)
-  let priceSpot = avgPrice >= 150 && avgPrice <= 400 ? 25 : avgPrice >= 100 && avgPrice < 150 ? 20 : avgPrice > 400 && avgPrice <= 600 ? 18 : avgPrice >= 50 && avgPrice < 100 ? 12 : avgPrice > 600 ? 8 : 3;
+  // Price sweet spot (20pts) — use whatever price we have
+  let priceSpot = 0;
+  if (avgPrice > 0) {
+    priceSpot = avgPrice >= 150 && avgPrice <= 400 ? 20 : avgPrice >= 100 && avgPrice < 150 ? 16 : avgPrice > 400 && avgPrice <= 600 ? 14 : avgPrice >= 50 && avgPrice < 100 ? 10 : avgPrice > 600 ? 6 : 2;
+  }
 
-  return velocity + revenue + priceSpot;
+  // Market demand (20pts) — from market_demand_cache
+  let market = 0;
+  if (marketSold90d > 0) {
+    market = marketSold90d >= 50 ? 20 : marketSold90d >= 30 ? 16 : marketSold90d >= 15 ? 12 : marketSold90d >= 5 ? 8 : 4;
+  }
+
+  return { total: velocity + revenue + priceSpot + market, velocity, revenue, priceSpot, market };
 }
 
 // ── Service ───────────────────────────────────────────────
@@ -147,8 +103,7 @@ class PhoenixService {
       VALUES (?, true, 'rebuild', NOW(), NOW())
       ON CONFLICT (name) DO UPDATE SET type = 'rebuild', enabled = true, "updatedAt" = NOW()
     `, [name]);
-    const row = await database('SoldItemSeller').where({ name }).first();
-    return row;
+    return database('SoldItemSeller').where({ name }).first();
   }
 
   async removeRebuildSeller(sellerName) {
@@ -162,38 +117,40 @@ class PhoenixService {
   async getPhoenixStats({ days = 180, seller = null }) {
     const sellers = await this.getRebuildSellers();
     const enabledNames = sellers.filter(s => s.enabled).map(s => s.name);
-    if (enabledNames.length === 0) return { totalGroups: 0, totalSales: 0, totalRevenue: 0, avgPrice: 0, topPartType: null, topMake: null, dateRange: {}, sellers: [] };
+    if (enabledNames.length === 0) return { totalGroups: 0, totalSales: 0, totalRevenue: 0, avgPrice: 0, topPartType: null, topMake: null, sellers: [], catalogItems: 0, itemsWithFitment: 0, itemsWithPartNumber: 0, marketCacheHits: 0 };
 
+    // Catalog stats from Item table
+    const itemSellerNames = [];
+    for (const n of enabledNames) itemSellerNames.push(...getItemSellerVariants(n));
+    const catalogCount = await database('Item').whereIn('seller', itemSellerNames).count('id as cnt').first();
+    const fitmentCount = await database('Item as i').join('AutoItemCompatibility as aic', 'aic.itemId', 'i.id').whereIn('i.seller', itemSellerNames).countDistinct('i.id as cnt').first();
+    const pnCount = await database('Item').whereIn('seller', itemSellerNames).whereNotNull('partNumberBase').countDistinct('partNumberBase as cnt').first();
+
+    // Sales stats from SoldItem
     const names = seller && enabledNames.includes(seller) ? [seller] : enabledNames;
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
-    const items = await database('SoldItem')
-      .whereIn('seller', names)
-      .where('soldDate', '>=', cutoff)
-      .select('title', 'soldPrice');
+    const items = await database('SoldItem').whereIn('seller', names).where('soldDate', '>=', cutoff).select('title', 'soldPrice');
 
     let totalRevenue = 0;
     const partTypeCounts = {};
-    const makeCounts = {};
     for (const item of items) {
       totalRevenue += parseFloat(item.soldPrice) || 0;
       const pt = extractPartTypeFromTitle(item.title);
       partTypeCounts[pt] = (partTypeCounts[pt] || 0) + 1;
-      const { make } = extractMakeModel(item.title);
-      makeCounts[make] = (makeCounts[make] || 0) + 1;
     }
-
     const topPartType = Object.entries(partTypeCounts).sort((a, b) => b[1] - a[1])[0];
-    const topMake = Object.entries(makeCounts).sort((a, b) => b[1] - a[1])[0];
 
     return {
-      totalGroups: 0, // filled by caller if needed
+      totalGroups: 0,
       totalSales: items.length,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       avgPrice: items.length > 0 ? Math.round((totalRevenue / items.length) * 100) / 100 : 0,
       topPartType: topPartType ? topPartType[0] : null,
-      topMake: topMake ? topMake[0] : null,
       sellers: enabledNames,
+      catalogItems: parseInt(catalogCount.cnt) || 0,
+      itemsWithFitment: parseInt(fitmentCount.cnt) || 0,
+      itemsWithPartNumber: parseInt(pnCount.cnt) || 0,
+      marketCacheHits: 0,
     };
   }
 
@@ -202,71 +159,215 @@ class PhoenixService {
     const enabledNames = sellers.filter(s => s.enabled).map(s => s.name);
     if (enabledNames.length === 0) return [];
 
-    const names = seller && enabledNames.includes(seller) ? [seller] : enabledNames;
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    // ── Layer 1: Item catalog with fitment ──
+    const itemSellerNames = [];
+    for (const n of enabledNames) itemSellerNames.push(...getItemSellerVariants(n));
 
-    const items = await database('SoldItem')
-      .whereIn('seller', names)
-      .where('soldDate', '>=', cutoff)
-      .orderBy('soldDate', 'desc')
-      .select('title', 'soldPrice', 'soldDate', 'seller', 'pictureUrl');
+    const catalogRows = await database('Item as i')
+      .join('AutoItemCompatibility as aic', 'aic.itemId', 'i.id')
+      .join('Auto as a', 'a.id', 'aic.autoId')
+      .whereIn('i.seller', itemSellerNames)
+      .select('i.id as itemId', 'i.title', 'i.price', 'i.partNumberBase',
+              'i.manufacturerPartNumber', 'i.categoryTitle', 'i.pictureUrl',
+              'a.year', 'a.make', 'a.model', 'a.trim', 'a.engine');
 
-    // Group by partType|MAKE|MODEL
+    // Group by partNumberBase (primary) or title-based fallback
     const groups = new Map();
-    for (const item of items) {
-      const partType = extractPartTypeFromTitle(item.title);
-      const { make, model } = extractMakeModel(item.title);
-      const yearRange = extractYearRange(item.title);
-      const groupKey = `${partType}|${make.toUpperCase()}|${model.toUpperCase()}`;
-      const price = parseFloat(item.soldPrice) || 0;
+
+    for (const row of catalogRows) {
+      const partType = extractPartTypeFromTitle(row.title || row.categoryTitle || '');
+      const pnBase = row.partNumberBase || null;
+      const groupKey = pnBase || (partType + '|' + (row.make || 'UNK').toUpperCase() + '|' + (row.model || 'UNK').toUpperCase());
+      const groupType = pnBase ? 'part_number' : 'title_match';
 
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
-          groupKey, partType, make, model, yearRange,
-          prices: [], dates: [], sellers: new Set(), sellerCounts: {},
-          sampleTitles: [], sampleImage: null,
+          groupKey, groupType, partNumberBase: pnBase,
+          manufacturerPartNumber: row.manufacturerPartNumber || null,
+          partType, fitment: [], fitmentSet: new Set(),
+          makes: new Set(), models: new Set(), years: [],
+          catalogCount: 0, catalogItemIds: new Set(),
+          catalogImage: null, sampleTitles: [],
+          listingPrice: null,
+          // Sales (filled in Layer 2)
+          salesCount: 0, soldPrices: [], lastSoldDate: null, soldSellers: new Set(), sellerCounts: {},
+          // Market (filled in Layer 3)
+          marketAvgPrice: null, marketSold90d: 0, marketScore: null,
         });
       }
 
       const g = groups.get(groupKey);
-      g.prices.push(price);
-      g.dates.push(item.soldDate);
-      g.sellers.add(item.seller);
-      g.sellerCounts[item.seller] = (g.sellerCounts[item.seller] || 0) + 1;
-      if (g.sampleTitles.length < 3) g.sampleTitles.push(item.title);
-      if (!g.sampleImage && item.pictureUrl) g.sampleImage = item.pictureUrl;
-      if (!g.yearRange && yearRange) g.yearRange = yearRange;
+      if (!g.catalogItemIds.has(row.itemId)) {
+        g.catalogItemIds.add(row.itemId);
+        g.catalogCount++;
+        if (!g.catalogImage && row.pictureUrl) g.catalogImage = row.pictureUrl;
+        if (g.sampleTitles.length < 3 && row.title) g.sampleTitles.push(row.title);
+        if (!g.listingPrice && row.price) g.listingPrice = parseFloat(row.price);
+        if (!g.manufacturerPartNumber && row.manufacturerPartNumber) g.manufacturerPartNumber = row.manufacturerPartNumber;
+      }
+
+      // Fitment dedup
+      const fitKey = `${row.year}|${(row.make || '').toUpperCase()}|${(row.model || '').toUpperCase()}|${row.engine || ''}`;
+      if (!g.fitmentSet.has(fitKey)) {
+        g.fitmentSet.add(fitKey);
+        g.fitment.push({ year: row.year, make: row.make, model: row.model, trim: row.trim, engine: row.engine });
+        if (row.make) g.makes.add(row.make);
+        if (row.model) g.models.add(row.model);
+        if (row.year) g.years.push(row.year);
+      }
     }
 
-    // Score and format
+    // ── Layer 2: SoldItem velocity ──
+    const soldNames = seller && enabledNames.includes(seller) ? [seller] : enabledNames;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const soldItems = await database('SoldItem')
+      .whereIn('seller', soldNames)
+      .where('soldDate', '>=', cutoff)
+      .orderBy('soldDate', 'desc')
+      .select('title', 'soldPrice', 'soldDate', 'seller');
+
+    // Match sold items to catalog groups by PN in title
+    const pnBaseSet = new Map(); // pnBase → groupKey
+    for (const [key, g] of groups) {
+      if (g.partNumberBase) pnBaseSet.set(g.partNumberBase.toUpperCase(), key);
+    }
+
+    for (const sold of soldItems) {
+      const title = (sold.title || '').toUpperCase();
+      let matched = false;
+
+      // Try to match by partNumberBase appearing in the title
+      for (const [pn, gKey] of pnBaseSet) {
+        if (title.includes(pn) || title.includes(pn.replace(/-/g, ''))) {
+          const g = groups.get(gKey);
+          g.salesCount++;
+          g.soldPrices.push(parseFloat(sold.soldPrice) || 0);
+          if (!g.lastSoldDate) g.lastSoldDate = sold.soldDate;
+          g.soldSellers.add(sold.seller);
+          g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
+          matched = true;
+          break;
+        }
+      }
+
+      // Fallback: create standalone group from SoldItem title
+      if (!matched) {
+        const pt = extractPartTypeFromTitle(sold.title);
+        // Only create standalone groups for identified part types
+        if (pt !== 'OTHER') {
+          const fallbackKey = 'SOLD|' + pt + '|' + sold.seller;
+          if (!groups.has(fallbackKey)) {
+            groups.set(fallbackKey, {
+              groupKey: fallbackKey, groupType: 'sold_only', partNumberBase: null,
+              manufacturerPartNumber: null, partType: pt,
+              fitment: [], fitmentSet: new Set(), makes: new Set(), models: new Set(), years: [],
+              catalogCount: 0, catalogItemIds: new Set(), catalogImage: null,
+              sampleTitles: [sold.title], listingPrice: null,
+              salesCount: 0, soldPrices: [], lastSoldDate: null, soldSellers: new Set(), sellerCounts: {},
+              marketAvgPrice: null, marketSold90d: 0, marketScore: null,
+            });
+          }
+          const g = groups.get(fallbackKey);
+          g.salesCount++;
+          g.soldPrices.push(parseFloat(sold.soldPrice) || 0);
+          if (!g.lastSoldDate) g.lastSoldDate = sold.soldDate;
+          g.soldSellers.add(sold.seller);
+          g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
+          if (g.sampleTitles.length < 3) g.sampleTitles.push(sold.title);
+        }
+      }
+    }
+
+    // ── Layer 3: market_demand_cache (keyed by YEAR|MAKE|MODEL|PARTTYPE) ──
+    // Build lookup keys from fitment data
+    const marketKeys = new Set();
+    const keyToGroup = new Map();
+    for (const [gKey, g] of groups) {
+      if (g.fitment.length > 0 && g.partType !== 'OTHER') {
+        for (const f of g.fitment) {
+          const mKey = `${f.year}|${(f.make || '').toUpperCase()}|${(f.model || '').toUpperCase()}|${g.partType}`;
+          marketKeys.add(mKey);
+          if (!keyToGroup.has(mKey)) keyToGroup.set(mKey, []);
+          keyToGroup.get(mKey).push(gKey);
+        }
+      }
+    }
+
+    if (marketKeys.size > 0) {
+      try {
+        const marketRows = await database('market_demand_cache')
+          .whereIn('part_number_base', [...marketKeys])
+          .select('part_number_base', 'ebay_avg_price', 'ebay_sold_90d', 'market_score');
+
+        for (const mr of marketRows) {
+          const gKeys = keyToGroup.get(mr.part_number_base) || [];
+          for (const gKey of gKeys) {
+            const g = groups.get(gKey);
+            if (g && !g.marketAvgPrice) {
+              g.marketAvgPrice = parseFloat(mr.ebay_avg_price) || null;
+              g.marketSold90d = parseInt(mr.ebay_sold_90d) || 0;
+              g.marketScore = mr.market_score ? parseInt(mr.market_score) : null;
+            }
+          }
+        }
+      } catch (e) { /* market cache may not exist */ }
+    }
+
+    // ── Score and format ──
     const results = [];
     for (const g of groups.values()) {
-      const salesCount = g.prices.length;
-      const avgPrice = Math.round((g.prices.reduce((a, b) => a + b, 0) / salesCount) * 100) / 100;
-      const totalRevenue = Math.round(salesCount * avgPrice * 100) / 100;
-      const phoenixScore = calcPhoenixScore(salesCount, avgPrice);
+      const avgSoldPrice = g.soldPrices.length > 0
+        ? Math.round((g.soldPrices.reduce((a, b) => a + b, 0) / g.soldPrices.length) * 100) / 100
+        : 0;
+      const bestPrice = g.marketAvgPrice || avgSoldPrice || g.listingPrice || 0;
+      const score = calcPhoenixScore(g.salesCount, avgSoldPrice, g.marketSold90d);
+
+      // Skip groups with no signal at all
+      if (score.total === 0 && g.catalogCount === 0) continue;
+
+      const yearsSorted = g.years.length > 0 ? [...new Set(g.years)].sort() : [];
+      const yearRange = yearsSorted.length > 0
+        ? (yearsSorted[0] === yearsSorted[yearsSorted.length - 1] ? `${yearsSorted[0]}` : `${yearsSorted[0]}-${yearsSorted[yearsSorted.length - 1]}`)
+        : null;
+
+      const makesArr = [...g.makes];
+      const modelsArr = [...g.models];
+      const fitmentSummary = makesArr.length > 0
+        ? makesArr[0] + (modelsArr.length > 0 ? ' ' + modelsArr[0] : '') + (yearRange ? ' ' + yearRange : '')
+        : null;
 
       results.push({
         groupKey: g.groupKey,
+        groupType: g.groupType,
+        partNumberBase: g.partNumberBase,
+        manufacturerPartNumber: g.manufacturerPartNumber,
         partType: g.partType,
-        make: g.make,
-        model: g.model,
-        yearRange: g.yearRange,
-        salesCount,
-        avgPrice,
-        minPrice: Math.min(...g.prices),
-        maxPrice: Math.max(...g.prices),
-        totalRevenue,
-        lastSoldDate: g.dates[0],
-        sellers: [...g.sellers],
-        sellerBreakdown: g.sellerCounts,
+        fitment: g.fitment.slice(0, 10),
+        fitmentSummary,
+        makes: makesArr,
+        models: modelsArr,
+        yearRange,
+        catalogCount: g.catalogCount,
+        catalogImage: g.catalogImage,
         sampleTitles: g.sampleTitles,
-        sampleImage: g.sampleImage,
-        phoenixScore,
+        salesCount: g.salesCount,
+        avgSoldPrice,
+        minSoldPrice: g.soldPrices.length > 0 ? Math.min(...g.soldPrices) : null,
+        maxSoldPrice: g.soldPrices.length > 0 ? Math.max(...g.soldPrices) : null,
+        totalRevenue: Math.round(g.salesCount * avgSoldPrice * 100) / 100,
+        lastSoldDate: g.lastSoldDate,
+        soldSellers: [...g.soldSellers],
+        sellerBreakdown: g.sellerCounts,
+        marketAvgPrice: g.marketAvgPrice,
+        marketSold90d: g.marketSold90d,
+        marketScore: g.marketScore,
+        bestPrice: bestPrice,
+        phoenixScore: score.total,
+        scoreBreakdown: score,
       });
     }
 
-    results.sort((a, b) => b.phoenixScore - a.phoenixScore || b.salesCount - a.salesCount);
+    results.sort((a, b) => b.phoenixScore - a.phoenixScore || (b.marketSold90d || 0) - (a.marketSold90d || 0) || b.catalogCount - a.catalogCount);
     return results.slice(0, limit);
   }
 }
