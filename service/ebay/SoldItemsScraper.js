@@ -80,22 +80,30 @@ class SoldItemsScraper {
    * @param {string} options.categoryId - Category ID (default: 35596 for ECU)
    * @param {number} options.pageNumber - Page number (default: 1)
    */
-  buildSearchUrl({ seller, keywords, categoryId = '35596', pageNumber = 1 }) {
+  buildSearchUrl({ seller, keywords, categoryId = '0', pageNumber = 1 }) {
     const baseUrl = 'https://www.ebay.com/sch/i.html';
-    const params = new URLSearchParams({
-      _nkw: keywords || '', // keywords (empty for all)
-      _sacat: categoryId,
-      LH_Sold: '1', // Sold items only
-      LH_Complete: '1', // Completed listings
-      _sop: '13', // Sort by end date: recent first
-      _ipg: '60', // Items per page
-      _pgn: pageNumber.toString(),
-    });
+    const params = new URLSearchParams();
 
     // Add seller filter if specified
     if (seller) {
       params.set('_ssn', seller);
     }
+
+    // Add keywords if specified
+    if (keywords) {
+      params.set('_nkw', keywords);
+    }
+
+    params.set('LH_Sold', '1'); // Sold items only
+    params.set('LH_Complete', '1'); // Completed listings
+
+    // Only add category if it's a real category (not '0' or empty)
+    if (categoryId && categoryId !== '0') {
+      params.set('_sacat', categoryId);
+    }
+
+    params.set('_pgn', pageNumber.toString());
+    params.set('_ipg', '60'); // Items per page
 
     return `${baseUrl}?${params.toString()}`;
   }
