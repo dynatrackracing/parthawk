@@ -276,8 +276,17 @@ async function runInstantResearch(){
         h+='</div>';
       });
       h+='</div>';
-      // Save to Sky Watch if results are rich enough
-      saveToSkyWatch(r, 'VIN', _lastVin);
+      // Check if results are thin — show prominent "Research on eBay" button
+      var richParts=r.parts?r.parts.filter(function(p){return p.yourDemand&&p.yourDemand.salesCount>0}):[];
+      var isThin=!r.parts||r.parts.length<3||richParts.length===0;
+      h+='<div id="apifyResearchArea" style="margin-top:8px;text-align:center">';
+      if(isThin){
+        h+='<div style="color:#eab308;font-size:11px;font-weight:600;margin-bottom:6px">Our data is thin for this vehicle — '+(r.parts?r.parts.length:0)+' parts found</div>';
+        h+='<button onclick="runApifyResearch(\'VIN\')" id="apifyBtn" style="width:100%;padding:14px;border-radius:8px;border:2px solid #eab308;background:#422006;color:#eab308;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Research on eBay (Apify)</button>';
+      }else{
+        h+='<button onclick="runApifyResearch(\'VIN\')" id="apifyBtn" style="padding:10px 16px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Deeper eBay Research</button>';
+      }
+      h+='<div id="apifyResults"></div></div>';
       out.innerHTML=h;
     }
   }catch(err){
@@ -313,68 +322,92 @@ async function runStandaloneResearch(){
       h+='</div><div style="font-weight:800;color:'+(p.verdict==='PULL'?'#22c55e':p.verdict==='RARE'?'#a855f7':'#9CA3AF')+';font-size:11px;white-space:nowrap">'+p.verdict+'</div></div>';
     });
     h+='</div>';
-    // Save standalone research to Sky Watch
-    saveToSkyWatch(r, 'STANDALONE', null);
+    // Add eBay research button for standalone too
+    h+='<div style="margin-top:8px;text-align:center"><button onclick="runApifyResearch(\'STANDALONE\')" style="padding:10px 16px;border-radius:8px;border:1px solid #eab308;background:#422006;color:#eab308;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Deeper eBay Research (Apify)</button><div id="standaloneApifyResults"></div></div>';
     out.innerHTML=h;
   }catch(err){out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Error: '+err.message+'</div>';}
   btn.disabled=false;btn.textContent='Research Vehicle';
 }
 document.getElementById('researchInput').addEventListener('keydown',function(e){if(e.key==='Enter')runStandaloneResearch()});
 
-function saveToSkyWatch(researchResult, source, vin) {
-  if (!researchResult || !researchResult.parts || researchResult.parts.length === 0) return;
-  // Parse vehicle from _lastVehicle or research result
-  var year = _lastYear || (researchResult.vehicle ? parseInt(researchResult.vehicle) : null);
-  var make = _lastMake || null;
-  var model = _lastModel || null;
-  if (!year || !make || !model) {
-    // Try parsing from vehicle string
-    var vm = (researchResult.vehicle || _lastVehicle || '').match(/^(\d{4})\s+(\S+)\s+(.+?)(?:\s+\d+\.\d+.*)?$/);
-    if (vm) { year = parseInt(vm[1]); make = vm[2]; model = vm[3].trim(); }
+async function runApifyResearch(source) {
+  if (!_lastYear || !_lastMake || !_lastModel) {
+    alert('No vehicle data — decode a VIN or enter a vehicle first');
+    return;
   }
-  if (!year || !make || !model) return;
+  var outId = source === 'VIN' ? 'apifyResults' : 'standaloneApifyResults';
+  var out = document.getElementById(outId);
+  if (!out) return;
+  out.innerHTML = '<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#eab308;font-size:12px;font-weight:600">Researching on eBay via Apify...</div><div style="color:#6B7280;font-size:10px;margin-top:2px">This takes 30-60 seconds</div></div>';
 
-  // Build results summary for storage
-  var partResults = researchResult.parts.map(function(p) {
-    var price = p.market && p.market.source === 'cache' ? p.market.avgPrice :
-      p.yourDemand && p.yourDemand.avgPrice > 0 ? p.yourDemand.avgPrice :
-      p.referencePrice || p.avgPrice || 0;
-    var soldCount = p.yourDemand ? p.yourDemand.salesCount : (p.soldCount || 0);
-    return {
-      partType: p.partType,
-      avgPrice: Math.round(price),
-      soldCount: soldCount,
-      inStock: p.yourStock ? p.yourStock.count : 0,
-      badge: p.badge || 'POOR',
-      partNumber: p.partNumberBase || null,
-    };
-  });
+  try {
+    var r = await fetch('/api/instant-research/apify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        year: _lastYear, make: _lastMake, model: _lastModel,
+        engine: _lastEngine || null, trim: null,
+        source: source, vin: _lastVin || null,
+      }),
+    }).then(function(r) { return r.json(); });
 
-  fetch('/opportunities/research', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      vehicle_year: year,
-      vehicle_make: make,
-      vehicle_model: model,
-      vehicle_engine: _lastEngine || null,
-      source: source,
-      source_vin: vin || null,
-      results: partResults,
-    }),
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    if (d.saved) {
-      // Show "Saved to Sky Watch" link
-      var el = document.createElement('div');
-      el.style.cssText = 'text-align:center;padding:8px;font-size:11px;margin-top:4px';
-      el.innerHTML = '<span style="color:#22c55e;font-weight:600">✓ Saved to Sky Watch</span> · <a href="/admin/opportunities" style="color:#eab308;text-decoration:none">View →</a>';
-      var container = source === 'VIN' ? document.getElementById('researchResults') : document.getElementById('standaloneResults');
-      if (container) container.appendChild(el);
+    if (!r.success) {
+      out.innerHTML = '<div style="color:#dc2626;padding:10px;font-size:12px">' + esc(r.error || 'Research failed') + '</div>';
+      return;
     }
-  })
-  .catch(function() { /* silent — save is best effort */ });
+
+    if (r.cached) {
+      out.innerHTML = '<div style="color:#6B7280;font-size:10px;margin-bottom:6px">Cached results (researched within 7 days)</div>';
+    } else {
+      out.innerHTML = '';
+    }
+
+    var parts = r.parts || [];
+    if (parts.length === 0) {
+      out.innerHTML += '<div style="color:#6B7280;padding:10px;font-size:12px;text-align:center">No sellable parts found on eBay</div>';
+      return;
+    }
+
+    var h = '<div style="margin-top:6px">';
+    // Summary
+    var s = r.summary || {};
+    if (s.totalEstimatedValue) {
+      var vc2 = s.totalEstimatedValue >= 800 ? '#22c55e' : s.totalEstimatedValue >= 400 ? '#eab308' : '#9CA3AF';
+      h += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Est. Value</div><div style="font-size:16px;font-weight:800;color:' + vc2 + '">$' + Math.round(s.totalEstimatedValue) + '</div></div>';
+      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Parts</div><div style="font-size:16px;font-weight:800">' + s.partsFoundCount + '</div></div>';
+      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">High Value</div><div style="font-size:16px;font-weight:800;color:#22c55e">' + (s.highValueCount || 0) + '</div></div>';
+      h += '</div>';
+    }
+
+    // Parts list
+    parts.forEach(function(p) {
+      var tierColor = p.valueTier === 'HIGH' ? '#22c55e' : p.valueTier === 'MEDIUM' ? '#eab308' : '#6B7280';
+      var tierBg = p.valueTier === 'HIGH' ? '#064e3b' : p.valueTier === 'MEDIUM' ? '#422006' : '#1f2937';
+      h += '<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
+      h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">';
+      h += '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:' + tierBg + ';color:' + tierColor + '">' + p.valueTier + ' $' + p.avgSoldPrice + '</span>';
+      h += '<span style="font-size:13px;font-weight:700">[' + esc(p.partType) + ']</span>';
+      h += '</div>';
+      h += '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' + p.soldCount + 'x sold · $' + p.minPrice + '-$' + p.maxPrice + ' range</div>';
+      if (p.partNumbers && p.partNumbers.length > 0) h += '<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">' + p.partNumbers.slice(0, 3).join(', ') + '</div>';
+      h += '</div>';
+    });
+
+    h += '</div>';
+    // Sky Watch save status
+    h += '<div style="text-align:center;padding:8px;font-size:11px;margin-top:4px">';
+    if (s.highValueCount >= 1 || s.partsFoundCount >= 3) {
+      h += '<span style="color:#22c55e;font-weight:600">✓ Saved to Sky Watch</span> · <a href="/admin/opportunities" style="color:#eab308;text-decoration:none">View →</a>';
+    } else {
+      h += '<span style="color:#6B7280">Results too thin to save (' + s.partsFoundCount + ' parts found)</span>';
+    }
+    h += ' · Enriched market_demand_cache with ' + parts.reduce(function(n, p) { return n + (p.partNumbers ? p.partNumbers.length : 0); }, 0) + ' PNs';
+    h += '</div>';
+    out.innerHTML += h;
+  } catch (err) {
+    out.innerHTML = '<div style="color:#dc2626;padding:10px;font-size:12px">Apify research failed: ' + esc(err.message) + '</div>';
+  }
 }
 
 function loadHistory(el){

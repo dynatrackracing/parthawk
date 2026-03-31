@@ -60,6 +60,36 @@ router.get('/quick', async (req, res) => {
   return router.handle(req, res);
 });
 
+/**
+ * POST /api/instant-research/apify
+ * Apify-powered eBay research — scrapes sold items for a vehicle.
+ * Body: { year, make, model, engine?, trim?, source: 'VIN'|'STANDALONE', vin? }
+ * Returns structured results with value scoring per part type.
+ * Enriches market_demand_cache + saves to sky_watch_research + caches in instant_research_cache.
+ */
+router.post('/apify', async (req, res) => {
+  const { year, make, model, engine, trim, source, vin } = req.body;
+  if (!year || !make || !model) {
+    return res.status(400).json({ success: false, error: 'year, make, model required' });
+  }
+
+  try {
+    const ApifyResearchService = require('../services/ApifyResearchService');
+    const apify = new ApifyResearchService();
+    const result = await apify.researchVehicle(
+      { year: parseInt(year), make, model, engine: engine || null, trim: trim || null },
+      { source: source || 'STANDALONE', vin: vin || null }
+    );
+    res.json({ success: true, ...result });
+  } catch (err) {
+    if (err.message.includes('already running')) {
+      return res.status(429).json({ success: false, error: err.message });
+    }
+    log.error({ err }, '[ApifyResearch] Research failed');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Dropdown data for vehicle selection
 router.get('/years', async (req, res) => {
   try {
