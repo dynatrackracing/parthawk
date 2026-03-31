@@ -168,7 +168,6 @@ app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));
-app.use('/trim-validation', require('./routes/trim-validation'));
 // Serve static admin tools with cache headers
 app.use('/admin', express.static(path.resolve(__dirname, 'public'), {
   maxAge: '10m',  // Cache static files for 10 minutes
