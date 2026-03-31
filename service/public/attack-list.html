@@ -641,11 +641,25 @@
 
     let html = '';
 
-    // Show platform siblings if any
-    if (v.expected_parts) {
+    // Show validated trim suggestions (sellable parts only, with price delta verdicts)
+    if (v.validated_suggestions && v.validated_suggestions.length > 0) {
+      const suggestionsHtml = v.validated_suggestions.map(s => {
+        if (s.verdict === 'CONFIRMED') return `<span style="color:#22c55e;font-weight:600">\u2705 ${s.suggestion} +$${Math.round(s.delta)}</span>`;
+        if (s.verdict === 'WORTH_IT') return `<span style="color:#eab308;font-weight:600">\uD83D\uDFE1 ${s.suggestion} +$${Math.round(s.delta)}</span>`;
+        if (s.verdict === 'MARGINAL') return `<span style="color:#6b7280">\u26AA ${s.suggestion} +$${Math.round(s.delta)}</span>`;
+        if (s.verdict === 'NO_PREMIUM') return `<span style="color:#ef4444">\uD83D\uDD34 ${s.suggestion} $${Math.round(s.delta)} (no premium)</span>`;
+        return `<span style="color:#4b5563">? ${s.suggestion}</span>`;
+      }).join('<br>');
+      html += `<div style="margin:6px 0 8px 0;padding:6px 8px;background:#1a1a2e;border-radius:6px;border:1px solid #333">
+        <span style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Validated Trim Parts</span>
+        ${v.audio_brand ? `<span style="color:#d946ef;font-size:10px;margin-left:8px;font-weight:600">\uD83D\uDD0A ${v.audio_brand}</span>` : ''}
+        <div style="font-size:12px;margin-top:3px;line-height:1.6">${suggestionsHtml}</div>
+      </div>`;
+    } else if (v.expected_parts) {
+      // Fallback: show raw expected_parts if no validated suggestions
       html += `<div style="margin:6px 0 8px 0;padding:6px 8px;background:#1a1a2e;border-radius:6px;border:1px solid #333">
         <span style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Expected on this trim</span>
-        ${v.audio_brand ? `<span style="color:#d946ef;font-size:10px;margin-left:8px;font-weight:600">🔊 ${v.audio_brand}</span>` : ''}
+        ${v.audio_brand ? `<span style="color:#d946ef;font-size:10px;margin-left:8px;font-weight:600">\uD83D\uDD0A ${v.audio_brand}</span>` : ''}
         <div style="color:#ccc;font-size:12px;margin-top:3px">${v.expected_parts}</div>
       </div>`;
     }

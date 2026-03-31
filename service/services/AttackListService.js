@@ -10,6 +10,8 @@ const { resolvePricesBatch } = require('../lib/priceResolver');
 
 let _inventoryIndexCache = null;
 let _inventoryIndexCacheTime = 0;
+let _validationCache = null;
+let _validationCacheTime = 0;
 let _salesIndexCache = null;
 let _salesIndexCacheTime = 0;
 let _stockIndexCache = null;
@@ -1350,7 +1352,112 @@ class AttackListService {
     }
 
     results.sort((a, b) => b.top_score - a.top_score);
+
+    // Enrich expected_parts with validation verdicts for premium/performance vehicles
+    const validations = await this.loadValidationCache();
+    for (const yard of results) {
+      for (const v of yard.vehicles) {
+        v.validated_suggestions = this.enrichSuggestions(v.make, v.expected_parts, v.audio_brand, validations);
+      }
+    }
+
     return results;
+  }
+
+  /**
+   * Load trim_value_validation cache (refreshes every 10 minutes).
+   */
+  async loadValidationCache() {
+    if (_validationCache && Date.now() - _validationCacheTime < INDEX_CACHE_TTL) return _validationCache;
+    try {
+      const rows = await database('trim_value_validation').select('*');
+      // Index by make (lowercased) for fast lookup
+      const index = {};
+      for (const r of rows) {
+        const key = r.make.toLowerCase();
+        if (!index[key]) index[key] = [];
+        index[key].push(r);
+      }
+      _validationCache = index;
+      _validationCacheTime = Date.now();
+    } catch (e) {
+      _validationCache = {};
+      _validationCacheTime = Date.now();
+    }
+    return _validationCache;
+  }
+
+  /**
+   * Enrich expected_parts suggestions with validation verdicts and deltas.
+   * Filters to sellable scope only (amps, modules, cameras, sensors, clusters, radios).
+   */
+  enrichSuggestions(make, expectedParts, audioBrand, validationIndex) {
+    if (!expectedParts) return null;
+
+    const parts = expectedParts.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+
+    const makeLower = (make || '').toLowerCase();
+    const makeValidations = validationIndex[makeLower] || [];
+
+    // Sellable keywords — only show parts pullers actually pull
+    const SELLABLE_RE = /\bamp\b|amplifier|stereo|audio|sound|ecm|pcm|bcm|tcm|abs|tipm|camera|around view|blind spot|park assist|parking sensor|cluster|virtual cockpit|digital cockpit|live cockpit|uconnect|sync\b|entune|mylink|mbux|comand|idrive|cue\b|head unit|\bnav\b|navigation/i;
+
+    const enriched = [];
+    for (const suggestion of parts) {
+      if (!SELLABLE_RE.test(suggestion)) continue;
+
+      // Try to find a matching validation
+      let validation = null;
+
+      for (const v of makeValidations) {
+        // Match by keyword in suggestion text
+        if (suggestion.toLowerCase().includes(v.premium_keyword.toLowerCase())) {
+          validation = v;
+          break;
+        }
+      }
+
+      // Special case: if audio_brand is set and suggestion includes "amp", match by audio brand
+      if (!validation && audioBrand && /amp/i.test(suggestion)) {
+        for (const v of makeValidations) {
+          if (v.part_type === 'amp' && audioBrand.toLowerCase().includes(v.premium_keyword.toLowerCase())) {
+            validation = v;
+            break;
+          }
+        }
+      }
+
+      // Special case: nav suggestions
+      if (!validation && /\bnav\b/i.test(suggestion)) {
+        for (const v of makeValidations) {
+          if (v.part_type === 'nav_radio') {
+            validation = v;
+            break;
+          }
+        }
+      }
+
+      if (validation) {
+        enriched.push({
+          suggestion,
+          verdict: validation.verdict,
+          delta: parseFloat(validation.delta),
+          premium_avg: parseFloat(validation.premium_avg_price),
+          base_avg: parseFloat(validation.base_avg_price),
+        });
+      } else {
+        enriched.push({ suggestion, verdict: 'UNVALIDATED' });
+      }
+    }
+
+    if (enriched.length === 0) return null;
+
+    // Sort: CONFIRMED first, then WORTH_IT, UNVALIDATED, MARGINAL, NO_PREMIUM last
+    const VERDICT_ORDER = { CONFIRMED: 0, WORTH_IT: 1, UNVALIDATED: 2, MARGINAL: 3, NO_PREMIUM: 4 };
+    enriched.sort((a, b) => (VERDICT_ORDER[a.verdict] || 9) - (VERDICT_ORDER[b.verdict] || 9));
+
+    return enriched;
   }
 }
 

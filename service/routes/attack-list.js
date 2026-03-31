@@ -144,12 +144,19 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       log.warn({ err: e.message }, 'Market enrichment failed');
     }
 
+    // Enrich expected_parts with validation verdicts
+    const validations = await service.loadValidationCache();
+    const validatedSuggestions = service.enrichSuggestions(
+      vehicle.make, vehicle.expected_parts, vehicle.audio_brand, validations
+    );
+
     res.json({
       success: true,
       id,
       parts: scored.parts || [],
       rebuild_parts: scored.rebuild_parts || null,
       platform_siblings: scored.platform_siblings || null,
+      validated_suggestions: validatedSuggestions,
     });
   } catch (err) {
     log.error({ err }, 'Error loading vehicle parts');
