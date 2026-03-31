@@ -1453,9 +1453,34 @@ class AttackListService {
 
     if (enriched.length === 0) return null;
 
-    // Sort: CONFIRMED first, then WORTH_IT, UNVALIDATED, MARGINAL, NO_PREMIUM last
-    const VERDICT_ORDER = { CONFIRMED: 0, WORTH_IT: 1, UNVALIDATED: 2, MARGINAL: 3, NO_PREMIUM: 4 };
-    enriched.sort((a, b) => (VERDICT_ORDER[a.verdict] || 9) - (VERDICT_ORDER[b.verdict] || 9));
+    // Compute show_base per part_type: true when ANY validation for this make+part_type has base_avg >= 100
+    const showBaseByPartType = {};
+    for (const v of makeValidations) {
+      const pt = v.part_type;
+      if (!showBaseByPartType[pt] && parseFloat(v.base_avg_price) >= 100) {
+        showBaseByPartType[pt] = { show: true, base_avg: parseFloat(v.base_avg_price) };
+      }
+    }
+
+    // Attach show_base and base_avg_price to each enriched entry
+    for (const e of enriched) {
+      // Determine the part_type for this suggestion
+      let pt = null;
+      if (/amp/i.test(e.suggestion)) pt = 'amp';
+      else if (/\bnav\b|navigation/i.test(e.suggestion)) pt = 'nav_radio';
+      else if (/360|surround|around.?view/i.test(e.suggestion) && /camera/i.test(e.suggestion)) pt = '360_camera';
+      else if (/camera/i.test(e.suggestion)) pt = 'backup_camera';
+      else if (/cluster|virtual cockpit|digital cockpit/i.test(e.suggestion)) pt = 'digital_cluster';
+
+      if (pt && showBaseByPartType[pt]) {
+        e.show_base = true;
+        e.base_avg_price = showBaseByPartType[pt].base_avg;
+        e.part_type_key = pt;
+      }
+    }
+
+    // Sort: highest premium_avg_price first
+    enriched.sort((a, b) => (b.premium_avg || 0) - (a.premium_avg || 0));
 
     return enriched;
   }
