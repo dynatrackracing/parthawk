@@ -220,18 +220,24 @@ function render(data){
   h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';document.getElementById(\'instantResearch\').style.display=\'none\';">Scan Another</button></div>';
   document.getElementById('results').innerHTML=h;
 
-  // Show Instant Research button
+  // Auto-run instant research — show our data immediately
   var veh=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
   window._lastVehicle=veh;
+  window._lastYear=d.year;window._lastMake=d.make;window._lastModel=data.baseModel||d.model;
   window._lastEngine=d.engine||null;
   window._lastDrivetrain=d.drivetrain||null;
+  window._lastVin=data.vin||null;
   document.getElementById('instantResearch').style.display='block';
   document.getElementById('researchResults').innerHTML='';
+  // Auto-trigger research
+  runInstantResearch();
 }
 
 var _lastVehicle=null;
+var _lastYear=null;var _lastMake=null;var _lastModel=null;
 var _lastEngine=null;
 var _lastDrivetrain=null;
+var _lastVin=null;
 async function runInstantResearch(){
   if(!_lastVehicle)return;
   var btn=document.getElementById('researchBtn');
@@ -260,19 +266,18 @@ async function runInstantResearch(){
         h+='<span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span>';
         if(yrLabel)h+='<span style="font-size:10px;color:#6B7280">('+yrLabel+')</span>';
         h+='</div>';
-        // Demand line
         var demandStr=p.yourDemand&&p.yourDemand.salesCount>0?'Sold '+p.yourDemand.salesCount+'x @ avg $'+p.yourDemand.avgPrice+(p.yourDemand.lastSoldDate?' (last: '+ta(p.yourDemand.lastSoldDate)+')':''):'<span style="color:#6B7280">Never sold by us</span>';
         h+='<div style="font-size:10px;margin-top:2px">'+demandStr+'</div>';
-        // Stock line
         var stockStr=p.yourStock&&p.yourStock.count>0?p.yourStock.count+' in stock'+(p.yourStock.prices.length>0?' @ $'+p.yourStock.prices[0]:''):'<span style="color:#ef4444">Out of stock</span>';
         h+='<div style="font-size:10px;margin-top:1px">'+stockStr+'</div>';
-        // Market line
         if(p.market&&p.market.source==='cache')h+='<div style="font-size:10px;margin-top:1px;color:#22c55e">Market avg $'+Math.round(p.market.avgPrice)+' ('+p.market.soldCount90d+' sold/90d)</div>';
         else h+='<div style="font-size:10px;margin-top:1px;color:#6B7280;font-style:italic">No market data available</div>';
         if(p.partNumberBase)h+='<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">'+esc(p.partNumberBase)+'</div>';
         h+='</div>';
       });
       h+='</div>';
+      // Save to Sky Watch if results are rich enough
+      saveToSkyWatch(r, 'VIN', _lastVin);
       out.innerHTML=h;
     }
   }catch(err){
@@ -284,6 +289,10 @@ async function runInstantResearch(){
 async function runStandaloneResearch(){
   var inp=document.getElementById('researchInput');
   var v=inp.value.trim();if(!v)return;
+  // Parse year/make/model from input for Sky Watch save
+  var vm=v.match(/^(\d{4})\s+(\S+)\s+(.+?)(?:\s+(\d+\.\d+L?.*))?$/);
+  if(vm){_lastYear=parseInt(vm[1]);_lastMake=vm[2];_lastModel=vm[3].trim();_lastEngine=vm[4]||null;}
+  _lastVehicle=v;_lastVin=null;
   var btn=document.getElementById('standaloneBtn');
   var out=document.getElementById('standaloneResults');
   btn.disabled=true;btn.textContent='Searching eBay...';
@@ -304,11 +313,69 @@ async function runStandaloneResearch(){
       h+='</div><div style="font-weight:800;color:'+(p.verdict==='PULL'?'#22c55e':p.verdict==='RARE'?'#a855f7':'#9CA3AF')+';font-size:11px;white-space:nowrap">'+p.verdict+'</div></div>';
     });
     h+='</div>';
+    // Save standalone research to Sky Watch
+    saveToSkyWatch(r, 'STANDALONE', null);
     out.innerHTML=h;
   }catch(err){out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Error: '+err.message+'</div>';}
   btn.disabled=false;btn.textContent='Research Vehicle';
 }
 document.getElementById('researchInput').addEventListener('keydown',function(e){if(e.key==='Enter')runStandaloneResearch()});
+
+function saveToSkyWatch(researchResult, source, vin) {
+  if (!researchResult || !researchResult.parts || researchResult.parts.length === 0) return;
+  // Parse vehicle from _lastVehicle or research result
+  var year = _lastYear || (researchResult.vehicle ? parseInt(researchResult.vehicle) : null);
+  var make = _lastMake || null;
+  var model = _lastModel || null;
+  if (!year || !make || !model) {
+    // Try parsing from vehicle string
+    var vm = (researchResult.vehicle || _lastVehicle || '').match(/^(\d{4})\s+(\S+)\s+(.+?)(?:\s+\d+\.\d+.*)?$/);
+    if (vm) { year = parseInt(vm[1]); make = vm[2]; model = vm[3].trim(); }
+  }
+  if (!year || !make || !model) return;
+
+  // Build results summary for storage
+  var partResults = researchResult.parts.map(function(p) {
+    var price = p.market && p.market.source === 'cache' ? p.market.avgPrice :
+      p.yourDemand && p.yourDemand.avgPrice > 0 ? p.yourDemand.avgPrice :
+      p.referencePrice || p.avgPrice || 0;
+    var soldCount = p.yourDemand ? p.yourDemand.salesCount : (p.soldCount || 0);
+    return {
+      partType: p.partType,
+      avgPrice: Math.round(price),
+      soldCount: soldCount,
+      inStock: p.yourStock ? p.yourStock.count : 0,
+      badge: p.badge || 'POOR',
+      partNumber: p.partNumberBase || null,
+    };
+  });
+
+  fetch('/opportunities/research', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      vehicle_year: year,
+      vehicle_make: make,
+      vehicle_model: model,
+      vehicle_engine: _lastEngine || null,
+      source: source,
+      source_vin: vin || null,
+      results: partResults,
+    }),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.saved) {
+      // Show "Saved to Sky Watch" link
+      var el = document.createElement('div');
+      el.style.cssText = 'text-align:center;padding:8px;font-size:11px;margin-top:4px';
+      el.innerHTML = '<span style="color:#22c55e;font-weight:600">✓ Saved to Sky Watch</span> · <a href="/admin/opportunities" style="color:#eab308;text-decoration:none">View →</a>';
+      var container = source === 'VIN' ? document.getElementById('researchResults') : document.getElementById('standaloneResults');
+      if (container) container.appendChild(el);
+    }
+  })
+  .catch(function() { /* silent — save is best effort */ });
+}
 
 function loadHistory(el){
   if(el)el.textContent='Loading...';

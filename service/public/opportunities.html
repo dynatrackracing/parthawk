@@ -14,95 +14,133 @@
     --gray: #9ca3af; --text: #F0F0F0; --text-mid: #d1d5db;
     --text-muted: #9CA3AF; --text-faint: #6B7280;
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    --gold: #eab308; --gold-bg: #713f12; --gold-border: #eab30844;
+    --blue: #3b82f6; --blue-bg: #1e3a5f;
   }
   body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  .sort-bar {
+  /* Status filter bar */
+  .filter-bar {
     display: flex; gap: 6px; padding: 10px 16px;
     background: var(--surface); border-bottom: 1px solid var(--border);
     overflow-x: auto; align-items: center;
   }
-  .sort-btn {
-    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+  .filter-tab {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--surface2); color: var(--text-muted); font-size: 11px;
     font-weight: 600; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center; gap: 5px;
   }
-  .sort-btn.active { background: #064e3b; color: #22c55e; border-color: #22c55e44; }
-  .sort-spacer { flex: 1; }
-  .toggle-dismissed {
-    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--surface2); color: var(--text-faint); font-size: 11px;
-    font-weight: 600; cursor: pointer; white-space: nowrap;
+  .filter-tab.active { background: #064e3b; color: #22c55e; border-color: #22c55e44; }
+  .filter-tab .badge {
+    background: #1f2937; color: var(--text-faint); font-size: 10px;
+    padding: 1px 5px; border-radius: 4px; font-weight: 700;
   }
-  .toggle-dismissed.active { background: #7f1d1d; color: #ef4444; border-color: #ef444444; }
+  .filter-tab.active .badge { background: #065f46; color: #34d399; }
 
-  .status-bar {
-    padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
-    font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;
+  /* Cards container */
+  .card-list { padding: 8px; max-width: 700px; margin: 0 auto; }
+
+  /* Vehicle research card */
+  .r-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 8px; overflow: hidden; transition: opacity 0.3s, transform 0.3s;
+  }
+  .r-card.fade-out { opacity: 0; transform: translateX(-40px); }
+
+  .r-card-header {
+    padding: 12px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  }
+  .r-card-vehicle { flex: 1; min-width: 0; }
+  .r-card-title { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .r-card-engine { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .r-card-badges { display: flex; gap: 5px; align-items: center; flex-shrink: 0; }
+  .badge-source {
+    font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .badge-source.vin { background: var(--blue-bg); color: var(--blue); }
+  .badge-source.research { background: #1f2937; color: var(--text-muted); }
+
+  .badge-status {
+    font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .badge-status.new { background: #064e3b; color: #22c55e; animation: pulse-green 2s infinite; }
+  .badge-status.reviewed { background: #1f2937; color: var(--text-muted); }
+  .badge-status.marked { background: var(--gold-bg); color: var(--gold); }
+  .badge-status.dismissed { background: #1f2937; color: var(--text-faint); opacity: 0.6; }
+
+  @keyframes pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
   }
 
-  .opp-list { padding: 0; }
-  .opp-card {
-    border-bottom: 1px solid var(--border); background: var(--surface2);
-    padding: 12px 14px; cursor: pointer; transition: opacity 0.3s, max-height 0.3s;
+  .r-card-summary {
+    padding: 0 14px 10px; font-size: 12px; color: var(--text-muted);
   }
-  .opp-card:active { background: var(--surface); }
-  .opp-card.dismissing { opacity: 0; max-height: 0; padding: 0 14px; overflow: hidden; }
-  .opp-card.dismissed-card { opacity: 0.4; }
-  .opp-card.dismissed-card:hover { opacity: 0.6; }
+  .r-card-summary strong { color: var(--green); font-weight: 700; }
 
-  .opp-top { display: flex; align-items: center; gap: 10px; }
-  .opp-score {
-    width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 800;
+  /* Parts breakdown */
+  .r-card-parts-toggle {
+    padding: 8px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+    cursor: pointer; border-top: 1px solid var(--border); display: flex;
+    align-items: center; justify-content: space-between;
+    user-select: none; -webkit-user-select: none;
   }
-  .opp-score.green { background: #064e3b; color: #22c55e; }
-  .opp-score.yellow { background: #713f12; color: #eab308; }
-  .opp-score.orange { background: #7c2d12; color: #f97316; }
-  .opp-score.gray { background: #1f2937; color: #6B7280; }
+  .r-card-parts-toggle:active { background: var(--surface); }
+  .r-card-parts-toggle .arrow { transition: transform 0.2s; font-size: 10px; }
+  .r-card-parts-toggle.open .arrow { transform: rotate(180deg); }
 
-  .opp-info { flex: 1; min-width: 0; }
-  .opp-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .opp-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .r-card-parts { display: none; border-top: 1px solid var(--border); }
+  .r-card-parts.open { display: block; }
 
-  .opp-right { text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
-  .opp-price { font-size: 14px; font-weight: 700; color: var(--green); }
-  .opp-sold { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
-  .opp-dismiss-btn {
-    width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text-faint); font-size: 14px;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  .part-row {
+    padding: 8px 14px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #1f1f1f; font-size: 12px;
+  }
+  .part-row:last-child { border-bottom: none; }
+  .part-type { font-weight: 600; color: var(--text-mid); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .part-stats { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+  .part-tier {
+    font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
+  }
+  .part-tier.high { background: #064e3b; color: #22c55e; }
+  .part-tier.medium { background: var(--gold-bg); color: var(--gold); }
+  .part-tier.low { background: #1f2937; color: var(--text-faint); }
+
+  .part-mark-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-faint);
+    font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer;
     flex-shrink: 0;
   }
-  .opp-dismiss-btn:hover { background: #7f1d1d; color: #ef4444; border-color: #ef4444; }
-  .opp-undismiss-btn {
-    padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--green); font-size: 10px;
-    font-weight: 600; cursor: pointer; white-space: nowrap;
-  }
-  .opp-undismiss-btn:hover { background: #064e3b; border-color: #22c55e; }
+  .part-mark-btn:active { background: var(--gold-bg); color: var(--gold); border-color: var(--gold); }
+  .part-mark-btn.marked { background: var(--gold-bg); color: var(--gold); border-color: var(--gold); pointer-events: none; }
 
-  .opp-chips { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-  .chip {
-    font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
-    letter-spacing: 0.03em; text-transform: uppercase;
+  /* Card actions */
+  .r-card-actions {
+    padding: 8px 14px 12px; display: flex; gap: 6px; flex-wrap: wrap;
+    border-top: 1px solid var(--border);
   }
-  .chip-type { background: #1e3a5f; color: #60a5fa; }
-  .chip-velocity { background: #713f12; color: #eab308; }
-
-  .opp-expanded { display: none; padding: 10px 0 4px; margin-top: 8px; border-top: 1px solid var(--border); }
-  .opp-expanded.open { display: block; }
-  .opp-detail { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
-  .opp-detail strong { color: var(--text-mid); }
-  .opp-rec { font-size: 12px; font-weight: 600; margin-top: 6px; }
-  .rec-high { color: #22c55e; }
-  .rec-strong { color: #eab308; }
-  .rec-moderate { color: #f97316; }
-  .rec-low { color: #6B7280; }
+  .action-btn {
+    padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border); cursor: pointer; white-space: nowrap;
+  }
+  .action-btn:disabled { opacity: 0.4; pointer-events: none; }
+  .action-btn.mark-all { background: var(--gold-bg); color: var(--gold); border-color: var(--gold-border); }
+  .action-btn.mark-all:active { background: #854d0e; }
+  .action-btn.review { background: #1f2937; color: var(--text-muted); }
+  .action-btn.review:active { background: #374151; }
+  .action-btn.review.done { background: #064e3b; color: #22c55e; border-color: #22c55e44; pointer-events: none; }
+  .action-btn.dismiss { background: var(--surface); color: var(--text-faint); }
+  .action-btn.dismiss:active { background: #1f2937; }
+  .action-btn.delete { background: var(--surface); color: #ef444480; }
+  .action-btn.delete:active { background: var(--red-dim); color: #ef4444; }
 
   .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px; }
-  .empty { text-align: center; padding: 60px 20px; color: var(--text-faint); font-size: 13px; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-faint); font-size: 13px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -110,233 +148,293 @@
 <div id="dh-nav"></div>
 <script src="/admin/dh-nav.js?v=2"></script><script>dhNav('sky')</script>
 
-<div class="sort-bar">
-  <button class="sort-btn active" data-sort="score">Score</button>
-  <button class="sort-btn" data-sort="price">Price</button>
-  <button class="sort-btn" data-sort="sold">Sold Count</button>
-  <button class="sort-btn" data-sort="velocity">Velocity</button>
-  <div class="sort-spacer"></div>
-  <button class="toggle-dismissed" id="toggleDismissed">Show Dismissed</button>
+<div class="filter-bar" id="filterBar">
+  <button class="filter-tab active" data-status="">All <span class="badge" id="cnt-all">0</span></button>
+  <button class="filter-tab" data-status="new">New <span class="badge" id="cnt-new">0</span></button>
+  <button class="filter-tab" data-status="reviewed">Reviewed <span class="badge" id="cnt-reviewed">0</span></button>
+  <button class="filter-tab" data-status="marked">Marked <span class="badge" id="cnt-marked">0</span></button>
+  <button class="filter-tab" data-status="dismissed">Dismissed <span class="badge" id="cnt-dismissed">0</span></button>
 </div>
 
-<div class="status-bar">
-  <span id="statusText">Loading...</span>
-  <span id="statusCount"></span>
-</div>
-
-<div class="opp-list" id="oppList">
-  <div class="loading" id="loadingMsg">Analyzing market gaps...</div>
+<div class="card-list" id="cardList">
+  <div class="loading" id="loadingMsg">Loading research results...</div>
 </div>
 
 <script>
-let allOpps = [];
-let currentSort = 'score';
-let showingDismissed = false;
-let dismissedItems = [];
+var items = [];
+var currentStatus = '';
 
-async function load() {
-  try {
-    const res = await fetch('/opportunities?sort=' + currentSort);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error);
-    allOpps = data.opportunities;
-    document.getElementById('statusText').textContent = data.total + ' opportunities found';
-    document.getElementById('statusCount').textContent = 'Updated ' + new Date(data.generated_at).toLocaleTimeString();
-    render();
-  } catch(e) {
-    document.getElementById('loadingMsg').textContent = 'Error: ' + e.message;
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function valueTier(avgPrice, soldCount) {
+  if (avgPrice >= 150 && soldCount >= 3) return 'high';
+  if (avgPrice >= 75 || soldCount >= 2) return 'medium';
+  return 'low';
+}
+
+function tierLabel(t) {
+  if (t === 'high') return 'HIGH';
+  if (t === 'medium') return 'MED';
+  return 'LOW';
+}
+
+function statusBadge(status) {
+  var s = (status || 'new').toLowerCase();
+  return '<span class="badge-status ' + s + '">' + s.toUpperCase() + '</span>';
+}
+
+function sourceBadge(source) {
+  var s = (source || 'research').toLowerCase();
+  if (s === 'vin') return '<span class="badge-source vin">VIN</span>';
+  return '<span class="badge-source research">RESEARCH</span>';
+}
+
+function countParts(r) {
+  var parts = r.parts || [];
+  var total = parts.length;
+  var highCount = 0;
+  var estValue = 0;
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    var avg = p.avgPrice || 0;
+    var sold = p.soldCount || 0;
+    estValue += avg;
+    if (valueTier(avg, sold) === 'high') highCount++;
   }
+  return { total: total, high: highCount, est: Math.round(estValue) };
 }
 
-function scoreColor(score) {
-  if (score >= 80) return 'green';
-  if (score >= 60) return 'yellow';
-  if (score >= 40) return 'orange';
-  return 'gray';
-}
+function renderCard(r, idx) {
+  var year = r.year || '';
+  var make = r.make || '';
+  var model = r.model || '';
+  var title = [year, make, model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+  var engine = r.engine || '';
+  var status = (r.status || 'new').toLowerCase();
+  var source = r.source || 'research';
+  var parts = r.parts || [];
+  var counts = countParts(r);
+  var id = r.id;
 
-function recClass(score) {
-  if (score >= 80) return 'rec-high';
-  if (score >= 60) return 'rec-strong';
-  if (score >= 40) return 'rec-moderate';
-  return 'rec-low';
-}
+  var html = '<div class="r-card" id="rcard-' + id + '">';
 
-function renderCard(o, i, isDismissed) {
-  const color = scoreColor(o.score || 0);
-  const chips = [];
-  if (o.partType) chips.push('<span class="chip chip-type">' + esc(o.partType) + '</span>');
-  if (o.velocity >= 2) chips.push('<span class="chip chip-velocity">' + o.velocity + '/wk</span>');
+  // Header
+  html += '<div class="r-card-header">';
+  html += '<div class="r-card-vehicle">';
+  html += '<div class="r-card-title">' + esc(title) + '</div>';
+  if (engine) html += '<div class="r-card-engine">' + esc(engine) + '</div>';
+  html += '</div>';
+  html += '<div class="r-card-badges">' + sourceBadge(source) + statusBadge(status) + '</div>';
+  html += '</div>';
 
-  const yearStr = o.yearEnd ? o.year + '-' + o.yearEnd : (o.year || '');
-  const vehicleLine = [yearStr, o.make, o.model].filter(Boolean).join(' ');
-  const title = o.description || o.original_title || '';
+  // Value summary
+  html += '<div class="r-card-summary">Est. <strong>$' + counts.est + '</strong> &middot; ' + counts.total + ' parts found &middot; ' + counts.high + ' high value</div>';
 
-  const actionBtn = isDismissed
-    ? '<button class="opp-undismiss-btn" onclick="undismiss(event, ' + i + ')">Restore</button>'
-    : '<button class="opp-dismiss-btn" onclick="dismiss(event, ' + i + ')" title="Dismiss">&#x2715;</button>';
+  // Parts toggle
+  if (parts.length > 0) {
+    html += '<div class="r-card-parts-toggle" onclick="toggleParts(this,' + id + ')">';
+    html += '<span>Parts breakdown (' + parts.length + ')</span>';
+    html += '<span class="arrow">&#9660;</span>';
+    html += '</div>';
 
-  var cardClass = 'opp-card' + (isDismissed ? ' dismissed-card' : '');
+    html += '<div class="r-card-parts" id="parts-' + id + '">';
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      var avg = p.avgPrice || 0;
+      var sold = p.soldCount || 0;
+      var tier = valueTier(avg, sold);
+      var partTitle = p.title || p.partType || 'Part';
+      var partType = p.partType || 'Part';
+      var isMarked = p.marked ? ' marked' : '';
 
-  var html = '<div class="' + cardClass + '" id="card-' + (isDismissed ? 'd' : '') + i + '" onclick="' + (isDismissed ? '' : 'toggle(' + i + ')') + '">' +
-    '<div class="opp-top">' +
-      (isDismissed ? '' : '<div class="opp-score ' + color + '">' + o.score + '</div>') +
-      '<div class="opp-info">' +
-        '<div class="opp-title">' + esc(vehicleLine || title) + '</div>' +
-        '<div class="opp-meta">' +
-          (o.partType ? '<span>' + esc(o.partType) + '</span>' : '') +
-          (o.partNumber ? '<span>PN: ' + esc(o.partNumber) + '</span>' : '') +
-          (o.engineSize ? '<span>' + esc(o.engineSize) + '</span>' : '') +
-          (isDismissed ? '<span style="color:#ef4444">Dismissed ' + new Date(o.dismissed_at).toLocaleDateString() + '</span>' : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="opp-right">' +
-        (isDismissed ? '' : '<div><div class="opp-price">$' + Math.round(o.marketMedian) + '</div><div class="opp-sold">' + o.soldCount + ' sold</div></div>') +
-        actionBtn +
-      '</div>' +
-    '</div>';
-
-  if (!isDismissed) {
-    html += '<div class="opp-chips">' + chips.join('') + '</div>' +
-      '<div class="opp-expanded" id="exp-' + i + '">' +
-        '<div class="opp-detail">' +
-          '<strong>Market median:</strong> $' + o.marketMedian.toFixed(2) + '<br>' +
-          '<strong>eBay sold (90d):</strong> ' + o.soldCount + ' &nbsp; <strong>Velocity:</strong> ' + o.velocity + '/week<br>' +
-          '<strong>Score breakdown:</strong> Demand ' + o.demandScore + ' + Price ' + o.priceScore + ' + Velocity ' + o.velocityScore + ' + Scarcity ' + o.scarcityScore + '<br>' +
-          '<strong>Cache key:</strong> ' + esc(o.cacheKey) +
-        '</div>' +
-        '<div class="opp-rec ' + recClass(o.score) + '">' + esc(o.recommendation) + '</div>' +
-      '</div>';
+      html += '<div class="part-row">';
+      html += '<span class="part-type">' + esc(partType) + '</span>';
+      html += '<span class="part-stats">$' + Math.round(avg) + ' &middot; ' + sold + ' sold</span>';
+      html += '<span class="part-tier ' + tier + '">' + tierLabel(tier) + '</span>';
+      html += '<button class="part-mark-btn' + isMarked + '" onclick="markPart(' + id + ',' + i + ',this)" title="Mark part">' + (p.marked ? '&#9733;' : '&#9734;') + '</button>';
+      html += '</div>';
+    }
+    html += '</div>';
   }
+
+  // Actions
+  html += '<div class="r-card-actions">';
+  var hasHigh = counts.high > 0;
+  html += '<button class="action-btn mark-all"' + (hasHigh ? '' : ' disabled') + ' onclick="markAllHigh(' + id + ',this)">&#9733; Mark All High</button>';
+  html += '<button class="action-btn review' + (status === 'reviewed' ? ' done' : '') + '" onclick="reviewCard(' + id + ',this)">' + (status === 'reviewed' ? 'Reviewed &#10003;' : 'Reviewed &#10003;') + '</button>';
+  html += '<button class="action-btn dismiss" onclick="dismissCard(' + id + ',this)">Dismiss</button>';
+  html += '<button class="action-btn delete" onclick="deleteCard(' + id + ')">Delete</button>';
+  html += '</div>';
 
   html += '</div>';
   return html;
 }
 
 function render() {
-  const list = document.getElementById('oppList');
-  if (allOpps.length === 0 && !showingDismissed) {
-    list.innerHTML = '<div class="empty">No opportunities found. Run the nightly price refresh to populate market data.</div>';
+  var list = document.getElementById('cardList');
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">No research results yet.<br>Use Hawk Eye to research unfamiliar vehicles.</div>';
     return;
   }
-
   var html = '';
-  if (!showingDismissed) {
-    html = allOpps.map(function(o, i) { return renderCard(o, i, false); }).join('');
+  for (var i = 0; i < items.length; i++) {
+    html += renderCard(items[i], i);
   }
-
-  if (showingDismissed && dismissedItems.length > 0) {
-    if (html) html += '<div style="border-top:2px solid #7f1d1d;margin:8px 0"></div>';
-    html += '<div style="padding:8px 16px;font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.05em;background:#141414;border-bottom:1px solid #2a2a2a">Dismissed (' + dismissedItems.length + ')</div>';
-    html += dismissedItems.map(function(o, i) { return renderCard(o, i, true); }).join('');
-  }
-
-  if (!html) {
-    html = '<div class="empty">No dismissed opportunities.</div>';
-  }
-
   list.innerHTML = html;
 }
 
-async function dismiss(event, idx) {
-  event.stopPropagation();
-  var o = allOpps[idx];
-  if (!o) return;
-
-  var card = document.getElementById('card-' + idx);
-  if (card) card.classList.add('dismissing');
-
-  try {
-    var res = await fetch('/opportunities/dismiss', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: o.description })
-    });
-    var data = await res.json();
-    if (!data.success) throw new Error(data.error);
-
-    setTimeout(function() {
-      allOpps.splice(idx, 1);
-      document.getElementById('statusText').textContent = allOpps.length + ' opportunities found';
-      render();
-    }, 300);
-  } catch(e) {
-    if (card) card.classList.remove('dismissing');
-    alert('Failed to dismiss: ' + e.message);
-  }
+function updateCounts(data) {
+  var all = data.counts || {};
+  document.getElementById('cnt-all').textContent = all.all || 0;
+  document.getElementById('cnt-new').textContent = all.new || 0;
+  document.getElementById('cnt-reviewed').textContent = all.reviewed || 0;
+  document.getElementById('cnt-marked').textContent = all.marked || 0;
+  document.getElementById('cnt-dismissed').textContent = all.dismissed || 0;
 }
 
-async function undismiss(event, idx) {
-  event.stopPropagation();
-  var o = dismissedItems[idx];
-  if (!o) return;
+async function load(status) {
+  if (status === undefined) status = currentStatus;
+  currentStatus = status;
+
+  // Update active tab
+  var tabs = document.querySelectorAll('.filter-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-status') === status);
+  }
+
+  var list = document.getElementById('cardList');
+  list.innerHTML = '<div class="loading">Loading research results...</div>';
 
   try {
-    var res = await fetch('/opportunities/undismiss', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: o.original_title })
-    });
+    var url = '/opportunities/research';
+    if (status) url += '?status=' + status;
+    var res = await fetch(url);
     var data = await res.json();
-    if (!data.success) throw new Error(data.error);
-
-    dismissedItems.splice(idx, 1);
+    if (!data.success && !Array.isArray(data)) throw new Error(data.error || 'Failed to load');
+    items = data.results || data.research || data || [];
+    if (Array.isArray(data)) items = data;
+    if (data.counts) updateCounts(data);
     render();
   } catch(e) {
-    alert('Failed to undismiss: ' + e.message);
+    list.innerHTML = '<div class="empty">Error loading research: ' + esc(e.message) + '</div>';
   }
 }
 
-async function loadDismissed() {
+function toggleParts(el, id) {
+  el.classList.toggle('open');
+  var parts = document.getElementById('parts-' + id);
+  if (parts) parts.classList.toggle('open');
+}
+
+async function markPart(cardId, partIdx, btn) {
+  var r = items.find(function(x) { return x.id === cardId; });
+  if (!r || !r.parts || !r.parts[partIdx]) return;
+  var p = r.parts[partIdx];
+
   try {
-    var res = await fetch('/opportunities/dismissed');
+    var res = await fetch('/opportunities/research/' + cardId + '/mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partType: p.partType, title: p.title || p.partType, avgPrice: p.avgPrice })
+    });
     var data = await res.json();
-    if (!data.success) throw new Error(data.error);
-    dismissedItems = data.dismissed || [];
+    if (!data.success) throw new Error(data.error || 'Failed');
+    btn.classList.add('marked');
+    btn.innerHTML = '&#9733;';
+    p.marked = true;
   } catch(e) {
-    dismissedItems = [];
+    alert('Mark failed: ' + e.message);
   }
 }
 
-function toggle(idx) {
-  var el = document.getElementById('exp-' + idx);
-  if (el) el.classList.toggle('open');
+async function markAllHigh(cardId, btn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    var res = await fetch('/opportunities/research/' + cardId + '/mark-all-high', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed');
+    btn.textContent = 'Marked!';
+    setTimeout(function() { load(); }, 500);
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '&#9733; Mark All High';
+    alert('Failed: ' + e.message);
+  }
 }
 
-function esc(s) {
-  if (!s) return '';
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+async function reviewCard(cardId, btn) {
+  btn.disabled = true;
+  try {
+    var res = await fetch('/opportunities/research/' + cardId + '/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed');
+    btn.classList.add('done');
+    btn.innerHTML = 'Reviewed &#10003;';
+  } catch(e) {
+    btn.disabled = false;
+    alert('Failed: ' + e.message);
+  }
 }
 
-// Sort buttons
-document.querySelectorAll('.sort-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    currentSort = btn.dataset.sort;
+async function dismissCard(cardId, btn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    var res = await fetch('/opportunities/research/' + cardId + '/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed');
+    var card = document.getElementById('rcard-' + cardId);
+    if (card) {
+      card.classList.add('fade-out');
+      setTimeout(function() { load(); }, 350);
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Dismiss';
+    alert('Failed: ' + e.message);
+  }
+}
 
-    if (currentSort === 'price') allOpps.sort(function(a, b) { return b.marketMedian - a.marketMedian; });
-    else if (currentSort === 'sold') allOpps.sort(function(a, b) { return b.soldCount - a.soldCount; });
-    else if (currentSort === 'velocity') allOpps.sort(function(a, b) { return b.velocity - a.velocity; });
-    else allOpps.sort(function(a, b) { return b.score !== a.score ? b.score - a.score : b.marketMedian - a.marketMedian; });
+async function deleteCard(cardId) {
+  if (!confirm('Delete this research entry?')) return;
+  try {
+    var res = await fetch('/opportunities/research/' + cardId, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed');
+    var card = document.getElementById('rcard-' + cardId);
+    if (card) {
+      card.classList.add('fade-out');
+      setTimeout(function() { load(); }, 350);
+    }
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
 
-    render();
+// Filter tab clicks
+document.querySelectorAll('.filter-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    load(tab.getAttribute('data-status'));
   });
 });
 
-// Dismissed toggle
-document.getElementById('toggleDismissed').addEventListener('click', async function() {
-  showingDismissed = !showingDismissed;
-  this.classList.toggle('active', showingDismissed);
-  this.textContent = showingDismissed ? 'Hide Dismissed' : 'Show Dismissed';
-
-  if (showingDismissed) {
-    await loadDismissed();
-  }
-  render();
-});
-
-load();
+load('');
 </script>
 </body>
 </html>
