@@ -104,25 +104,17 @@ router.get('/gap-intel', async (req, res) => {
       if (!g.lastSold || new Date(item.soldDate) > new Date(g.lastSold)) g.lastSold = item.soldDate;
     }
 
-    // Get all YOUR sold titles (from YourSale) - normalized
-    const yourSales = await database('YourSale')
-      .select('title')
-      .limit(25000);
-    const yourSoldTitles = new Set(yourSales.map(s => normalizeTitle(s.title)).filter(Boolean));
+    // Build match sets from our data (PNs + partType|make|model keys)
+    const yourSales = await database('YourSale').select('title').limit(25000);
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
+    const yourItems = await database('Item').whereRaw("LOWER(seller) LIKE '%dynatrack%'").select('title').limit(5000);
 
-    // Get all YOUR active listing titles (from YourListing) - normalized
-    const yourListings = await database('YourListing')
-      .where('listingStatus', 'Active')
-      .select('title')
-      .limit(10000);
-    const yourListingTitles = new Set(yourListings.map(l => normalizeTitle(l.title)).filter(Boolean));
-
-    // Get all Item table titles for your seller - normalized
-    const yourItems = await database('Item')
-      .whereRaw("LOWER(seller) LIKE '%dynatrack%'")
-      .select('title')
-      .limit(5000);
-    const yourItemTitles = new Set(yourItems.map(i => normalizeTitle(i.title)).filter(Boolean));
+    const allOurTitles = [
+      ...yourSales.map(s => s.title),
+      ...yourListings.map(l => l.title),
+      ...yourItems.map(i => i.title),
+    ].filter(Boolean);
+    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurTitles);
 
     let dismissedTitles = new Set();
     try {
@@ -130,15 +122,19 @@ router.get('/gap-intel', async (req, res) => {
       dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
     } catch (e) { /* table may not exist yet */ }
 
+    // Check yard_vehicle for local matches (moved BEFORE gap loop)
+    let yardMakes = new Set();
+    try {
+      const yardVehicles = await database('yard_vehicle').where('active', true).select('make').limit(5000);
+      for (const v of yardVehicles) {
+        if (v.make) yardMakes.add(v.make.toUpperCase());
+      }
+    } catch (e) { /* yard_vehicle may not have data */ }
+
     // Find gaps: competitor parts that we have never sold, listed, or stocked
     const gaps = [];
     for (const [key, group] of Object.entries(compGroups)) {
-      // Check if we have ever dealt with this part
-      const inYourSales = matchesAny(key, yourSoldTitles);
-      const inYourListings = matchesAny(key, yourListingTitles);
-      const inYourItems = matchesAny(key, yourItemTitles);
-
-      if (inYourSales || inYourListings || inYourItems) continue;
+      if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
 
       // Calculate median price
@@ -187,15 +183,6 @@ router.get('/gap-intel', async (req, res) => {
         yardMatch: titleMatchesYard(group.title, yardMakes),
       });
     }
-
-    // Check yard_vehicle for local matches
-    let yardMakes = new Set();
-    try {
-      const yardVehicles = await database('yard_vehicle').select('make').limit(5000);
-      for (const v of yardVehicles) {
-        if (v.make) yardMakes.add(v.make.toUpperCase());
-      }
-    } catch (e) { /* yard_vehicle may not have data */ }
 
     // Sort by score descending
     gaps.sort((a, b) => b.score - a.score);
@@ -262,10 +249,11 @@ router.get('/emerging', async (req, res) => {
     const olderItems = await database('SoldItem').where('soldDate', '<', cutoff).select('title').limit(10000);
     const previouslySeenTitles = new Set(olderItems.map(function(i) { return normalizeTitle(i.title); }).filter(Boolean));
 
+    // Build match sets from our data
     const yourSales = await database('YourSale').select('title').limit(25000);
-    const yourSoldTitles = new Set(yourSales.map(function(s) { return normalizeTitle(s.title); }).filter(Boolean));
     const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
-    const yourListingTitles = new Set(yourListings.map(function(l) { return normalizeTitle(l.title); }).filter(Boolean));
+    const allOurTitles = [...yourSales.map(s => s.title), ...yourListings.map(l => l.title)].filter(Boolean);
+    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurTitles);
 
     let dismissedTitles = new Set();
     try {
@@ -275,7 +263,7 @@ router.get('/emerging', async (req, res) => {
 
     const emerging = [];
     for (const [key, group] of Object.entries(groups)) {
-      if (matchesAny(key, yourSoldTitles) || matchesAny(key, yourListingTitles)) continue;
+      if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
 
       const sorted = group.prices.sort(function(a, b) { return a - b; });
@@ -332,23 +320,85 @@ function normalizeTitle(title) {
     .substring(0, 65);
 }
 
-// Critical auto parts keywords that must never be filtered out
-var KEEP_WORDS = new Set(['ECU','ECM','BCM','TCM','ABS','AMP','PCM','SRS','MAF','EPS','OEM','TIPM','HVAC','BCM','LED','A/C','AC']);
+// Known automotive makes for title parsing
+var KNOWN_MAKES_UPPER = ['FORD','CHEVROLET','CHEVY','DODGE','RAM','CHRYSLER','JEEP','TOYOTA','HONDA','NISSAN','HYUNDAI','KIA','SUBARU','MAZDA','MITSUBISHI','BMW','MERCEDES','AUDI','VOLKSWAGEN','VOLVO','MINI','PORSCHE','LEXUS','ACURA','INFINITI','GENESIS','CADILLAC','BUICK','GMC','LINCOLN','PONTIAC','SATURN','OLDSMOBILE','JAGUAR','LAND ROVER','FIAT','SCION','SUZUKI','SAAB'];
 
-// Helper: check if a normalized key matches any title in a set (fuzzy - 70% word overlap)
-function matchesAny(key, titleSet) {
-  if (titleSet.has(key)) return true;
-  var words = key.split(' ').filter(function(w) {
-    return w.length > 3 || KEEP_WORDS.has(w);
-  });
-  if (words.length === 0) return false;
-  for (var t of titleSet) {
-    var matches = 0;
-    for (var w of words) {
-      if (t.includes(w)) matches++;
-    }
-    if (matches / words.length >= 0.7) return true;
+/**
+ * Extract a structured key from a title: "PARTTYPE|MAKE|MODEL"
+ * Used for two-tier gap-intel matching instead of fuzzy word overlap.
+ */
+function buildTitleKey(title) {
+  if (!title) return null;
+  var upper = title.toUpperCase();
+
+  var partType = extractPartType(title) || null;
+  if (!partType) return null;
+
+  var make = null;
+  for (var m of KNOWN_MAKES_UPPER) {
+    if (upper.includes(m)) { make = m; break; }
   }
+  if (!make) return null;
+
+  // Extract model: first non-noise word(s) after make
+  var makeIdx = upper.indexOf(make);
+  var afterMake = upper.substring(makeIdx + make.length).trim();
+  var modelWords = [];
+  var stopWords = new Set(['OEM','GENUINE','PROGRAMMED','REBUILT','PLUG','PLAY','ASSEMBLY','MODULE','UNIT','REMAN','REMANUFACTURED','NEW','USED','TESTED','ENGINE','CONTROL','COMPUTER','ELECTRONIC','ANTI','LOCK','BRAKE','PUMP','FUSE','POWER','BOX','BODY','TRANSMISSION','ECU','ECM','PCM','BCM','TCM','ABS','TIPM','SRS','HVAC','INSTRUMENT','CLUSTER','SPEEDOMETER','RADIO','HEAD','STEREO','AMPLIFIER','THROTTLE','INTAKE','ALTERNATOR','STARTER','TURBO','CAMERA','SENSOR','WORKING','FAST','FREE','SHIPPING','SHIP']);
+  for (var w of afterMake.replace(/[^A-Z0-9\s]/g, '').split(/\s+/)) {
+    if (!w || w.length < 2) continue;
+    if (/^\d{4}$/.test(w)) continue; // skip years
+    if (stopWords.has(w)) continue;
+    modelWords.push(w);
+    if (modelWords.length >= 2) break;
+  }
+  var model = modelWords.join(' ') || null;
+  if (!model) return null;
+
+  return partType + '|' + make + '|' + model;
+}
+
+/**
+ * Build PN and title-key sets from an array of title strings.
+ * Returns { pnSet: Set<string>, keySet: Set<string> }
+ */
+function buildMatchSets(titles) {
+  var pnSet = new Set();
+  var keySet = new Set();
+  for (var title of titles) {
+    if (!title) continue;
+    // Extract part number
+    var pn = extractPartNumber(title);
+    if (pn) {
+      var pnBase = pn.replace(/[-\s]/g, '').replace(/[A-Z]{1,2}$/, '');
+      if (pnBase.length >= 5) pnSet.add(pnBase);
+      pnSet.add(pn.replace(/[-\s]/g, ''));
+    }
+    // Extract title key
+    var key = buildTitleKey(title);
+    if (key) keySet.add(key);
+  }
+  return { pnSet, keySet };
+}
+
+/**
+ * Two-tier matching: do we already sell this part?
+ * Tier 1: PN match (if extractable). Tier 2: strict partType|make|model key match.
+ */
+function weAlreadySellThis(competitorTitle, yourPNs, yourKeys) {
+  // Tier 1: check by part number
+  var pn = extractPartNumber(competitorTitle);
+  if (pn) {
+    var pnClean = pn.replace(/[-\s]/g, '');
+    var pnBase = pnClean.replace(/[A-Z]{1,2}$/, '');
+    if (yourPNs.has(pnClean) || (pnBase.length >= 5 && yourPNs.has(pnBase))) return true;
+  }
+
+  // Tier 2: strict partType|make|model key
+  var key = buildTitleKey(competitorTitle);
+  if (key && yourKeys.has(key)) return true;
+
+  // No match — this is a gap
   return false;
 }
 
