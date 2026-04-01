@@ -247,30 +247,6 @@ app.get('/test', (req, res) => {
   res.json('haribol');
 });
 
-// Diagnostic: check migration status and run pending migrations
-app.get('/api/migrate-status', async (req, res) => {
-  try {
-    const { database } = require('./database/database');
-    const ran = await database('knex_migrations').select('name', 'batch').orderBy('id', 'desc').limit(10);
-    const lock = await database('knex_migrations_lock').select('*');
-    const hasCache = await database.schema.hasTable('the_cache');
-    res.json({ ran, lock, hasCache });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post('/api/run-migrations', async (req, res) => {
-  try {
-    const { database } = require('./database/database');
-    // Unlock if stuck
-    await database('knex_migrations_lock').update({ is_locked: 0 });
-    const result = await database.migrate.latest(database.client.config.migration);
-    const hasCache = await database.schema.hasTable('the_cache');
-    res.json({ success: true, result, hasCache });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack?.split('\n').slice(0, 5) });
-  }
-});
 
 // Market pricing batch trigger — kicks off full pricing pass in background
 app.post('/api/market-price/run-batch', async (req, res) => {

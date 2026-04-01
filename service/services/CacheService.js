@@ -262,7 +262,7 @@ class CacheService {
    * Dashboard stats.
    */
   async getStats() {
-    const [statusCounts] = await database.raw(`
+    const statusResult = await database.raw(`
       SELECT
         COUNT(*) FILTER (WHERE status = 'claimed') as active,
         COUNT(*) FILTER (WHERE status = 'listed') as listed,
@@ -286,7 +286,7 @@ class CacheService {
       .groupBy('source');
 
     return {
-      ...statusCounts.rows[0],
+      ...statusResult.rows[0],
       by_source: sourceCounts.reduce((acc, r) => { acc[r.source] = parseInt(r.count); return acc; }, {}),
     };
   }
