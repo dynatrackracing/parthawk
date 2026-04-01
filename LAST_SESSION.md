@@ -1,28 +1,26 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Tab cleanup + VIN decode cron
+**Session type:** Daily Feed — vehicle render cap
 
 ## What was done
-- Removed "All" and "Florida" tabs from Daily Feed — default is now Raleigh
-- Added VIN decode cron at 3:00 AM and 8:40 AM UTC (post-scrape)
-  - Loops VinDecodeService.decodeAllUndecoded() until queue drained (200/batch)
-  - Then runs enrichYard() on all enabled yards for trim tier assignment
-- Updated CLAUDE_RULES.md cron schedule
-- Ran one-time backfill: all VINs already decoded (vin_decoded=true), 1,883 vehicles needed trim_tier assignment via enrichYard
+- Capped frontend vehicle rendering per date pill for faster load times
+- Caps: Newest=25, 3d=75, 7d=150, 30d=250, 60d=400, 90d/All=500 (no cap)
+- Fresh arrivals sections always render fully regardless of cap
+- Capped sections show "+ X more vehicles — switch to a wider filter" hint
+- Fully capped sections show collapsed header with "N hidden" count
+- API unchanged — still returns all vehicles for accurate scoring
+- Lazy loading (IntersectionObserver) still operates within capped results
 
 ## What files were touched
-- service/public/attack-list.html (removed All/Florida tabs, default Raleigh)
-- service/index.js (added VIN decode cron jobs)
-- CLAUDE_RULES.md (added VIN decode to cron schedule)
+- service/public/attack-list.html (VEHICLE_CAPS constant, section rendering loop)
 - LAST_SESSION.md (this file)
 
 ## What is still broken / needs attention
 - EST badge styling: estimate prices show red verdict-poor instead of gray
 - buildInventoryIndex Item.price>0 filter may exclude parts with no Item.price but valid market cache data
 - OTHER chips still appear for some parts — more detectPartType patterns needed
-- 5,552 vehicles have vin_decoded=true but decoded_trim IS NULL (NHTSA returned no trim data — these are base trims or older vehicles)
-- 1,883 vehicles had no trim_tier — enrichYard backfill running
+- 5,552 vehicles have vin_decoded=true but decoded_trim IS NULL (NHTSA returned no trim data)
 
 ## What's next
 - EST badge gray styling
@@ -37,3 +35,4 @@
 - VIN decode cron runs at 3am + 8:40am UTC on Railway
 - isMarked comes from AttackListService scoreVehicle() matching against the_mark table
 - alertBadges come from attack-list.js route joining scout_alerts to yard vehicles
+- VEHICLE_CAPS: rendering cap per date pill, fresh sections always bypass cap
