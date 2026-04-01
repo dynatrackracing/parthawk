@@ -149,8 +149,28 @@ class FlywayScrapeRunner {
       }
 
     } else if (chain === 'carolina pnp') {
+      // Carolina PNP requires local execution — datacenter IPs are blocked
+      if (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME) {
+        this.log.info({ yard: yard.name }, 'Skipping Carolina PNP — local-only scraper, blocked on Railway');
+        return;
+      }
       const CarolinaPickNPullScraper = require('../scrapers/CarolinaPickNPullScraper');
       const scraper = new CarolinaPickNPullScraper();
+      await scraper.scrapeYard(yard);
+
+    } else if (chain === 'upullandsave' || chain === 'u-pull-and-save') {
+      const UPullAndSaveScraper = require('../scrapers/UPullAndSaveScraper');
+      const scraper = new UPullAndSaveScraper();
+      await scraper.scrapeYard(yard);
+
+    } else if (chain === 'chesterfield') {
+      const ChesterfieldScraper = require('../scrapers/ChesterfieldScraper');
+      const scraper = new ChesterfieldScraper();
+      await scraper.scrapeYard(yard);
+
+    } else if (chain === 'pickapartva' || chain === 'pick-a-part va') {
+      const PickAPartVAScraper = require('../scrapers/PickAPartVAScraper');
+      const scraper = new PickAPartVAScraper();
       await scraper.scrapeYard(yard);
 
     } else {

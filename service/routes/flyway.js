@@ -179,6 +179,40 @@ router.get('/cleanup-preview', async (req, res) => {
 router.get('/trips/:id/attack-list', async (req, res) => {
   try {
     const result = await FlywayService.getFlywayAttackList(req.params.id);
+
+    // Attach scout alert badges — same logic as Daily Feed
+    try {
+      const alerts = await database('scout_alerts')
+        .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
+        .select('id', 'source', 'source_title', 'part_value', 'confidence', 'yard_name',
+                'vehicle_year', 'vehicle_make', 'vehicle_model');
+
+      const alertsByVehicle = {};
+      for (const a of alerts) {
+        const key = [a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|');
+        if (!alertsByVehicle[key]) alertsByVehicle[key] = [];
+        alertsByVehicle[key].push({
+          id: a.id, source: a.source, title: a.source_title,
+          value: a.part_value, confidence: a.confidence,
+        });
+      }
+
+      for (const yard of (result.yards || [])) {
+        const yardName = (yard.yard?.name || '').toLowerCase();
+        for (const vehicle of (yard.vehicles || [])) {
+          const key = [vehicle.year, (vehicle.make || '').toLowerCase(), (vehicle.model || '').toLowerCase(), yardName].join('|');
+          const va = alertsByVehicle[key];
+          if (va && va.length > 0) {
+            vehicle.alertBadges = va.sort((a, b) => {
+              if (a.source === 'PERCH' && b.source !== 'PERCH') return -1;
+              if (a.source !== 'PERCH' && b.source === 'PERCH') return 1;
+              return 0;
+            });
+          }
+        }
+      }
+    } catch (e) { /* scout_alerts may not exist */ }
+
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
