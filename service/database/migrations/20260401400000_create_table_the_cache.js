@@ -1,6 +1,8 @@
 'use strict';
 
 exports.up = async function(knex) {
+  const exists = await knex.schema.hasTable('the_cache');
+  if (exists) return;
   await knex.schema.createTable('the_cache', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
 
@@ -52,6 +54,7 @@ exports.up = async function(knex) {
     table.index(['vehicle_make', 'vehicle_model', 'vehicle_year'], 'idx_cache_vehicle');
   });
 };
+
 
 exports.down = async function(knex) {
   await knex.schema.dropTableIfExists('the_cache');
