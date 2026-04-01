@@ -180,6 +180,9 @@ app.use('/admin', express.static(path.resolve(__dirname, 'public'), {
     }
   }
 }));
+app.get('/admin/home', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'home.html'));
+});
 app.get('/admin/import', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'import.html'));
 });

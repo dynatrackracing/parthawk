@@ -39,7 +39,7 @@ function dhNav(activePage) {
 </style>
 <div style="background:#0a0a0a;position:sticky;top:0;z-index:100">
   <div style="text-align:center;padding:14px 16px 8px;background:#0a0a0a">
-    <a href="/" style="text-decoration:none;display:inline-flex;align-items:center;gap:12px">
+    <a href="/admin/home" style="text-decoration:none;display:inline-flex;align-items:center;gap:12px">
       <img src="/admin/darkhawk-logo-sm.png" style="height:50px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DH">
       <span style="font-size:22px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
     </a>
