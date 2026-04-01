@@ -230,6 +230,7 @@ class FlywayService {
       for (const vehicle of combined) {
         vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
           partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
+          isMarked: p.isMarked || false,
         }));
         delete vehicle.parts;
         delete vehicle.rebuild_parts;

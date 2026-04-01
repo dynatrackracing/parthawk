@@ -608,7 +608,8 @@
     }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 4).map(p => {
       const price = p.price || 0;
       const cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
-      return `<span class="chip ${cc}">${p.partType || '?'}</span>`;
+      const markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
+      return `<span class="chip ${cc}">${markIcon}${p.partType || '?'}</span>`;
     }).join('');
 
     const rowClass = vehicleRowClass(v);
@@ -651,6 +652,18 @@
     }
 
     let html = '';
+
+    // Scout alert matches
+    if (v.alertBadges && v.alertBadges.length > 0) {
+      html += '<div style="padding:8px 12px;background:#2e1065;border-radius:6px;margin-bottom:8px;">';
+      html += '<div style="font-size:10px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">\u26A1 SCOUT ALERTS</div>';
+      for (const a of v.alertBadges) {
+        const srcLabel = a.source === 'PERCH' ? '\uD83C\uDFAF MARK' : a.source === 'OVERSTOCK' ? 'OVERSTOCK' : a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
+        const valueStr = a.value ? ' \u2014 $' + a.value : '';
+        html += `<div style="font-size:12px;color:#e9d5ff;padding:2px 0;">${srcLabel}: ${a.title || 'Match'}${valueStr}</div>`;
+      }
+      html += '</div>';
+    }
 
     // Show validated trim suggestions (sellable parts only, with avg prices)
     if (v.validated_suggestions && v.validated_suggestions.length > 0) {
@@ -1081,14 +1094,14 @@
 
   function renderAlertBadges(v) {
     if (!v.alertBadges || v.alertBadges.length === 0) return '';
+    const count = v.alertBadges.length;
     let html = '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;align-items:center">';
+    html += `<span class="chip" style="font-size:9px;padding:1px 6px;background:#7c3aed;color:#fff;font-weight:700">\u26A1 ${count} ALERT${count > 1 ? 'S' : ''}</span>`;
     for (const ab of v.alertBadges) {
       if (ab.source === 'PERCH') {
-        // Gold star badge — Mark signal (highest priority)
-        const conf = ab.confidence === 'high' ? '★' : '☆';
+        const conf = ab.confidence === 'high' ? '\u2605' : '\u2606';
         html += `<span class="alert-badge alert-badge-mark" onclick="event.stopPropagation();claimAlertFromFeed(${ab.id},this)" title="${ab.title || 'Marked part'}">${conf} MARKED</span>`;
       } else {
-        // Blue badge — Scour Stream signal
         html += `<span class="alert-badge alert-badge-stream" onclick="event.stopPropagation();claimAlertFromFeed(${ab.id},this)" title="${ab.title || 'Restock'}">Restock</span>`;
       }
     }
