@@ -57,10 +57,9 @@ function parsePage(html) {
 async function scrapePages(slug, yardId) {
   const allNew = [];
   let page = 1;
-  let consecutiveDupes = 0;
-  const DUPE_THRESHOLD = 5; // stop after 5 consecutive duplicates on a page
+  let consecutiveAllDupePages = 0;
 
-  while (page <= 100) {
+  while (page <= 60) {
     const url = page === 1
       ? `https://www.pyp.com/inventory/${slug}/`
       : `https://www.pyp.com/inventory/${slug}/?page=${page}`;
@@ -72,7 +71,7 @@ async function scrapePages(slug, yardId) {
       const { vehicles, hasNext } = parsePage(html);
       if (vehicles.length === 0) break;
 
-      // Check each vehicle against DB — newest are first on pyp.com
+      // Check each vehicle against DB
       let pageNew = 0, pageDupes = 0;
       for (const v of vehicles) {
         let exists = false;
@@ -90,9 +89,7 @@ async function scrapePages(slug, yardId) {
 
         if (exists) {
           pageDupes++;
-          consecutiveDupes++;
         } else {
-          consecutiveDupes = 0;
           allNew.push(v);
           pageNew++;
         }
@@ -100,15 +97,17 @@ async function scrapePages(slug, yardId) {
 
       process.stdout.write(`  Page ${page}: ${pageNew} new, ${pageDupes} existing (total new: ${allNew.length})\n`);
 
-      // Early termination: if entire page was duplicates, we've caught up
+      // Early termination: require 2 consecutive all-dupe pages to stop.
+      // LKQ interleaves new/old vehicles — one all-dupe page doesn't mean
+      // we've seen everything. Two in a row means we've likely caught up.
       if (pageNew === 0) {
-        console.log(`  Hit all-duplicate page — caught up. Stopping.`);
-        break;
-      }
-      // Or if we've seen many consecutive dupes (mixed page near the boundary)
-      if (consecutiveDupes >= DUPE_THRESHOLD) {
-        console.log(`  ${consecutiveDupes} consecutive dupes — caught up. Stopping.`);
-        break;
+        consecutiveAllDupePages++;
+        if (consecutiveAllDupePages >= 2) {
+          console.log(`  2 consecutive all-dupe pages — caught up. Stopping.`);
+          break;
+        }
+      } else {
+        consecutiveAllDupePages = 0;
       }
 
       if (!hasNext) break;

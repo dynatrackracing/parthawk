@@ -533,6 +533,15 @@
         </div>
         <div class="vehicle-list">`;
 
+      // Stale scrape warning: if no vehicles were first seen today, show alert
+      const todayCount = filtered.filter(v => getSetDaysAgo(v) <= 0).length;
+      if (todayCount === 0) {
+        html += `<div style="padding:6px 14px;background:#713f12;border-bottom:1px solid var(--border);font-size:11px;color:#fbbf24;display:flex;justify-content:space-between;align-items:center;">
+          <span>No new vehicles detected today — try manual refresh</span>
+          <button class="icon-btn" style="width:24px;height:24px;font-size:11px;background:transparent;border:1px solid #fbbf24;color:#fbbf24;" onclick="scrapeYard('${yd.yard.id}',this)" title="Refresh ${yd.yard.name}">🔄</button>
+        </div>`;
+      }
+
       // Group by date section
       const sections = [
         { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) <= 0) },
