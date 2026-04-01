@@ -112,6 +112,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 - CompetitorMonitor: Thursday 4am
 - CompetitorDripRunner: 4x/day (5am, noon, 6pm, midnight — random 0-45min jitter)
 - FlywayScrapeRunner: daily 6am
+- VinDecodeService: daily 3am + 8:40am (post-scrape VIN decode + trim tier)
 - ScoutAlerts: on startup
 - DISABLED: CronWorkRunner, MarketDemandCronRunner (Finding API dead)
 

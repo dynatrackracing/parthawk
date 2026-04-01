@@ -907,6 +907,56 @@ async function start() {
       }
     });
 
+    // VIN decode — runs after each local scrape to decode new vehicles + assign trim tiers
+    // 3:00 AM UTC = after 2:00 AM local scrape
+    // 8:40 AM UTC = after 8:30 AM local scrape
+    const vinDecodeJob3am = schedule.scheduleJob('0 3 * * *', async function () {
+      log.info('VIN decode cron: post-2am scrape batch');
+      try {
+        const VinDecodeService = require('./services/VinDecodeService');
+        const service = new VinDecodeService();
+        // Loop until all undecoded VINs are processed (200 per batch)
+        let total = 0;
+        for (let i = 0; i < 30; i++) { // max 30 batches = 6000 VINs
+          const result = await service.decodeAllUndecoded();
+          total += result.decoded;
+          if (result.decoded === 0) break;
+        }
+        log.info({ totalDecoded: total }, 'VIN decode cron complete');
+        // Assign trim tiers for newly decoded vehicles
+        const { enrichYard } = require('./services/PostScrapeService');
+        const yards = await database('yard').where('enabled', true).select('id', 'name');
+        for (const yard of yards) {
+          try { await enrichYard(yard.id); } catch (e) { log.warn({ yard: yard.name, err: e.message }, 'Trim tier enrichment failed'); }
+        }
+        log.info('Post-decode trim tier enrichment complete');
+      } catch (err) {
+        log.error({ err }, 'VIN decode cron failed');
+      }
+    });
+
+    const vinDecodeJob840am = schedule.scheduleJob('40 8 * * *', async function () {
+      log.info('VIN decode cron: post-8:30am scrape mop-up');
+      try {
+        const VinDecodeService = require('./services/VinDecodeService');
+        const service = new VinDecodeService();
+        let total = 0;
+        for (let i = 0; i < 10; i++) { // max 10 batches = 2000 VINs
+          const result = await service.decodeAllUndecoded();
+          total += result.decoded;
+          if (result.decoded === 0) break;
+        }
+        log.info({ totalDecoded: total }, 'VIN decode mop-up complete');
+        const { enrichYard } = require('./services/PostScrapeService');
+        const yards = await database('yard').where('enabled', true).select('id', 'name');
+        for (const yard of yards) {
+          try { await enrichYard(yard.id); } catch (e) { log.warn({ yard: yard.name, err: e.message }, 'Trim tier mop-up failed'); }
+        }
+      } catch (err) {
+        log.error({ err }, 'VIN decode mop-up failed');
+      }
+    });
+
     // Competitor drip scraping — 4x daily with random 0-45min startup jitter
     // Each run: picks 1 least-recently-scraped seller, scrapes 1-2 pages
     // Replaces old Sunday 8pm blast-all-sellers cron (removed from competitors.js)
