@@ -251,14 +251,18 @@ function renderPage() {
       badge = '? VERIFY'; bc = 'b-out'; tierLabel = 'NO MATCH'; tierColor = '#dc2626';
     } else if (item.matchMethod === 'PART_NUMBER') {
       tierLabel = 'PART_NUMBER'; tierColor = '#22c55e';
+      var lc = item.listingCount || item.stock;
+      var stockLabel = (lc !== item.stock) ? item.stock + ' qty / ' + lc + ' listing' + (lc !== 1 ? 's' : '') : item.stock + '';
       if (item.stock === 0) { badge = '0'; bc = 'b-out'; }
-      else if (item.stock <= 2) { badge = item.stock + ''; bc = 'b-low'; }
-      else { badge = item.stock + ''; bc = 'b-ok'; }
+      else if (item.stock <= 2) { badge = stockLabel; bc = 'b-low'; }
+      else { badge = stockLabel; bc = 'b-ok'; }
     } else if (item.matchMethod === 'VEHICLE_MATCH') {
       tierLabel = 'VEHICLE_MATCH'; tierColor = '#eab308';
+      var lc = item.listingCount || item.stock;
+      var stockLabel = (lc !== item.stock) ? item.stock + ' qty / ' + lc + ' listing' + (lc !== 1 ? 's' : '') : item.stock + '';
       if (item.stock === 0) { badge = '0'; bc = 'b-out'; }
-      else if (item.stock <= 2) { badge = item.stock + ''; bc = 'b-low'; }
-      else { badge = item.stock + ''; bc = 'b-ok'; }
+      else if (item.stock <= 2) { badge = stockLabel; bc = 'b-low'; }
+      else { badge = stockLabel; bc = 'b-ok'; }
     } else if (item.matchMethod === 'KEYWORD') {
       tierLabel = 'KEYWORD'; tierColor = '#dc2626';
       if (item.stock === 0) { badge = '0'; bc = 'b-out'; }
@@ -577,7 +581,7 @@ function renderOverstock() {
     }
 
     h += '<div style="margin-top:8px;font-size:13px;font-weight:700;color:' + qtyColor + '">Stock: ' + stock + ' / ' + group.initial_stock + '</div>';
-    h += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Restock at: ' + group.restock_target;
+    h += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px" id="restock-target-row-' + group.id + '">Restock at: <span onclick="editRestockTarget(' + group.id + ',' + group.restock_target + ',' + stock + ')" style="cursor:pointer;border-bottom:1px dashed #6B7280" title="Click to edit">' + group.restock_target + '</span>';
     if (group.restock_target === 0) h += ' <span style="color:#6B7280;font-size:9px;font-weight:700">SLOW MOVER</span>';
     h += '</div>';
     h += '<div style="font-size:10px;color:#6B7280;margin-top:4px">' + timeStr + '</div>';
@@ -700,6 +704,28 @@ function deleteOverstock(id) {
   }).then(function() { loadOverstock(); }).catch(function(err) { alert('Error: ' + err.message); });
 }
 
+function editRestockTarget(groupId, current, stock) {
+  var el = document.getElementById('restock-target-row-' + groupId);
+  el.innerHTML = 'Restock at: <input type="number" id="restock-edit-' + groupId + '" value="' + current + '" min="0" max="' + Math.max(stock - 1, 0) + '" style="width:42px;padding:2px 4px;border:1px solid #dc2626;border-radius:4px;background:#1a1a1a;color:#F0F0F0;font-size:11px;text-align:center"> <button onclick="saveRestockTarget(' + groupId + ')" style="padding:2px 8px;border:1px solid #22c55e;border-radius:4px;background:#1a1a1a;color:#22c55e;font-size:10px;cursor:pointer">Save</button> <button onclick="loadOverstock()" style="padding:2px 8px;border:1px solid #333;border-radius:4px;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer">Cancel</button>';
+  document.getElementById('restock-edit-' + groupId).focus();
+}
+
+function saveRestockTarget(groupId) {
+  var input = document.getElementById('restock-edit-' + groupId);
+  var val = parseInt(input.value);
+  if (isNaN(val) || val < 0) { alert('Invalid target'); return; }
+  fetch('/restock-want-list/overstock/update-target', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: groupId, restockTarget: val })
+  })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { alert(res.data.error || 'Error'); return; }
+      loadOverstock();
+    })
+    .catch(function(err) { alert('Error: ' + err.message); });
+}
+
 function loadSuggestions() {
   var btn = document.getElementById('suggestBtn');
   btn.disabled = true; btn.textContent = 'Searching...';
@@ -718,6 +744,7 @@ function loadSuggestions() {
       items.forEach(function(item, idx) {
         h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1f1f1f;font-size:11px">';
         h += '<input type="checkbox" class="suggest-check" data-id="' + esc(item.ebayItemId) + '" style="accent-color:#dc2626">';
+        h += '<input type="number" class="suggest-target" data-id="' + esc(item.ebayItemId) + '" value="1" min="0" max="' + (item.quantity - 1) + '" style="width:42px;padding:3px 4px;border:1px solid #333;border-radius:4px;background:#1a1a1a;color:#F0F0F0;font-size:11px;text-align:center">';
         h += '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d1d5db">' + esc(item.title) + '</div>';
         h += '<span style="color:#EAB308;font-weight:700;white-space:nowrap">Qty: ' + item.quantity + '</span>';
         if (item.currentPrice) h += '<span style="color:#22c55e;white-space:nowrap">$' + Math.round(item.currentPrice) + '</span>';
@@ -739,10 +766,12 @@ function trackSelectedSuggestions() {
   var promises = [];
   checks.forEach(function(cb) {
     var id = cb.getAttribute('data-id');
+    var targetInput = document.querySelector('.suggest-target[data-id="' + id + '"]');
+    var target = targetInput ? (parseInt(targetInput.value) || 1) : 1;
     promises.push(
       fetch('/restock-want-list/overstock/add', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ebayItemIds: [id], restockTarget: 1 })
+        body: JSON.stringify({ ebayItemIds: [id], restockTarget: target })
       }).then(function(r) { return r.json(); })
     );
   });

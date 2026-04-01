@@ -27,12 +27,14 @@ async function countStockedForEntry(knex, title) {
         if (rawUp !== pn.normalized) this.orWhere('title', 'ilike', `%${rawUp}%`);
       }
     });
-    const listings = await q.select('title').limit(20);
+    const listings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(20);
+    const totalStock = listings.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
     return {
-      stock: listings.length,
+      stock: totalStock,
+      listingCount: listings.length,
       matchedTitles: listings.map(l => l.title),
       method: 'PART_NUMBER',
-      debug: `PN: ${realPNs[0].raw} (${listings.length} found)`
+      debug: `PN: ${realPNs[0].raw} (${listings.length} listing${listings.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
     };
   }
 
@@ -45,7 +47,7 @@ async function countStockedForEntry(knex, title) {
       for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
     });
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
-    const allListings = await q.select('title').limit(50);
+    const allListings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(50);
     // Year filter
     const filtered = parsed.yearStart && parsed.yearEnd
       ? allListings.filter(l => {
@@ -54,13 +56,15 @@ async function countStockedForEntry(knex, title) {
           return ly.start <= parsed.yearEnd && ly.end >= parsed.yearStart;
         })
       : allListings;
+    const totalStock = filtered.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
     const yearLabel = parsed.yearStart ? (parsed.yearStart === parsed.yearEnd ? String(parsed.yearStart) : parsed.yearStart + '-' + parsed.yearEnd) : null;
     const debug = [yearLabel, parsed.models.join('/'), '"' + parsed.partPhrase + '"'].filter(Boolean).join(' + ');
     return {
-      stock: filtered.length,
+      stock: totalStock,
+      listingCount: filtered.length,
       matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'VEHICLE_MATCH',
-      debug: `${debug} (${filtered.length} found)`
+      debug: `${debug} (${filtered.length} listing${filtered.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
     };
   }
 
@@ -69,7 +73,7 @@ async function countStockedForEntry(knex, title) {
     let q = knex('YourListing').where('listingStatus', 'Active');
     q = q.andWhere('title', 'ilike', `%${parsed.make}%`);
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
-    const allListings = await q.select('title').limit(50);
+    const allListings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(50);
     const filtered = parsed.yearStart && parsed.yearEnd
       ? allListings.filter(l => {
           const ly = extractYearsFromListingTitle(l.title);
@@ -77,11 +81,13 @@ async function countStockedForEntry(knex, title) {
           return ly.start <= parsed.yearEnd && ly.end >= parsed.yearStart;
         })
       : allListings;
+    const totalStock = filtered.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
     return {
-      stock: filtered.length,
+      stock: totalStock,
+      listingCount: filtered.length,
       matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'KEYWORD',
-      debug: `${parsed.make} + "${parsed.partPhrase}" (${filtered.length} found, keyword)`
+      debug: `${parsed.make} + "${parsed.partPhrase}" (${filtered.length} listing${filtered.length !== 1 ? 's' : ''}, ${totalStock} in stock, keyword)`
     };
   }
 
@@ -137,6 +143,7 @@ router.get('/items', async (req, res) => {
       pulled_date: item.pulled_date,
       pulled_from: item.pulled_from || null,
       stock: listings.stock,
+      listingCount: listings.listingCount || listings.stock,
       avgPrice: sales.avgPrice,
       lastSold: sales.lastSold,
       matchedTitles: listings.matchedTitles,
@@ -766,6 +773,36 @@ router.post('/overstock/delete', async (req, res) => {
   // CASCADE handles overstock_group_item deletion
   await database('overstock_group').where({ id }).del();
   res.json({ success: true });
+});
+
+router.post('/overstock/update-target', async (req, res) => {
+  const { id, restockTarget } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID required.' });
+  const target = parseInt(restockTarget);
+  if (isNaN(target) || target < 0) return res.status(400).json({ error: 'Restock target must be >= 0.' });
+
+  const group = await database('overstock_group').where({ id }).first();
+  if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+  if (target >= group.current_stock && group.current_stock > 0) {
+    return res.status(400).json({ error: `Restock target (${target}) must be below current stock (${group.current_stock}).` });
+  }
+
+  const update = { restock_target: target, updated_at: new Date() };
+
+  // Handle state changes: if current_stock <= new target and was watching, trigger
+  if (group.status === 'watching' && group.current_stock <= target) {
+    update.status = 'triggered';
+    update.triggered_at = new Date();
+  }
+  // If was triggered and new target is below current stock, reset to watching
+  if (group.status === 'triggered' && group.current_stock > target) {
+    update.status = 'watching';
+    update.triggered_at = null;
+  }
+
+  const [row] = await database('overstock_group').where({ id }).update(update).returning('*');
+  res.json(row);
 });
 
 router.post('/overstock/check-now', async (req, res) => {
