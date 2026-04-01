@@ -1,21 +1,28 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Fix — the_cache migration + CacheService.getStats()
+**Session type:** Feature — The Cache Phase 7 Part 2 (Frontend + Puller Tool Wiring)
 
 ## What was done
-- Fixed store column migration: was not idempotent, failed because column already existed on prod (added manually before migration system)
-- Fixed the_cache migration: was blocked by store column migration failure — added `hasTable` guard
-- Fixed CacheService.getStats(): pg driver returns `{ rows }` not array — destructuring `[statusCounts]` failed
-- Added temporary diagnostic endpoints to debug migration issue, then removed them
-- Both migrations now recorded in knex_migrations (batch 51)
-- All /cache endpoints verified working on production
+- Created cache.html: Active/History/Add Part tabs, mobile-first, manual entry by PN or YMM
+- Manual entry pre-checks stock (eBay + cache) before adding
+- Daily Feed (attack-list.html): markPulled() replaced with claimPart() that POSTs to /cache/claim
+- Scout Alerts (scout-alerts.html): claim handler wired through /cache/claim (CacheService marks alert claimed server-side)
+- Hawk Eye (vin-scanner.html): Pull buttons on each part in scan results, cachedParts shown in yellow notice
+- Flyway (flyway.html): Pull buttons on expanded parts, vehicle data stored in global _flywayVehicles lookup
+- gate.html (Nest Protector): stock check shows "In The Cache" section for cached claims
+- dh-nav.js: Added THE CACHE link between SCOUT ALERTS and HAWK EYE
+- index.js: Added /admin/the-cache route serving cache.html
 
 ## What files were touched
-- service/database/migrations/20260401300000_add_store_column.js (idempotent hasColumn guards)
-- service/database/migrations/20260401400000_create_table_the_cache.js (idempotent hasTable guard)
-- service/services/CacheService.js (getStats pg driver fix)
-- service/index.js (removed diagnostic endpoints)
+- service/public/cache.html (NEW)
+- service/public/dh-nav.js (added cache nav link)
+- service/public/attack-list.html (markPulled → claimPart via /cache/claim)
+- service/public/scout-alerts.html (claimAlert → /cache/claim for claims, _alertLookup for data)
+- service/public/vin-scanner.html (pullFromHawkEye, cachedParts notice, Pull buttons)
+- service/public/flyway.html (pullFromFlyway, _flywayVehicles lookup, Pull buttons)
+- service/public/gate.html (cached claims in stock check results)
+- service/index.js (added /admin/the-cache route)
 - CHANGELOG.md, LAST_SESSION.md
 
 ## What is still broken / needs attention
@@ -25,15 +32,13 @@
 - 5,552 vehicles have vin_decoded=true but decoded_trim IS NULL
 - Mark icons (target) not appearing — marks lack partNumber, byTitle matching not wired up
 - Scout alert icons (lightning) not appearing — depends on marks having PNs
-- The Cache Phase 7 Part 2: Frontend (the-cache.html admin page) not yet built
-- gate.html stock check doesn't render cachedClaims yet (data is in API response)
 
 ## What's next
-- The Cache Phase 7 Part 2: Frontend page (the-cache.html)
-- gate.html: render cachedClaims in stock check results (cache badge section)
-- Daily Feed claim buttons wired to /cache/claim
-- Scout Alerts claim buttons wired to /cache/claim
 - First Autolumen CSV upload to populate data
+- Test cache claim flow end-to-end on mobile
+- Verify auto-resolution works after next YourData sync
+- EST badge gray styling
+- buildInventoryIndex filter fix
 
 ## Critical reminders for next session
 - DO NOT modify AttackListService.js without reading it completely first
@@ -43,4 +48,6 @@
 - Valid cache sources: daily_feed, scout_alert, hawk_eye, flyway, manual
 - Valid cache statuses: claimed, listed, returned, deleted
 - Scout alert cross-linking: claiming marks alert claimed, returning re-activates it
-- StaleInventoryService is scoped to dynatrack only — Autolumen has no eBay API access
+- dh-nav.js v3 now includes THE CACHE — all pages using dh-nav.js auto-get the link
+- _flywayVehicles is a global lookup populated during flyway render for Pull button access
+- _alertLookup is a global lookup populated during scout-alerts render for cache claim data

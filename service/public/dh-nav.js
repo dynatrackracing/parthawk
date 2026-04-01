@@ -7,6 +7,7 @@ function dhNav(activePage) {
   const field = [
     { key: 'feed',   label: 'DAILY FEED',      href: '/admin/pull' },
     { key: 'alerts', label: 'SCOUT ALERTS',     href: '/admin/scout-alerts' },
+    { key: 'cache',  label: 'THE CACHE',        href: '/admin/the-cache' },
     { key: 'vin',    label: 'HAWK EYE',         href: '/admin/vin' },
     { key: 'gate',   label: 'NEST PROTECTOR',   href: '/admin/gate' },
     { key: 'flyway', label: 'THE FLYWAY',       href: '/admin/flyway' },

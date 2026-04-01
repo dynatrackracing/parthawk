@@ -4,6 +4,20 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-01] The Cache Phase 7 Part 2 — Frontend + Puller Tool Wiring
+- **Added:** cache.html — Active/History/Add Part tabs, mobile-first, manual entry by PN or YMM
+- **Added:** Pull buttons on Daily Feed, Hawk Eye, Flyway expanded parts
+- **Added:** THE CACHE nav link in dh-nav.js (between Scout Alerts and Hawk Eye)
+- **Changed:** Daily Feed markPulled() → claimPart() via POST /cache/claim
+- **Changed:** Scout Alerts claim handler → routes through /cache/claim (server marks alert claimed)
+- **Changed:** Hawk Eye shows cachedParts notice and Pull buttons on scan results
+- **Changed:** gate.html stock check shows "In The Cache" section for cached claims
+- **Files touched:** cache.html (new), dh-nav.js, attack-list.html, scout-alerts.html, vin-scanner.html, flyway.html, gate.html, index.js
+- **Affects:** All puller tools, stock checks, nav across all pages
+- **Notes:** Source badges color-coded: daily_feed=red, scout_alert=orange, hawk_eye=teal, flyway=blue, manual=gray
+
+---
+
 ## [2026-04-01] Fix: the_cache migration + CacheService.getStats()
 - **Fixed:** Store column migration failed on prod because column already existed — made idempotent with `hasColumn` check
 - **Fixed:** Cache migration blocked by store column migration failure — both now run with existence guards

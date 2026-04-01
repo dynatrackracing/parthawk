@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/admin/manifest.json">
+<link rel="apple-touch-icon" href="/admin/icon-192.png">
+<title>DarkHawk — THE CACHE</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--rd:#7f1d1d;--y:#eab308;--yd:#713f12;--g:#22c55e;--gd:#064e3b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:80px;-webkit-tap-highlight-color:transparent}
+
+/* Stats bar */
+.stats-bar{padding:8px 16px;background:var(--s);border-bottom:1px solid var(--b);font-size:11px;color:var(--tf);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.stats-bar .stat-val{color:var(--tm);font-weight:700}
+.stats-bar .dot{color:#444;margin:0 2px}
+
+/* Tabs */
+.tabs{display:flex;background:var(--s);border-bottom:1px solid var(--b);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:11px 16px;font-size:12px;font-weight:600;color:#9CA3AF;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0}
+.tab.active{color:var(--t);border-bottom-color:var(--r)}
+
+/* Container */
+.c{padding:12px;max-width:600px;margin:0 auto}
+
+/* Cards */
+.card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.card-part{font-size:15px;font-weight:700;line-height:1.3}
+.card-vehicle{font-size:13px;color:var(--g);font-weight:600;margin-top:3px}
+.card-meta{font-size:11px;color:var(--tf);margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card-meta span{display:inline-flex;align-items:center;gap:3px}
+.card-pn{font-size:11px;color:var(--tm);font-family:SFMono-Regular,Menlo,monospace;margin-top:4px}
+.card-value{font-size:14px;font-weight:700;color:var(--g);margin-top:6px}
+.card-value .price-src{font-size:10px;color:var(--tf);font-weight:400;margin-left:4px}
+
+/* Source badges */
+.src-badge{font-size:8px;font-weight:800;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.src-daily_feed{background:var(--rd);color:#ef4444}
+.src-scout_alert{background:#7c2d12;color:#f97316}
+.src-hawk_eye{background:#134e4a;color:#0d9488}
+.src-flyway{background:#1e3a5f;color:#3b82f6}
+.src-manual{background:#1f2937;color:#6B7280}
+
+/* Action buttons */
+.card-actions{display:flex;gap:6px;margin-top:10px}
+.act-btn{padding:10px 14px;border-radius:8px;border:1px solid var(--b);font-size:12px;font-weight:600;cursor:pointer;min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;flex:1}
+.act-btn:active{opacity:.7}
+.act-return{background:var(--s2);color:var(--y);border-color:#854d0e}
+.act-listed{background:var(--gd);color:var(--g);border-color:#166534}
+.act-delete{background:var(--s2);color:#6B7280;border-color:var(--b)}
+
+/* History */
+.hist-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #1f1f1f}
+.hist-row:last-child{border-bottom:none}
+.hist-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.hist-icon.listed{background:var(--gd);color:var(--g)}
+.hist-icon.returned{background:var(--yd);color:var(--y)}
+.hist-icon.deleted{background:var(--rd);color:#ef4444;opacity:.6}
+.hist-info{flex:1;min-width:0}
+.hist-part{font-size:13px;font-weight:600}
+.hist-detail{font-size:11px;color:var(--tf);margin-top:2px}
+.hist-time{font-size:10px;color:#444;margin-top:2px}
+
+/* Form styles */
+.form-group{margin-bottom:12px}
+.form-label{font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block}
+.form-input{width:100%;padding:12px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:15px}
+.form-input:focus{outline:none;border-color:var(--r)}
+.form-input::placeholder{color:var(--tf)}
+.form-input.mono{font-family:SFMono-Regular,Menlo,monospace;font-size:20px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.form-select{width:100%;padding:12px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:15px;appearance:none}
+.form-select:focus{outline:none;border-color:var(--r)}
+textarea.form-input{resize:vertical;min-height:60px;font-family:inherit}
+.form-row{display:flex;gap:8px}
+.form-row>*{flex:1}
+
+/* Mode toggle */
+.mode-toggle{display:flex;background:var(--s2);border:1px solid var(--b);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.mode-btn{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--tf);cursor:pointer;border:none;background:transparent;min-height:44px}
+.mode-btn.active{background:var(--r);color:#fff}
+
+/* Primary button */
+.btn-primary{width:100%;padding:14px;border-radius:8px;border:none;background:var(--r);color:#fff;font-size:14px;font-weight:700;cursor:pointer;min-height:48px}
+.btn-primary:active{opacity:.8}
+.btn-primary:disabled{opacity:.4;cursor:default}
+.btn-secondary{width:100%;padding:14px;border-radius:8px;border:1px solid var(--b);background:var(--s2);color:var(--tm);font-size:14px;font-weight:600;cursor:pointer;min-height:48px;margin-bottom:8px}
+.btn-secondary:active{opacity:.8}
+.btn-secondary:disabled{opacity:.4;cursor:default}
+
+/* Stock results */
+.stock-results{margin-top:10px;border-radius:8px;padding:10px 12px}
+.stock-results.found{background:var(--gd);border:1px solid #166534}
+.stock-results.none{background:var(--s2);border:1px solid var(--b)}
+.stock-results .sr-title{font-size:12px;font-weight:700;margin-bottom:6px}
+.stock-results .sr-item{font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.stock-results .sr-item:last-child{border-bottom:none}
+
+/* Return modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal-sheet{background:var(--s);border-top-left-radius:16px;border-top-right-radius:16px;padding:20px 16px 30px;width:100%;max-width:500px}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:14px}
+.modal-quick{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.modal-quick-btn{padding:12px;border-radius:8px;border:1px solid var(--b);background:var(--s2);color:var(--tm);font-size:13px;font-weight:500;cursor:pointer;text-align:left;min-height:44px}
+.modal-quick-btn:active{background:var(--b)}
+.modal-cancel{width:100%;padding:12px;border-radius:8px;border:1px solid var(--b);background:transparent;color:var(--tf);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;min-height:44px}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--gd);color:var(--g);border:1px solid #166534;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* Spinner */
+.spinner{width:18px;height:18px;border:2px solid #333;border-top-color:var(--r);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:var(--tf);padding:40px 10px;font-size:13px}
+.loading{text-align:center;padding:40px}
+.loading .lbl{margin-top:8px;color:var(--tf);font-size:12px}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('cache')</script>
+
+<!-- Stats bar -->
+<div class="stats-bar" id="statsBar">
+  <span>Active: <span class="stat-val" id="statActive">-</span></span>
+  <span class="dot">&middot;</span>
+  <span>Avg <span class="stat-val" id="statAvgDays">-</span> to list</span>
+  <span class="dot">&middot;</span>
+  <span><span class="stat-val" id="statListed">-</span> listed this week</span>
+  <span class="dot">&middot;</span>
+  <span><span class="stat-val" id="statReturned">-</span> returned</span>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" id="mainTabs">
+  <div class="tab active" onclick="switchTab('active',this)">Active</div>
+  <div class="tab" onclick="switchTab('history',this)">History</div>
+  <div class="tab" onclick="switchTab('add',this)">Add Part</div>
+</div>
+
+<!-- Active tab -->
+<div id="tab-active" class="c">
+  <div id="activeLoading" class="loading"><div class="spinner"></div><div class="lbl">Loading cache...</div></div>
+  <div id="activeList"></div>
+</div>
+
+<!-- History tab -->
+<div id="tab-history" class="c" style="display:none">
+  <div id="histLoading" class="loading"><div class="spinner"></div><div class="lbl">Loading history...</div></div>
+  <div id="histList"></div>
+</div>
+
+<!-- Add Part tab -->
+<div id="tab-add" class="c" style="display:none">
+  <div class="card">
+    <div class="mode-toggle">
+      <div class="mode-btn active" id="modePN" onclick="setMode('pn')">By Part Number</div>
+      <div class="mode-btn" id="modeVeh" onclick="setMode('vehicle')">By Vehicle</div>
+    </div>
+
+    <!-- PN mode -->
+    <div id="form-pn">
+      <div class="form-group">
+        <label class="form-label">Part Number</label>
+        <input type="text" class="form-input mono" id="addPN" placeholder="e.g. 68225314AA" autocapitalize="characters" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description (optional)</label>
+        <textarea class="form-input" id="addPNDesc" rows="2" placeholder="What is this part?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-input" id="addPNNotes" rows="2" placeholder="Yard, condition, etc."></textarea>
+      </div>
+    </div>
+
+    <!-- Vehicle mode -->
+    <div id="form-vehicle" style="display:none">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input type="number" class="form-input" id="addYear" placeholder="2018" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Make</label>
+          <input type="text" class="form-input" id="addMake" placeholder="Dodge" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Model</label>
+        <input type="text" class="form-input" id="addModel" placeholder="Grand Caravan" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Part Type</label>
+        <select class="form-select" id="addPartType">
+          <option value="">Select part type...</option>
+          <option>ECM</option><option>BCM</option><option>ABS</option><option>TCM</option>
+          <option>TIPM</option><option>AMP</option><option>RADIO</option><option>CLUSTER</option>
+          <option>CAMERA</option><option>THROTTLE</option><option>STEERING</option><option>MIRROR</option>
+          <option>ALTERNATOR</option><option>STARTER</option><option>HVAC</option><option>BLOWER</option>
+          <option>OTHER</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-input" id="addVehDesc" rows="2" placeholder="Part description"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Part Number (optional)</label>
+          <input type="text" class="form-input" id="addVehPN" placeholder="PN" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;font-family:SFMono-Regular,Menlo,monospace">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yard + Row (optional)</label>
+          <input type="text" class="form-input" id="addVehYard" placeholder="Raleigh R12" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-input" id="addVehNotes" rows="2" placeholder="Condition, other details..."></textarea>
+      </div>
+    </div>
+
+    <div id="stockResults"></div>
+
+    <button class="btn-secondary" onclick="checkStock()" id="checkStockBtn">Check Stock</button>
+    <button class="btn-primary" onclick="addToCache()" id="addCacheBtn">Add to Cache</button>
+  </div>
+</div>
+
+<!-- Return reason modal (hidden) -->
+<div id="returnModal" class="modal-overlay" style="display:none" onclick="closeReturnModal(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-title">Why are you returning this?</div>
+    <div class="modal-quick">
+      <button class="modal-quick-btn" onclick="submitReturn('couldn\'t find it')">Couldn't find it</button>
+      <button class="modal-quick-btn" onclick="submitReturn('wrong part')">Wrong part</button>
+      <button class="modal-quick-btn" onclick="submitReturn('changed mind')">Changed mind</button>
+    </div>
+    <div class="form-group">
+      <input type="text" class="form-input" id="returnCustom" placeholder="Other reason..." style="font-size:14px">
+    </div>
+    <button class="btn-primary" onclick="submitReturn(document.getElementById('returnCustom').value)" style="background:var(--y);color:#78350f">Return Part</button>
+    <button class="modal-cancel" onclick="closeReturnModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+var currentTab = 'active';
+var currentMode = 'pn';
+var returnId = null;
+
+/* ---- Helpers ---- */
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  var now = Date.now();
+  var then = new Date(dateStr).getTime();
+  var diff = Math.max(0, now - then);
+  var mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins + 'm ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  var days = Math.floor(hrs / 24);
+  return days + 'd ago';
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+
+/* ---- Tabs ---- */
+function switchTab(name, el) {
+  currentTab = name;
+  document.querySelectorAll('#mainTabs .tab').forEach(function(t) { t.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  document.getElementById('tab-active').style.display = name === 'active' ? '' : 'none';
+  document.getElementById('tab-history').style.display = name === 'history' ? '' : 'none';
+  document.getElementById('tab-add').style.display = name === 'add' ? '' : 'none';
+  if (name === 'active') loadActive();
+  if (name === 'history') loadHistory();
+}
+
+/* ---- Mode toggle ---- */
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('modePN').classList.toggle('active', m === 'pn');
+  document.getElementById('modeVeh').classList.toggle('active', m === 'vehicle');
+  document.getElementById('form-pn').style.display = m === 'pn' ? '' : 'none';
+  document.getElementById('form-vehicle').style.display = m === 'vehicle' ? '' : 'none';
+  document.getElementById('stockResults').innerHTML = '';
+}
+
+/* ---- Stats ---- */
+function loadStats() {
+  fetch('/cache/stats').then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById('statActive').textContent = d.active || 0;
+    document.getElementById('statAvgDays').textContent = (d.avg_days_to_list != null ? d.avg_days_to_list.toFixed(1) + 'd' : '-');
+    document.getElementById('statListed').textContent = d.listed_this_week || 0;
+    document.getElementById('statReturned').textContent = d.returned || 0;
+  }).catch(function() {});
+}
+
+/* ---- Active tab ---- */
+function loadActive() {
+  var list = document.getElementById('activeList');
+  var loading = document.getElementById('activeLoading');
+  loading.style.display = '';
+  list.innerHTML = '';
+  fetch('/cache/active').then(function(r) { return r.json(); }).then(function(items) {
+    loading.style.display = 'none';
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="empty">Cache is empty. Go pull some parts.</div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function(it) {
+      var veh = '';
+      if (it.year || it.make || it.model) {
+        veh = esc([it.year, it.make, it.model].filter(Boolean).join(' '));
+      }
+      var srcClass = 'src-' + (it.source || 'manual');
+      html += '<div class="card" id="card-' + it.id + '">';
+      html += '<div class="card-top"><div>';
+      if (it.part_type) html += '<div class="card-part">' + esc(it.part_type) + '</div>';
+      if (veh) html += '<div class="card-vehicle">' + veh + '</div>';
+      if (it.part_number) html += '<div class="card-pn">' + esc(it.part_number) + '</div>';
+      html += '</div>';
+      html += '<span class="src-badge ' + srcClass + '">' + esc((it.source || 'manual').replace('_', ' ')) + '</span>';
+      html += '</div>';
+      html += '<div class="card-meta">';
+      if (it.yard_name) {
+        var loc = esc(it.yard_name);
+        if (it.row) loc += ' · ' + esc(it.row);
+        html += '<span>' + loc + '</span>';
+      }
+      if (it.claimed_by) html += '<span>' + esc(it.claimed_by) + '</span>';
+      html += '<span>' + timeAgo(it.claimed_at || it.created_at) + '</span>';
+      html += '</div>';
+      if (it.estimated_value) {
+        html += '<div class="card-value">$' + Number(it.estimated_value).toFixed(0);
+        if (it.price_source) html += '<span class="price-src">' + esc(it.price_source) + '</span>';
+        html += '</div>';
+      }
+      html += '<div class="card-actions">';
+      html += '<button class="act-btn act-return" onclick="returnPart(' + it.id + ')">Return</button>';
+      html += '<button class="act-btn act-listed" onclick="listPart(' + it.id + ')">Listed</button>';
+      html += '<button class="act-btn act-delete" onclick="deletePart(' + it.id + ')">Delete</button>';
+      html += '</div>';
+      html += '</div>';
+    });
+    list.innerHTML = html;
+  }).catch(function() {
+    loading.style.display = 'none';
+    list.innerHTML = '<div class="empty">Failed to load. Pull to retry.</div>';
+  });
+}
+
+/* ---- Actions ---- */
+function returnPart(id) {
+  returnId = id;
+  document.getElementById('returnCustom').value = '';
+  document.getElementById('returnModal').style.display = '';
+}
+
+function closeReturnModal(e) {
+  if (e && e.target !== document.getElementById('returnModal')) return;
+  document.getElementById('returnModal').style.display = 'none';
+  returnId = null;
+}
+
+function submitReturn(reason) {
+  if (!reason || !reason.trim()) return;
+  var id = returnId;
+  document.getElementById('returnModal').style.display = 'none';
+  returnId = null;
+  fetch('/cache/' + id + '/return', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason.trim() })
+  }).then(function(r) {
+    if (r.ok) {
+      removeCard(id);
+      showToast('Part returned');
+      loadStats();
+    } else { showToast('Error returning part'); }
+  }).catch(function() { showToast('Network error'); });
+}
+
+function listPart(id) {
+  var ebayId = prompt('eBay item ID (optional — leave blank to skip):');
+  var body = {};
+  if (ebayId && ebayId.trim()) body.ebay_item_id = ebayId.trim();
+  fetch('/cache/' + id + '/resolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (r.ok) {
+      removeCard(id);
+      showToast('Marked as listed');
+      loadStats();
+    } else { showToast('Error marking listed'); }
+  }).catch(function() { showToast('Network error'); });
+}
+
+function deletePart(id) {
+  if (!confirm('Delete this claim? Mistakes only.')) return;
+  fetch('/cache/' + id, {
+    method: 'DELETE'
+  }).then(function(r) {
+    if (r.ok) {
+      removeCard(id);
+      showToast('Claim deleted');
+      loadStats();
+    } else { showToast('Error deleting'); }
+  }).catch(function() { showToast('Network error'); });
+}
+
+function removeCard(id) {
+  var el = document.getElementById('card-' + id);
+  if (el) {
+    el.style.transition = 'opacity .25s, transform .25s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(40px)';
+    setTimeout(function() { el.remove(); }, 260);
+  }
+}
+
+/* ---- History tab ---- */
+function loadHistory() {
+  var list = document.getElementById('histList');
+  var loading = document.getElementById('histLoading');
+  loading.style.display = '';
+  list.innerHTML = '';
+  fetch('/cache/history').then(function(r) { return r.json(); }).then(function(items) {
+    loading.style.display = 'none';
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="empty">No history yet.</div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function(it) {
+      var status = it.status || 'listed';
+      var iconClass = status === 'listed' ? 'listed' : status === 'returned' ? 'returned' : 'deleted';
+      var icon = status === 'listed' ? '&#10003;' : status === 'returned' ? '&#8617;' : '&#10005;';
+      var color = status === 'listed' ? 'var(--g)' : status === 'returned' ? 'var(--y)' : '#7f1d1d';
+      var part = esc(it.part_type || it.part_number || 'Part');
+      var veh = '';
+      if (it.year || it.make || it.model) veh = esc([it.year, it.make, it.model].filter(Boolean).join(' '));
+
+      html += '<div class="hist-row">';
+      html += '<div class="hist-icon ' + iconClass + '">' + icon + '</div>';
+      html += '<div class="hist-info">';
+      html += '<div class="hist-part" style="color:' + color + '">' + part + '</div>';
+      if (veh) html += '<div class="hist-detail">' + veh + '</div>';
+      if (it.part_number) html += '<div class="hist-detail" style="font-family:SFMono-Regular,Menlo,monospace">' + esc(it.part_number) + '</div>';
+      if (it.reason) html += '<div class="hist-detail" style="color:var(--y);font-style:italic">' + esc(it.reason) + '</div>';
+      if (it.ebay_item_id) html += '<div class="hist-detail" style="color:var(--g)">eBay: ' + esc(it.ebay_item_id) + '</div>';
+      html += '<div class="hist-time">' + timeAgo(it.resolved_at || it.updated_at) + '</div>';
+      html += '</div></div>';
+    });
+    list.innerHTML = html;
+  }).catch(function() {
+    loading.style.display = 'none';
+    list.innerHTML = '<div class="empty">Failed to load history.</div>';
+  });
+}
+
+/* ---- Check Stock ---- */
+function checkStock() {
+  var btn = document.getElementById('checkStockBtn');
+  var container = document.getElementById('stockResults');
+  var pn = '';
+  var payload = {};
+  if (currentMode === 'pn') {
+    pn = document.getElementById('addPN').value.trim().toUpperCase();
+    if (!pn) { showToast('Enter a part number'); return; }
+    payload.part_number = pn;
+  } else {
+    var year = document.getElementById('addYear').value.trim();
+    var make = document.getElementById('addMake').value.trim();
+    var model = document.getElementById('addModel').value.trim();
+    var partType = document.getElementById('addPartType').value;
+    pn = (document.getElementById('addVehPN').value || '').trim().toUpperCase();
+    if (!partType && !pn) { showToast('Select part type or enter PN'); return; }
+    payload = { year: year, make: make, model: model, part_type: partType };
+    if (pn) payload.part_number = pn;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  container.innerHTML = '<div class="loading" style="padding:12px"><div class="spinner"></div></div>';
+
+  var results = { cache: null, cogs: null };
+  var done = 0;
+
+  function render() {
+    if (done < 2) return;
+    btn.disabled = false;
+    btn.textContent = 'Check Stock';
+    var html = '';
+    var cacheHits = results.cache && results.cache.length;
+    var cogsHits = results.cogs && results.cogs.length;
+    if (cacheHits) {
+      html += '<div class="stock-results found" style="margin-bottom:8px"><div class="sr-title" style="color:var(--g)">Already in Cache (' + results.cache.length + ')</div>';
+      results.cache.forEach(function(it) {
+        html += '<div class="sr-item">' + esc(it.part_type || it.part_number || 'Part') + ' — ' + esc(it.status || 'active') + ' · ' + timeAgo(it.claimed_at || it.created_at) + '</div>';
+      });
+      html += '</div>';
+    }
+    if (cogsHits) {
+      html += '<div class="stock-results found"><div class="sr-title" style="color:var(--g)">In Inventory / COGS (' + results.cogs.length + ')</div>';
+      results.cogs.forEach(function(it) {
+        var label = esc(it.part_type || it.part_number || it.description || 'Part');
+        if (it.status) label += ' — ' + esc(it.status);
+        html += '<div class="sr-item">' + label + '</div>';
+      });
+      html += '</div>';
+    }
+    if (!cacheHits && !cogsHits) {
+      html += '<div class="stock-results none"><div class="sr-title" style="color:var(--tf)">No matches found</div><div style="font-size:11px;color:var(--tf);margin-top:2px">Safe to add.</div></div>';
+    }
+    container.innerHTML = html;
+  }
+
+  var qs = Object.keys(payload).map(function(k) { return k + '=' + encodeURIComponent(payload[k]); }).join('&');
+
+  fetch('/cache/check-stock?' + qs).then(function(r) { return r.json(); }).then(function(d) {
+    results.cache = Array.isArray(d) ? d : (d.results || []);
+  }).catch(function() { results.cache = []; }).then(function() { done++; render(); });
+
+  fetch('/cogs/check-stock?' + qs).then(function(r) { return r.json(); }).then(function(d) {
+    results.cogs = Array.isArray(d) ? d : (d.results || []);
+  }).catch(function() { results.cogs = []; }).then(function() { done++; render(); });
+}
+
+/* ---- Add to Cache ---- */
+function addToCache() {
+  var btn = document.getElementById('addCacheBtn');
+  var payload = { source: 'manual' };
+
+  if (currentMode === 'pn') {
+    var pn = document.getElementById('addPN').value.trim().toUpperCase();
+    if (!pn) { showToast('Enter a part number'); return; }
+    payload.part_number = pn;
+    payload.description = document.getElementById('addPNDesc').value.trim() || undefined;
+    payload.notes = document.getElementById('addPNNotes').value.trim() || undefined;
+  } else {
+    var year = document.getElementById('addYear').value.trim();
+    var make = document.getElementById('addMake').value.trim();
+    var model = document.getElementById('addModel').value.trim();
+    var partType = document.getElementById('addPartType').value;
+    if (!partType) { showToast('Select a part type'); return; }
+    payload.year = year || undefined;
+    payload.make = make || undefined;
+    payload.model = model || undefined;
+    payload.part_type = partType;
+    payload.description = document.getElementById('addVehDesc').value.trim() || undefined;
+    payload.part_number = (document.getElementById('addVehPN').value || '').trim().toUpperCase() || undefined;
+    var yardRow = document.getElementById('addVehYard').value.trim();
+    if (yardRow) {
+      var parts = yardRow.split(/\s+/);
+      payload.yard_name = parts[0] || undefined;
+      payload.row = parts.slice(1).join(' ') || undefined;
+    }
+    payload.notes = document.getElementById('addVehNotes').value.trim() || undefined;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  fetch('/cache/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r) {
+    btn.disabled = false;
+    btn.textContent = 'Add to Cache';
+    if (r.ok) {
+      showToast('Added to Cache');
+      clearAddForm();
+      loadStats();
+    } else {
+      r.json().then(function(d) { showToast(d.error || 'Error adding'); }).catch(function() { showToast('Error adding'); });
+    }
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = 'Add to Cache';
+    showToast('Network error');
+  });
+}
+
+function clearAddForm() {
+  document.getElementById('addPN').value = '';
+  document.getElementById('addPNDesc').value = '';
+  document.getElementById('addPNNotes').value = '';
+  document.getElementById('addYear').value = '';
+  document.getElementById('addMake').value = '';
+  document.getElementById('addModel').value = '';
+  document.getElementById('addPartType').value = '';
+  document.getElementById('addVehDesc').value = '';
+  document.getElementById('addVehPN').value = '';
+  document.getElementById('addVehYard').value = '';
+  document.getElementById('addVehNotes').value = '';
+  document.getElementById('stockResults').innerHTML = '';
+}
+
+/* ---- Init ---- */
+loadStats();
+loadActive();
+</script>
+</body>
+</html>

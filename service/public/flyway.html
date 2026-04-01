@@ -261,6 +261,7 @@ var availableYards = [];
 var selectedYardIds = new Set();
 var activeYardFilter = 'all';
 var sortMode = 'score';
+var _flywayVehicles = {};
 var filterPremium = false;
 var filterHighValue = false;
 var confirmCallback = null;
@@ -276,6 +277,25 @@ function fmtDateRange(s, e) { if (s === e) return fmtDate(s); return fmtDate(s) 
 function daysUntil(d) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000); }
 function tripTypeBadge(t) { var tt = t.trip_type || 'road_trip'; return tt === 'day_trip' ? '<span class="badge-day">DAY TRIP</span>' : '<span class="badge-road">ROAD TRIP</span>'; }
 function tripTypeAccent(t) { return (t.trip_type || 'road_trip') === 'day_trip' ? 'var(--teal)' : 'var(--orange)'; }
+
+function pullFromFlyway(vehicleId, partType, partNumber, price, priceSource, btn) {
+  btn.disabled = true; btn.textContent = 'Caching...';
+  var v = _flywayVehicles[vehicleId] || {};
+  fetch('/cache/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    partType: partType || null,
+    partDescription: (partType || 'Part') + ' \u2014 ' + [v.year, v.make, v.model].filter(Boolean).join(' '),
+    partNumber: partNumber || null,
+    vehicle: { year: v.year || null, make: v.make || null, model: v.model || null, trim: v.decoded_trim || v.trim || null, vin: v.vin || null },
+    yard: { name: v._yardName || null, row: v.row_number || null },
+    estimatedValue: price || null,
+    priceSource: priceSource || null,
+    source: 'flyway',
+    sourceId: vehicleId,
+  }) }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) { btn.textContent = 'Cached \u2713'; btn.style.background = '#064e3b'; btn.style.color = '#22c55e'; btn.style.borderColor = '#065f46'; }
+    else { btn.disabled = false; btn.textContent = 'Pull'; }
+  }).catch(function() { btn.disabled = false; btn.textContent = 'Pull'; });
+}
 
 var LKQ_CODES = new Set(['JK','JL','JT','WK','XK','MK','KJ','KL','DJ','DT','DH','BK','WJ','ZJ','TJ','ND','WD','PF','UF','FK','FF','AN','EN','GS','JS','KA','RU','ZH','WH','RE','PT','LA','LD','BR','BE','AB','AY','PM','PG','DR','SA']);
 function cleanModel(text, make) {
@@ -619,6 +639,7 @@ function renderActiveTrip() {
     (y.vehicles || []).forEach(function(v) {
       v._yardName = y.yard.name;
       v._yardId = y.yard.id;
+      _flywayVehicles[v.id] = v;
       allVehicles.push(v);
     });
   });
@@ -887,6 +908,7 @@ function renderExpandedParts(vehicleId, data) {
       var dwText = p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold \u2014 was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold \u2014 low demand for this part' : esc(p.deadWarning.failureReason);
       h += '<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">' + dwText + '</div>';
     }
+    h += '<div style="margin-top:6px"><button onclick="pullFromFlyway(\'' + vehicleId + '\',\'' + esc(p.partType || '') + '\',\'' + esc(p.partNumber || '') + '\',' + (displayPrice || 0) + ',\'' + esc(p.priceSource || '') + '\',this)" style="padding:5px 14px;border-radius:6px;border:1px solid var(--b,#2a2a2a);background:var(--s2,#1a1a1a);color:var(--tm,#d1d5db);font-size:11px;font-weight:700;cursor:pointer;min-height:32px">Pull</button></div>';
     h += '</div>';
   });
 

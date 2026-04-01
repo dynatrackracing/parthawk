@@ -202,6 +202,9 @@ app.get('/admin/hunters-perch', (req, res) => {
 app.get('/admin/phoenix', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'phoenix.html'));
 });
+app.get('/admin/the-cache', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'cache.html'));
+});
 app.get('/admin/the-mark', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'the-mark.html'));
 });

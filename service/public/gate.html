@@ -435,6 +435,23 @@ function checkStock() {
         h += '<div class="stock-overstock">Tracked in Overstock Watch \u2014 ' + d.overstock.groupName + ' \u2014 ' + d.overstock.currentStock + ' in stock, restock at ' + d.overstock.restockTarget + '</div>';
       }
 
+      if (d.totalCached > 0) {
+        h += '<div class="stock-result" style="border-color:#92400e">';
+        h += '<div class="stock-result-header" style="color:#eab308">\u26A1 IN THE CACHE \u2014 ' + d.totalCached + ' claimed</div>';
+        d.cachedClaims.forEach(function(c) {
+          h += '<div class="stock-item">';
+          h += '<div class="si-title" style="color:#fbbf24">' + esc(c.partType || 'Part');
+          if (c.vehicle) h += ' \u2014 ' + esc(c.vehicle);
+          h += '</div>';
+          h += '<div class="si-meta">';
+          h += '<span>Claimed by ' + esc(c.claimedBy || '?') + '</span>';
+          h += '<span>via ' + esc(c.source) + '</span>';
+          h += '<span>' + timeAgo(new Date(c.claimedAt)) + '</span>';
+          h += '</div></div>';
+        });
+        h += '</div>';
+      }
+
       document.getElementById('stockResults').innerHTML = h;
     })
     .catch(function(err) {

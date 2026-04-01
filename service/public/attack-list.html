@@ -915,17 +915,50 @@
   function markPulled(vid, itemId, evt) {
     evt.stopPropagation();
     const el = document.getElementById('pd-' + vid + '-' + itemId);
-    if (el) {
-      el.style.opacity = '0.4';
-      el.querySelector('.btn-pull').textContent = '✓ Logged';
-      el.querySelector('.btn-pull').disabled = true;
-    }
-    // Log to pull_session via API (best effort)
-    fetch('/attack-list/log-pull', {
+    const btn = el ? el.querySelector('.btn-pull') : null;
+    if (!btn) return;
+
+    // Find vehicle and part data for cache claim
+    const v = findVehicleById(vid);
+    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
+
+    btn.disabled = true; btn.textContent = 'Caching...';
+    fetch('/cache/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleId: vid, itemId }),
-    }).catch(() => {});
+      body: JSON.stringify({
+        partType: p ? p.partType : null,
+        partDescription: p ? (p.title || p.category) : null,
+        partNumber: p ? (p.partNumberBase || p.partNumber) : null,
+        vehicle: {
+          year: v ? v.year : null,
+          make: v ? v.make : null,
+          model: v ? v.model : null,
+          trim: v ? (v.decoded_trim || v.trim) : null,
+          vin: v ? v.vin : null,
+        },
+        yard: {
+          name: v ? v.yard_name : null,
+          row: v ? v.row_number : null,
+        },
+        estimatedValue: p ? p.price : null,
+        priceSource: p ? p.priceSource : null,
+        source: 'daily_feed',
+        sourceId: vid,
+      }),
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        el.style.opacity = '0.4';
+        btn.textContent = 'Cached ✓';
+        btn.style.background = '#064e3b';
+        btn.style.color = '#22c55e';
+        btn.style.borderColor = '#065f46';
+      } else {
+        btn.disabled = false; btn.textContent = 'Pull';
+      }
+    }).catch(() => {
+      btn.disabled = false; btn.textContent = 'Pull';
+    });
   }
 
   function toggleSkip(vid, itemId) {

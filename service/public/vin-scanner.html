@@ -184,7 +184,8 @@ function render(data){
       h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
       h+='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+badge+'<span class="b '+vc(v)+'">'+v+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700">['+p.pt+']</span></div>';
       if(p.title)h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.title||'').substring(0,65)+'</div>';
-      h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.stk+' in stock · '+p.sold+'x sold · Last '+ta(p.last)+'</div>';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-top:3px"><span style="font-size:10px;color:#9CA3AF">'+p.stk+' in stock · '+p.sold+'x sold · Last '+ta(p.last)+'</span>';
+      h+='<button onclick="pullFromHawkEye(\''+esc(p.pt)+'\',this)" style="padding:4px 10px;border-radius:6px;border:1px solid #2a2a2a;background:#1a1a1a;color:#d1d5db;font-size:10px;font-weight:700;cursor:pointer;min-height:28px">Pull</button></div>';
       h+='</div>';
     });
   }else{h+='<div class="section-empty">No parts data for this vehicle yet</div>';}
@@ -216,6 +217,19 @@ function render(data){
     h+='</table></details></div>';
   }
 
+  // Cached parts notice
+  if(data.cachedParts&&data.cachedParts.length>0){
+    h+='<div class="card" style="background:#422006;border:1px solid #92400e">';
+    h+='<div style="color:#eab308;font-size:11px;font-weight:700;margin-bottom:4px">\u26A1 IN THE CACHE</div>';
+    data.cachedParts.forEach(function(c){
+      h+='<div style="font-size:12px;color:#d1d5db;margin-top:4px">';
+      h+=(c.partType||'Part')+' \u2014 claimed by '+(c.claimedBy||'?')+' via '+c.source+' \u00b7 '+ta(c.claimedAt);
+      if(c.yardName)h+=' \u00b7 '+c.yardName;
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
   // Scan Another
   h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';document.getElementById(\'instantResearch\').style.display=\'none\';">Scan Another</button></div>';
   document.getElementById('results').innerHTML=h;
@@ -231,6 +245,20 @@ function render(data){
   document.getElementById('researchResults').innerHTML='';
   // Auto-trigger research
   runInstantResearch();
+}
+
+function pullFromHawkEye(partType,btn){
+  btn.disabled=true;btn.textContent='Caching...';
+  fetch('/cache/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    partType:partType,
+    partDescription:partType+' \u2014 '+(_lastYear||'')+' '+(_lastMake||'')+' '+(_lastModel||''),
+    vehicle:{year:_lastYear||null,make:_lastMake||null,model:_lastModel||null,vin:_lastVin||null},
+    source:'hawk_eye',
+    sourceId:_lastVin||null,
+  })}).then(function(r){return r.json()}).then(function(d){
+    if(d.success){btn.textContent='Cached \u2713';btn.style.background='#064e3b';btn.style.color='#22c55e';btn.style.borderColor='#065f46';}
+    else{btn.disabled=false;btn.textContent='Pull';}
+  }).catch(function(){btn.disabled=false;btn.textContent='Pull';});
 }
 
 var _lastVehicle=null;
