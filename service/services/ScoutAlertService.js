@@ -137,10 +137,43 @@ async function generateAlerts() {
     alerts.push(ma.alert);
   }
 
-  // 4. Delete old alerts (preserve OVERSTOCK source) and insert new ones
+  // 4. Snapshot claimed alerts before wipe so we can restore them
+  const claimedAlerts = await database('scout_alerts')
+    .where('claimed', true)
+    .whereNot('source', 'OVERSTOCK')
+    .select('source', 'source_title', 'vehicle_year', 'vehicle_make', 'vehicle_model', 'yard_name', 'claimed_by', 'claimed_at');
+  const claimedKeys = new Set(
+    claimedAlerts.map(a => [a.source, a.source_title, a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|'))
+  );
+
+  // Delete old alerts (preserve OVERSTOCK source) and insert new ones
   await database('scout_alerts').whereNot('source', 'OVERSTOCK').del();
   for (let i = 0; i < alerts.length; i += 50) {
     await database('scout_alerts').insert(alerts.slice(i, i + 50));
+  }
+
+  // Restore claimed status for alerts that still match
+  if (claimedKeys.size > 0) {
+    const newAlerts = await database('scout_alerts')
+      .whereNot('source', 'OVERSTOCK')
+      .select('id', 'source', 'source_title', 'vehicle_year', 'vehicle_make', 'vehicle_model', 'yard_name');
+
+    const toRestore = [];
+    for (const a of newAlerts) {
+      const key = [a.source, a.source_title, a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|');
+      if (claimedKeys.has(key)) {
+        toRestore.push(a.id);
+      }
+    }
+
+    if (toRestore.length > 0) {
+      for (let i = 0; i < toRestore.length; i += 50) {
+        await database('scout_alerts')
+          .whereIn('id', toRestore.slice(i, i + 50))
+          .update({ claimed: true, claimed_at: new Date().toISOString() });
+      }
+      log.info({ restored: toRestore.length, totalClaimed: claimedKeys.size }, 'Restored claimed status for persisted alerts');
+    }
   }
 
   // 5. Update the_mark with match data
