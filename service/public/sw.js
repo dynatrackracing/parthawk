@@ -1,4 +1,4 @@
-const CACHE_NAME = 'darkhawk-v3';
+const CACHE_NAME = 'darkhawk-v4';
 const PRECACHE_URLS = [
   '/admin/darkhawk-logo-sm.png',
 ];

@@ -362,17 +362,19 @@
   }
 
   function getSetDaysAgo(v) {
-    // How many calendar days ago (Eastern) was this vehicle first scraped into our DB
-    // Uses createdAt instead of date_added because LKQ's "Available" dates are
-    // unreliable (vary ±1 day per location — Clearwater runs 1 day ahead, others behind)
-    const d = v.createdAt || v.date_added;
+    // How many calendar days ago (Eastern) was this vehicle set at the yard?
+    // Uses date_added (LKQ's "Available" date) because createdAt reflects scraper
+    // run time (often 10pm ET = previous day in Eastern), not the actual set date.
+    // Clamp future dates to today (Clearwater sometimes reports 1 day ahead).
+    const d = v.date_added || v.createdAt;
     if (!d) return 999;
     const todayET = easternDateStr(new Date());
     const addedET = easternDateStr(d);
     if (!todayET || !addedET) return 999;
     const todayMs = new Date(todayET + 'T00:00:00').getTime();
     const addedMs = new Date(addedET + 'T00:00:00').getTime();
-    return Math.round((todayMs - addedMs) / 86400000);
+    const days = Math.round((todayMs - addedMs) / 86400000);
+    return Math.max(0, days); // clamp: future dates show as "today"
   }
 
   function ageBadge(v) {
@@ -683,7 +685,7 @@
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
             ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age ${v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
-            ${(v.createdAt || v.date_added) ? `<span>${timeAgo(v.createdAt || v.date_added)}</span>` : ''}
+            ${(v.date_added || v.createdAt) ? `<span>${timeAgo(v.date_added || v.createdAt)}</span>` : ''}
           </div>
           <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
         </div>

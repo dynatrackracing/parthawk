@@ -1125,11 +1125,10 @@ class AttackListService {
     if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
     // Bonus: any part on The Mark want list
     if (filteredParts.some(p => p.isMarked)) score += 15;
-    // Bonus: fresh arrival (today) — use createdAt (when we first scraped it)
-    // because LKQ's date_added is unreliable (varies ±1 day per location)
-    if (vehicle.createdAt) {
-      const firstSeen = new Date(vehicle.createdAt);
-      const daysSinceAdded = Math.floor((Date.now() - firstSeen.getTime()) / 86400000);
+    // Bonus: fresh arrival (within 2 days by date_added or createdAt)
+    const arrivalDate = vehicle.date_added || vehicle.createdAt;
+    if (arrivalDate) {
+      const daysSinceAdded = Math.floor((Date.now() - new Date(arrivalDate).getTime()) / 86400000);
       if (daysSinceAdded <= 1) score += 5;
     }
 
