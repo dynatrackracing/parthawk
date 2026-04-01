@@ -1,38 +1,37 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Daily Feed fixes
+**Session type:** Daily Feed rework
 
 ## What was done
-- Reworked Daily Feed date pills from hard-filter to fresh-highlight + still-on-lot split
-- Removed server-side `since` filter — API always returns all active vehicles
-- Date pills now control client-side grouping: "NEW TODAY" / "STILL ON LOT" split when a pill is active, age-tier grouping for "All"
-- Improved detectPartType() coverage — added 17 new part types to reduce OTHER chips
-- Updated CLAUDE_RULES.md rule 19: steering and sunroof ARE sellable, not excluded
-- Fixed Today empty state: shows "No new vehicles set today" italic banner when no fresh arrivals
-- Fixed All filter: shows full age timeline including empty tiers with 0 counts (SET TODAY 0 / LAST 3 DAYS 47 / etc.)
+- Replaced calendar-based "Today" filter with data-driven "Newest" filter
+- Date pills now relative to actual newest date_added in scrape data, not today's calendar date
+- "Newest" always has results — it's the most recent batch in the data
+- Removed yard health banners (yellow/red scrape warnings), added clean "Last scraped: Xh ago" line
+- Removed timezone-dependent date functions (easternDateStr, easternSinceDateISO, filterSinceParam, getLastSeenDaysAgo, getSetDaysAgo)
+- Replaced with parseLocalDate(), getNewestDate(), getDaysFromNewest() — no timezone issues
+- Age badges now relative to newest date: NEW / 2D AGO / 7D AGO etc.
+- Removed scrape-health API fetch from loadData (last_scraped comes from attack list API already)
+- Removed per-filter data caching (one dataset, re-rendered client-side)
 
 ## What files were touched
-- service/public/attack-list.html (date pill rework, section grouping, removed since filter)
-- service/services/AttackListService.js (detectPartType expanded)
-- CLAUDE_RULES.md (rule 19 correction)
+- service/public/attack-list.html (full date pill rework)
 - LAST_SESSION.md (this file)
 
 ## What is still broken / needs attention
-- EST badge styling: estimate prices show red verdict-poor instead of gray — should use distinct verdict-est class
+- EST badge styling: estimate prices show red verdict-poor instead of gray
 - buildInventoryIndex Item.price>0 filter may exclude parts with no Item.price but valid market cache data
-- VIN route ILIKE stock lookup (potential performance issue)
-- Trim value validation Step 4 not yet done (eBay sold listing scrapes for gaps)
-- yard_vehicle transmission columns exist but are never populated (need VIN re-decode)
+- OTHER chips still appear for some parts — more detectPartType patterns needed
+- Trim value validation Step 4 not yet done
+- yard_vehicle transmission columns exist but are never populated
 
 ## What's next
 - EST badge gray styling
 - buildInventoryIndex filter fix
-- Consider adding CONSERVATIVE_SELL_ESTIMATES entries for new part types
+- Continue Daily Feed polish
 
 ## Critical reminders for next session
 - DO NOT modify AttackListService.js without reading it completely first
-- DO NOT modify attack-list.html without reading it completely first
 - Item.price is FROZEN — never use as display/scoring price
-- Price resolution: market_demand_cache -> PriceCheck -> Item.price (last resort)
-- Date pills are CLIENT-SIDE only now — no server filter
+- Date pills are CLIENT-SIDE only — no server filter, no timezone functions
+- getDaysFromNewest() compares to newest date_added in dataset, not today's calendar date
