@@ -1,21 +1,19 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Daily Feed rework
+**Session type:** Daily Feed — Mark + Alert indicators
 
 ## What was done
-- Replaced calendar-based "Today" filter with data-driven "Newest" filter
-- Date pills now relative to actual newest date_added in scrape data, not today's calendar date
-- "Newest" always has results — it's the most recent batch in the data
-- Removed yard health banners (yellow/red scrape warnings), added clean "Last scraped: Xh ago" line
-- Removed timezone-dependent date functions (easternDateStr, easternSinceDateISO, filterSinceParam, getLastSeenDaysAgo, getSetDaysAgo)
-- Replaced with parseLocalDate(), getNewestDate(), getDaysFromNewest() — no timezone issues
-- Age badges now relative to newest date: NEW / 2D AGO / 7D AGO etc.
-- Removed scrape-health API fetch from loadData (last_scraped comes from attack list API already)
-- Removed per-filter data caching (one dataset, re-rendered client-side)
+- Added 🎯 icon on part chips matching The Mark (collapsed view: "🎯 ECM")
+- Added ⚡ purple badge on vehicles with scout alerts (collapsed view: "⚡ 2 ALERTS")
+- Added purple SCOUT ALERTS detail box in expanded view listing source + title + value per alert
+- Added isMarked to part_chips slim mode mapping in both attack-list.js and FlywayService.js
+- Existing MARKED/Restock claimable badges preserved alongside new ⚡ count chip
 
 ## What files were touched
-- service/public/attack-list.html (full date pill rework)
+- service/public/attack-list.html (chip rendering, renderAlertBadges, renderExpandedParts)
+- service/routes/attack-list.js (part_chips mapping — added isMarked)
+- service/services/FlywayService.js (part_chips mapping — added isMarked)
 - LAST_SESSION.md (this file)
 
 ## What is still broken / needs attention
@@ -35,3 +33,5 @@
 - Item.price is FROZEN — never use as display/scoring price
 - Date pills are CLIENT-SIDE only — no server filter, no timezone functions
 - getDaysFromNewest() compares to newest date_added in dataset, not today's calendar date
+- isMarked comes from AttackListService scoreVehicle() matching against the_mark table
+- alertBadges come from attack-list.js route joining scout_alerts to yard vehicles
