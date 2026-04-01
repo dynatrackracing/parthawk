@@ -5,6 +5,7 @@ const COGSService = require('../services/COGSService');
 const { database } = require('../database/database');
 const { v4: uuidv4 } = require('uuid');
 const { log } = require('../lib/logger');
+const { extractPartNumbers, stripRevisionSuffix } = require('../utils/partIntelligence');
 
 /**
  * POST /cogs/gate
@@ -104,6 +105,123 @@ router.get('/yards', async (req, res) => {
     res.json({ success: true, yards: yardsWithCalc });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /cogs/check-stock?pn={partNumber}
+ * Check if a part number is in our active eBay inventory
+ */
+router.get('/check-stock', async (req, res) => {
+  try {
+    const rawPN = (req.query.pn || '').trim();
+    if (!rawPN || rawPN.length < 4) {
+      return res.status(400).json({ error: 'Part number must be at least 4 characters.' });
+    }
+
+    const searchUpper = rawPN.toUpperCase();
+    const searchCompressed = searchUpper.replace(/[-\s.]/g, '');
+    const searchBase = stripRevisionSuffix(searchCompressed);
+
+    // 1. Exact match: search YourListing titles for this PN (case-insensitive)
+    const exactListings = await database('YourListing')
+      .where('listingStatus', 'Active')
+      .where(function() {
+        this.where('title', 'ilike', `%${searchUpper}%`);
+        // Also search compressed form (no dashes)
+        if (searchCompressed !== searchUpper) {
+          this.orWhere('title', 'ilike', `%${searchCompressed}%`);
+        }
+        // Also try with common dash patterns
+        if (rawPN.includes('-')) {
+          const noDash = rawPN.replace(/-/g, '');
+          this.orWhere('title', 'ilike', `%${noDash}%`);
+        } else if (searchCompressed.length >= 8) {
+          // Try matching even if listed with dashes
+          this.orWhere('title', 'ilike', `%${searchCompressed}%`);
+        }
+        // Also check SKU
+        this.orWhere('sku', 'ilike', `%${searchUpper}%`);
+      })
+      .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable', 'sku')
+      .limit(20);
+
+    const exactResults = exactListings.map(l => ({
+      ebayItemId: l.ebayItemId,
+      title: l.title,
+      currentPrice: parseFloat(l.currentPrice) || null,
+      quantity: parseInt(l.quantityAvailable) || 1,
+      matchType: 'EXACT',
+    }));
+    const exactItemIds = new Set(exactResults.map(r => r.ebayItemId));
+
+    // 2. Variant match: search for same base PN, different suffix
+    let variantResults = [];
+    if (searchBase && searchBase.length >= 6 && searchBase !== searchCompressed) {
+      const variantListings = await database('YourListing')
+        .where('listingStatus', 'Active')
+        .where('title', 'ilike', `%${searchBase}%`)
+        .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable')
+        .limit(30);
+
+      for (const l of variantListings) {
+        if (exactItemIds.has(l.ebayItemId)) continue;
+        // Verify this listing actually contains a PN with the same base
+        const listingPNs = extractPartNumbers(l.title);
+        const hasVariant = listingPNs.some(pn => {
+          const pnBase = stripRevisionSuffix(pn.normalized);
+          return pnBase === searchBase && pn.normalized !== searchCompressed;
+        });
+        if (hasVariant) {
+          const matchedPN = listingPNs.find(pn => stripRevisionSuffix(pn.normalized) === searchBase);
+          const suffix = matchedPN ? matchedPN.normalized.slice(searchBase.length) : '';
+          const searchSuffix = searchCompressed.slice(searchBase.length);
+          variantResults.push({
+            ebayItemId: l.ebayItemId,
+            title: l.title,
+            currentPrice: parseFloat(l.currentPrice) || null,
+            quantity: parseInt(l.quantityAvailable) || 1,
+            matchType: 'VARIANT',
+            variantNote: `Same base, different suffix (${suffix || '?'} vs ${searchSuffix || '?'})`,
+          });
+        }
+      }
+    }
+
+    // 3. Check overstock groups
+    let overstock = null;
+    try {
+      const allMatchIds = [...exactResults, ...variantResults].map(r => r.ebayItemId);
+      if (allMatchIds.length > 0) {
+        const trackedItem = await database('overstock_group_item')
+          .whereIn('ebay_item_id', allMatchIds)
+          .first();
+        if (trackedItem) {
+          const group = await database('overstock_group')
+            .where('id', trackedItem.group_id)
+            .first();
+          if (group) {
+            overstock = {
+              tracked: true,
+              groupName: group.name,
+              currentStock: group.current_stock,
+              restockTarget: group.restock_target,
+            };
+          }
+        }
+      }
+    } catch (e) { /* overstock tables may not exist */ }
+
+    res.json({
+      searchPN: searchUpper,
+      exact: exactResults,
+      variants: variantResults,
+      totalExact: exactResults.length,
+      totalVariants: variantResults.length,
+      overstock,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Stock check failed: ' + err.message });
   }
 });
 

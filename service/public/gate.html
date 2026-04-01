@@ -61,6 +61,26 @@
 
   .add-btn{width:100%;padding:12px;background:var(--s2);border:1px dashed var(--b);border-radius:8px;color:var(--tf);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
 
+  /* Check Stock */
+  .section-header{font-size:11px;font-weight:800;color:var(--tf);text-transform:uppercase;letter-spacing:.1em;padding:10px 14px 6px;background:var(--bg)}
+  .stock-input{flex:1;padding:12px;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t);font-size:16px;font-weight:600;letter-spacing:.05em}
+  .stock-input:focus{outline:none;border-color:var(--r)}
+  .stock-input::placeholder{color:var(--tf);font-weight:400;letter-spacing:0}
+  .stock-btn{padding:12px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
+  .stock-btn:disabled{opacity:.4}
+  .stock-btn.search{background:var(--r);color:#fff}
+  .stock-btn.clear{background:var(--s2);color:var(--tf);border:1px solid var(--b)}
+  .stock-result{margin-top:10px;border-radius:8px;padding:10px 12px}
+  .stock-result.exact{background:var(--gd);border:1px solid #166534}
+  .stock-result.variant{background:var(--yd);border:1px solid #854d0e}
+  .stock-result.none{background:var(--s2);border:1px solid var(--b)}
+  .stock-result-header{font-size:12px;font-weight:700;margin-bottom:6px}
+  .stock-item{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);font-size:12px}
+  .stock-item:last-child{border-bottom:none}
+  .stock-item .si-title{font-weight:600;color:var(--t);line-height:1.3}
+  .stock-item .si-meta{color:var(--tf);margin-top:2px;font-size:11px;display:flex;gap:8px}
+  .stock-overstock{margin-top:6px;padding:6px 8px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:6px;font-size:11px;color:var(--y)}
+
   /* Breakdown */
   .brow{display:flex;justify-content:space-between;padding:7px 0;font-size:12px;border-bottom:1px solid #1f1f1f}
   .brow:last-child{border:none}
@@ -79,6 +99,17 @@
 <script src="/admin/dh-nav.js?v=2"></script><script>dhNav('gate')</script>
 
 <div class="c">
+  <div class="section-header">CHECK STOCK</div>
+  <div class="card">
+    <div style="display:flex;gap:8px">
+      <input type="text" class="stock-input" id="stockPN" placeholder="Enter part number to check stock..." autocomplete="off">
+      <button class="stock-btn search" id="stockSearchBtn" onclick="checkStock()">Search</button>
+      <button class="stock-btn clear" onclick="clearStock()">Clear</button>
+    </div>
+    <div id="stockResults"></div>
+  </div>
+
+  <div class="section-header">COGS CALCULATOR</div>
   <div class="card">
     <div class="card-title">Yard</div>
     <select id="yardSel" onchange="onYardChange()"><option value="">Loading yards...</option></select>
@@ -304,6 +335,88 @@ function recalc() {
     '<div class="brow"><span class="bl" style="font-weight:600">Absolute max (35%)</span><span class="bv" style="color:var(--y)">$' + ceiling + '</span></div>' +
     '<div class="brow"><span class="bl" style="font-weight:600">Blended COGS</span><span class="bv" style="color:' + (color === 'green' ? 'var(--g)' : color === 'yellow' ? 'var(--y)' : 'var(--r)') + '">' + blended.toFixed(1) + '%</span></div>';
 }
+
+// ── CHECK STOCK ─────────────────────────────────────────────
+document.getElementById('stockPN').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') checkStock();
+});
+
+function checkStock() {
+  var pn = document.getElementById('stockPN').value.trim();
+  if (!pn || pn.length < 4) {
+    document.getElementById('stockResults').innerHTML = '<div class="stock-result none"><div style="font-size:11px;color:var(--tf)">Enter at least 4 characters</div></div>';
+    return;
+  }
+  var btn = document.getElementById('stockSearchBtn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+  document.getElementById('stockResults').innerHTML = '';
+
+  fetch('/cogs/check-stock?pn=' + encodeURIComponent(pn))
+    .then(function(r) {
+      if (!r.ok) throw new Error('Server error');
+      return r.json();
+    })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = 'Search';
+      var h = '';
+
+      if (d.totalExact > 0) {
+        h += '<div class="stock-result exact">';
+        h += '<div class="stock-result-header" style="color:var(--g)">\u2713 IN STOCK \u2014 ' + d.totalExact + ' exact match' + (d.totalExact > 1 ? 'es' : '') + '</div>';
+        d.exact.forEach(function(item) {
+          h += '<div class="stock-item">';
+          h += '<div class="si-title">' + esc(item.title) + '</div>';
+          h += '<div class="si-meta">';
+          if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
+          h += '<span>Qty: ' + item.quantity + '</span>';
+          h += '<a href="https://www.ebay.com/itm/' + esc(item.ebayItemId) + '" target="_blank" style="color:var(--tf);text-decoration:none">#' + esc(item.ebayItemId) + '</a>';
+          h += '</div></div>';
+        });
+        h += '</div>';
+      }
+
+      if (d.totalVariants > 0) {
+        h += '<div class="stock-result variant">';
+        h += '<div class="stock-result-header" style="color:var(--y)">\u26A0 VARIANT' + (d.totalExact > 0 ? 'S' : ' FOUND') + ' \u2014 ' + d.totalVariants + ' similar part number' + (d.totalVariants > 1 ? 's' : '') + '</div>';
+        d.variants.forEach(function(item) {
+          h += '<div class="stock-item">';
+          h += '<div class="si-title">' + esc(item.title) + '</div>';
+          h += '<div class="si-meta">';
+          if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
+          h += '<span>Qty: ' + item.quantity + '</span>';
+          h += '</div>';
+          if (item.variantNote) h += '<div style="font-size:10px;color:var(--y);margin-top:2px">' + esc(item.variantNote) + '</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      if (d.totalExact === 0 && d.totalVariants === 0) {
+        h += '<div class="stock-result none">';
+        h += '<div style="font-size:13px;color:var(--tf)">No stock found for <b style="color:var(--t)">' + esc(d.searchPN) + '</b></div>';
+        h += '<div style="font-size:11px;color:var(--tf);margin-top:4px">This part is not in our inventory. Safe to buy.</div>';
+        h += '</div>';
+      }
+
+      if (d.overstock) {
+        h += '<div class="stock-overstock">Tracked in Overstock Watch \u2014 ' + d.overstock.groupName + ' \u2014 ' + d.overstock.currentStock + ' in stock, restock at ' + d.overstock.restockTarget + '</div>';
+      }
+
+      document.getElementById('stockResults').innerHTML = h;
+    })
+    .catch(function(err) {
+      btn.disabled = false; btn.textContent = 'Search';
+      document.getElementById('stockResults').innerHTML = '<div class="stock-result none"><div style="color:var(--r);font-size:12px">Error: ' + (err.message || 'Failed') + '</div></div>';
+    });
+}
+
+function clearStock() {
+  document.getElementById('stockPN').value = '';
+  document.getElementById('stockResults').innerHTML = '';
+  document.getElementById('stockPN').focus();
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 loadYards();
 </script>
