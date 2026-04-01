@@ -122,14 +122,18 @@ router.get('/list', async (req, res) => {
   const yardCounts = await yardCountQuery
     .select('yard_name').count('* as count').groupBy('yard_name').orderBy('count', 'desc');
 
-  // Source counts with same filters
+  // Source counts with same filters — show unique parts, not raw alert rows
   let srcQuery = knex('scout_alerts');
   srcQuery = applyFilters(srcQuery);
-  const sourceCounts = await srcQuery.select('source').count('* as count').groupBy('source');
-  const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
-  const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
-  const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).count) || 0;
-  const overstockCount = parseInt((sourceCounts.find(s => s.source === 'OVERSTOCK') || {}).count) || 0;
+  const sourceCounts = await srcQuery
+    .select('source')
+    .count('* as count')
+    .countDistinct('source_title as unique_parts')
+    .groupBy('source');
+  const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).unique_parts) || 0;
+  const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).unique_parts) || 0;
+  const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).unique_parts) || 0;
+  const overstockCount = parseInt((sourceCounts.find(s => s.source === 'OVERSTOCK') || {}).unique_parts) || 0;
 
   // Tag perch alerts with recent sales
   let justSoldCount = 0;

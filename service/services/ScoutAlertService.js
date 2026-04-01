@@ -3,7 +3,7 @@
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
 const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
-const { modelMatches: piModelMatches, parseYearRange: piParseYear } = require('../utils/partIntelligence');
+const { modelMatches: piModelMatches, parseYearRange: piParseYear, extractPartNumbers: piExtractPNs } = require('../utils/partIntelligence');
 
 // Known automotive makes for title parsing
 const KNOWN_MAKES = [
@@ -69,7 +69,7 @@ async function generateAlerts() {
   // THE QUARRY — recently sold items with low/no stock
   try {
     const bonePileSales = await database('YourSale')
-      .where('soldDate', '>=', database.raw("NOW() - INTERVAL '60 days'"))
+      .where('soldDate', '>=', database.raw("NOW() - INTERVAL '90 days'"))
       .whereNotNull('title')
       .whereRaw('"salePrice"::numeric >= 50')
       .select('title', 'salePrice');
@@ -91,7 +91,30 @@ async function generateAlerts() {
         });
       }
     }
-    for (const part of seen.values()) partsToMatch.push(part);
+    // Stock filter — skip parts we already have listed
+    const activeListings = await database('YourListing')
+      .where('listingStatus', 'Active')
+      .select('title');
+    const stockPNs = new Set();
+    for (const listing of activeListings) {
+      const pns = piExtractPNs(listing.title || '');
+      for (const pn of pns) {
+        stockPNs.add(pn.normalized);
+        if (pn.base !== pn.normalized) stockPNs.add(pn.base);
+      }
+    }
+
+    let boneSkipped = 0;
+    for (const part of seen.values()) {
+      const salePNs = piExtractPNs(part.title || '');
+      const hasStock = salePNs.some(pn => stockPNs.has(pn.normalized) || stockPNs.has(pn.base));
+      if (!hasStock) {
+        partsToMatch.push(part);
+      } else {
+        boneSkipped++;
+      }
+    }
+    log.info({ bonePileTotal: seen.size, filtered: seen.size - boneSkipped, skippedInStock: boneSkipped, stockPNCount: stockPNs.size }, 'Bone pile stock filter');
   } catch (e) {
     log.warn({ err: e.message }, 'Failed to load bone pile data');
   }
