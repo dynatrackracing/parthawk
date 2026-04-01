@@ -56,6 +56,16 @@ class YourDataManager {
       this.log.error({ err }, 'Overstock watch check failed (non-fatal)');
     }
 
+    // Auto-resolve cache entries against newly synced listings
+    try {
+      const CacheService = require('../services/CacheService');
+      const cacheService = new CacheService();
+      const cacheResult = await cacheService.resolveFromListings();
+      this.log.info({ cacheResult }, 'Cache auto-resolution complete after YourData sync');
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'Cache auto-resolution failed (non-fatal)');
+    }
+
     this.log.info({ results }, 'Completed full sync of your eBay data');
     return results;
   }

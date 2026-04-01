@@ -214,6 +214,14 @@ router.get('/check-stock', async (req, res) => {
       }
     } catch (e) { /* overstock tables may not exist */ }
 
+    // Also check The Cache for parts already claimed but not yet listed
+    let cachedClaims = [];
+    try {
+      const CacheService = require('../services/CacheService');
+      const cacheService = new CacheService();
+      cachedClaims = await cacheService.checkCacheStock({ partNumber: rawPN });
+    } catch (e) { /* cache table may not exist yet */ }
+
     res.json({
       searchPN: searchUpper,
       exact: exactResults,
@@ -221,6 +229,15 @@ router.get('/check-stock', async (req, res) => {
       totalExact: exactResults.length,
       totalVariants: variantResults.length,
       overstock,
+      cachedClaims: cachedClaims.map(c => ({
+        partType: c.part_type,
+        partNumber: c.part_number,
+        vehicle: `${c.vehicle_year || ''} ${c.vehicle_make || ''} ${c.vehicle_model || ''}`.trim(),
+        claimedBy: c.claimed_by,
+        claimedAt: c.claimed_at,
+        source: c.source,
+      })),
+      totalCached: cachedClaims.length,
     });
   } catch (err) {
     res.status(500).json({ error: 'Stock check failed: ' + err.message });

@@ -4,6 +4,20 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-01] The Cache Phase 7 Part 1 — Backend
+- **Added:** `the_cache` table with UUID PK, vehicle/part/yard fields, status lifecycle (claimed→listed/returned/deleted)
+- **Added:** CacheService — claim, return, delete, resolve, stats, checkCacheStock
+- **Added:** /cache routes — active, history, stats, claim, return, delete, resolve, check-stock
+- **Added:** Manual entry via source='manual' (by PN or by YMM+description)
+- **Changed:** YourDataManager.syncAll now runs cache auto-resolution after listing sync (4x/day)
+- **Changed:** /cogs/check-stock returns cachedClaims alongside YourListing results
+- **Changed:** /vin/scan returns cachedParts for scanned vehicle
+- **Files touched:** migration (new), CacheService.js (new), routes/cache.js (new), YourDataManager.js, cogs.js, vin.js, index.js
+- **Affects:** Stock checks (Nest Protector + Hawk Eye), VIN scanner, all puller tools
+- **Notes:** Scout alert cross-linking: claim marks alert claimed, return re-activates. Phase 7 Part 2 (frontend) not yet built.
+
+---
+
 ## [2026-04-01] Autolumen Multi-Store Integration
 - **Added:** `store` column on YourListing and YourSale (default: 'dynatrack')
 - **Added:** AutolumenImportService — CSV import for active listings, orders, and transaction reports

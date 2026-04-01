@@ -524,6 +524,26 @@ router.post('/scan', async (req, res) => {
       }
     }
 
+    // Check The Cache for parts already claimed for this vehicle
+    let cacheMatches = [];
+    try {
+      const vinMatches = await database('the_cache')
+        .where('status', 'claimed')
+        .where('vehicle_vin', vin)
+        .select('*');
+      if (vinMatches.length > 0) {
+        cacheMatches = vinMatches;
+      } else if (decoded && decoded.make && decoded.model) {
+        // Fallback: check by make+model+year
+        cacheMatches = await database('the_cache')
+          .where('status', 'claimed')
+          .whereRaw('UPPER(vehicle_make) = ?', [decoded.make.toUpperCase()])
+          .whereRaw('UPPER(vehicle_model) = ?', [decoded.model.toUpperCase()])
+          .where('vehicle_year', decoded.year)
+          .select('*');
+      }
+    } catch (e) { /* cache table may not exist yet */ }
+
     // Limit response size to prevent mobile memory issues
     res.json({
       success: true, vin, decoded, baseModel, totalValue,
@@ -531,6 +551,15 @@ router.post('/scan', async (req, res) => {
       currentStock: currentStock.slice(0, 15),
       marketRef: marketRef.slice(0, 20),
       aiResearch,
+      cachedParts: cacheMatches.map(c => ({
+        partType: c.part_type,
+        partNumber: c.part_number,
+        description: c.part_description,
+        claimedBy: c.claimed_by,
+        claimedAt: c.claimed_at,
+        source: c.source,
+        yardName: c.yard_name,
+      })),
     });
   } catch (err) {
     log.error({ err }, 'VIN scan failed');
