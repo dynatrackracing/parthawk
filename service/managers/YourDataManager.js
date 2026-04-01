@@ -42,6 +42,20 @@ class YourDataManager {
       results.listings.errors = 1;
     }
 
+    // Overstock watch check — runs after every listing sync
+    try {
+      const OverstockCheckService = require('../services/OverstockCheckService');
+      const overstockService = new OverstockCheckService();
+      const result = await overstockService.checkAll();
+      if (result.triggered > 0) {
+        this.log.info({ result }, 'Overstock alerts triggered');
+      } else {
+        this.log.debug({ result }, 'Overstock watch check complete');
+      }
+    } catch (err) {
+      this.log.error({ err }, 'Overstock watch check failed (non-fatal)');
+    }
+
     this.log.info({ results }, 'Completed full sync of your eBay data');
     return results;
   }

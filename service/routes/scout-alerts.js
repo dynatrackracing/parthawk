@@ -61,6 +61,9 @@ router.get('/list', async (req, res) => {
       }).orWhere(function() {
         // PERCH (The Mark) alerts — no hard age ceiling, always show active marks
         this.where('source', 'PERCH');
+      }).orWhere(function() {
+        // OVERSTOCK alerts — always show, no date filtering
+        this.where('source', 'OVERSTOCK');
       });
     });
     if (yard && yard !== 'all') {
@@ -87,6 +90,7 @@ router.get('/list', async (req, res) => {
         WHEN source = 'hunters_perch' AND confidence = 'high' THEN 5
         WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 6
         WHEN source = 'hunters_perch' AND confidence = 'low' THEN 7
+        WHEN source = 'OVERSTOCK' THEN 1
         ELSE 8
       END
     `)
@@ -125,6 +129,7 @@ router.get('/list', async (req, res) => {
   const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).count) || 0;
   const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).count) || 0;
   const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).count) || 0;
+  const overstockCount = parseInt((sourceCounts.find(s => s.source === 'OVERSTOCK') || {}).count) || 0;
 
   // Tag perch alerts with recent sales
   let justSoldCount = 0;
@@ -156,7 +161,7 @@ router.get('/list', async (req, res) => {
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
-    boneCount, perchCount, markCount, justSoldCount,
+    boneCount, perchCount, markCount, overstockCount, justSoldCount,
     total, page, totalPages: Math.ceil(total / perPage),
     lastGenerated
   });

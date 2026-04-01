@@ -32,6 +32,7 @@ nav a.active{color:#DC2626;font-weight:700}
 .b-perch{background:#ea580c;color:#fff;font-size:8px;letter-spacing:0.05em}
 .b-mark{background:#eab308;color:#78350f;font-size:8px;letter-spacing:0.05em;font-weight:800}
 .b-sold{background:#16a34a;color:#fff;font-size:8px;letter-spacing:0.05em}
+.b-overstock{background:#F59E0B;color:#78350F;font-size:8px;letter-spacing:0.05em;font-weight:800}
 .yard-header{padding:10px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #dc2626;margin-bottom:8px}
 .yard-name{font-size:15px;font-weight:800;color:#F0F0F0}
 .yard-count{font-size:11px;color:#9CA3AF}
@@ -167,6 +168,7 @@ function load(page) {
       sh += '<div class="summary-card"><div class="summary-num" style="color:#eab308">' + (d.markCount || 0) + '</div><div class="summary-label">★ MARK</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">QUARRY</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">STREAM</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#F59E0B">' + (d.overstockCount || 0) + '</div><div class="summary-label">OVERSTOCK</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
       sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
       sh += '</div>';
@@ -189,8 +191,8 @@ function load(page) {
 
         alerts.forEach(function(a) {
           var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
-          var srcClass = a.source === 'PERCH' ? 'b-mark' : a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
-          var srcLabel = a.source === 'PERCH' ? '★ MARK' : a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
+          var srcClass = a.source === 'PERCH' ? 'b-mark' : a.source === 'OVERSTOCK' ? 'b-overstock' : a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
+          var srcLabel = a.source === 'PERCH' ? '★ MARK' : a.source === 'OVERSTOCK' ? 'OVERSTOCK' : a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
           var soldTag = a.justSold ? '<span class="badge b-sold">SOLD ' + a.justSold.toUpperCase() + '</span>' : '';
           var priceStr = a.part_value ? '$' + a.part_value : '';
           var setStr = '';
@@ -207,16 +209,25 @@ function load(page) {
           h += '<div class="alert-row' + (isClaimed ? ' claimed' : '') + '">';
           h += '<div class="claim-check' + (isClaimed ? ' checked' : '') + '" onclick="claimAlert(' + a.id + ',' + !isClaimed + ')">' + checkSvg + '</div>';
           h += '<div class="alert-info">';
-          h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
-          h += '<div class="alert-vehicle">' + esc([a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' '));
-          if (a.vehicle_color) h += ' <span style="color:#6B7280;font-weight:400">(' + esc(a.vehicle_color) + ')</span>';
-          h += '</div>';
+          if (a.source === 'OVERSTOCK') {
+            h += '<div class="alert-part"><a href="https://www.ebay.com/itm/' + esc(a.source_title).replace(/[^0-9a-zA-Z ]/g, '') + '" target="_blank" style="color:#F0F0F0;text-decoration:none">' + esc(a.source_title) + '</a></div>';
+            h += '<div class="alert-vehicle" style="color:#F59E0B">Low Stock Alert</div>';
+          } else {
+            h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
+            h += '<div class="alert-vehicle">' + esc([a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' '));
+            if (a.vehicle_color) h += ' <span style="color:#6B7280;font-weight:400">(' + esc(a.vehicle_color) + ')</span>';
+            h += '</div>';
+          }
           h += '<div class="alert-meta">';
           if (isClaimed) h += '<span class="badge" style="background:#064e3b;color:#22c55e">PULLED</span>';
           h += '<span class="badge ' + srcClass + '">' + srcLabel + '</span>';
-          h += '<span class="badge ' + bc + '">' + a.confidence.toUpperCase() + '</span>';
+          if (a.source !== 'OVERSTOCK') h += '<span class="badge ' + bc + '">' + (a.confidence || '').toUpperCase() + '</span>';
           if (soldTag) h += soldTag;
-          if (priceStr) h += '<span style="font-weight:700;color:#22c55e">' + priceStr + '</span>';
+          if (a.source === 'OVERSTOCK' && priceStr) {
+            h += '<span style="font-weight:700;color:#22c55e">Sells for ' + priceStr + '</span>';
+          } else if (priceStr) {
+            h += '<span style="font-weight:700;color:#22c55e">' + priceStr + '</span>';
+          }
           if (a.row) h += '<span>Row ' + esc(a.row) + '</span>';
           if (setStr) h += '<span>' + setStr + '</span>';
           h += '</div>';

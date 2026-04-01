@@ -459,4 +459,134 @@ router.post('/watchlist/update', async (req, res) => {
   res.json({ success: true });
 });
 
+// ══════════════════════════════════════════════════════════════
+// OVERSTOCK WATCH — track high-quantity items for restock alerts
+// ══════════════════════════════════════════════════════════════
+
+router.get('/overstock', async (req, res) => {
+  const items = await database('overstock_watch')
+    .leftJoin('YourListing', 'YourListing.ebayItemId', 'overstock_watch.ebay_item_id')
+    .select(
+      'overstock_watch.*',
+      'YourListing.quantityAvailable as live_quantity',
+      'YourListing.listingStatus as live_status'
+    )
+    .orderByRaw(`
+      CASE overstock_watch.status
+        WHEN 'triggered' THEN 0
+        WHEN 'watching' THEN 1
+        WHEN 'acknowledged' THEN 2
+        ELSE 3
+      END
+    `)
+    .orderByRaw(`
+      CASE overstock_watch.status
+        WHEN 'triggered' THEN EXTRACT(EPOCH FROM overstock_watch.triggered_at)
+        WHEN 'watching' THEN EXTRACT(EPOCH FROM overstock_watch.created_at)
+        WHEN 'acknowledged' THEN EXTRACT(EPOCH FROM overstock_watch.acknowledged_at)
+        ELSE 0
+      END DESC
+    `);
+
+  res.json(items);
+});
+
+router.post('/overstock/add', async (req, res) => {
+  const { ebayItemId, restockTarget = 1, notes } = req.body;
+  if (!ebayItemId) return res.status(400).json({ error: 'eBay item ID required.' });
+
+  const listing = await database('YourListing').where('ebayItemId', ebayItemId).first();
+  if (!listing) return res.status(400).json({ error: 'Listing not found in your inventory.' });
+
+  const qty = parseInt(listing.quantityAvailable) || 0;
+  if (qty < 3) return res.status(400).json({ error: `This listing only has ${qty} in stock. Overstock tracking requires 3+.` });
+
+  const target = parseInt(restockTarget);
+  if (isNaN(target) || target < 0) return res.status(400).json({ error: 'Restock target cannot be negative.' });
+  if (target >= qty) return res.status(400).json({ error: `Restock target must be below current stock (${qty}).` });
+
+  const existing = await database('overstock_watch').where('ebay_item_id', ebayItemId).first();
+  if (existing) return res.status(400).json({ error: 'Already tracking this item.' });
+
+  const [row] = await database('overstock_watch').insert({
+    ebay_item_id: ebayItemId,
+    title: listing.title || ebayItemId,
+    part_number_base: null,
+    current_quantity: qty,
+    initial_quantity: qty,
+    restock_target: target,
+    status: 'watching',
+    notes: notes || null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }).returning('*');
+
+  res.json(row);
+});
+
+router.post('/overstock/acknowledge', async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID required.' });
+
+  const [row] = await database('overstock_watch').where({ id }).update({
+    status: 'acknowledged',
+    acknowledged_at: new Date(),
+    updated_at: new Date(),
+  }).returning('*');
+
+  res.json(row);
+});
+
+router.post('/overstock/rewatch', async (req, res) => {
+  const { id, restockTarget } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID required.' });
+
+  const item = await database('overstock_watch').where({ id }).first();
+  if (!item) return res.status(404).json({ error: 'Not found.' });
+
+  const listing = await database('YourListing').where('ebayItemId', item.ebay_item_id).first();
+  const qty = listing ? (parseInt(listing.quantityAvailable) || 0) : 0;
+  if (qty < 3) return res.status(400).json({ error: `Stock is only at ${qty}. Need 3+ to re-watch.` });
+
+  const update = {
+    status: 'watching',
+    current_quantity: qty,
+    triggered_at: null,
+    acknowledged_at: null,
+    updated_at: new Date(),
+  };
+
+  if (restockTarget !== undefined && restockTarget !== null) {
+    const target = parseInt(restockTarget);
+    if (!isNaN(target) && target >= 0 && target < qty) {
+      update.restock_target = target;
+    }
+  }
+
+  const [row] = await database('overstock_watch').where({ id }).update(update).returning('*');
+  res.json(row);
+});
+
+router.post('/overstock/delete', async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID required.' });
+
+  const item = await database('overstock_watch').where({ id }).first();
+  if (item) {
+    await database('scout_alerts')
+      .where('source', 'OVERSTOCK')
+      .where('source_title', 'like', `%${item.ebay_item_id}%`)
+      .del();
+  }
+  await database('overstock_watch').where({ id }).del();
+  res.json({ success: true });
+});
+
+router.post('/overstock/check-now', async (req, res) => {
+  const OverstockCheckService = require('../services/OverstockCheckService');
+  const service = new OverstockCheckService();
+  const result = await service.checkAll();
+  res.json(result);
+});
+
 module.exports = router;
