@@ -308,6 +308,7 @@
   let allData = null;
   let currentTab = 'yard:LKQ Raleigh';
   let dateFilter = 'newest';
+  const VEHICLE_CAPS = { newest: 25, '3d': 75, '7d': 150, '30d': 250, '60d': 400, '90d': 500, all: 500 };
   const activeSessions = {};
   let _currentNewestDate = null; // set per-yard during render
 
@@ -542,19 +543,38 @@
         }
       }
 
+      const yardCap = VEHICLE_CAPS[dateFilter] || 500;
+      let yardRendered = 0;
+
       for (const sec of sections) {
+        // Fresh sections always render fully; others respect the cap
+        const remaining = yardCap - yardRendered;
+        const vehiclesToRender = sec.isFresh ? sec.vehicles : sec.vehicles.slice(0, Math.max(0, remaining));
+        const hiddenCount = sec.vehicles.length - vehiclesToRender.length;
+
+        if (vehiclesToRender.length === 0 && hiddenCount > 0) {
+          // Entire section capped — show collapsed hint
+          html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;color:#4B5563;display:flex;justify-content:space-between;">`
+            + `<span>${sec.label}</span><span>${sec.vehicles.length} hidden</span></div>`;
+          continue;
+        }
+
         const sectionStyle = sec.isFresh ? 'border-left:3px solid #22c55e;padding-left:11px;' : '';
         html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;${sectionStyle}">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
         const BATCH = 30;
-        for (let i = 0; i < Math.min(BATCH, sec.vehicles.length); i++) {
-          html += renderVehicle(sec.vehicles[i]);
+        for (let i = 0; i < Math.min(BATCH, vehiclesToRender.length); i++) {
+          html += renderVehicle(vehiclesToRender[i]);
         }
-        if (sec.vehicles.length > BATCH) {
+        if (vehiclesToRender.length > BATCH) {
           const sectionId = 'lazy-' + yd.yard.id + '-' + sec.label.replace(/\s+/g, '');
-          pendingLazy.push({ id: sectionId, vehicles: sec.vehicles.slice(BATCH) });
-          html += `<div id="${sectionId}" style="padding:12px 14px;text-align:center;color:#6B7280;font-size:11px;cursor:pointer;" onclick="loadLazySection('${sectionId}')">Show ${sec.vehicles.length - BATCH} more...</div>`;
+          pendingLazy.push({ id: sectionId, vehicles: vehiclesToRender.slice(BATCH) });
+          html += `<div id="${sectionId}" style="padding:12px 14px;text-align:center;color:#6B7280;font-size:11px;cursor:pointer;" onclick="loadLazySection('${sectionId}')">Show ${vehiclesToRender.length - BATCH} more...</div>`;
         }
+        if (hiddenCount > 0) {
+          html += `<div style="padding:8px 14px;text-align:center;font-size:11px;color:#6B7280;">+ ${hiddenCount} more vehicles \u2014 switch to a wider filter to see them</div>`;
+        }
+        yardRendered += vehiclesToRender.length;
       }
       html += '</div></div>';
     }
