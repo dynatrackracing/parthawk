@@ -113,6 +113,7 @@ class SoldItemsManager {
           maxPages,
         });
         this.log.info({ seller, itemCount: items.length }, 'Scraped sold items via Playwright');
+        this.log.info({ seller, itemCount: items.length, firstThree: items.slice(0,3).map(i => ({ id: i.ebayItemId, price: i.soldPrice, title: (i.title||'').substring(0,50) })) }, 'DEBUG: raw scraper output');
       } catch (scrapeErr) {
         this.log.error({ err: scrapeErr, seller }, 'Playwright scrape failed');
         items = [];
