@@ -7,8 +7,10 @@
 - Reworked Daily Feed date pills from hard-filter to fresh-highlight + still-on-lot split
 - Removed server-side `since` filter — API always returns all active vehicles
 - Date pills now control client-side grouping: "NEW TODAY" / "STILL ON LOT" split when a pill is active, age-tier grouping for "All"
-- Improved detectPartType() coverage — added 17 new part types (CAMERA, HVAC, HEADLIGHT, TAILLIGHT, BLIND_SPOT, PARK_SENSOR, AIR_RIDE, CLOCK_SPRING, LOCK, IGNITION, LIFTGATE, HMI, SAM, SEAT_BELT, ALTERNATOR, STARTER, BLOWER, NAV) to reduce OTHER chips
+- Improved detectPartType() coverage — added 17 new part types to reduce OTHER chips
 - Updated CLAUDE_RULES.md rule 19: steering and sunroof ARE sellable, not excluded
+- Fixed Today empty state: shows "No new vehicles set today" italic banner when no fresh arrivals
+- Fixed All filter: shows full age timeline including empty tiers with 0 counts (SET TODAY 0 / LAST 3 DAYS 47 / etc.)
 
 ## What files were touched
 - service/public/attack-list.html (date pill rework, section grouping, removed since filter)

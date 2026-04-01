@@ -587,13 +587,15 @@
 
       let sections;
       if (freshDays >= 999) {
-        sections = [
+        // "All" mode — show full age timeline, even empty tiers
+        const allTiers = [
           { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) <= 0) },
           { label: 'LAST 3 DAYS', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 1 && d <= 3; }) },
           { label: 'THIS WEEK', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 4 && d <= 7; }) },
           { label: 'THIS MONTH', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 8 && d <= 30; }) },
           { label: 'OLDER', vehicles: filtered.filter(v => getSetDaysAgo(v) > 30) },
         ];
+        sections = allTiers.map(t => t.vehicles.length === 0 ? { label: t.label, vehicles: [], isEmpty: true } : t);
       } else {
         const fresh = filtered.filter(v => getSetDaysAgo(v) <= freshDays);
         const rest = filtered.filter(v => getSetDaysAgo(v) > freshDays);
@@ -602,12 +604,23 @@
           : freshDays <= 7 ? 'NEW THIS WEEK'
           : 'NEW — LAST ' + freshDays + ' DAYS';
         sections = [];
-        if (fresh.length > 0) sections.push({ label: freshLabel, vehicles: fresh, isFresh: true });
+        if (fresh.length > 0) {
+          sections.push({ label: freshLabel, vehicles: fresh, isFresh: true });
+        } else {
+          const noFreshLabel = freshDays === 0 ? 'No new vehicles set today'
+            : 'No new vehicles in the last ' + freshDays + ' days';
+          sections.push({ label: noFreshLabel, vehicles: [], isEmpty: true });
+        }
         if (rest.length > 0) sections.push({ label: 'STILL ON LOT', vehicles: rest });
       }
 
       for (const sec of sections) {
-        if (sec.vehicles.length === 0) continue;
+        // Empty sections: render header only (info banner or empty tier)
+        if (sec.isEmpty) {
+          html += `<div style="padding:10px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:${sec.label.startsWith('No ') ? '11px;font-style:italic;color:#6B7280' : '10px;font-weight:700;color:#4B5563;text-transform:uppercase;letter-spacing:0.05em'};display:flex;justify-content:space-between;">`
+            + `<span>${sec.label}</span>${sec.label.startsWith('No ') ? '' : '<span>0</span>'}</div>`;
+          continue;
+        }
         const sectionStyle = sec.isFresh ? 'border-left:3px solid #22c55e;padding-left:11px;' : '';
         html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;${sectionStyle}">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
