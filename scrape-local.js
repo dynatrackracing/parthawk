@@ -58,6 +58,8 @@ async function scrapePages(slug, yardId) {
   const allNew = [];
   let page = 1;
   let consecutiveAllDupePages = 0;
+  let totalSeen = 0;
+  let terminationReason = 'complete';
 
   while (page <= 60) {
     const url = page === 1
@@ -66,10 +68,11 @@ async function scrapePages(slug, yardId) {
     try {
       const { execSync } = require('child_process');
       const html = execSync(`curl -s -L --max-time 30 -H "User-Agent: ${UA}" -H "Accept: text/html,application/xhtml+xml" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
-      if (html.includes('Just a moment')) { console.log('  CloudFlare blocked'); break; }
+      if (html.includes('Just a moment')) { console.log('  CloudFlare blocked'); terminationReason = 'cloudflare'; break; }
 
       const { vehicles, hasNext } = parsePage(html);
-      if (vehicles.length === 0) break;
+      if (vehicles.length === 0) { terminationReason = 'empty_page'; break; }
+      totalSeen += vehicles.length;
 
       // Check each vehicle against DB
       let pageNew = 0, pageDupes = 0;
@@ -104,18 +107,19 @@ async function scrapePages(slug, yardId) {
         consecutiveAllDupePages++;
         if (consecutiveAllDupePages >= 2) {
           console.log(`  2 consecutive all-dupe pages — caught up. Stopping.`);
+          terminationReason = '2_consecutive_dupe_pages';
           break;
         }
       } else {
         consecutiveAllDupePages = 0;
       }
 
-      if (!hasNext) break;
+      if (!hasNext) { terminationReason = 'no_more_pages'; break; }
       page++;
       await sleep(500);
-    } catch(e) { console.log(`  Page ${page} error: ${e.message.substring(0,80)}`); break; }
+    } catch(e) { console.log(`  Page ${page} error: ${e.message.substring(0,80)}`); terminationReason = 'error: ' + e.message.substring(0,60); break; }
   }
-  return allNew;
+  return { vehicles: allNew, totalSeen, pagesScraped: page, terminationReason };
 }
 
 // ── SAVE (new vehicles only — dupes already filtered during scraping) ──
@@ -279,11 +283,20 @@ async function scrapeFlywayYards(coreYardNames) {
 
       try {
         console.log(`\n━━━ [FLYWAY] ${yard.name} ━━━`);
-        const newVehicles = await scrapePages(slug, yard.id);
-        await saveYard({ name: yard.name, slug }, newVehicles, yard.id);
+        const scrapeResult = await scrapePages(slug, yard.id);
+        await saveYard({ name: yard.name, slug }, scrapeResult.vehicles, yard.id);
 
         await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
           .update({ last_seen: new Date(), updatedAt: new Date() });
+
+        try {
+          await knex('scrape_log').insert({
+            yard_id: yard.id, scraped_at: new Date(),
+            vehicles_found: scrapeResult.totalSeen, new_vehicles: scrapeResult.vehicles.length,
+            pages_scraped: scrapeResult.pagesScraped, termination_reason: scrapeResult.terminationReason,
+            source: 'flyway',
+          });
+        } catch (e) { /* scrape_log may not exist */ }
       } catch (err) {
         console.error(`  [FLYWAY] Failed ${yard.name}: ${err.message.substring(0, 80)}`);
       }
@@ -317,12 +330,25 @@ async function main() {
       const yard = await knex('yard').where('name', loc.name).first();
       if (!yard) { console.log(`  ERROR: "${loc.name}" not in DB — skipping`); continue; }
 
-      const newVehicles = await scrapePages(loc.slug, yard.id);
-      await saveYard(loc, newVehicles, yard.id);
+      const scrapeResult = await scrapePages(loc.slug, yard.id);
+      await saveYard(loc, scrapeResult.vehicles, yard.id);
 
       // Update last_seen for ALL active vehicles in this yard (proves scrape ran)
       await knex('yard_vehicle').where('yard_id', yard.id).where('active', true)
         .update({ last_seen: new Date(), updatedAt: new Date() });
+
+      // Log scrape result for health dashboard
+      try {
+        await knex('scrape_log').insert({
+          yard_id: yard.id,
+          scraped_at: new Date(),
+          vehicles_found: scrapeResult.totalSeen,
+          new_vehicles: scrapeResult.vehicles.length,
+          pages_scraped: scrapeResult.pagesScraped,
+          termination_reason: scrapeResult.terminationReason,
+          source: 'local',
+        });
+      } catch (e) { /* scrape_log table may not exist yet */ }
     } catch (e) {
       console.error(`  YARD ERROR [${loc.name}]: ${e.message.substring(0, 100)}`);
     }

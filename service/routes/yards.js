@@ -187,6 +187,99 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// Scrape health dashboard
+router.get('/scrape-health', async (req, res) => {
+  try {
+    const yards = await database('yard')
+      .where('enabled', true)
+      .where(function() { this.where('flagged', false).orWhereNull('flagged'); })
+      .select('id', 'name', 'chain', 'last_scraped')
+      .orderBy('name');
+
+    const yardIds = yards.map(y => y.id);
+
+    // Vehicle stats per yard
+    const stats = await database('yard_vehicle')
+      .whereIn('yard_id', yardIds)
+      .where('active', true)
+      .groupBy('yard_id')
+      .select('yard_id')
+      .count('* as total_active')
+      .max('date_added as newest_date_added')
+      .max({ newest_created_at: 'createdAt' });
+
+    const statsMap = {};
+    stats.forEach(s => { statsMap[s.yard_id] = s; });
+
+    // New vehicles per yard from last scrape (within 1hr window of last_scraped)
+    const newCounts = await Promise.all(yards.map(async (y) => {
+      if (!y.last_scraped) return { yard_id: y.id, new_vehicles_last_scrape: 0 };
+      const window = new Date(new Date(y.last_scraped).getTime() - 60 * 60 * 1000);
+      const count = await database('yard_vehicle')
+        .where('yard_id', y.id)
+        .where('createdAt', '>=', window)
+        .where('createdAt', '<=', y.last_scraped)
+        .count('* as cnt')
+        .first();
+      return { yard_id: y.id, new_vehicles_last_scrape: parseInt(count.cnt) || 0 };
+    }));
+    const newMap = {};
+    newCounts.forEach(n => { newMap[n.yard_id] = n.new_vehicles_last_scrape; });
+
+    // Recent scrape_log entries (last 5 per yard)
+    let logMap = {};
+    try {
+      const logs = await database('scrape_log')
+        .whereIn('yard_id', yardIds)
+        .orderBy('scraped_at', 'desc')
+        .limit(yardIds.length * 5);
+      for (const l of logs) {
+        if (!logMap[l.yard_id]) logMap[l.yard_id] = [];
+        if (logMap[l.yard_id].length < 5) logMap[l.yard_id].push(l);
+      }
+    } catch (e) { /* scrape_log may not exist yet */ }
+
+    const result = yards.map(y => {
+      const s = statsMap[y.id] || {};
+      const hoursSince = y.last_scraped
+        ? Math.round((Date.now() - new Date(y.last_scraped).getTime()) / 3600000 * 10) / 10
+        : null;
+
+      let status = 'unknown';
+      if (!y.last_scraped || hoursSince > 30) status = 'critical';
+      else if (hoursSince > 18) status = 'stale';
+      else if ((newMap[y.id] || 0) === 0) status = 'warning';
+      else status = 'healthy';
+
+      return {
+        id: y.id,
+        name: y.name,
+        chain: y.chain,
+        last_scraped: y.last_scraped,
+        hours_since_scrape: hoursSince,
+        new_vehicles_last_scrape: newMap[y.id] || 0,
+        total_active: parseInt(s.total_active) || 0,
+        newest_date_added: s.newest_date_added,
+        newest_created_at: s.newest_created_at,
+        status,
+        recent_logs: logMap[y.id] || [],
+      };
+    });
+
+    const summary = {
+      total: result.length,
+      healthy: result.filter(r => r.status === 'healthy').length,
+      warning: result.filter(r => r.status === 'warning').length,
+      stale: result.filter(r => r.status === 'stale').length,
+      critical: result.filter(r => r.status === 'critical').length,
+    };
+
+    res.json({ success: true, summary, yards: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Log a yard visit with feedback
 router.post('/:id/feedback', async (req, res) => {
   const { id } = req.params;

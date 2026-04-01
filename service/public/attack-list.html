@@ -228,6 +228,7 @@
   }
   .manual-banner span { font-size: 12px; font-weight: 700; color: #ef4444; letter-spacing: 0.05em; }
   .manual-banner button { font-size: 11px; padding: 4px 10px; border-radius: 5px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 </style>
 </head>
 <body>
@@ -437,14 +438,31 @@
       .trim();
   }
 
+  let scrapeHealth = {}; // keyed by yard name
+
   async function loadData() {
     document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
       const since = filterSinceParam();
       const url = since ? '/attack-list?since=' + encodeURIComponent(since) : '/attack-list';
-      const res = await fetch(url);
+      // Fetch attack list and scrape health in parallel
+      const [res, healthRes] = await Promise.all([
+        fetch(url),
+        fetch('/yards/scrape-health').catch(() => null),
+      ]);
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
+
+      // Parse scrape health
+      if (healthRes && healthRes.ok) {
+        try {
+          const h = await healthRes.json();
+          scrapeHealth = {};
+          if (h.yards) h.yards.forEach(y => { scrapeHealth[y.name] = y; });
+          scrapeHealth._summary = h.summary;
+        } catch (e) { scrapeHealth = {}; }
+      }
+
       allData = data;
       dataCache[dateFilter] = data;
       renderData();
@@ -506,6 +524,20 @@
     document.getElementById('statusRight').textContent = `${totalV} vehicles · ${hotV} flagged`;
 
     let html = '';
+
+    // Scrape health summary on All tab — only show when problems exist
+    if (currentTab === 'all' && scrapeHealth._summary) {
+      const s = scrapeHealth._summary;
+      const problems = s.warning + s.stale + s.critical;
+      if (problems > 0) {
+        const color = s.critical > 0 ? '#fca5a5' : '#fbbf24';
+        const bg = s.critical > 0 ? '#7f1d1d' : '#713f12';
+        html += `<div style="padding:8px 14px;background:${bg};border-bottom:1px solid var(--border);font-size:12px;color:${color};font-weight:600;">
+          Scrape health: ${s.healthy}/${s.total} yards healthy · ${problems} yard${problems > 1 ? 's' : ''} need attention
+        </div>`;
+      }
+    }
+
     for (const yd of yards) {
       if (yd.total_vehicles === 0) continue;
 
@@ -533,13 +565,27 @@
         </div>
         <div class="vehicle-list">`;
 
-      // Stale scrape warning: if no vehicles were first seen today, show alert
-      const todayCount = filtered.filter(v => getSetDaysAgo(v) <= 0).length;
-      if (todayCount === 0) {
-        html += `<div style="padding:6px 14px;background:#713f12;border-bottom:1px solid var(--border);font-size:11px;color:#fbbf24;display:flex;justify-content:space-between;align-items:center;">
-          <span>No new vehicles detected today — try manual refresh</span>
-          <button class="icon-btn" style="width:24px;height:24px;font-size:11px;background:transparent;border:1px solid #fbbf24;color:#fbbf24;" onclick="scrapeYard('${yd.yard.id}',this)" title="Refresh ${yd.yard.name}">🔄</button>
-        </div>`;
+      // Scrape health indicator
+      const yHealth = scrapeHealth[yd.yard.name];
+      if (yHealth) {
+        const hrs = yHealth.hours_since_scrape;
+        const newV = yHealth.new_vehicles_last_scrape;
+        if (yHealth.status === 'critical') {
+          html += `<div style="padding:6px 14px;background:#7f1d1d;border-bottom:1px solid var(--border);font-size:11px;color:#fca5a5;display:flex;justify-content:space-between;align-items:center;animation:pulse 2s infinite;">
+            <span>No scrape in ${Math.round(hrs)}h — CHECK SCRAPER IMMEDIATELY</span>
+            <button class="icon-btn" style="width:24px;height:24px;font-size:11px;background:transparent;border:1px solid #fca5a5;color:#fca5a5;" onclick="scrapeYard('${yd.yard.id}',this)">🔄</button>
+          </div>`;
+        } else if (yHealth.status === 'stale') {
+          html += `<div style="padding:6px 14px;background:#7f1d1d;border-bottom:1px solid var(--border);font-size:11px;color:#fca5a5;display:flex;justify-content:space-between;align-items:center;">
+            <span>No scrape in ${Math.round(hrs)}h — scraper may not have run</span>
+            <button class="icon-btn" style="width:24px;height:24px;font-size:11px;background:transparent;border:1px solid #fca5a5;color:#fca5a5;" onclick="scrapeYard('${yd.yard.id}',this)">🔄</button>
+          </div>`;
+        } else if (yHealth.status === 'warning') {
+          html += `<div style="padding:6px 14px;background:#713f12;border-bottom:1px solid var(--border);font-size:11px;color:#fbbf24;display:flex;justify-content:space-between;align-items:center;">
+            <span>Last scrape found 0 new vehicles — data may be stale</span>
+            <button class="icon-btn" style="width:24px;height:24px;font-size:11px;background:transparent;border:1px solid #fbbf24;color:#fbbf24;" onclick="scrapeYard('${yd.yard.id}',this)">🔄</button>
+          </div>`;
+        }
       }
 
       // Group by date section
