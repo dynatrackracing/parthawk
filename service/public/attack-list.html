@@ -361,8 +361,10 @@
   }
 
   function getSetDaysAgo(v) {
-    // How many calendar days ago (Eastern) was this vehicle set at the yard (LKQ date)
-    const d = v.date_added;
+    // How many calendar days ago (Eastern) was this vehicle first scraped into our DB
+    // Uses createdAt instead of date_added because LKQ's "Available" dates are
+    // unreliable (vary ±1 day per location — Clearwater runs 1 day ahead, others behind)
+    const d = v.createdAt || v.date_added;
     if (!d) return 999;
     const todayET = easternDateStr(new Date());
     const addedET = easternDateStr(d);
@@ -626,7 +628,7 @@
             ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
             ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
             ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age ${v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
-            ${v.date_added ? `<span>${timeAgo(v.date_added)}</span>` : ''}
+            ${(v.createdAt || v.date_added) ? `<span>${timeAgo(v.createdAt || v.date_added)}</span>` : ''}
           </div>
           <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
         </div>

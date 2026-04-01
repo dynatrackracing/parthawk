@@ -1125,10 +1125,11 @@ class AttackListService {
     if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
     // Bonus: any part on The Mark want list
     if (filteredParts.some(p => p.isMarked)) score += 15;
-    // Bonus: fresh arrival (today)
-    if (vehicle.date_added) {
-      const addedDate = new Date(vehicle.date_added);
-      const daysSinceAdded = Math.floor((Date.now() - addedDate.getTime()) / 86400000);
+    // Bonus: fresh arrival (today) — use createdAt (when we first scraped it)
+    // because LKQ's date_added is unreliable (varies ±1 day per location)
+    if (vehicle.createdAt) {
+      const firstSeen = new Date(vehicle.createdAt);
+      const daysSinceAdded = Math.floor((Date.now() - firstSeen.getTime()) / 86400000);
       if (daysSinceAdded <= 1) score += 5;
     }
 
@@ -1158,7 +1159,7 @@ class AttackListService {
     return {
       id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model,
       trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
-      date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
+      date_added: vehicle.date_added, createdAt: vehicle.createdAt, last_seen: vehicle.last_seen, is_active: vehicle.active,
       vin: vehicle.vin || null,
       engine: formatEngineDisplay(vehicle.engine),
       engine_type: vehicle.engine_type || null,
