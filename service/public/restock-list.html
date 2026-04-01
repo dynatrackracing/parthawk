@@ -108,23 +108,30 @@ nav a.active{color:#DC2626;font-weight:700}
 
 <div class="container" id="overstockView" style="display:none">
   <div class="card">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div style="flex:1;min-width:120px">
-        <div style="font-size:10px;color:#6B7280;margin-bottom:3px">eBay Item Number</div>
-        <input type="text" class="add-input" id="overstockItemInput" placeholder="Enter eBay item number" autocomplete="off">
-      </div>
+    <div style="font-size:10px;color:#6B7280;margin-bottom:3px">Paste eBay Item Numbers</div>
+    <textarea class="add-input" id="overstockIdsInput" rows="4" placeholder="Paste eBay item numbers, one per line or separated by commas/spaces" style="resize:vertical;font-size:13px;line-height:1.5"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
       <div style="width:80px">
         <div style="font-size:10px;color:#6B7280;margin-bottom:3px">Restock At</div>
         <input type="number" class="add-input" id="overstockTargetInput" value="1" min="0" max="99" style="text-align:center">
       </div>
-      <div style="flex:.8;min-width:100px">
+      <div style="flex:1;min-width:100px">
+        <div style="font-size:10px;color:#6B7280;margin-bottom:3px">Group Name</div>
+        <input type="text" class="add-input" id="overstockNameInput" placeholder="Auto-generated from first item" autocomplete="off">
+      </div>
+      <div style="flex:.6;min-width:80px">
         <div style="font-size:10px;color:#6B7280;margin-bottom:3px">Notes</div>
         <input type="text" class="add-input" id="overstockNotesInput" placeholder="Notes (optional)" autocomplete="off">
       </div>
-      <button class="btn-add" onclick="addOverstock()">Track</button>
+      <button class="btn-add" onclick="addOverstockGroup()">Track Group</button>
     </div>
     <div style="font-size:9px;color:#6B7280;margin-top:6px">0 = slow mover (sell out first) · 1 = keep one on hand · 2+ = high demand</div>
     <div id="overstockFormError" class="overstock-error" style="display:none"></div>
+    <div id="overstockFormWarnings" style="display:none;font-size:10px;color:#EAB308;margin-top:6px"></div>
+  </div>
+  <div id="suggestionsSection" style="margin-bottom:10px">
+    <button class="btn-add" onclick="loadSuggestions()" id="suggestBtn" style="background:#1a1a1a;color:#d1d5db;border:1px solid #333;font-size:11px;padding:8px 14px;width:100%;margin-bottom:6px">Find High-Quantity Listings</button>
+    <div id="suggestionsContent"></div>
   </div>
   <div id="overstockLoading" style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading...</div></div>
   <div id="overstockList"></div>
@@ -473,14 +480,14 @@ function loadJustSold() {
 load();
 loadJustSold();
 
-// ── OVERSTOCK ───────────────────────────────────────────────
+// ── OVERSTOCK (group-based) ──────────────────────────────────
 function loadOverstock() {
   document.getElementById('overstockLoading').style.display = 'block';
   fetch('/restock-want-list/overstock')
     .then(function(r) { return r.json(); })
-    .then(function(items) {
+    .then(function(groups) {
       document.getElementById('overstockLoading').style.display = 'none';
-      overstockItems = items;
+      overstockItems = groups;
       overstockLoaded = true;
       renderOverstock();
       updateOverstockBadge();
@@ -492,7 +499,7 @@ function loadOverstock() {
 }
 
 function updateOverstockBadge() {
-  var triggered = overstockItems.filter(function(i) { return i.status === 'triggered'; }).length;
+  var triggered = overstockItems.filter(function(g) { return g.status === 'triggered'; }).length;
   var tabEl = document.getElementById('tab-overstock');
   if (triggered > 0) {
     tabEl.innerHTML = 'OVERSTOCK <span style="color:#EF4444">(' + triggered + ')</span>';
@@ -509,84 +516,154 @@ function relTime(dateStr) {
   return days + 'd ago';
 }
 
+function parseItemIds(text) {
+  return text.split(/[\n,\s\t]+/).map(function(s) { return s.trim(); }).filter(function(s) { return /^\d{10,15}$/.test(s); });
+}
+
 function renderOverstock() {
   if (overstockItems.length === 0) {
-    document.getElementById('overstockList').innerHTML = '<div class="empty">No overstock items tracked yet.<br><span style="font-size:11px">Add an eBay item number above to start monitoring high-quantity parts.</span></div>';
+    document.getElementById('overstockList').innerHTML = '<div class="empty">No overstock groups tracked yet.<br><span style="font-size:11px">Paste eBay item numbers above to start monitoring, or use "Find High-Quantity Listings" to auto-detect.</span></div>';
     return;
   }
   var h = '';
-  overstockItems.forEach(function(item) {
-    var liveQty = item.live_quantity != null ? parseInt(item.live_quantity) : item.current_quantity;
+  overstockItems.forEach(function(group) {
+    var stock = group.live_stock != null ? group.live_stock : group.current_stock;
     var qtyColor = '#22C55E';
-    if (liveQty <= item.restock_target) qtyColor = '#EF4444';
-    else if (liveQty === item.restock_target + 1) qtyColor = '#EAB308';
+    if (stock <= group.restock_target) qtyColor = '#EF4444';
+    else if (stock === group.restock_target + 1) qtyColor = '#EAB308';
 
     var statusBadge = '';
     var cardClass = 'overstock-card';
-    if (item.status === 'triggered') {
+    if (group.status === 'triggered') {
       statusBadge = '<div class="status-badge" style="background:#EF4444;color:#fff">RESTOCK NOW</div>';
       cardClass += ' overstock-triggered';
-    } else if (item.status === 'acknowledged') {
+    } else if (group.status === 'acknowledged') {
       statusBadge = '<div class="status-badge" style="background:#374151;color:#9CA3AF">ACKNOWLEDGED</div>';
     } else {
       statusBadge = '<div class="status-badge" style="background:#6B7280;color:#fff">WATCHING</div>';
     }
 
     var timeStr = '';
-    if (item.status === 'triggered' && item.triggered_at) timeStr = 'Triggered ' + relTime(item.triggered_at);
-    else if (item.status === 'acknowledged' && item.acknowledged_at) timeStr = 'Acknowledged ' + relTime(item.acknowledged_at);
-    else timeStr = 'Tracking for ' + relTime(item.created_at);
+    if (group.status === 'triggered' && group.triggered_at) timeStr = 'Triggered ' + relTime(group.triggered_at);
+    else if (group.status === 'acknowledged' && group.acknowledged_at) timeStr = 'Acknowledged ' + relTime(group.acknowledged_at);
+    else timeStr = 'Tracking for ' + relTime(group.created_at);
+
+    var typeLabel = group.group_type === 'single'
+      ? 'SINGLE (qty ' + group.initial_stock + ')'
+      : 'GROUP (' + (group.items ? group.items.length : group.initial_stock) + ' listings)';
 
     h += '<div class="' + cardClass + '">';
     h += statusBadge;
-    h += '<div style="font-size:14px;font-weight:700;color:#F0F0F0;padding-right:90px">' + esc(item.title) + '</div>';
-    h += '<div style="font-size:11px;margin-top:3px"><a href="https://www.ebay.com/itm/' + esc(item.ebay_item_id) + '" target="_blank" style="color:#6B7280;text-decoration:none">#' + esc(item.ebay_item_id) + '</a></div>';
-    if (item.part_number_base) h += '<div style="font-size:11px;color:#6B7280;margin-top:2px">PN: ' + esc(item.part_number_base) + '</div>';
-    h += '<div style="margin-top:8px;font-size:13px;font-weight:700;color:' + qtyColor + '">Stock: ' + liveQty + ' / ' + item.initial_quantity + '</div>';
-    h += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Restock at: ' + item.restock_target;
-    if (item.restock_target === 0) h += ' <span style="color:#6B7280;font-size:9px;font-weight:700">SLOW MOVER</span>';
+    h += '<div style="font-size:14px;font-weight:700;color:#F0F0F0;padding-right:90px">' + esc(group.name) + '</div>';
+    h += '<div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">';
+    if (group.part_type) h += '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:#1a1a1a;color:#9CA3AF;font-weight:700;border:1px solid #333">' + esc(group.part_type) + '</span>';
+    h += '<span style="font-size:10px;color:#6B7280">' + typeLabel + '</span>';
+    h += '</div>';
+
+    // Expandable item list
+    if (group.items && group.items.length > 0) {
+      h += '<details style="margin-top:6px"><summary style="font-size:10px;color:#6B7280;cursor:pointer;user-select:none">' + group.items.length + ' item' + (group.items.length > 1 ? 's' : '') + ' &#9654;</summary>';
+      h += '<div style="margin-top:4px;padding:4px 8px;background:#0a0a0a;border-radius:4px;border:1px solid #2a2a2a">';
+      group.items.forEach(function(item) {
+        var style = item.is_active ? 'color:#d1d5db' : 'color:#6B7280;text-decoration:line-through;opacity:0.5';
+        h += '<div style="font-size:10px;padding:3px 0;' + style + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">';
+        h += '<a href="https://www.ebay.com/itm/' + esc(item.ebay_item_id) + '" target="_blank" style="color:inherit;text-decoration:none">#' + esc(item.ebay_item_id) + '</a> ';
+        h += esc(item.title || '');
+        if (item.current_price) h += ' <span style="color:#22c55e">$' + parseFloat(item.current_price).toFixed(0) + '</span>';
+        if (!item.is_active) h += ' <span style="color:#EF4444;font-size:8px;font-weight:700">SOLD</span>';
+        h += '</div>';
+      });
+      h += '</div></details>';
+    }
+
+    h += '<div style="margin-top:8px;font-size:13px;font-weight:700;color:' + qtyColor + '">Stock: ' + stock + ' / ' + group.initial_stock + '</div>';
+    h += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Restock at: ' + group.restock_target;
+    if (group.restock_target === 0) h += ' <span style="color:#6B7280;font-size:9px;font-weight:700">SLOW MOVER</span>';
     h += '</div>';
     h += '<div style="font-size:10px;color:#6B7280;margin-top:4px">' + timeStr + '</div>';
-    if (item.notes) h += '<div style="font-size:10px;color:#9CA3AF;margin-top:3px;font-style:italic">' + esc(item.notes) + '</div>';
+    if (group.notes) h += '<div style="font-size:10px;color:#9CA3AF;margin-top:3px;font-style:italic">' + esc(group.notes) + '</div>';
 
     h += '<div class="actions-row">';
-    if (item.status === 'triggered') {
-      h += '<button class="btn-ack" onclick="ackOverstock(' + item.id + ')">Acknowledge</button>';
-      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + item.id + ')">Re-watch</button>';
-    } else if (item.status === 'acknowledged') {
-      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + item.id + ')">Re-watch</button>';
-      h += '<button class="btn-del" onclick="deleteOverstock(' + item.id + ')">Delete</button>';
+    if (group.status === 'triggered') {
+      h += '<button class="btn-ack" onclick="ackOverstock(' + group.id + ')">Acknowledge</button>';
+      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + group.id + ')">Re-watch</button>';
+    } else if (group.status === 'acknowledged') {
+      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + group.id + ')">Re-watch</button>';
+      h += '<button class="btn-del" onclick="deleteOverstock(' + group.id + ')">Delete</button>';
     } else {
-      h += '<button class="btn-del" onclick="deleteOverstock(' + item.id + ')">Delete</button>';
+      h += '<button class="btn-rewatch" onclick="showAddItems(' + group.id + ')" style="border-color:#6B7280;color:#9CA3AF">Add Items</button>';
+      h += '<button class="btn-del" onclick="deleteOverstock(' + group.id + ')">Delete</button>';
     }
     h += '</div>';
-    h += '<div id="overstock-err-' + item.id + '" class="overstock-error" style="display:none"></div>';
+    h += '<div id="overstock-add-' + group.id + '" style="display:none;margin-top:8px"><input type="text" class="add-input" style="font-size:12px;padding:8px" placeholder="Paste item numbers (comma or space separated)" id="overstock-add-input-' + group.id + '"><button class="btn-add" style="margin-top:4px;font-size:11px;padding:6px 12px" onclick="addItemsToGroup(' + group.id + ')">Add to Group</button></div>';
+    h += '<div id="overstock-err-' + group.id + '" class="overstock-error" style="display:none"></div>';
     h += '</div>';
   });
   document.getElementById('overstockList').innerHTML = h;
 }
 
-function addOverstock() {
-  var itemId = document.getElementById('overstockItemInput').value.trim();
+function addOverstockGroup() {
+  var raw = document.getElementById('overstockIdsInput').value;
+  var ids = parseItemIds(raw);
   var target = parseInt(document.getElementById('overstockTargetInput').value) || 1;
+  var name = document.getElementById('overstockNameInput').value.trim();
   var notes = document.getElementById('overstockNotesInput').value.trim();
   var errEl = document.getElementById('overstockFormError');
+  var warnEl = document.getElementById('overstockFormWarnings');
   errEl.style.display = 'none';
-  if (!itemId) { errEl.textContent = 'Enter an eBay item number.'; errEl.style.display = 'block'; return; }
+  warnEl.style.display = 'none';
+
+  if (ids.length === 0) { errEl.textContent = 'No valid eBay item numbers found. Item numbers are 10-15 digits.'; errEl.style.display = 'block'; return; }
 
   fetch('/restock-want-list/overstock/add', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ebayItemId: itemId, restockTarget: target, notes: notes || undefined })
+    body: JSON.stringify({ ebayItemIds: ids, restockTarget: target, name: name || undefined, notes: notes || undefined })
   })
     .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
     .then(function(res) {
-      if (!res.ok) { errEl.textContent = res.data.error || 'Error adding item.'; errEl.style.display = 'block'; return; }
-      document.getElementById('overstockItemInput').value = '';
+      if (!res.ok) {
+        var msg = res.data.error || 'Error creating group.';
+        if (res.data.errors && res.data.errors.length > 0) msg += '\n' + res.data.errors.join('\n');
+        errEl.textContent = msg; errEl.style.display = 'block';
+        return;
+      }
+      document.getElementById('overstockIdsInput').value = '';
       document.getElementById('overstockTargetInput').value = '1';
+      document.getElementById('overstockNameInput').value = '';
       document.getElementById('overstockNotesInput').value = '';
-      overstockItems.unshift(res.data);
-      renderOverstock();
-      updateOverstockBadge();
+      if (res.data.errors && res.data.errors.length > 0) {
+        warnEl.textContent = 'Warnings: ' + res.data.errors.join('; ');
+        warnEl.style.display = 'block';
+      }
+      loadOverstock();
+    })
+    .catch(function(err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+}
+
+function showAddItems(groupId) {
+  var el = document.getElementById('overstock-add-' + groupId);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function addItemsToGroup(groupId) {
+  var input = document.getElementById('overstock-add-input-' + groupId);
+  var ids = parseItemIds(input.value);
+  var errEl = document.getElementById('overstock-err-' + groupId);
+  errEl.style.display = 'none';
+  if (ids.length === 0) { errEl.textContent = 'No valid item numbers found.'; errEl.style.display = 'block'; return; }
+
+  fetch('/restock-want-list/overstock/add-items', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ groupId: groupId, ebayItemIds: ids })
+  })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { errEl.textContent = res.data.error || 'Error'; errEl.style.display = 'block'; return; }
+      if (res.data.errors && res.data.errors.length > 0) {
+        errEl.textContent = res.data.errors.join('; '); errEl.style.display = 'block';
+        errEl.style.color = '#EAB308';
+      }
+      loadOverstock();
     })
     .catch(function(err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
 }
@@ -595,10 +672,7 @@ function ackOverstock(id) {
   fetch('/restock-want-list/overstock/acknowledge', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: id })
-  })
-    .then(function(r) { return r.json(); })
-    .then(function() { loadOverstock(); })
-    .catch(function(err) { alert('Error: ' + err.message); });
+  }).then(function() { loadOverstock(); }).catch(function(err) { alert('Error: ' + err.message); });
 }
 
 function rewatchOverstock(id) {
@@ -619,23 +693,70 @@ function rewatchOverstock(id) {
 }
 
 function deleteOverstock(id) {
-  if (!confirm('Remove overstock tracking for this item?')) return;
+  if (!confirm('Remove overstock tracking for this group?')) return;
   fetch('/restock-want-list/overstock/delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: id })
-  })
-    .then(function(r) { return r.json(); })
-    .then(function() { loadOverstock(); })
-    .catch(function(err) { alert('Error: ' + err.message); });
+  }).then(function() { loadOverstock(); }).catch(function(err) { alert('Error: ' + err.message); });
 }
 
-document.getElementById('overstockItemInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') addOverstock(); });
+function loadSuggestions() {
+  var btn = document.getElementById('suggestBtn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  var el = document.getElementById('suggestionsContent');
+
+  fetch('/restock-want-list/overstock/suggestions')
+    .then(function(r) { return r.json(); })
+    .then(function(items) {
+      btn.disabled = false; btn.textContent = 'Find High-Quantity Listings';
+      if (!items || items.length === 0) {
+        el.innerHTML = '<div style="text-align:center;font-size:11px;color:#6B7280;padding:8px">No high-quantity listings found (all items are quantity 1)</div>';
+        return;
+      }
+      var h = '<div class="card" style="padding:10px">';
+      h += '<div style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:6px">' + items.length + ' high-quantity listings</div>';
+      items.forEach(function(item, idx) {
+        h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1f1f1f;font-size:11px">';
+        h += '<input type="checkbox" class="suggest-check" data-id="' + esc(item.ebayItemId) + '" style="accent-color:#dc2626">';
+        h += '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d1d5db">' + esc(item.title) + '</div>';
+        h += '<span style="color:#EAB308;font-weight:700;white-space:nowrap">Qty: ' + item.quantity + '</span>';
+        if (item.currentPrice) h += '<span style="color:#22c55e;white-space:nowrap">$' + Math.round(item.currentPrice) + '</span>';
+        h += '</div>';
+      });
+      h += '<button class="btn-add" style="margin-top:8px;font-size:11px;padding:6px 12px;width:100%" onclick="trackSelectedSuggestions()">Track Selected</button>';
+      h += '</div>';
+      el.innerHTML = h;
+    })
+    .catch(function(err) {
+      btn.disabled = false; btn.textContent = 'Find High-Quantity Listings';
+      el.innerHTML = '<div style="color:#EF4444;font-size:11px;padding:4px">Error: ' + err.message + '</div>';
+    });
+}
+
+function trackSelectedSuggestions() {
+  var checks = document.querySelectorAll('.suggest-check:checked');
+  if (checks.length === 0) { alert('Select at least one listing'); return; }
+  var promises = [];
+  checks.forEach(function(cb) {
+    var id = cb.getAttribute('data-id');
+    promises.push(
+      fetch('/restock-want-list/overstock/add', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ebayItemIds: [id], restockTarget: 1 })
+      }).then(function(r) { return r.json(); })
+    );
+  });
+  Promise.all(promises).then(function() {
+    document.getElementById('suggestionsContent').innerHTML = '';
+    loadOverstock();
+  }).catch(function(err) { alert('Error: ' + err.message); });
+}
 
 // Pre-load overstock badge count on page load
 fetch('/restock-want-list/overstock')
   .then(function(r) { return r.json(); })
-  .then(function(items) {
-    overstockItems = items;
+  .then(function(groups) {
+    overstockItems = groups;
     overstockLoaded = true;
     updateOverstockBadge();
   })

@@ -460,19 +460,43 @@ router.post('/watchlist/update', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// OVERSTOCK WATCH — track high-quantity items for restock alerts
+// OVERSTOCK WATCH — group-based inventory monitoring
 // ══════════════════════════════════════════════════════════════
 
+// Detect common part types from title
+function detectPartType(title) {
+  if (!title) return null;
+  const t = title.toUpperCase();
+  const types = [
+    [/\bECM\b|\bECU\b|ENGINE\s*CONTROL\s*MODULE/, 'ECM'],
+    [/\bBCM\b|BODY\s*CONTROL\s*MODULE/, 'BCM'],
+    [/\bTCM\b|TRANS(MISSION)?\s*CONTROL\s*MODULE/, 'TCM'],
+    [/\bABS\b.*\b(PUMP|MODULE)\b/, 'ABS'],
+    [/\bPCM\b|POWERTRAIN\s*CONTROL/, 'PCM'],
+    [/\bHEADLIGHT\b|\bHEADLAMP\b/, 'HEADLIGHT'],
+    [/\bTAILLIGHT\b|\bTAIL\s*LIGHT\b|\bTAILLAMP\b/, 'TAILLIGHT'],
+    [/\bMIRROR\b/, 'MIRROR'],
+    [/\bDOOR\b.*\bHANDLE\b/, 'DOOR HANDLE'],
+    [/\bALTERNATOR\b/, 'ALTERNATOR'],
+    [/\bSTARTER\b/, 'STARTER'],
+    [/\bRADIATOR\b/, 'RADIATOR'],
+    [/\bCOMPRESSOR\b|\bA\/?C\b/, 'AC COMPRESSOR'],
+    [/\bSPINDLE\b|\bKNUCKLE\b/, 'SPINDLE'],
+    [/\bCALIPER\b/, 'CALIPER'],
+    [/\bSTRUT\b|\bSHOCK\b/, 'STRUT'],
+    [/\bFUSE\s*BOX\b/, 'FUSE BOX'],
+    [/\bINSTRUMENT\s*CLUSTER\b|\bSPEEDOMETER\b|\bGAUGE\s*CLUSTER\b/, 'CLUSTER'],
+  ];
+  for (const [re, label] of types) {
+    if (re.test(t)) return label;
+  }
+  return null;
+}
+
 router.get('/overstock', async (req, res) => {
-  const items = await database('overstock_watch')
-    .leftJoin('YourListing', 'YourListing.ebayItemId', 'overstock_watch.ebay_item_id')
-    .select(
-      'overstock_watch.*',
-      'YourListing.quantityAvailable as live_quantity',
-      'YourListing.listingStatus as live_status'
-    )
+  const groups = await database('overstock_group')
     .orderByRaw(`
-      CASE overstock_watch.status
+      CASE status
         WHEN 'triggered' THEN 0
         WHEN 'watching' THEN 1
         WHEN 'acknowledged' THEN 2
@@ -480,55 +504,205 @@ router.get('/overstock', async (req, res) => {
       END
     `)
     .orderByRaw(`
-      CASE overstock_watch.status
-        WHEN 'triggered' THEN EXTRACT(EPOCH FROM overstock_watch.triggered_at)
-        WHEN 'watching' THEN EXTRACT(EPOCH FROM overstock_watch.created_at)
-        WHEN 'acknowledged' THEN EXTRACT(EPOCH FROM overstock_watch.acknowledged_at)
+      CASE status
+        WHEN 'triggered' THEN EXTRACT(EPOCH FROM triggered_at)
+        WHEN 'watching' THEN EXTRACT(EPOCH FROM created_at)
+        WHEN 'acknowledged' THEN EXTRACT(EPOCH FROM acknowledged_at)
         ELSE 0
       END DESC
     `);
 
-  res.json(items);
+  // Eager load items + compute live stock for each group
+  const results = [];
+  for (const group of groups) {
+    const items = await database('overstock_group_item')
+      .where('group_id', group.id)
+      .orderBy('is_active', 'desc')
+      .orderBy('added_at', 'asc');
+
+    // Compute live stock
+    let liveStock = 0;
+    if (group.group_type === 'single' && items.length > 0) {
+      const listing = await database('YourListing')
+        .where('ebayItemId', items[0].ebay_item_id)
+        .first();
+      if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
+        liveStock = parseInt(listing.quantityAvailable) || 1;
+      }
+    } else {
+      for (const item of items) {
+        if (item.is_active) {
+          const listing = await database('YourListing')
+            .where('ebayItemId', item.ebay_item_id)
+            .first();
+          if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
+            liveStock++;
+          }
+        }
+      }
+    }
+
+    results.push({
+      ...group,
+      live_stock: liveStock,
+      items: items,
+    });
+  }
+
+  res.json(results);
 });
 
 router.post('/overstock/add', async (req, res) => {
-  const { ebayItemId, restockTarget = 1, notes } = req.body;
-  if (!ebayItemId) return res.status(400).json({ error: 'eBay item ID required.' });
-
-  const listing = await database('YourListing').where('ebayItemId', ebayItemId).first();
-  if (!listing) return res.status(400).json({ error: 'Listing not found in your inventory.' });
-
-  const qty = parseInt(listing.quantityAvailable) || 0;
-  if (qty < 3) return res.status(400).json({ error: `This listing only has ${qty} in stock. Overstock tracking requires 3+.` });
+  const { ebayItemIds, restockTarget = 1, name, notes } = req.body;
+  if (!ebayItemIds || !Array.isArray(ebayItemIds) || ebayItemIds.length === 0) {
+    return res.status(400).json({ error: 'At least one eBay item ID required.' });
+  }
 
   const target = parseInt(restockTarget);
   if (isNaN(target) || target < 0) return res.status(400).json({ error: 'Restock target cannot be negative.' });
-  if (target >= qty) return res.status(400).json({ error: `Restock target must be below current stock (${qty}).` });
 
-  const existing = await database('overstock_watch').where('ebay_item_id', ebayItemId).first();
-  if (existing) return res.status(400).json({ error: 'Already tracking this item.' });
+  // Look up each item
+  const validItems = [];
+  const errors = [];
+  for (const rawId of ebayItemIds) {
+    const id = String(rawId).trim();
+    if (!id) continue;
+    const listing = await database('YourListing').where('ebayItemId', id).first();
+    if (!listing) {
+      errors.push(`Item ${id} not found in inventory`);
+    } else {
+      // Check not already tracked
+      const existing = await database('overstock_group_item').where('ebay_item_id', id).first();
+      if (existing) {
+        errors.push(`Item ${id} is already tracked in another group`);
+      } else {
+        validItems.push({
+          ebayItemId: id,
+          title: listing.title || id,
+          currentPrice: parseFloat(listing.currentPrice) || null,
+          quantity: parseInt(listing.quantityAvailable) || 1,
+          listingStatus: listing.listingStatus,
+        });
+      }
+    }
+  }
 
-  const [row] = await database('overstock_watch').insert({
-    ebay_item_id: ebayItemId,
-    title: listing.title || ebayItemId,
-    part_number_base: null,
-    current_quantity: qty,
-    initial_quantity: qty,
+  if (validItems.length === 0) {
+    return res.status(400).json({ error: 'No valid items found.', errors });
+  }
+
+  let groupType, initialStock;
+  if (validItems.length === 1) {
+    // Single item — must have quantity 2+
+    if (validItems[0].quantity < 2) {
+      return res.status(400).json({
+        error: 'Single item has quantity 1 — nothing to track. Paste multiple item numbers for group tracking, or use an item with quantity 2+.',
+        errors
+      });
+    }
+    groupType = 'single';
+    initialStock = validItems[0].quantity;
+  } else {
+    // Multi group — need at least 2 valid items
+    if (validItems.length < 2) {
+      return res.status(400).json({
+        error: 'Need at least 2 listings to create a group. For single items, the item must have quantity 2+.',
+        errors
+      });
+    }
+    groupType = 'multi';
+    initialStock = validItems.length;
+  }
+
+  if (target >= initialStock) {
+    return res.status(400).json({ error: `Restock target (${target}) must be below current stock (${initialStock}).` });
+  }
+
+  const groupName = (name && name.trim()) ? name.trim().substring(0, 256) : validItems[0].title.substring(0, 80);
+  const partType = detectPartType(validItems[0].title);
+
+  const [group] = await database('overstock_group').insert({
+    name: groupName,
+    part_type: partType,
     restock_target: target,
+    current_stock: initialStock,
+    initial_stock: initialStock,
+    group_type: groupType,
     status: 'watching',
     notes: notes || null,
     created_at: new Date(),
     updated_at: new Date(),
   }).returning('*');
 
-  res.json(row);
+  // Insert items
+  const itemRows = [];
+  for (const vi of validItems) {
+    const [row] = await database('overstock_group_item').insert({
+      group_id: group.id,
+      ebay_item_id: vi.ebayItemId,
+      title: vi.title,
+      current_price: vi.currentPrice,
+      is_active: true,
+      added_at: new Date(),
+    }).returning('*');
+    itemRows.push(row);
+  }
+
+  res.json({ ...group, items: itemRows, errors: errors.length > 0 ? errors : undefined });
+});
+
+router.post('/overstock/add-items', async (req, res) => {
+  const { groupId, ebayItemIds } = req.body;
+  if (!groupId) return res.status(400).json({ error: 'groupId required.' });
+  if (!ebayItemIds || !Array.isArray(ebayItemIds) || ebayItemIds.length === 0) {
+    return res.status(400).json({ error: 'At least one eBay item ID required.' });
+  }
+
+  const group = await database('overstock_group').where('id', groupId).first();
+  if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+  const errors = [];
+  const added = [];
+  for (const rawId of ebayItemIds) {
+    const id = String(rawId).trim();
+    if (!id) continue;
+    const listing = await database('YourListing').where('ebayItemId', id).first();
+    if (!listing) { errors.push(`Item ${id} not found in inventory`); continue; }
+    const existing = await database('overstock_group_item')
+      .where('group_id', groupId).where('ebay_item_id', id).first();
+    if (existing) { errors.push(`Item ${id} already in this group`); continue; }
+
+    const [row] = await database('overstock_group_item').insert({
+      group_id: groupId,
+      ebay_item_id: id,
+      title: listing.title || id,
+      current_price: parseFloat(listing.currentPrice) || null,
+      is_active: true,
+      added_at: new Date(),
+    }).returning('*');
+    added.push(row);
+  }
+
+  // Update initial_stock if it grew
+  if (added.length > 0) {
+    const totalItems = await database('overstock_group_item').where('group_id', groupId).count('* as count').first();
+    const newCount = parseInt(totalItems.count) || 0;
+    const update = { updated_at: new Date() };
+    if (newCount > group.initial_stock) update.initial_stock = newCount;
+    update.current_stock = newCount; // refresh
+    await database('overstock_group').where('id', groupId).update(update);
+  }
+
+  const updated = await database('overstock_group').where('id', groupId).first();
+  const items = await database('overstock_group_item').where('group_id', groupId);
+  res.json({ ...updated, items, added: added.length, errors: errors.length > 0 ? errors : undefined });
 });
 
 router.post('/overstock/acknowledge', async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID required.' });
 
-  const [row] = await database('overstock_watch').where({ id }).update({
+  const [row] = await database('overstock_group').where({ id }).update({
     status: 'acknowledged',
     acknowledged_at: new Date(),
     updated_at: new Date(),
@@ -541,29 +715,40 @@ router.post('/overstock/rewatch', async (req, res) => {
   const { id, restockTarget } = req.body;
   if (!id) return res.status(400).json({ error: 'ID required.' });
 
-  const item = await database('overstock_watch').where({ id }).first();
-  if (!item) return res.status(404).json({ error: 'Not found.' });
+  const group = await database('overstock_group').where({ id }).first();
+  if (!group) return res.status(404).json({ error: 'Not found.' });
 
-  const listing = await database('YourListing').where('ebayItemId', item.ebay_item_id).first();
-  const qty = listing ? (parseInt(listing.quantityAvailable) || 0) : 0;
-  if (qty < 3) return res.status(400).json({ error: `Stock is only at ${qty}. Need 3+ to re-watch.` });
+  // Recompute live stock
+  const items = await database('overstock_group_item').where('group_id', id);
+  let liveStock = 0;
+  if (group.group_type === 'single' && items.length > 0) {
+    const listing = await database('YourListing').where('ebayItemId', items[0].ebay_item_id).first();
+    if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
+      liveStock = parseInt(listing.quantityAvailable) || 1;
+    }
+  } else {
+    for (const item of items) {
+      const listing = await database('YourListing').where('ebayItemId', item.ebay_item_id).first();
+      if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) liveStock++;
+    }
+  }
+
+  if (liveStock < 2) return res.status(400).json({ error: `Stock is only at ${liveStock}. Need 2+ to re-watch.` });
 
   const update = {
     status: 'watching',
-    current_quantity: qty,
+    current_stock: liveStock,
     triggered_at: null,
     acknowledged_at: null,
     updated_at: new Date(),
   };
 
   if (restockTarget !== undefined && restockTarget !== null) {
-    const target = parseInt(restockTarget);
-    if (!isNaN(target) && target >= 0 && target < qty) {
-      update.restock_target = target;
-    }
+    const t = parseInt(restockTarget);
+    if (!isNaN(t) && t >= 0 && t < liveStock) update.restock_target = t;
   }
 
-  const [row] = await database('overstock_watch').where({ id }).update(update).returning('*');
+  const [row] = await database('overstock_group').where({ id }).update(update).returning('*');
   res.json(row);
 });
 
@@ -571,14 +756,15 @@ router.post('/overstock/delete', async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID required.' });
 
-  const item = await database('overstock_watch').where({ id }).first();
-  if (item) {
+  const group = await database('overstock_group').where({ id }).first();
+  if (group) {
     await database('scout_alerts')
       .where('source', 'OVERSTOCK')
-      .where('source_title', 'like', `%${item.ebay_item_id}%`)
+      .where('source_title', group.name)
       .del();
   }
-  await database('overstock_watch').where({ id }).del();
+  // CASCADE handles overstock_group_item deletion
+  await database('overstock_group').where({ id }).del();
   res.json({ success: true });
 });
 
@@ -587,6 +773,31 @@ router.post('/overstock/check-now', async (req, res) => {
   const service = new OverstockCheckService();
   const result = await service.checkAll();
   res.json(result);
+});
+
+router.get('/overstock/suggestions', async (req, res) => {
+  // Find YourListing items with quantity >= 2 that aren't already tracked
+  const tracked = await database('overstock_group_item').select('ebay_item_id');
+  const trackedIds = tracked.map(t => t.ebay_item_id);
+
+  let q = database('YourListing')
+    .where('listingStatus', 'Active')
+    .where('quantityAvailable', '>=', 2)
+    .select('ebayItemId', 'title', 'quantityAvailable', 'currentPrice')
+    .orderBy('quantityAvailable', 'desc')
+    .limit(50);
+
+  if (trackedIds.length > 0) {
+    q = q.whereNotIn('ebayItemId', trackedIds);
+  }
+
+  const suggestions = await q;
+  res.json(suggestions.map(s => ({
+    ebayItemId: s.ebayItemId,
+    title: s.title,
+    quantity: parseInt(s.quantityAvailable) || 1,
+    currentPrice: parseFloat(s.currentPrice) || null,
+  })));
 });
 
 module.exports = router;

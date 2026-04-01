@@ -210,7 +210,7 @@ function load(page) {
           h += '<div class="claim-check' + (isClaimed ? ' checked' : '') + '" onclick="claimAlert(' + a.id + ',' + !isClaimed + ')">' + checkSvg + '</div>';
           h += '<div class="alert-info">';
           if (a.source === 'OVERSTOCK') {
-            h += '<div class="alert-part"><a href="https://www.ebay.com/itm/' + esc(a.source_title).replace(/[^0-9a-zA-Z ]/g, '') + '" target="_blank" style="color:#F0F0F0;text-decoration:none">' + esc(a.source_title) + '</a></div>';
+            h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
             h += '<div class="alert-vehicle" style="color:#F59E0B">Low Stock Alert</div>';
           } else {
             h += '<div class="alert-part">' + esc(a.source_title) + '</div>';

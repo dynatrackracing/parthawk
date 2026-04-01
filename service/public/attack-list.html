@@ -322,7 +322,7 @@
     const now = new Date();
     const past = new Date(now);
     past.setDate(past.getDate() - daysAgo);
-    const dateStr = past.toISOString().split('T')[0];
+    const dateStr = past.toLocaleDateString('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
     // 5am UTC = midnight EST (safe floor — in EDT this is 1am, still captures full day)
     return dateStr + 'T05:00:00.000Z';
   }
