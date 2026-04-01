@@ -501,62 +501,70 @@ function detectPartType(title) {
 }
 
 router.get('/overstock', async (req, res) => {
-  const groups = await database('overstock_group')
-    .orderByRaw(`
-      CASE status
-        WHEN 'triggered' THEN 0
-        WHEN 'watching' THEN 1
-        WHEN 'acknowledged' THEN 2
-        ELSE 3
-      END
-    `)
-    .orderByRaw(`
-      CASE status
-        WHEN 'triggered' THEN EXTRACT(EPOCH FROM triggered_at)
-        WHEN 'watching' THEN EXTRACT(EPOCH FROM created_at)
-        WHEN 'acknowledged' THEN EXTRACT(EPOCH FROM acknowledged_at)
-        ELSE 0
-      END DESC
-    `);
+  try {
+    const groups = await database('overstock_group')
+      .orderByRaw(`
+        CASE status
+          WHEN 'triggered' THEN 0
+          WHEN 'watching' THEN 1
+          WHEN 'acknowledged' THEN 2
+          ELSE 3
+        END
+      `)
+      .orderByRaw(`
+        CASE status
+          WHEN 'triggered' THEN EXTRACT(EPOCH FROM triggered_at)
+          WHEN 'watching' THEN EXTRACT(EPOCH FROM created_at)
+          WHEN 'acknowledged' THEN EXTRACT(EPOCH FROM acknowledged_at)
+          ELSE 0
+        END DESC
+      `);
 
-  // Eager load items + compute live stock for each group
-  const results = [];
-  for (const group of groups) {
-    const items = await database('overstock_group_item')
-      .where('group_id', group.id)
-      .orderBy('is_active', 'desc')
-      .orderBy('added_at', 'asc');
+    // Eager load items + compute live stock for each group
+    const results = [];
+    for (const group of groups) {
+      const items = await database('overstock_group_item')
+        .where('group_id', group.id)
+        .orderBy('is_active', 'desc')
+        .orderBy('added_at', 'asc');
 
-    // Compute live stock
-    let liveStock = 0;
-    if (group.group_type === 'single' && items.length > 0) {
-      const listing = await database('YourListing')
-        .where('ebayItemId', items[0].ebay_item_id)
-        .first();
-      if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
-        liveStock = parseInt(listing.quantityAvailable) || 1;
-      }
-    } else {
-      for (const item of items) {
-        if (item.is_active) {
+      // Compute live stock
+      let liveStock = 0;
+      try {
+        if (group.group_type === 'single' && items.length > 0) {
           const listing = await database('YourListing')
-            .where('ebayItemId', item.ebay_item_id)
+            .where('ebayItemId', items[0].ebay_item_id)
             .first();
           if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
-            liveStock++;
+            liveStock = parseInt(listing.quantityAvailable) || 1;
+          }
+        } else {
+          for (const item of items) {
+            if (item.is_active) {
+              const listing = await database('YourListing')
+                .where('ebayItemId', item.ebay_item_id)
+                .first();
+              if (listing && !/ended|inactive/i.test(listing.listingStatus || '')) {
+                liveStock++;
+              }
+            }
           }
         }
+      } catch (e) {
+        liveStock = group.current_stock || 0;
       }
+
+      results.push({
+        ...group,
+        live_stock: liveStock,
+        items: items,
+      });
     }
 
-    results.push({
-      ...group,
-      live_stock: liveStock,
-      items: items,
-    });
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load overstock groups: ' + err.message });
   }
-
-  res.json(results);
 });
 
 router.post('/overstock/add', async (req, res) => {

@@ -156,7 +156,7 @@ function switchTab(tab) {
   document.getElementById('wantlistView').style.display = tab === 'wantlist' ? 'block' : 'none';
   document.getElementById('overstockView').style.display = tab === 'overstock' ? 'block' : 'none';
   if (tab === 'wantlist' && allItems.length === 0) load();
-  if (tab === 'overstock' && !overstockLoaded) loadOverstock();
+  if (tab === 'overstock') loadOverstock();
 }
 
 // ── WATCHLIST ────────────────────────────────────────────────
@@ -487,10 +487,18 @@ loadJustSold();
 // ── OVERSTOCK (group-based) ──────────────────────────────────
 function loadOverstock() {
   document.getElementById('overstockLoading').style.display = 'block';
+  document.getElementById('overstockList').innerHTML = '';
   fetch('/restock-want-list/overstock')
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error('Server error (' + r.status + ')');
+      return r.json();
+    })
     .then(function(groups) {
       document.getElementById('overstockLoading').style.display = 'none';
+      if (!Array.isArray(groups)) {
+        document.getElementById('overstockList').innerHTML = '<div class="empty">Error: unexpected response</div>';
+        return;
+      }
       overstockItems = groups;
       overstockLoaded = true;
       renderOverstock();
@@ -498,7 +506,7 @@ function loadOverstock() {
     })
     .catch(function(err) {
       document.getElementById('overstockLoading').style.display = 'none';
-      document.getElementById('overstockList').innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
+      document.getElementById('overstockList').innerHTML = '<div class="empty">Error: ' + (err.message || 'Failed to load') + '</div>';
     });
 }
 
@@ -781,13 +789,14 @@ function trackSelectedSuggestions() {
   }).catch(function(err) { alert('Error: ' + err.message); });
 }
 
-// Pre-load overstock badge count on page load
+// Pre-load overstock badge count on page load (badge only, don't mark as loaded)
 fetch('/restock-want-list/overstock')
   .then(function(r) { return r.json(); })
   .then(function(groups) {
-    overstockItems = groups;
-    overstockLoaded = true;
-    updateOverstockBadge();
+    if (Array.isArray(groups)) {
+      overstockItems = groups;
+      updateOverstockBadge();
+    }
   })
   .catch(function() {});
 </script>
