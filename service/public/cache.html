@@ -326,31 +326,35 @@ function loadActive() {
   var loading = document.getElementById('activeLoading');
   loading.style.display = '';
   list.innerHTML = '';
-  fetch('/cache/active').then(function(r) { return r.json(); }).then(function(items) {
+  fetch('/cache/active').then(function(r) { return r.json(); }).then(function(data) {
     loading.style.display = 'none';
-    if (!items || !items.length) {
+    var items = data.claims || data || [];
+    if (!items.length) {
       list.innerHTML = '<div class="empty">Cache is empty. Go pull some parts.</div>';
       return;
     }
     var html = '';
     items.forEach(function(it) {
       var veh = '';
-      if (it.year || it.make || it.model) {
-        veh = esc([it.year, it.make, it.model].filter(Boolean).join(' '));
+      if (it.vehicle_year || it.vehicle_make || it.vehicle_model) {
+        veh = esc([it.vehicle_year, it.vehicle_make, it.vehicle_model].filter(Boolean).join(' '));
       }
       var srcClass = 'src-' + (it.source || 'manual');
+      var hasContent = it.part_type || it.part_number || veh || it.part_description;
       html += '<div class="card" id="card-' + it.id + '">';
       html += '<div class="card-top"><div>';
       if (it.part_type) html += '<div class="card-part">' + esc(it.part_type) + '</div>';
+      else if (!it.part_number && !veh) html += '<div class="card-part" style="color:#6B7280">Manual entry</div>';
       if (veh) html += '<div class="card-vehicle">' + veh + '</div>';
       if (it.part_number) html += '<div class="card-pn">' + esc(it.part_number) + '</div>';
+      if (it.part_description) html += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">' + esc(it.part_description) + '</div>';
       html += '</div>';
       html += '<span class="src-badge ' + srcClass + '">' + esc((it.source || 'manual').replace('_', ' ')) + '</span>';
       html += '</div>';
       html += '<div class="card-meta">';
       if (it.yard_name) {
         var loc = esc(it.yard_name);
-        if (it.row) loc += ' · ' + esc(it.row);
+        if (it.row_number) loc += ' · ' + esc(it.row_number);
         html += '<span>' + loc + '</span>';
       }
       if (it.claimed_by) html += '<span>' + esc(it.claimed_by) + '</span>';
@@ -361,10 +365,11 @@ function loadActive() {
         if (it.price_source) html += '<span class="price-src">' + esc(it.price_source) + '</span>';
         html += '</div>';
       }
+      if (it.notes) html += '<div style="font-size:10px;color:#eab308;margin-top:4px;font-style:italic">' + esc(it.notes) + '</div>';
       html += '<div class="card-actions">';
-      html += '<button class="act-btn act-return" onclick="returnPart(' + it.id + ')">Return</button>';
-      html += '<button class="act-btn act-listed" onclick="listPart(' + it.id + ')">Listed</button>';
-      html += '<button class="act-btn act-delete" onclick="deletePart(' + it.id + ')">Delete</button>';
+      html += '<button class="act-btn act-return" onclick="returnPart(\'' + it.id + '\')">Return</button>';
+      html += '<button class="act-btn act-listed" onclick="listPart(\'' + it.id + '\')">Listed</button>';
+      html += '<button class="act-btn act-delete" onclick="deletePart(\'' + it.id + '\')">Delete</button>';
       html += '</div>';
       html += '</div>';
     });
@@ -592,8 +597,8 @@ function addToCache() {
   if (currentMode === 'pn') {
     var pn = document.getElementById('addPN').value.trim().toUpperCase();
     if (!pn) { showToast('Enter a part number'); return; }
-    payload.part_number = pn;
-    payload.description = document.getElementById('addPNDesc').value.trim() || undefined;
+    payload.partNumber = pn;
+    payload.partDescription = document.getElementById('addPNDesc').value.trim() || undefined;
     payload.notes = document.getElementById('addPNNotes').value.trim() || undefined;
   } else {
     var year = document.getElementById('addYear').value.trim();
@@ -601,17 +606,21 @@ function addToCache() {
     var model = document.getElementById('addModel').value.trim();
     var partType = document.getElementById('addPartType').value;
     if (!partType) { showToast('Select a part type'); return; }
-    payload.year = year || undefined;
-    payload.make = make || undefined;
-    payload.model = model || undefined;
-    payload.part_type = partType;
-    payload.description = document.getElementById('addVehDesc').value.trim() || undefined;
-    payload.part_number = (document.getElementById('addVehPN').value || '').trim().toUpperCase() || undefined;
+    payload.partType = partType;
+    payload.partDescription = document.getElementById('addVehDesc').value.trim() || undefined;
+    payload.partNumber = (document.getElementById('addVehPN').value || '').trim().toUpperCase() || undefined;
+    if (year || make || model) {
+      payload.vehicle = {};
+      if (year) payload.vehicle.year = year;
+      if (make) payload.vehicle.make = make;
+      if (model) payload.vehicle.model = model;
+    }
     var yardRow = document.getElementById('addVehYard').value.trim();
     if (yardRow) {
       var parts = yardRow.split(/\s+/);
-      payload.yard_name = parts[0] || undefined;
-      payload.row = parts.slice(1).join(' ') || undefined;
+      payload.yard = {};
+      if (parts[0]) payload.yard.name = parts[0];
+      if (parts.length > 1) payload.yard.row = parts.slice(1).join(' ');
     }
     payload.notes = document.getElementById('addVehNotes').value.trim() || undefined;
   }
