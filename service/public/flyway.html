@@ -597,7 +597,8 @@ function renderActiveTrip() {
   tripYards.forEach(function(y) {
     var yid = y.id;
     var count = yardVehicleCounts[yid] || 0;
-    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + count + '</span></div>';
+    var scraped = y.last_scraped ? timeAgo(y.last_scraped) : '<span style="color:#ef4444">Never</span>';
+    h += '<div class="yard-tab' + (activeYardFilter === yid ? ' active' : '') + '" onclick="setYardFilter(\'' + yid + '\')">' + esc(y.name.replace(/^LKQ |^Pull-A-Part /, '')) + ' <span style="color:var(--text-faint)">' + count + '</span><div style="font-size:8px;color:var(--text-faint);margin-top:1px">' + scraped + '</div></div>';
   });
   h += '</div>';
 
@@ -717,11 +718,24 @@ function renderVehicleCard(v) {
     badges += '<span class="chip" style="font-size:8px;padding:1px 5px;background:#78350f;color:#fbbf24;font-weight:600;letter-spacing:0.05em">RARE: ' + esc(v.guaranteedReason) + '</span> ';
   }
 
-  // Days in yard badge
+  // Scout alert badges
+  if (v.alertBadges && v.alertBadges.length > 0) {
+    v.alertBadges.slice(0, 2).forEach(function(ab) {
+      if (ab.source === 'PERCH') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#422006;color:#f59e0b;font-weight:700">\uD83C\uDFAF MARK</span> ';
+      else if (ab.source === 'bone_pile') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#7c2d12;color:#f97316;font-weight:700">\u26A1 QUARRY</span> ';
+      else if (ab.source === 'hunters_perch') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#1e3a5f;color:#3b82f6;font-weight:700">\u26A1 PERCH</span> ';
+      else if (ab.source === 'OVERSTOCK') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#7f1d1d;color:#ef4444;font-weight:700">\u26A0 OVERSTOCK</span> ';
+    });
+  }
+
+  // Age badge (data-driven relative)
   var diy = v.daysInYard || 0;
-  if (diy > 0) {
-    var ageColor = diy <= 3 ? '#22c55e' : diy <= 7 ? '#eab308' : diy <= 14 ? '#f97316' : '#6B7280';
-    badges += '<span style="font-size:10px;color:' + ageColor + '">' + diy + 'd</span>';
+  if (diy === 0) {
+    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#064e3b;color:#22c55e;font-weight:700">NEW</span> ';
+  } else if (diy <= 3) {
+    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#713f12;color:#eab308;font-weight:700">' + diy + 'D</span> ';
+  } else if (diy <= 7) {
+    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#1f2937;color:#6B7280;font-weight:600">' + diy + 'D</span> ';
   }
 
   // Part type chips — names only, no dollar amounts (matches Daily Feed)
@@ -736,7 +750,8 @@ function renderVehicleCard(v) {
   }).sort(function(a, b) { return (b.price || 0) - (a.price || 0); }).slice(0, 4).forEach(function(p) {
     var price = p.price || 0;
     var cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
-    chips += '<span class="chip ' + cc + '">' + esc(p.partType || '?') + '</span> ';
+    var markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
+    chips += '<span class="chip ' + cc + '">' + markIcon + esc(p.partType || '?') + '</span> ';
   });
 
   var yardLabel = activeYardFilter === 'all' && v._yardName ? '<span style="font-size:9px;color:var(--text-faint)">' + esc(v._yardName.replace(/^LKQ |^Pull-A-Part /, '')) + '</span> ' : '';
@@ -750,7 +765,11 @@ function renderVehicleCard(v) {
   h += '<div class="v-chips">' + (chips || '<span class="chip chip-gray">No data</span>') + '</div>';
   h += '</div>';
   h += '<div class="v-right">';
-  if (v.est_value > 0) h += '<div class="v-value">$' + v.est_value + '</div>';
+  if (v.est_value > 0) {
+    var allEst = chipSource.length > 0 && chipSource.every(function(p) { return p.priceSource === 'estimate'; });
+    if (allEst) h += '<div class="v-value" style="color:#6B7280">~$' + v.est_value + ' <span style="font-size:9px">EST</span></div>';
+    else h += '<div class="v-value">$' + v.est_value + '</div>';
+  }
   if (v.matched_parts > 0) h += '<div class="v-parts-count">' + v.matched_parts + ' parts</div>';
   h += '</div></div>';
 
