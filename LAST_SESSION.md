@@ -1,18 +1,20 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Bugfix — Cache check-stock parity with Nest Protector
+**Session type:** Fix — Homepage section links + Autolumen uploads placement
 
 ## What was done
-- Fixed 4 bugs in cache.html checkStock() function:
-  1. Sent `part_number` query param but `/cogs/check-stock` expects `pn` — eBay stock never found
-  2. Sent `part_number` query param but `/cache/check-stock` expects `pn` — cache matches never found
-  3. Parsed `/cogs/check-stock` response as `d.results` (undefined) instead of `d.exact`/`d.variants`
-  4. Parsed `/cache/check-stock` response as `d.results` (undefined) instead of `d.cached`
-- cache.html now calls `/cogs/check-stock?pn=X` (same URL as gate.html) and correctly renders exact matches, variants, and cache hits
+- Created home.html: DarkHawk homepage at /admin/home with section links organized by category
+- Moved Autolumen Sync card from gate.html to home.html (both upload sections preserved)
+- gate.html stripped down to Nest Protector only (stock check + COGS calculator)
+- DarkHawk logo in dh-nav.js now links to /admin/home instead of /
+- timeAgo() kept in gate.html for cache display in stock check results
 
 ## What files were touched
-- service/public/cache.html (checkStock function rewritten)
+- service/public/home.html (NEW)
+- service/public/gate.html (removed Autolumen card + JS, kept timeAgo)
+- service/public/dh-nav.js (logo links to /admin/home)
+- service/index.js (added /admin/home route)
 - CHANGELOG.md, LAST_SESSION.md
 
 ## What is still broken / needs attention
@@ -24,16 +26,15 @@
 - Scout alert icons (lightning) not appearing — depends on marks having PNs
 
 ## What's next
-- First Autolumen CSV upload to populate data
+- First Autolumen CSV upload via /admin/home
 - Test cache claim flow end-to-end on mobile
-- Verify auto-resolution works after next YourData sync
 - EST badge gray styling
 
 ## Critical reminders for next session
 - DO NOT modify AttackListService.js without reading it completely first
 - Item.price is FROZEN — never use as display/scoring price
 - YourDataManager deactivation sweep is scoped to store='dynatrack' — DO NOT remove this
-- Cache auto-resolution runs AFTER YourData sync in syncAll() — relies on CacheService
-- Valid cache sources: daily_feed, scout_alert, hawk_eye, flyway, manual
-- /cogs/check-stock expects `pn` param, /cache/check-stock expects `pn` (or make/model/year/partType)
-- dh-nav.js v3 includes THE CACHE — all pages using dh-nav.js auto-get the link
+- Root / serves React SPA (DynaTrack inventory), NOT DarkHawk. DarkHawk homepage is /admin/home
+- Autolumen Sync card is on home.html, NOT gate.html
+- gate.html = Nest Protector only (stock check + COGS)
+- dh-nav.js logo links to /admin/home

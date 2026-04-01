@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-01] Homepage section links + Autolumen uploads placement
+- **Added:** home.html at /admin/home — DarkHawk homepage with categorized section links (Field/Intel/Inventory/Tools)
+- **Moved:** Autolumen Sync card from gate.html to home.html (both Active Listings + Sales History uploads)
+- **Changed:** gate.html stripped to Nest Protector only (stock check + COGS)
+- **Changed:** DarkHawk logo in dh-nav.js links to /admin/home instead of /
+- **Files touched:** home.html (new), gate.html, dh-nav.js, index.js
+- **Notes:** Root / still serves React SPA (DynaTrack inventory). DarkHawk homepage is /admin/home.
+
+---
+
 ## [2026-04-01] Fix: Cache check-stock matches Nest Protector accuracy
 - **Fixed:** cache.html sent `part_number` param but both `/cogs/check-stock` and `/cache/check-stock` expect `pn`
 - **Fixed:** cache.html parsed `/cogs/check-stock` response as `d.results` instead of `d.exact`/`d.variants`
