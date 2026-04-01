@@ -491,11 +491,11 @@ function checkStock() {
   var btn = document.getElementById('checkStockBtn');
   var container = document.getElementById('stockResults');
   var pn = '';
-  var payload = {};
+  var cacheParams = {};
   if (currentMode === 'pn') {
     pn = document.getElementById('addPN').value.trim().toUpperCase();
     if (!pn) { showToast('Enter a part number'); return; }
-    payload.part_number = pn;
+    cacheParams.pn = pn;
   } else {
     var year = document.getElementById('addYear').value.trim();
     var make = document.getElementById('addMake').value.trim();
@@ -503,15 +503,18 @@ function checkStock() {
     var partType = document.getElementById('addPartType').value;
     pn = (document.getElementById('addVehPN').value || '').trim().toUpperCase();
     if (!partType && !pn) { showToast('Select part type or enter PN'); return; }
-    payload = { year: year, make: make, model: model, part_type: partType };
-    if (pn) payload.part_number = pn;
+    if (pn) cacheParams.pn = pn;
+    if (make) cacheParams.make = make;
+    if (model) cacheParams.model = model;
+    if (year) cacheParams.year = year;
+    if (partType) cacheParams.partType = partType;
   }
 
   btn.disabled = true;
   btn.textContent = 'Checking...';
   container.innerHTML = '<div class="loading" style="padding:12px"><div class="spinner"></div></div>';
 
-  var results = { cache: null, cogs: null };
+  var results = { cache: null, stock: null };
   var done = 0;
 
   function render() {
@@ -519,39 +522,66 @@ function checkStock() {
     btn.disabled = false;
     btn.textContent = 'Check Stock';
     var html = '';
+
+    // Cache results
     var cacheHits = results.cache && results.cache.length;
-    var cogsHits = results.cogs && results.cogs.length;
     if (cacheHits) {
-      html += '<div class="stock-results found" style="margin-bottom:8px"><div class="sr-title" style="color:var(--g)">Already in Cache (' + results.cache.length + ')</div>';
+      html += '<div class="stock-results found" style="margin-bottom:8px"><div class="sr-title" style="color:var(--y)">\u26A1 Already in Cache (' + results.cache.length + ')</div>';
       results.cache.forEach(function(it) {
-        html += '<div class="sr-item">' + esc(it.part_type || it.part_number || 'Part') + ' — ' + esc(it.status || 'active') + ' · ' + timeAgo(it.claimed_at || it.created_at) + '</div>';
+        html += '<div class="sr-item">' + esc(it.partType || it.partNumber || 'Part');
+        if (it.vehicle) html += ' \u2014 ' + esc(it.vehicle);
+        html += ' \u00b7 ' + esc(it.claimedBy || '?') + ' \u00b7 ' + timeAgo(it.claimedAt) + ' \u00b7 via ' + esc(it.source || '') + '</div>';
       });
       html += '</div>';
     }
-    if (cogsHits) {
-      html += '<div class="stock-results found"><div class="sr-title" style="color:var(--g)">In Inventory / COGS (' + results.cogs.length + ')</div>';
-      results.cogs.forEach(function(it) {
-        var label = esc(it.part_type || it.part_number || it.description || 'Part');
-        if (it.status) label += ' — ' + esc(it.status);
-        html += '<div class="sr-item">' + label + '</div>';
+
+    // eBay inventory results (from /cogs/check-stock)
+    var exactHits = results.stock && results.stock.exact && results.stock.exact.length;
+    var variantHits = results.stock && results.stock.variants && results.stock.variants.length;
+    if (exactHits) {
+      html += '<div class="stock-results found" style="margin-bottom:8px"><div class="sr-title" style="color:var(--g)">\u2713 In eBay Inventory (' + results.stock.exact.length + ' exact)</div>';
+      results.stock.exact.forEach(function(it) {
+        var storeBadge = it.store === 'autolumen' ? ' [AUTOLUMEN]' : '';
+        html += '<div class="sr-item">' + esc(it.title) + storeBadge;
+        if (it.currentPrice) html += ' \u2014 $' + it.currentPrice.toFixed(2);
+        html += ' \u00b7 Qty: ' + (it.quantity || 1) + '</div>';
       });
       html += '</div>';
     }
-    if (!cacheHits && !cogsHits) {
+    if (variantHits) {
+      html += '<div class="stock-results found" style="margin-bottom:8px;border-color:var(--yd)"><div class="sr-title" style="color:var(--y)">\u26A0 Variants (' + results.stock.variants.length + ')</div>';
+      results.stock.variants.forEach(function(it) {
+        html += '<div class="sr-item">' + esc(it.title);
+        if (it.currentPrice) html += ' \u2014 $' + it.currentPrice.toFixed(2);
+        if (it.variantNote) html += ' <span style="color:var(--tf);font-size:10px">(' + esc(it.variantNote) + ')</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (!cacheHits && !exactHits && !variantHits) {
       html += '<div class="stock-results none"><div class="sr-title" style="color:var(--tf)">No matches found</div><div style="font-size:11px;color:var(--tf);margin-top:2px">Safe to add.</div></div>';
     }
     container.innerHTML = html;
   }
 
-  var qs = Object.keys(payload).map(function(k) { return k + '=' + encodeURIComponent(payload[k]); }).join('&');
+  // Build query strings using correct param names for each endpoint
+  var cacheQs = Object.keys(cacheParams).map(function(k) { return k + '=' + encodeURIComponent(cacheParams[k]); }).join('&');
 
-  fetch('/cache/check-stock?' + qs).then(function(r) { return r.json(); }).then(function(d) {
-    results.cache = Array.isArray(d) ? d : (d.results || []);
+  // Cache check — uses pn, make, model, year, partType params
+  fetch('/cache/check-stock?' + cacheQs).then(function(r) { return r.json(); }).then(function(d) {
+    results.cache = d.cached || [];
   }).catch(function() { results.cache = []; }).then(function() { done++; render(); });
 
-  fetch('/cogs/check-stock?' + qs).then(function(r) { return r.json(); }).then(function(d) {
-    results.cogs = Array.isArray(d) ? d : (d.results || []);
-  }).catch(function() { results.cogs = []; }).then(function() { done++; render(); });
+  // eBay stock check — uses pn param only (same as Nest Protector)
+  if (pn) {
+    fetch('/cogs/check-stock?pn=' + encodeURIComponent(pn)).then(function(r) { return r.json(); }).then(function(d) {
+      results.stock = { exact: d.exact || [], variants: d.variants || [] };
+    }).catch(function() { results.stock = { exact: [], variants: [] }; }).then(function() { done++; render(); });
+  } else {
+    results.stock = { exact: [], variants: [] };
+    done++;
+  }
 }
 
 /* ---- Add to Cache ---- */
