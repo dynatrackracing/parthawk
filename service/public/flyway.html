@@ -855,7 +855,15 @@ function renderExpandedParts(vehicleId, data) {
 
     h += '<div class="part-row" style="flex-direction:column;align-items:stretch;padding:10px 0">';
     h += '<div style="display:flex;justify-content:space-between;align-items:center">';
-    h += '<div style="font-size:13px;font-weight:600">' + (p.isMarked ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px">MARKED</span>' : '') + (p.partType ? '[' + esc(p.partType) + '] ' : '') + esc(p.title || p.category || 'Part') + '</div>';
+    var alertTag = '';
+    if (p.alertMatch) {
+      var as = p.alertMatch.source;
+      if (as === 'PERCH') alertTag = '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#422006;color:#f59e0b;margin-right:6px;display:inline-block">\uD83C\uDFAF MARK</span>';
+      else if (as === 'bone_pile') alertTag = '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#7c2d12;color:#f97316;margin-right:6px;display:inline-block">\u26A1 QUARRY</span>';
+      else if (as === 'hunters_perch') alertTag = '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#1e3a5f;color:#3b82f6;margin-right:6px;display:inline-block">\u26A1 PERCH</span>';
+      else if (as === 'OVERSTOCK') alertTag = '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#7f1d1d;color:#ef4444;margin-right:6px;display:inline-block">\u26A0 OVER</span>';
+    }
+    h += '<div style="font-size:13px;font-weight:600">' + alertTag + (p.isMarked && !alertTag ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px">MARKED</span>' : '') + (p.partType ? '[' + esc(p.partType) + '] ' : '') + esc(p.title || p.category || 'Part') + '</div>';
     h += '<div><span class="chip ' + vc + '" style="font-size:10px">' + badgeVerdict + ' ' + pricePrefix + displayPrice + ' ' + freshness + '</span></div>';
     h += '</div>';
     h += '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">';
@@ -864,6 +872,7 @@ function renderExpandedParts(vehicleId, data) {
     if (p.partNumber) h += '<span>' + esc(p.partNumber) + '</span>';
     if (isEst && !hasOurSales && !p.marketMedian) h += '<span style="color:#6B7280">est</span>';
     h += '</div>';
+    if (p.alertMatch && p.alertMatch.value) h += '<div style="font-size:10px;color:var(--text-faint);margin-top:3px">Alert value: $' + p.alertMatch.value + '</div>';
     if (p.reason) h += '<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:3px">' + esc(p.reason) + '</div>';
     if (p.marketMedian > 0) {
       var mColor = hasOurSales ? '#6B7280' : (Math.abs(displayPrice - p.marketMedian) / p.marketMedian > 0.2 ? (displayPrice > p.marketMedian ? '#ef4444' : '#eab308') : '#10B981');

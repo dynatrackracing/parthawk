@@ -288,6 +288,36 @@ router.get('/vehicle/:vehicleId/parts', async (req, res) => {
       log.warn({ err: e.message }, 'Flyway market enrichment failed');
     }
 
+    // Tag parts that match scout alerts for this vehicle
+    try {
+      const yard = await database('yard').where('id', vehicle.yard_id).first();
+      if (yard) {
+        const alerts = await database('scout_alerts')
+          .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
+          .where('vehicle_year', vehicle.year)
+          .whereRaw('LOWER(vehicle_make) = ?', [(vehicle.make || '').toLowerCase()])
+          .whereRaw('LOWER(vehicle_model) = ?', [(vehicle.model || '').toLowerCase()])
+          .whereRaw('LOWER(yard_name) LIKE ?', ['%' + (yard.name || '').toLowerCase() + '%'])
+          .select('source', 'source_title', 'part_value', 'confidence');
+
+        if (alerts.length > 0) {
+          for (const part of (scored.parts || [])) {
+            for (const alert of alerts) {
+              const alertTitle = (alert.source_title || '').toLowerCase();
+              const partType = (part.partType || '').toLowerCase();
+              const partNumber = (part.partNumber || '').toUpperCase();
+              const typeMatch = partType.length >= 3 && alertTitle.includes(partType);
+              const pnMatch = partNumber.length >= 5 && alertTitle.toUpperCase().includes(partNumber);
+              if (typeMatch || pnMatch) {
+                part.alertMatch = { source: alert.source, title: alert.source_title, value: alert.part_value, confidence: alert.confidence };
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) { /* alert matching is non-fatal */ }
+
     res.json({
       success: true,
       id: vehicleId,
