@@ -89,6 +89,7 @@ class YourDataManager {
               soldDate: order.createdTime ? new Date(order.createdTime) : null,
               buyerUsername: order.buyerUsername,
               shippedDate: order.shippedTime ? new Date(order.shippedTime) : null,
+              store: 'dynatrack',
             };
 
             // Upsert on conflict (order ID + item ID)
@@ -140,6 +141,7 @@ class YourDataManager {
             listingStatus: listing.listingStatus,
             startTime: listing.startTime ? new Date(listing.startTime) : null,
             viewItemUrl: listing.viewItemUrl,
+            store: 'dynatrack',
             syncedAt: new Date(),
           };
 
@@ -167,6 +169,7 @@ class YourDataManager {
           const now = new Date();
           const result = await database('YourListing')
             .where('listingStatus', 'Active')
+            .where('store', 'dynatrack') // CRITICAL: only deactivate dynatrack listings
             .where('syncedAt', '<', new Date(now.getTime() - 60000)) // not synced in last minute
             .whereNotIn('ebayItemId', syncedIds)
             .update({ listingStatus: 'Ended', updatedAt: now });

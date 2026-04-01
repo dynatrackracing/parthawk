@@ -167,6 +167,7 @@ app.use('/part-location', require('./routes/part-location'));
 app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
+app.use('/autolumen', require('./routes/autolumen'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));
 app.use('/ebay-messaging', require('./routes/ebay-messaging'));
 // Serve static admin tools with cache headers

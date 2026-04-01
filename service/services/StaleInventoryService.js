@@ -56,6 +56,7 @@ class StaleInventoryService {
     try {
       listings = await database('YourListing')
         .where('listingStatus', 'Active')
+        .where('store', 'dynatrack')
         .whereNotNull('startTime')
         .select('*');
     } catch (err) {

@@ -37,6 +37,7 @@
     "knex": "^0.21.15",
     "lodash": "^4.17.21",
     "moment": "^2.29.1",
+    "multer": "^2.1.1",
     "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
     "node-schedule": "^2.0.0",

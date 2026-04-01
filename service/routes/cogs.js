@@ -143,7 +143,7 @@ router.get('/check-stock', async (req, res) => {
         // Also check SKU
         this.orWhere('sku', 'ilike', `%${searchUpper}%`);
       })
-      .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable', 'sku')
+      .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable', 'sku', 'store')
       .limit(20);
 
     const exactResults = exactListings.map(l => ({
@@ -151,6 +151,7 @@ router.get('/check-stock', async (req, res) => {
       title: l.title,
       currentPrice: parseFloat(l.currentPrice) || null,
       quantity: parseInt(l.quantityAvailable) || 1,
+      store: l.store || 'dynatrack',
       matchType: 'EXACT',
     }));
     const exactItemIds = new Set(exactResults.map(r => r.ebayItemId));
@@ -161,7 +162,7 @@ router.get('/check-stock', async (req, res) => {
       const variantListings = await database('YourListing')
         .where('listingStatus', 'Active')
         .where('title', 'ilike', `%${searchBase}%`)
-        .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable')
+        .select('ebayItemId', 'title', 'currentPrice', 'quantityAvailable', 'store')
         .limit(30);
 
       for (const l of variantListings) {
@@ -181,6 +182,7 @@ router.get('/check-stock', async (req, res) => {
             title: l.title,
             currentPrice: parseFloat(l.currentPrice) || null,
             quantity: parseInt(l.quantityAvailable) || 1,
+            store: l.store || 'dynatrack',
             matchType: 'VARIANT',
             variantNote: `Same base, different suffix (${suffix || '?'} vs ${searchSuffix || '?'})`,
           });

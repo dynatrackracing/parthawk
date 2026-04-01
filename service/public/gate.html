@@ -109,6 +109,33 @@
     <div id="stockResults"></div>
   </div>
 
+  <div class="section-header" id="autolumenHeader" style="cursor:pointer;display:flex;align-items:center;gap:6px" onclick="toggleAutolumen()">
+    <span id="autolumenArrow">&#9654;</span> AUTOLUMEN SYNC <span id="autolumenSummary" style="font-weight:400;color:var(--tf);font-size:10px;margin-left:4px">loading...</span>
+  </div>
+  <div class="card" id="autolumenCard" style="display:none">
+    <div id="autolumenStats" style="font-size:12px;color:var(--tm);margin-bottom:12px"></div>
+
+    <div style="font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">ACTIVE LISTINGS</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="file" id="autolumenListingFile" accept=".csv" style="flex:1;font-size:12px;color:var(--tf)">
+      <button class="stock-btn search" id="autolumenListingBtn" onclick="uploadAutolumenListings()" style="font-size:12px;padding:8px 14px">Upload</button>
+    </div>
+    <div style="font-size:10px;color:var(--tf);margin-top:4px">Replaces current Autolumen inventory</div>
+    <div id="autolumenListingResult" style="margin-top:6px;font-size:12px"></div>
+
+    <div style="border-top:1px solid var(--b);margin:12px 0"></div>
+
+    <div style="font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">SALES HISTORY</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="file" id="autolumenSalesFile" accept=".csv" style="flex:1;min-width:120px;font-size:12px;color:var(--tf)">
+      <label style="font-size:10px;color:var(--tf);display:flex;align-items:center;gap:4px"><input type="radio" name="salesFormat" value="orders" checked style="margin:0"> Orders Report</label>
+      <label style="font-size:10px;color:var(--tf);display:flex;align-items:center;gap:4px"><input type="radio" name="salesFormat" value="transactions" style="margin:0"> Transaction Report</label>
+      <button class="stock-btn search" id="autolumenSalesBtn" onclick="uploadAutolumenSales()" style="font-size:12px;padding:8px 14px">Upload</button>
+    </div>
+    <div style="font-size:10px;color:var(--tf);margin-top:4px">Safe to re-upload — duplicates handled</div>
+    <div id="autolumenSalesResult" style="margin-top:6px;font-size:12px"></div>
+  </div>
+
   <div class="section-header">COGS CALCULATOR</div>
   <div class="card">
     <div class="card-title">Yard</div>
@@ -364,8 +391,11 @@ function checkStock() {
         h += '<div class="stock-result exact">';
         h += '<div class="stock-result-header" style="color:var(--g)">\u2713 IN STOCK \u2014 ' + d.totalExact + ' exact match' + (d.totalExact > 1 ? 'es' : '') + '</div>';
         d.exact.forEach(function(item) {
+          var storeBadge = item.store === 'autolumen'
+            ? '<span style="background:#713f12;color:#eab308;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;margin-left:6px">AUTOLUMEN</span>'
+            : '<span style="background:#064e3b;color:#22c55e;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;margin-left:6px">DYNATRACK</span>';
           h += '<div class="stock-item">';
-          h += '<div class="si-title">' + esc(item.title) + '</div>';
+          h += '<div class="si-title">' + esc(item.title) + storeBadge + '</div>';
           h += '<div class="si-meta">';
           if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
           h += '<span>Qty: ' + item.quantity + '</span>';
@@ -379,8 +409,11 @@ function checkStock() {
         h += '<div class="stock-result variant">';
         h += '<div class="stock-result-header" style="color:var(--y)">\u26A0 VARIANT' + (d.totalExact > 0 ? 'S' : ' FOUND') + ' \u2014 ' + d.totalVariants + ' similar part number' + (d.totalVariants > 1 ? 's' : '') + '</div>';
         d.variants.forEach(function(item) {
+          var storeBadge = item.store === 'autolumen'
+            ? '<span style="background:#713f12;color:#eab308;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;margin-left:6px">AUTOLUMEN</span>'
+            : '<span style="background:#064e3b;color:#22c55e;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;margin-left:6px">DYNATRACK</span>';
           h += '<div class="stock-item">';
-          h += '<div class="si-title">' + esc(item.title) + '</div>';
+          h += '<div class="si-title">' + esc(item.title) + storeBadge + '</div>';
           h += '<div class="si-meta">';
           if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
           h += '<span>Qty: ' + item.quantity + '</span>';
@@ -419,6 +452,86 @@ function clearStock() {
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 loadYards();
+
+// ── AUTOLUMEN SYNC ─────────────────────────────────────────────
+var autolumenOpen = false;
+function toggleAutolumen() {
+  autolumenOpen = !autolumenOpen;
+  document.getElementById('autolumenCard').style.display = autolumenOpen ? 'block' : 'none';
+  document.getElementById('autolumenArrow').innerHTML = autolumenOpen ? '&#9660;' : '&#9654;';
+}
+
+function loadAutolumenStats() {
+  fetch('/autolumen/stats')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || (!d.stats.activeListings && !d.stats.totalSales)) {
+        document.getElementById('autolumenSummary').textContent = 'No Autolumen data yet';
+        document.getElementById('autolumenStats').innerHTML = '<span style="color:var(--tf)">No Autolumen data imported yet. Upload a CSV to get started.</span>';
+        return;
+      }
+      var s = d.stats;
+      var ago = s.lastImport ? timeAgo(new Date(s.lastImport)) : 'never';
+      document.getElementById('autolumenSummary').textContent = s.activeListings + ' active \u00b7 ' + s.totalSales + ' sold \u00b7 last import: ' + ago;
+      document.getElementById('autolumenStats').innerHTML =
+        'Active: <b>' + s.activeListings + '</b> \u00b7 Sales (90d): <b>' + s.sales90d + '</b> \u00b7 Revenue (90d): <b>$' + s.revenue90d.toLocaleString() + '</b>';
+    })
+    .catch(function() {
+      document.getElementById('autolumenSummary').textContent = 'No Autolumen data yet';
+    });
+}
+
+function timeAgo(date) {
+  var diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+async function uploadAutolumenListings() {
+  var fileInput = document.getElementById('autolumenListingFile');
+  if (!fileInput.files[0]) return;
+  var btn = document.getElementById('autolumenListingBtn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  var formData = new FormData();
+  formData.append('csv', fileInput.files[0]);
+  try {
+    var resp = await fetch('/autolumen/import/listings', { method: 'POST', body: formData });
+    var data = await resp.json();
+    document.getElementById('autolumenListingResult').innerHTML = data.success
+      ? '<span style="color:#22c55e">\u2705 Imported ' + data.inserted + ' listings (deactivated ' + data.deactivated + ' old)</span>'
+      : '<span style="color:#ef4444">Error: ' + esc(data.error || 'Unknown') + '</span>';
+    loadAutolumenStats();
+  } catch (err) {
+    document.getElementById('autolumenListingResult').innerHTML = '<span style="color:#ef4444">Upload failed: ' + esc(err.message) + '</span>';
+  }
+  btn.disabled = false; btn.textContent = 'Upload';
+}
+
+async function uploadAutolumenSales() {
+  var fileInput = document.getElementById('autolumenSalesFile');
+  if (!fileInput.files[0]) return;
+  var btn = document.getElementById('autolumenSalesBtn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  var format = document.querySelector('input[name="salesFormat"]:checked').value;
+  var endpoint = format === 'transactions' ? '/autolumen/import/transactions' : '/autolumen/import/sales';
+  var formData = new FormData();
+  formData.append('csv', fileInput.files[0]);
+  try {
+    var resp = await fetch(endpoint, { method: 'POST', body: formData });
+    var data = await resp.json();
+    document.getElementById('autolumenSalesResult').innerHTML = data.success
+      ? '<span style="color:#22c55e">\u2705 Imported ' + data.synced + ' sales (' + data.skipped + ' skipped, ' + data.errors + ' errors)</span>'
+      : '<span style="color:#ef4444">Error: ' + esc(data.error || 'Unknown') + '</span>';
+    loadAutolumenStats();
+  } catch (err) {
+    document.getElementById('autolumenSalesResult').innerHTML = '<span style="color:#ef4444">Upload failed: ' + esc(err.message) + '</span>';
+  }
+  btn.disabled = false; btn.textContent = 'Upload';
+}
+
+loadAutolumenStats();
 </script>
 </body>
 </html>
