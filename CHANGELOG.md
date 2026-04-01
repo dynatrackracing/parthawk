@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-01] Fix: Cache check-stock matches Nest Protector accuracy
+- **Fixed:** cache.html sent `part_number` param but both `/cogs/check-stock` and `/cache/check-stock` expect `pn`
+- **Fixed:** cache.html parsed `/cogs/check-stock` response as `d.results` instead of `d.exact`/`d.variants`
+- **Fixed:** cache.html parsed `/cache/check-stock` response as `d.results` instead of `d.cached`
+- **Files touched:** cache.html
+- **Notes:** Cache check-stock now produces identical results to Nest Protector for the same PN input
+
+---
+
 ## [2026-04-01] The Cache Phase 7 Part 2 — Frontend + Puller Tool Wiring
 - **Added:** cache.html — Active/History/Add Part tabs, mobile-first, manual entry by PN or YMM
 - **Added:** Pull buttons on Daily Feed, Hawk Eye, Flyway expanded parts
