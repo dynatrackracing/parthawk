@@ -27,8 +27,15 @@ const LOCATIONS = [
   { name: 'LKQ Clearwater', slug: 'clearwater-1190' },
 ];
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+];
+function randomUA() { return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function randomDelay() { return sleep(1000 + Math.random() * 2000); }
 
 // ── SCRAPE (with early termination on duplicates) ──────
 
@@ -62,12 +69,15 @@ async function scrapePages(slug, yardId) {
   let terminationReason = 'complete';
 
   while (page <= 60) {
+    // Cache-busting: append timestamp param to defeat CDN caching
+    const cb = Date.now() + Math.floor(Math.random() * 10000);
     const url = page === 1
-      ? `https://www.pyp.com/inventory/${slug}/`
-      : `https://www.pyp.com/inventory/${slug}/?page=${page}`;
+      ? `https://www.pyp.com/inventory/${slug}/?_cb=${cb}`
+      : `https://www.pyp.com/inventory/${slug}/?page=${page}&_cb=${cb}`;
     try {
       const { execSync } = require('child_process');
-      const html = execSync(`curl -s -L --max-time 30 -H "User-Agent: ${UA}" -H "Accept: text/html,application/xhtml+xml" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
+      const ua = randomUA();
+      const html = execSync(`curl -s -L --max-time 30 -H "User-Agent: ${ua}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" -H "Accept-Encoding: gzip, deflate, br" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
       if (html.includes('Just a moment')) { console.log('  CloudFlare blocked'); terminationReason = 'cloudflare'; break; }
 
       const { vehicles, hasNext } = parsePage(html);
@@ -116,7 +126,7 @@ async function scrapePages(slug, yardId) {
 
       if (!hasNext) { terminationReason = 'no_more_pages'; break; }
       page++;
-      await sleep(500);
+      await randomDelay();
     } catch(e) { console.log(`  Page ${page} error: ${e.message.substring(0,80)}`); terminationReason = 'error: ' + e.message.substring(0,60); break; }
   }
   return { vehicles: allNew, totalSeen, pagesScraped: page, terminationReason };
