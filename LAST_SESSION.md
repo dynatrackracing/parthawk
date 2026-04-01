@@ -1,27 +1,21 @@
 # LAST SESSION — READ THIS BEFORE DOING ANYTHING
 
 **Date:** 2026-04-01
-**Session type:** Feature — The Cache Phase 7 Part 1 (Backend)
+**Session type:** Fix — the_cache migration + CacheService.getStats()
 
 ## What was done
-- Created `the_cache` table with UUID PK, vehicle/part/yard fields, status lifecycle
-- Created CacheService: claim, return, delete, resolve, stats, checkCacheStock
-- Created /cache routes: active, history, stats, claim, return, delete, resolve, check-stock
-- Manual entry support via source='manual' (by PN or by YMM+description)
-- Auto-resolution wired into YourDataManager.syncAll (runs 4x/day after listing sync)
-- /cogs/check-stock extended to show cached claims alongside YourListing stock
-- /vin/scan extended to show cachedParts for scanned vehicle
-- Scout alert cross-linking: claim marks alert claimed, return re-activates
-- pull_session cross-linking preserved for Daily Feed claims
+- Fixed store column migration: was not idempotent, failed because column already existed on prod (added manually before migration system)
+- Fixed the_cache migration: was blocked by store column migration failure — added `hasTable` guard
+- Fixed CacheService.getStats(): pg driver returns `{ rows }` not array — destructuring `[statusCounts]` failed
+- Added temporary diagnostic endpoints to debug migration issue, then removed them
+- Both migrations now recorded in knex_migrations (batch 51)
+- All /cache endpoints verified working on production
 
 ## What files were touched
-- service/database/migrations/20260401400000_create_table_the_cache.js (NEW)
-- service/services/CacheService.js (NEW)
-- service/routes/cache.js (NEW)
-- service/managers/YourDataManager.js (cache auto-resolution after sync)
-- service/routes/cogs.js (cache check in check-stock handler)
-- service/routes/vin.js (cache check in VIN scan handler)
-- service/index.js (mount /cache route)
+- service/database/migrations/20260401300000_add_store_column.js (idempotent hasColumn guards)
+- service/database/migrations/20260401400000_create_table_the_cache.js (idempotent hasTable guard)
+- service/services/CacheService.js (getStats pg driver fix)
+- service/index.js (removed diagnostic endpoints)
 - CHANGELOG.md, LAST_SESSION.md
 
 ## What is still broken / needs attention

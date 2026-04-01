@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-01] Fix: the_cache migration + CacheService.getStats()
+- **Fixed:** Store column migration failed on prod because column already existed — made idempotent with `hasColumn` check
+- **Fixed:** Cache migration blocked by store column migration failure — both now run with existence guards
+- **Fixed:** `CacheService.getStats()` destructured `database.raw()` result incorrectly for pg driver — returns `{ rows }` not array
+- **Removed:** Temporary diagnostic endpoints (`/api/migrate-status`, `/api/run-migrations`)
+- **Files touched:** migrations/20260401300000, migrations/20260401400000, CacheService.js, index.js
+- **Notes:** Migrations now recorded in knex_migrations (batch 51). All /cache endpoints verified working on production.
+
+---
+
 ## [2026-04-01] The Cache Phase 7 Part 1 — Backend
 - **Added:** `the_cache` table with UUID PK, vehicle/part/yard fields, status lifecycle (claimed→listed/returned/deleted)
 - **Added:** CacheService — claim, return, delete, resolve, stats, checkCacheStock
