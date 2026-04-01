@@ -367,8 +367,13 @@
     // Clamp future dates to today (Clearwater sometimes reports 1 day ahead).
     const d = v.date_added || v.createdAt;
     if (!d) return 999;
+    // Date-only strings like "2026-04-01" are parsed as UTC midnight by JS,
+    // which rolls back one day in Eastern time. Parse them as local dates instead.
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(d)
+      ? new Date(parseInt(d.slice(0,4)), parseInt(d.slice(5,7)) - 1, parseInt(d.slice(8,10)))
+      : new Date(d);
     const todayET = easternDateStr(new Date());
-    const addedET = easternDateStr(d);
+    const addedET = easternDateStr(parsed);
     if (!todayET || !addedET) return 999;
     const todayMs = new Date(todayET + 'T00:00:00').getTime();
     const addedMs = new Date(addedET + 'T00:00:00').getTime();
