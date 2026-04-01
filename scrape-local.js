@@ -77,11 +77,17 @@ async function scrapePages(slug, yardId) {
     try {
       const { execSync } = require('child_process');
       const ua = randomUA();
-      const html = execSync(`curl -s -L --max-time 30 -H "User-Agent: ${ua}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" -H "Accept-Encoding: gzip, deflate, br" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
+      const html = execSync(`curl -s -L --compressed --max-time 30 -H "User-Agent: ${ua}" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: en-US,en;q=0.9" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -H "Referer: https://www.lkqpickyourpart.com/" "${url}"`, { maxBuffer: 10*1024*1024, encoding: 'utf-8' });
       if (html.includes('Just a moment')) { console.log('  CloudFlare blocked'); terminationReason = 'cloudflare'; break; }
 
       const { vehicles, hasNext } = parsePage(html);
-      if (vehicles.length === 0) { terminationReason = 'empty_page'; break; }
+      if (vehicles.length === 0) {
+        // Log preview so we can diagnose silent failures (binary garbage, new HTML format, etc.)
+        const preview = html.substring(0, 200).replace(/[^\x20-\x7E]/g, '?');
+        console.log(`  Page ${page}: 0 vehicles parsed. HTML length=${html.length} preview: ${preview}`);
+        terminationReason = 'empty_page';
+        break;
+      }
       totalSeen += vehicles.length;
 
       // Check each vehicle against DB
