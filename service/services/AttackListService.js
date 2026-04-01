@@ -245,14 +245,33 @@ function detectPartType(title) {
   if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX') || t.includes('IPDM')) return 'TIPM';
   if (t.includes('AMPLIFIER') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE') || t.includes('JBL')) return 'AMP';
   if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT') || t.includes('GAUGE')) return 'CLUSTER';
-  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO')) return 'RADIO';
+  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO') || t.includes('RECEIVER')) return 'RADIO';
   if (t.includes('THROTTLE')) return 'THROTTLE';
   if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
   if (t.includes('TRANSFER CASE') || t.includes('XFER CASE')) return null; // never pull these
-  if (t.includes('WINDOW') && t.includes('REGULATOR')) return 'REGULATOR';
+  if (t.includes('WINDOW') && (t.includes('REGULATOR') || t.includes('MOTOR'))) return 'REGULATOR';
   if (t.includes('MIRROR')) return 'MIRROR';
   if (t.includes('SUNROOF') || t.includes('MOONROOF') || t.includes('MOON ROOF') || t.includes('SUN ROOF')) return 'SUNROOF';
   if (t.includes('FUEL PUMP DRIVER') || t.includes('FUEL PUMP MODULE') || t.includes('FUEL PUMP CONTROL')) return 'FUEL_MODULE';
+  // Extended part types — reduce OTHER chips
+  if (t.includes('CAMERA') || t.includes('BACKUP CAM') || t.includes('MONOCULAR')) return 'CAMERA';
+  if ((t.includes('CLIMATE') || t.includes('HVAC') || t.includes('HEATER')) && t.includes('CONTROL')) return 'HVAC';
+  if (t.includes('HEADLIGHT') || t.includes('HEAD LIGHT') || t.includes('XENON') || t.includes('HID')) return 'HEADLIGHT';
+  if (t.includes('TAIL LIGHT') || t.includes('TAILLIGHT') || t.includes('TAIL LAMP')) return 'TAILLIGHT';
+  if (t.includes('BLIND SPOT') || t.includes('RADAR')) return 'BLIND_SPOT';
+  if (t.includes('PARK ASSIST') || t.includes('PARKING SENSOR')) return 'PARK_SENSOR';
+  if (t.includes('AIR RIDE') || t.includes('AIR SUSPENSION') || t.includes('SUSPENSION COMP')) return 'AIR_RIDE';
+  if (t.includes('CLOCK SPRING') || t.includes('CLOCKSPRING')) return 'CLOCK_SPRING';
+  if (t.includes('DOOR LOCK') || t.includes('LATCH') || t.includes('KEYLESS ENTRY')) return 'LOCK';
+  if (t.includes('IGNITION') || t.includes('KEY') || t.includes('IMMOBILIZER')) return 'IGNITION';
+  if ((t.includes('LIFTGATE') || t.includes('TAILGATE') || t.includes('HATCH')) && (t.includes('MOTOR') || t.includes('MODULE') || t.includes('ACTUATOR'))) return 'LIFTGATE';
+  if (t.includes('HMI') || t.includes('HUMAN INTERFACE') || t.includes('MULTIMEDIA')) return 'HMI';
+  if (t.includes('SAM') && t.includes('MODULE')) return 'SAM';
+  if (t.includes('SEAT BELT') || t.includes('SEATBELT') || t.includes('PRETENSIONER')) return 'SEAT_BELT';
+  if (t.includes('ALTERNATOR')) return 'ALTERNATOR';
+  if (t.includes('STARTER')) return 'STARTER';
+  if (t.includes('BLOWER MOTOR')) return 'BLOWER';
+  if (t.includes('NAVIGATION') || (t.includes('NAV') && t.includes('MODULE'))) return 'NAV';
   return null;
 }
 

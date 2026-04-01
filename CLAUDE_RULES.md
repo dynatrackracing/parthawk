@@ -50,7 +50,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 18. **Price source display:** `sold` and `market` sources display normally. `estimate` source displays as grey `~$XXX EST`.
 
-19. **Engines and transmissions are excluded** from attack list parts via `isExcludedPart()`. Also exclude transfer cases and steering.
+19. **Excluded from attack list:** engines, transmissions, internal engine components, body panels, transfer cases. Steering IS sellable (racks, EPS modules, steering wheels). Sunroof glass IS sellable. Do not exclude these.
 
 20. **Pro-rebuild parts shown as grey reference only,** never scored.
 

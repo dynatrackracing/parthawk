@@ -341,8 +341,7 @@
     dateFilter = mode;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('filt-' + mode).classList.add('active');
-    if (dataCache[mode]) {
-      allData = dataCache[mode];
+    if (allData) {
       renderData();
     } else {
       await loadData();
@@ -445,11 +444,9 @@
   async function loadData() {
     document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
-      const since = filterSinceParam();
-      const url = since ? '/attack-list?since=' + encodeURIComponent(since) : '/attack-list';
-      // Fetch attack list and scrape health in parallel
+      // Always fetch all active vehicles — date pills only affect client-side grouping
       const [res, healthRes] = await Promise.all([
-        fetch(url),
+        fetch('/attack-list'),
         fetch('/yards/scrape-health').catch(() => null),
       ]);
       const data = await res.json();
@@ -466,20 +463,10 @@
       }
 
       allData = data;
-      dataCache[dateFilter] = data;
       renderData();
       const ts = new Date(data.generated_at);
       document.getElementById('statusLeft').textContent = 'Updated ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
       document.getElementById('headerSub').textContent = data.yards.length + ' yards scored';
-
-      // Pre-fetch 3d in background after today renders
-      if (dateFilter === 'today' && !dataCache['3d']) {
-        const since3d = easternSinceDateISO(3);
-        fetch('/attack-list?since=' + encodeURIComponent(since3d))
-          .then(r => r.json())
-          .then(d => { if (d.success) dataCache['3d'] = d; })
-          .catch(() => {});
-      }
     } catch (err) {
       document.getElementById('mainContent').innerHTML = `<div class="empty-state"><h3>Could not load</h3><p>${err.message}</p><button class="btn-primary" onclick="loadData()">Retry</button></div>`;
     }
@@ -590,17 +577,39 @@
         }
       }
 
-      // Group by date section
-      const sections = [
-        { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) <= 0) },
-        { label: 'LAST 3 DAYS', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 1 && d <= 3; }) },
-        { label: 'THIS WEEK', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 4 && d <= 7; }) },
-        { label: 'OLDER', vehicles: filtered.filter(v => getSetDaysAgo(v) > 7) },
-      ];
+      // Group by date section — pills control fresh highlight, not hard filter
+      const freshDays = dateFilter === 'today' ? 0
+        : dateFilter === '3d' ? 3
+        : dateFilter === '7d' ? 7
+        : dateFilter === '30d' ? 30
+        : dateFilter === '60d' ? 60
+        : 999; // 'all'
+
+      let sections;
+      if (freshDays >= 999) {
+        sections = [
+          { label: 'SET TODAY', vehicles: filtered.filter(v => getSetDaysAgo(v) <= 0) },
+          { label: 'LAST 3 DAYS', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 1 && d <= 3; }) },
+          { label: 'THIS WEEK', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 4 && d <= 7; }) },
+          { label: 'THIS MONTH', vehicles: filtered.filter(v => { const d = getSetDaysAgo(v); return d >= 8 && d <= 30; }) },
+          { label: 'OLDER', vehicles: filtered.filter(v => getSetDaysAgo(v) > 30) },
+        ];
+      } else {
+        const fresh = filtered.filter(v => getSetDaysAgo(v) <= freshDays);
+        const rest = filtered.filter(v => getSetDaysAgo(v) > freshDays);
+        const freshLabel = freshDays === 0 ? 'NEW TODAY'
+          : freshDays <= 3 ? 'NEW — LAST ' + freshDays + ' DAYS'
+          : freshDays <= 7 ? 'NEW THIS WEEK'
+          : 'NEW — LAST ' + freshDays + ' DAYS';
+        sections = [];
+        if (fresh.length > 0) sections.push({ label: freshLabel, vehicles: fresh, isFresh: true });
+        if (rest.length > 0) sections.push({ label: 'STILL ON LOT', vehicles: rest });
+      }
 
       for (const sec of sections) {
         if (sec.vehicles.length === 0) continue;
-        html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;">`
+        const sectionStyle = sec.isFresh ? 'border-left:3px solid #22c55e;padding-left:11px;' : '';
+        html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;${sectionStyle}">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
         // Render first BATCH_SIZE immediately, rest via lazy loading
         const BATCH = 30;
