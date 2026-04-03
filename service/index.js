@@ -23,6 +23,13 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors());
 
+// Auth gate — password protection for all DarkHawk pages and APIs
+const { authGate } = require('./middleware/authGate');
+app.use(authGate);
+app.use('/auth', require('./routes/auth'));
+app.get('/login', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'login.html'));
+});
 
 app.get('/api/health-check', (req, res) => res.json({ ok: true, time: new Date(), env: process.env.NODE_ENV }));
 

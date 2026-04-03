@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>DarkHawk — Login</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#141414;border:1px solid #2a2a2a;border-radius:16px;padding:32px 28px;width:100%;max-width:360px}
+.logo{text-align:center;margin-bottom:28px}
+.logo-text{font-size:26px;font-weight:900;letter-spacing:3px;color:#F0F0F0}
+.logo-text span{color:#DC2626}
+.logo-sub{font-size:10px;color:#6B7280;margin-top:6px;letter-spacing:.15em;text-transform:uppercase}
+.form-input{width:100%;padding:14px 16px;border:1px solid #2a2a2a;border-radius:10px;font-size:15px;background:#1a1a1a;color:#F0F0F0;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:#DC2626}
+.form-input::placeholder{color:#6B7280}
+.btn-login{width:100%;padding:14px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;letter-spacing:.05em;transition:opacity .15s}
+.btn-login:hover{opacity:.9}
+.btn-login:active{opacity:.7}
+.btn-login:disabled{opacity:.4;cursor:default}
+.error{color:#DC2626;font-size:12px;margin-top:10px;text-align:center;display:none}
+.lock{text-align:center;margin-bottom:16px;font-size:28px;opacity:.3}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo">
+    <div class="lock">&#128274;</div>
+    <div class="logo-text">DARK<span>HAWK</span></div>
+    <div class="logo-sub">Pull Intelligence Platform</div>
+  </div>
+  <input type="password" class="form-input" id="pwd" placeholder="Enter password" autofocus autocomplete="current-password">
+  <button class="btn-login" id="loginBtn" onclick="doLogin()">ACCESS</button>
+  <div class="error" id="error"></div>
+</div>
+
+<script>
+function doLogin() {
+  var pwd = document.getElementById('pwd').value;
+  var err = document.getElementById('error');
+  var btn = document.getElementById('loginBtn');
+  if (!pwd) { err.textContent = 'Enter password'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = '...';
+  fetch('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pwd })
+  }).then(function(r) {
+    btn.disabled = false;
+    btn.textContent = 'ACCESS';
+    if (r.ok) { window.location.href = '/admin/home'; }
+    else { err.textContent = 'Access denied'; err.style.display = 'block'; document.getElementById('pwd').select(); }
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = 'ACCESS';
+    err.textContent = 'Connection error'; err.style.display = 'block';
+  });
+}
+document.getElementById('pwd').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>
