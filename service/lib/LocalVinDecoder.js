@@ -146,6 +146,55 @@ function parseDrivetrain(driveType) {
   return null;
 }
 
+/**
+ * Clean decoded trim — filters junk, chassis codes, cab types, drivetrain strings.
+ * Copied from PostScrapeService.cleanDecodedTrim() for self-contained use.
+ */
+function cleanDecodedTrim(raw) {
+  if (!raw) return null;
+  var t = raw.trim();
+  if (!t) return null;
+
+  var JUNK_LIST = [
+    'nfa','nfb','nfc','cma','std','sa','hev','phev',
+    'n/a','na','unknown','standard','unspecified',
+    'styleside','flareside','stepside','sportside',
+    'crew','crew cab','regular cab','extended cab','supercab','supercrew','double cab','quad cab','king cab','access cab',
+    'middle level','middle-low level','high level','low level',
+    'middle grade','middle-low grade','high grade','low grade',
+    'xdrive','sdrive','4matic','quattro',
+    'leather','cloth','premium cloth',
+    'f-series','f series',
+  ];
+  var lower = t.toLowerCase();
+  for (var i = 0; i < JUNK_LIST.length; i++) {
+    if (lower === JUNK_LIST[i]) return null;
+  }
+
+  t = t.replace(/\s*\([^)]*\)\s*/g, '').trim();
+  t = t.replace(/\b[VIL][\-\s]?\d\b/gi, '').trim();
+  t = t.replace(/\b\d\.\d[A-Z]?\s*(L|LITER)?\b/gi, '').trim();
+  t = t.replace(/\bW\/LEA(THER)?\b/gi, '-L').trim();
+  t = t.replace(/\bWITH\s+LEATHER\b/gi, '-L').trim();
+  t = t.replace(/\bW\/NAV(I|IGATION)?\b/gi, '').trim();
+  t = t.replace(/\bW\/RES\b/gi, '').trim();
+  t = t.replace(/\bWITH\s+RES\b/gi, '').trim();
+  t = t.replace(/\bWITH\s+NAV(IGATION)?\b/gi, '').trim();
+  t = t.replace(/\s+\-/g, '-').replace(/\-\s+/g, '-').replace(/\s+/g, ' ').trim();
+
+  if (/^[A-Z]{0,3}\d{2,3}[A-Z]?$/i.test(t)) return null;
+  if (/^\d\.\d[a-z]{1,2}$/i.test(t)) return null;
+
+  if (/,/.test(t)) t = t.split(',')[0].trim();
+  if (/\//.test(t)) {
+    var parts = t.split('/').map(function(p) { return p.trim(); }).filter(Boolean);
+    t = parts[parts.length - 1];
+  }
+
+  if (!t || t.length < 2 || t.length > 30) return null;
+  return t;
+}
+
 function parseEngineType(fuelType) {
   if (!fuelType) return 'Gas';
   var ft = fuelType.toLowerCase();
@@ -207,11 +256,16 @@ async function decode(vin) {
   var year = vehicle.year || null;
   var make = vehicle.make || null;
   var model = vehicle.model || null;
-  var trim = vehicle.series || null;
-  // Tonnage series (1500/2500/3500/pure numbers) belongs in model, not trim
-  if (trim && /^\d+$/.test(trim)) {
-    model = model ? model + ' ' + trim : trim;
-    trim = null;
+  var rawSeries = vehicle.series || null;
+  var trim = null;
+  if (rawSeries) {
+    // Tonnage patterns belong in model, not trim
+    if (/^\d{3,4}(\s|\(|$)/.test(rawSeries) || /^\d\/\d\s*ton/i.test(rawSeries) || /^\d+$/.test(rawSeries)) {
+      model = model ? model + ' ' + rawSeries : rawSeries;
+    } else {
+      // Run through junk filter before accepting as trim
+      trim = cleanDecodedTrim(rawSeries);
+    }
   }
   var bodyStyle = vehicle.bodyStyle || null;
   var driveType = vehicle.driveType || null;
@@ -219,6 +273,23 @@ async function decode(vin) {
 
   var displacement = corgiEngine.displacement ? parseFloat(corgiEngine.displacement) : null;
   var cylinders = corgiEngine.cylinders ? parseInt(corgiEngine.cylinders) : null;
+
+  // Engine fallback: if corgi has no engine data, check old vin_cache (may have NHTSA data)
+  if (!displacement && !cylinders) {
+    try {
+      var oldCache = await database('vin_cache').where('vin', vin).first();
+      if (oldCache && oldCache.engine) {
+        var engMatch = oldCache.engine.match(/^(\d+\.?\d*)L\s*(V?\d+|[\d]+-cyl)?/i);
+        if (engMatch) {
+          displacement = parseFloat(engMatch[1]);
+          if (engMatch[2]) {
+            var cylMatch = engMatch[2].match(/\d+/);
+            if (cylMatch) cylinders = parseInt(cylMatch[0]);
+          }
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+  }
 
   var engineCode = null;
   var forcedInduction = null;
