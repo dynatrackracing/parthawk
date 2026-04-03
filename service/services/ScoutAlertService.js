@@ -5,6 +5,9 @@ const { log } = require('../lib/logger');
 const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
 const { modelMatches: piModelMatches, parseYearRange: piParseYear, extractPartNumbers: piExtractPNs } = require('../utils/partIntelligence');
 
+// Concurrency guard — only one generateAlerts() at a time
+let _running = false;
+
 // Known automotive makes for title parsing
 const KNOWN_MAKES = [
   'Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Fiat','Ford',
@@ -19,8 +22,36 @@ const MAKE_ALIASES = {
 };
 
 async function generateAlerts() {
+  // Concurrency guard — skip if already running
+  if (_running) {
+    log.warn('generateAlerts already running — skipping');
+    return { alerts: 0, skipped: true };
+  }
+  _running = true;
+
+  try {
+    return await _generateAlertsInner();
+  } finally {
+    _running = false;
+  }
+}
+
+async function _generateAlertsInner() {
   const startTime = Date.now();
   log.info('Generating scout alerts...');
+
+  // Disk space safety check — skip if DB over 4GB (on 5GB volume)
+  try {
+    const [{ db_size }] = await database.raw('SELECT pg_database_size(current_database()) as db_size');
+    const sizeMB = Math.round(db_size / 1024 / 1024);
+    log.info({ dbSizeMB: sizeMB }, 'DB size check');
+    if (sizeMB > 4000) {
+      log.error({ dbSizeMB: sizeMB }, 'DB over 4GB — skipping scout alert generation to prevent disk full crash');
+      return { alerts: 0, skipped: true, reason: 'disk_full' };
+    }
+  } catch (e) {
+    log.warn({ err: e.message }, 'Could not check DB size — proceeding anyway');
+  }
 
   // Ensure models are loaded from Auto table before parsing
   await loadModelsFromDB();
@@ -169,33 +200,39 @@ async function generateAlerts() {
     claimedAlerts.map(a => [a.source, a.source_title, a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|'))
   );
 
-  // Delete old alerts (preserve OVERSTOCK source) and insert new ones
-  await database('scout_alerts').whereNot('source', 'OVERSTOCK').del();
-  for (let i = 0; i < alerts.length; i += 50) {
-    await database('scout_alerts').insert(alerts.slice(i, i + 50));
-  }
-
-  // Restore claimed status for alerts that still match
-  if (claimedKeys.size > 0) {
-    const newAlerts = await database('scout_alerts')
-      .whereNot('source', 'OVERSTOCK')
-      .select('id', 'source', 'source_title', 'vehicle_year', 'vehicle_make', 'vehicle_model', 'yard_name');
-
-    const toRestore = [];
-    for (const a of newAlerts) {
-      const key = [a.source, a.source_title, a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|');
-      if (claimedKeys.has(key)) {
-        toRestore.push(a.id);
-      }
+  // Transaction: delete + insert atomically (crash between them won't leave table empty)
+  await database.transaction(async (trx) => {
+    await trx('scout_alerts').whereNot('source', 'OVERSTOCK').del();
+    for (let i = 0; i < alerts.length; i += 50) {
+      await trx('scout_alerts').insert(alerts.slice(i, i + 50));
     }
+  });
 
-    if (toRestore.length > 0) {
-      for (let i = 0; i < toRestore.length; i += 50) {
-        await database('scout_alerts')
-          .whereIn('id', toRestore.slice(i, i + 50))
-          .update({ claimed: true, claimed_at: new Date().toISOString() });
+  // Restore claimed status for alerts that still match (outside txn — non-critical)
+  if (claimedKeys.size > 0) {
+    try {
+      const newAlerts = await database('scout_alerts')
+        .whereNot('source', 'OVERSTOCK')
+        .select('id', 'source', 'source_title', 'vehicle_year', 'vehicle_make', 'vehicle_model', 'yard_name');
+
+      const toRestore = [];
+      for (const a of newAlerts) {
+        const key = [a.source, a.source_title, a.vehicle_year, (a.vehicle_make || '').toLowerCase(), (a.vehicle_model || '').toLowerCase(), (a.yard_name || '').toLowerCase()].join('|');
+        if (claimedKeys.has(key)) {
+          toRestore.push(a.id);
+        }
       }
-      log.info({ restored: toRestore.length, totalClaimed: claimedKeys.size }, 'Restored claimed status for persisted alerts');
+
+      if (toRestore.length > 0) {
+        for (let i = 0; i < toRestore.length; i += 50) {
+          await database('scout_alerts')
+            .whereIn('id', toRestore.slice(i, i + 50))
+            .update({ claimed: true, claimed_at: new Date().toISOString() });
+        }
+        log.info({ restored: toRestore.length, totalClaimed: claimedKeys.size }, 'Restored claimed status for persisted alerts');
+      }
+    } catch (e) {
+      log.warn({ err: e.message }, 'Failed to restore claimed status (non-fatal)');
     }
   }
 
