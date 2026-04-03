@@ -4,5 +4,5 @@ buildCommand = "npm install && npm run build"
 
 [deploy]
 startCommand = "node service/index.js"
-healthcheckPath = "/"
+healthcheckPath = "/test"
 restartPolicyType = "on_failure"
