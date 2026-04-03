@@ -504,37 +504,24 @@ router.post('/manual', async (req, res) => {
       _raw_line: v.raw,
     }));
 
-    // VIN decode any that have VINs (batch via NHTSA)
+    // VIN decode any that have VINs (local offline decode)
     const withVins = vehicles.filter(v => v.vin && v.vin.length >= 11);
     if (withVins.length > 0) {
       try {
+        const { decode: localDecode } = require('../lib/LocalVinDecoder');
         for (const v of withVins) {
           try {
-            const nhtsa = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${v.vin}?format=json`);
-            const data = await nhtsa.json();
-            const results = data.Results || [];
-            const get = (id) => {
-              const r = results.find(r => r.VariableId === id);
-              return r && r.Value && r.Value !== 'Not Applicable' ? r.Value : null;
-            };
-            if (!v.year && get(29)) v.year = parseInt(get(29));
-            if (get(26)) v.make = get(26);
-            if (get(28)) {
-              // Use NHTSA model but strip trim suffixes to keep it clean
-              const nhtsaModel = get(28);
-              // Only override if parser didn't get a model, or NHTSA is more specific
-              if (!v.model || v.model.toUpperCase() === nhtsaModel.split(' ')[0].toUpperCase()) {
-                v.model = nhtsaModel.split(/\s+(LE|SE|XLE|SR5|LX|EX|SXT|RT|Limited|Sport|Base|Touring)\b/i)[0];
+            const decoded = await localDecode(v.vin);
+            if (!decoded) continue;
+            if (!v.year && decoded.year) v.year = decoded.year;
+            if (decoded.make) v.make = decoded.make;
+            if (decoded.model) {
+              if (!v.model || v.model.toUpperCase() === decoded.model.split(' ')[0].toUpperCase()) {
+                v.model = decoded.model.split(/\s+(LE|SE|XLE|SR5|LX|EX|SXT|RT|Limited|Sport|Base|Touring)\b/i)[0];
               }
             }
-            if (get(38)) v.trim_level = get(38); // NHTSA var 38 = trim
-            // Engine: displacement (var 13) + cylinders (var 71)
-            const disp = get(13);
-            const cyl = get(71);
-            if (disp && !v.engine) {
-              const d = parseFloat(disp);
-              v.engine = (!isNaN(d) ? d.toFixed(1) : disp) + 'L' + (cyl ? ' ' + (parseInt(cyl) <= 4 ? '4-cyl' : parseInt(cyl) === 6 ? 'V6' : parseInt(cyl) === 8 ? 'V8' : cyl + '-cyl') : '');
-            }
+            if (decoded.trim) v.trim_level = decoded.trim;
+            if (decoded.engine && !v.engine) v.engine = decoded.engine;
           } catch (e) { /* skip individual VIN errors */ }
         }
       } catch (e) {

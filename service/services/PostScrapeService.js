@@ -2,7 +2,6 @@
 
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
-const axios = require('axios');
 const TrimTierService = require('./TrimTierService');
 const { getTrimTier } = require('../config/trim-tier-config');
 
@@ -65,21 +64,8 @@ function cleanDecodedTrim(raw) {
 }
 
 async function decodeBatch(vins) {
-  const data = `format=json&data=${vins.join(';')}`;
-  try {
-    const response = await axios.post(
-      'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVINValuesBatch/',
-      data,
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        timeout: 30000,
-      }
-    );
-    return response.data?.Results || [];
-  } catch (err) {
-    log.warn({ err: err.message }, 'PostScrape: NHTSA batch error');
-    return [];
-  }
+  const { decodeBatchLocal } = require('../lib/LocalVinDecoder');
+  return decodeBatchLocal(vins);
 }
 
 async function lookupTrimTier(year, make, model, trimName, engineDisplacement, transmission, drivetrain) {
@@ -148,7 +134,6 @@ async function enrichYard(yardId) {
 
       if (results.length === 0) {
         stats.errors += batch.length;
-        await new Promise(r => setTimeout(r, 2000));
         continue;
       }
 
@@ -219,8 +204,8 @@ async function enrichYard(yardId) {
         }
       }
 
-      // Rate limit between NHTSA batches
-      if (i + 50 < rows.length) await new Promise(r => setTimeout(r, 1000));
+      // Brief pause between batches (local decode, no rate limit needed)
+      if (i + 50 < rows.length) await new Promise(r => setTimeout(r, 50));
     }
 
     plog.info({ vinsDecoded: stats.vinsDecoded }, 'PostScrape: VIN decode complete');

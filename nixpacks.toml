@@ -9,7 +9,9 @@ aptPkgs = [
   "libx11-xcb1", "libxshmfence1",
   "libcups2t64",
   "libpango-1.0-0", "libcairo2",
-  "fonts-liberation", "xdg-utils"
+  "fonts-liberation", "xdg-utils",
+  # Native build tools for better-sqlite3 (@cardog/corgi dependency)
+  "python3", "build-essential"
 ]
 
 # Use npm install instead of npm ci to avoid lockfile version mismatch

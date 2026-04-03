@@ -2,7 +2,7 @@
 
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
-const axios = require('axios');
+// axios removed — VIN decoding now uses LocalVinDecoder (offline)
 
 /**
  * Format engine from NHTSA displacement + cylinder count.
@@ -31,44 +31,26 @@ class VinDecodeService {
   }
 
   /**
-   * Decode a VIN. Returns cached result if available.
+   * Decode a VIN. Uses LocalVinDecoder (offline corgi + VDS enrichment).
    */
   async decode(vin) {
     if (!vin || vin.length < 11) return null;
-    vin = vin.trim().toUpperCase();
-
-    // Check cache first
     try {
-      const cached = await database('vin_cache').where('vin', vin).first();
-      if (cached) return this.formatCached(cached);
-    } catch (e) { /* table may not exist */ }
-
-    // Call NHTSA API
-    try {
-      const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`;
-      const res = await axios.get(url, { timeout: 10000 });
-      const results = res.data?.Results || [];
-      const decoded = this.parseNHTSA(results);
-
-      // Cache it
-      try {
-        await database('vin_cache').insert({
-          vin,
-          year: decoded.year,
-          make: decoded.make,
-          model: decoded.model,
-          trim: decoded.trim,
-          engine: decoded.engine,
-          drivetrain: decoded.drivetrain,
-          body_style: decoded.bodyStyle,
-          decoded_at: new Date(),
-          createdAt: new Date(),
-        }).onConflict('vin').ignore();
-      } catch (e) { /* ignore cache insert errors */ }
-
-      return decoded;
+      const { decode: localDecode } = require('../lib/LocalVinDecoder');
+      const result = await localDecode(vin);
+      if (!result) return null;
+      return {
+        year: result.year,
+        make: result.make,
+        model: result.model,
+        trim: result.trim,
+        engine: result.engine,
+        engineType: result.engineType,
+        drivetrain: result.drivetrain,
+        bodyStyle: result.bodyStyle,
+      };
     } catch (err) {
-      this.log.warn({ err: err.message, vin }, 'NHTSA decode failed');
+      this.log.warn({ err: err.message, vin }, 'LocalVinDecoder failed');
       return null;
     }
   }
@@ -171,8 +153,7 @@ class VinDecodeService {
       } else {
         errors++;
       }
-      // Rate limit: 200ms between NHTSA calls
-      await new Promise(r => setTimeout(r, 200));
+      // Local decode — no rate limit needed
     }
 
     this.log.info({ decoded, errors }, 'VIN decode batch complete');

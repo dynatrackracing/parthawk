@@ -4,6 +4,25 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-03] Phase 9: Local VIN Decoder — Eliminate All NHTSA API Calls
+- **Added:** @cardog/corgi for offline VIN decoding (sub-15ms, zero network, ~20MB bundled SQLite)
+- **Added:** vin_decoder schema with manufacturers, vds_trim_lookup, engine_codes, name_aliases tables
+- **Added:** GM/Chrysler/Honda/Ford trim and engine code seed data
+- **Added:** LocalVinDecoder singleton service (corgi + VDS enrichment pipeline)
+- **Added:** /vin/test-local/:vin diagnostic endpoint
+- **Changed:** PostScrapeService.decodeBatch() → local decode (was NHTSA batch API)
+- **Changed:** VinDecodeService.decode() → local decode (was NHTSA single VIN API)
+- **Changed:** /vin/decode-photo and /vin/scan routes → local decode
+- **Changed:** attack-list manual VIN decode → local decode
+- **Changed:** nixpacks.toml adds python3 + build-essential for better-sqlite3
+- **Removed:** All NHTSA API calls (zero remain in codebase)
+- **Removed:** NHTSA rate limit sleeps (200ms, 1000ms, 2000ms)
+- **Files touched:** package.json, nixpacks.toml, migration (new), LocalVinDecoder.js (new), PostScrapeService.js, VinDecodeService.js, vin.js, attack-list.js, index.js
+- **Affects:** All VIN decoding across DarkHawk — post-scrape, cron, VIN scanner, manual lists
+- **Notes:** Decoder pre-inits on startup. VDS enrichment falls back gracefully if tables not yet migrated.
+
+---
+
 ## [2026-04-01] Homepage section links + Autolumen uploads placement
 - **Added:** home.html at /admin/home — DarkHawk homepage with categorized section links (Field/Intel/Inventory/Tools)
 - **Moved:** Autolumen Sync card from gate.html to home.html (both Active Listings + Sales History uploads)

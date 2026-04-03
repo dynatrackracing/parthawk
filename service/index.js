@@ -797,6 +797,14 @@ async function start() {
       log.info(`Server started at port ${PORT}`);
     });
 
+    // Initialize local VIN decoder (pre-loads corgi SQLite database)
+    const { getDecoder } = require('./lib/LocalVinDecoder');
+    getDecoder().then(() => {
+      log.info('Local VIN decoder ready');
+    }).catch(err => {
+      log.warn({ err: err.message }, 'Local VIN decoder init failed — will retry on first decode');
+    });
+
     // DISABLED: CronWorkRunner used SellerItemManager → FindingsAPI (dead since Feb 2025).
     // Item table (21K records) is permanently frozen. market_demand_cache is the pricing source of truth (see priceResolver.js).
     // if (process.env.RUN_JOB_NOW === '1') {

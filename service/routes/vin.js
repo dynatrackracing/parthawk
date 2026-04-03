@@ -77,63 +77,23 @@ router.post('/decode-photo', async (req, res) => {
       return res.json({ success: true, vin, partial: true });
     }
 
-    // Step 2: Check vin_cache first
+    // Step 2: Decode via LocalVinDecoder (offline, checks vin_cache internally)
+    const { decode: localDecode } = require('../lib/LocalVinDecoder');
     let decoded = null;
     let matchedVehicle = null;
 
-    try {
-      const cached = await database('vin_cache').where('vin', vin).first();
-      if (cached) {
-        decoded = {
-          year: cached.year, make: cached.make, model: cached.model,
-          engine: cached.engine, bodyStyle: cached.body_style,
-        };
-      }
-    } catch (e) {
-      // vin_cache table may not exist yet
-    }
-
-    // Step 3: If not cached, call NHTSA
-    if (!decoded) {
-      const nhtsaRes = await axios.get(
-        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`,
-        { timeout: 10000 }
-      );
-
-      const results = nhtsaRes.data?.Results || [];
-      const getValue = (varId) => {
-        const item = results.find(r => r.VariableId === varId);
-        return (item && item.Value && item.Value.trim()) || null;
-      };
-
+    const localResult = await localDecode(vin);
+    if (localResult) {
       decoded = {
-        year: getValue(29) ? parseInt(getValue(29)) : null,
-        make: getValue(26),
-        model: getValue(28),
-        engine: [getValue(13), getValue(71)].filter(Boolean).join(' ') || null, // displacement + cylinders
-        bodyStyle: getValue(5),
+        year: localResult.year,
+        make: localResult.make,
+        model: localResult.model,
+        engine: localResult.engine,
+        bodyStyle: localResult.bodyStyle,
       };
-
-      // Cache the result
-      try {
-        await database('vin_cache').insert({
-          vin,
-          year: decoded.year,
-          make: decoded.make,
-          model: decoded.model,
-          engine: decoded.engine,
-          body_style: decoded.bodyStyle,
-          raw_nhtsa: JSON.stringify(nhtsaRes.data?.Results || []),
-          decoded_at: new Date(),
-          createdAt: new Date(),
-        });
-      } catch (e) {
-        // Ignore duplicate or table-not-exists errors
-        log.warn({ err: e.message }, 'vin_cache insert failed');
-      }
     }
 
-    // Step 4: Try to match against yard vehicles
+    // Step 3: Try to match against yard vehicles
     if (decoded.year && decoded.make && decoded.model) {
       try {
         const match = await database('yard_vehicle')
@@ -168,96 +128,27 @@ router.post('/scan', async (req, res) => {
     if (!vin || vin.length < 11) return res.status(400).json({ error: 'Valid VIN required (11-17 chars)' });
     vin = vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
 
-    // --- Step 1: Decode via cache or NHTSA ---
+    // --- Step 1: Decode via LocalVinDecoder (offline, checks vin_cache internally) ---
+    const { decode: localDecode } = require('../lib/LocalVinDecoder');
+    const localResult = await localDecode(vin);
+
     let decoded = null;
-    let rawResults = null;
-
-    try {
-      const cached = await database('vin_cache').where('vin', vin).first();
-      if (cached) {
-        decoded = {
-          year: cached.year, make: cached.make, model: cached.model,
-          trim: cached.trim, engine: cached.engine, drivetrain: cached.drivetrain,
-          bodyStyle: cached.body_style,
-        };
-        if (cached.raw_nhtsa) {
-          try { rawResults = JSON.parse(cached.raw_nhtsa); } catch (e) {}
-        }
-      }
-    } catch (e) { /* table may not exist */ }
-
-    if (!decoded) {
-      const nhtsaRes = await axios.get(
-        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`,
-        { timeout: 10000 }
-      );
-      rawResults = nhtsaRes.data?.Results || [];
-      const get = (varId) => {
-        const item = rawResults.find(r => r.VariableId === varId);
-        const val = item?.Value?.trim();
-        return (val && val !== '' && val !== 'Not Applicable') ? val : null;
-      };
-
-      const displacement = get(13);
-      const cylinders = get(71);
-      const engine = formatEngineStr(displacement, cylinders);
-
-      const fuelType = get(24);
-      let engineType = 'Gas';
-      if (fuelType) {
-        const ft = fuelType.toLowerCase();
-        if (ft.includes('diesel')) engineType = 'Diesel';
-        else if (ft.includes('hybrid')) engineType = 'Hybrid';
-        else if (ft.includes('electric') && !ft.includes('hybrid')) engineType = 'Electric';
-        else if (ft.includes('flex')) engineType = 'Flex Fuel';
-      }
-
-      const driveType = get(15);
-      let drivetrain = null;
-      if (driveType) {
-        const dt = driveType.toUpperCase();
-        if (dt.includes('4WD') || dt.includes('4X4') || dt.includes('4-WHEEL')) drivetrain = '4WD';
-        else if (dt.includes('AWD') || dt.includes('ALL-WHEEL') || dt.includes('ALL WHEEL')) drivetrain = 'AWD';
-        else if (dt.includes('FWD') || dt.includes('FRONT-WHEEL') || dt.includes('FRONT WHEEL')) drivetrain = 'FWD';
-        else if (dt.includes('RWD') || dt.includes('REAR-WHEEL') || dt.includes('REAR WHEEL')) drivetrain = 'RWD';
-      }
-
+    if (localResult) {
       decoded = {
-        year: get(29) ? parseInt(get(29)) : null,
-        make: get(26), model: get(28), trim: get(38),
-        engine, engineType, drivetrain,
-        bodyStyle: get(5), plantCity: get(31), plantCountry: get(75),
-        paintCode: null, // NHTSA doesn't provide paint code
+        year: localResult.year,
+        make: localResult.make,
+        model: localResult.model,
+        trim: localResult.trim,
+        engine: localResult.engine,
+        engineType: localResult.engineType || 'Gas',
+        drivetrain: localResult.drivetrain,
+        bodyStyle: localResult.bodyStyle,
+        plantCity: null,
+        plantCountry: null,
+        paintCode: null,
       };
-
-      // Cache it
-      try {
-        await database('vin_cache').insert({
-          vin, year: decoded.year, make: decoded.make, model: decoded.model,
-          trim: decoded.trim, engine: decoded.engine, drivetrain: decoded.drivetrain,
-          body_style: decoded.bodyStyle, raw_nhtsa: JSON.stringify(rawResults),
-          decoded_at: new Date(), createdAt: new Date(),
-        }).onConflict('vin').ignore();
-      } catch (e) { /* ignore */ }
-    }
-
-    // Extract extra fields from raw NHTSA if available
-    if (rawResults && !decoded.engineType) {
-      const get = (varId) => {
-        const item = rawResults.find(r => r.VariableId === varId);
-        const val = item?.Value?.trim();
-        return (val && val !== '' && val !== 'Not Applicable') ? val : null;
-      };
-      const fuelType = get(24);
-      decoded.engineType = 'Gas';
-      if (fuelType) {
-        const ft = fuelType.toLowerCase();
-        if (ft.includes('diesel')) decoded.engineType = 'Diesel';
-        else if (ft.includes('hybrid')) decoded.engineType = 'Hybrid';
-        else if (ft.includes('electric')) decoded.engineType = 'Electric';
-      }
-      if (!decoded.plantCity) decoded.plantCity = get(31);
-      if (!decoded.plantCountry) decoded.plantCountry = get(75);
+    } else {
+      decoded = { year: null, make: null, model: null, trim: null, engine: null, engineType: 'Gas', drivetrain: null, bodyStyle: null };
     }
 
     // --- Step 2: Parts Intelligence (3 separate sections) ---
@@ -669,5 +560,19 @@ function detectPartTypeForVin(title) {
   if (t.includes('MIRROR')) return 'MIRROR';
   return 'OTHER';
 }
+
+/**
+ * GET /vin/test-local/:vin
+ * Test the local VIN decoder. Returns full decode result with timing.
+ */
+router.get('/test-local/:vin', async (req, res) => {
+  try {
+    const { decode } = require('../lib/LocalVinDecoder');
+    const result = await decode(req.params.vin);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;
