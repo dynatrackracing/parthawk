@@ -208,6 +208,11 @@ async function decode(vin) {
   var make = vehicle.make || null;
   var model = vehicle.model || null;
   var trim = vehicle.series || null;
+  // Tonnage series (1500/2500/3500/pure numbers) belongs in model, not trim
+  if (trim && /^\d+$/.test(trim)) {
+    model = model ? model + ' ' + trim : trim;
+    trim = null;
+  }
   var bodyStyle = vehicle.bodyStyle || null;
   var driveType = vehicle.driveType || null;
   var fuelType = vehicle.fuelType || corgiEngine.fuel || null;
