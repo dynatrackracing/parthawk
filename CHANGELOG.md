@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [2026-04-03] Fix: VIN decoder trim filtering + engine fallback
+- **Fixed:** Tonnage strings ("1500 (1/2 Ton)", "3/4 Ton") now append to model, not stored as trim
+- **Fixed:** Chassis codes (MCX20L) and junk strings filtered via cleanDecodedTrim() on all corgi series output
+- **Added:** Engine fallback from old vin_cache entries when corgi returns null engine
+- **Verified:** 6 production VINs — Tahoe/Sierra/Yukon XL tonnage fixed, Avalon chassis code filtered, Yukon XL now gets VDS trim (SL)
+- **Files touched:** LocalVinDecoder.js
+- **Notes:** Honda/Acura engine still null for some models (corgi gap, no old cache after purge)
+
+---
+
 ## [2026-04-03] Phase 9: Local VIN Decoder — Eliminate All NHTSA API Calls
 - **Added:** @cardog/corgi for offline VIN decoding (sub-15ms, zero network, ~20MB bundled SQLite)
 - **Added:** vin_decoder schema with manufacturers, vds_trim_lookup, engine_codes, name_aliases tables
