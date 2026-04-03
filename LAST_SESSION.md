@@ -1,38 +1,31 @@
-# LAST SESSION — READ THIS BEFORE DOING ANYTHING
+# LAST SESSION — 2026-04-03
 
-**Date:** 2026-04-03
-**Session type:** Fix — VIN decoder trim filtering + engine fallback
+## Phase 9: Local VIN Decoder (DEPLOYED)
+- Installed @cardog/corgi for offline VIN decoding
+- Created vin_decoder schema with VDS trim + engine code lookup tables
+- Built LocalVinDecoder.js singleton service (service/lib/)
+- Rewired all 5 NHTSA callers (PostScrapeService, VinDecodeService, VIN routes, attack list)
+- Fixed tonnage leaking into trim field
+- Fixed chassis codes (MCX20L) leaking into trim field
+- Added engine fallback for null corgi data
+- Added /vin/test-local/:vin diagnostic endpoint
+- Tested against 20 real VINs: engine improved, drivetrain perfect, some trim regressions (corgi doesn't surface trim for all vehicles)
 
-## What was done
-- Expanded tonnage-to-model logic: catches "1500 (1/2 Ton)", "3/4 Ton", pure numbers
-- All corgi series values now run through cleanDecodedTrim() before storing as trim
-- Filters chassis codes (MCX20L), junk strings (NFA), cab types, drivetrain strings
-- Added engine fallback: if corgi returns null engine, checks old vin_cache for NHTSA data
-- Verified on 6 production VINs: tonnage and chassis code fixes confirmed working
-- Yukon XL now gets VDS trim enrichment (SL) since tonnage moved to model
+## PartOutPRO Evaluated — Rejected
+- No listing automation capability, research tool only
+- Downgraded to free tier
 
-## What files were touched
-- service/lib/LocalVinDecoder.js (tonnage regex, cleanDecodedTrim, engine fallback)
-- LAST_SESSION.md, CHANGELOG.md
+## Intelligence Diagnostic Run
+- 5 issues identified (see HANDOFF_2026-04-03.md)
+- instrumentclusterstore scraper: 0 items
+- 416 VINs need decode (next cron handles)
+- Autolumen listings not in YourListing table
+- The Mark table empty (adoption gap)
+- QUARRY queries wrong data source (frozen Item table)
 
-## What is still broken / needs attention
-- Honda/Acura engine data: corgi returns null for some models (MDX, Pilot), no old cache to fall back to
-- VDS trim seed data gaps: Honda uses numeric pos8 chars (0-9), not R/S/T/U/V/W from our seed
-- Ford engine code coverage: most common chars (2, N, L, E) not in seed data
-- Chrysler price_class: most common chars (4, 5, 1, 2) not in seed data
-- EST badge styling still needs gray treatment
-- Mark icons not appearing (marks lack partNumber)
-
-## What's next
-- Fix Honda/Acura VDS seed data to use numeric chars from real inventory
-- Expand Ford engine code coverage for missing chars
-- Expand Chrysler price_class for actual inventory chars
-- EST badge gray styling
-
-## Critical reminders for next session
-- DO NOT modify AttackListService.js without reading it completely first
-- Item.price is FROZEN — never use as display/scoring price
-- LocalVinDecoder is a SINGLETON — one instance for app lifetime
-- cleanDecodedTrim() is copied in LocalVinDecoder (not imported from PostScrapeService)
-- Engine fallback only works when old vin_cache entries exist — won't help fresh VINs with no NHTSA history
-- Zero NHTSA API calls remain in the codebase
+## Open for Next Session
+1. Debug instrumentclusterstore scraper
+2. Trigger batch VIN decode for 416 vehicles
+3. Import Autolumen active listings
+4. The Mark adoption
+5. QUARRY data source fix

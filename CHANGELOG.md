@@ -4,17 +4,19 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
-## [2026-04-03] Fix: VIN decoder trim filtering + engine fallback
-- **Fixed:** Tonnage strings ("1500 (1/2 Ton)", "3/4 Ton") now append to model, not stored as trim
-- **Fixed:** Chassis codes (MCX20L) and junk strings filtered via cleanDecodedTrim() on all corgi series output
-- **Added:** Engine fallback from old vin_cache entries when corgi returns null engine
-- **Verified:** 6 production VINs — Tahoe/Sierra/Yukon XL tonnage fixed, Avalon chassis code filtered, Yukon XL now gets VDS trim (SL)
-- **Files touched:** LocalVinDecoder.js
-- **Notes:** Honda/Acura engine still null for some models (corgi gap, no old cache after purge)
-
----
-
-## [2026-04-03] Phase 9: Local VIN Decoder — Eliminate All NHTSA API Calls
+## [Phase 9] Local VIN Decoder — 2026-04-03
+- Installed @cardog/corgi for offline VIN decoding (eliminates all NHTSA API calls)
+- Created vin_decoder schema with manufacturers, vds_trim_lookup, engine_codes, name_aliases tables
+- Seeded GM, Chrysler, Honda, Ford trim and engine lookup data
+- Built LocalVinDecoder singleton service (service/lib/LocalVinDecoder.js)
+- Rewired 5 NHTSA callers: PostScrapeService, VinDecodeService, VIN routes, attack list
+- Fixed tonnage series values leaking into trim field
+- Fixed chassis codes (MCX20L) filtered by cleanDecodedTrim()
+- Added engine fallback for null corgi engine data
+- Added /vin/test-local/:vin diagnostic endpoint
+- Pre-initializes decoder on app startup
+- Tested 20 real VINs: 20/20 year/make/model, 20/20 drivetrain, 15/20 engine improved
+- Full intelligence diagnostic run: attack list healthy, 5 tuning items identified
 - **Added:** @cardog/corgi for offline VIN decoding (sub-15ms, zero network, ~20MB bundled SQLite)
 - **Added:** vin_decoder schema with manufacturers, vds_trim_lookup, engine_codes, name_aliases tables
 - **Added:** GM/Chrysler/Honda/Ford trim and engine code seed data
