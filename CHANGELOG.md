@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## QUARRY Velocity Scoring + Want List Auto-Sync — 2026-04-04
+- Velocity ratio: sold_count / in_stock, urgency tiers CRITICAL/LOW/WATCH/FINE
+- CRITICAL + LOW auto-added to restock_want_list (518 entries on first run)
+- POST /restock/quarry-sync for manual trigger
+- Runs after YourDataManager.syncAll (4x/day via cron)
+- Cleanup: deactivates quarry_auto entries when velocity drops below threshold
+- Scout Alerts reads want list via Hunters Perch source (no changes needed)
+- Verified: 126 CRITICAL, 512 LOW, 133 WATCH
+
+---
+
 ## Market Drip Rewrite — 2026-04-04
 - Expanded importapart drip to 3-bucket priority queue: active inventory (1,151) + sold-not-restocked (1,583) + importapart catalog (9,009) = 10,912 unique PNs
 - Comp quality filter: regex excludes as-is/untested/for-parts/core before averaging
