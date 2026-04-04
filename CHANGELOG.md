@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe Phase D] Cache Key Standardization — 2026-04-04
+- market_demand_cache: added key_type column (pn/ymm), normalized all PN keys (stripped spaces/dashes/dots)
+- 74 keys renamed, 0 duplicates found, 582 PN + 8 YMM total
+- Updated MarketPricingService, PriceCheckService, MarketDemandCronRunner writers to normalize before insert
+- Updated priceResolver.js reader to normalize lookup keys
+- Cache keys now joinable with YourSale/YourListing/SoldItem partNumberBase columns
+
+---
+
 ## [Clean Pipe Phase C] Wire Insert Paths — 2026-04-04
 - Wired extractStructuredFields() into all insert/upsert paths
 - YourDataManager: syncOrders (YourSale) + syncListings (YourListing)
