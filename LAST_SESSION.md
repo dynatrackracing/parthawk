@@ -27,10 +27,12 @@
 - Intelligence tuning (5 diagnostic items from 4/3 session)
 
 ## Open items
-- instrumentclusterstore scraper returning 0 items
 - The Mark table empty
 - Unauthenticated write endpoints
-- QUARRY data source needs rethink (queries frozen Item table)
+
+## Closed items (this session)
+- instrumentclusterstore scraper: NOT broken. 427 SoldItems, last scraped 2026-04-04. False alarm from stale diagnostic query.
+- QUARRY data source: rewritten to pure SQL with Clean Pipe columns (no more frozen Item table)
 
 ## Architecture reminders
 - Stock penalty uses max in_stock across all parts on the vehicle
