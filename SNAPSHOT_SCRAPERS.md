@@ -156,3 +156,21 @@ LKQ runs separately via local Windows Task Scheduler (CloudFlare blocks Railway 
 - CarolinaPickNPull and PickAPartVA require residential IP (local machine)
 - VIN decode crons at 3:00 AM and 8:40 AM UTC chase local scrapes
 - YourData sync (orders + listings) runs 4x daily at 1, 7, 13, 19 UTC
+
+## Sniper Scripts
+
+### service/scripts/run-yard-market-sniper.js
+- **Purpose:** Fill market_demand_cache for parts matched to recent yard vehicles. PN-only search, no keyword fallback.
+- **Usage:** `node service/scripts/run-yard-market-sniper.js --dry-run` (default) or `--execute --limit=50`
+- **Queue building flow:**
+  1. Get active yard vehicles (last 7 days)
+  2. Match to inventory parts via `Auto + AIC + Item` join
+  3. Extract PNs from matched Item titles (`extractPartNumbers`)
+  4. **Sanitize + dedup** via `sanitizePartNumberForSearch()` and `deduplicatePNQueue()` from partIntelligence.js (Phase E1) -- strips junk PNs, Ford ECU suffixes, dash-variant duplicates
+  5. Filter against `market_demand_cache` (skip fresh entries <7d)
+  6. Sort by Item.price descending, cap at `--limit`
+  7. Scrape eBay sold comps via `PriceCheckServiceV2.scrapeSoldComps()` (quoted exact match, retry once)
+  8. Write results to `market_demand_cache` with `key_type='pn'`, `source='yard_sniper'`
+- **Dependencies:** `partIntelligence.js` (PN extraction + sanitization), `OpportunityService.shouldExclude` (skip engines/trans/panels), `PriceCheckServiceV2` (cheerio scraper)
+- **Rate limit:** 2-3s random delay between scrapes
+- **Gotcha:** Uses its own Knex instance (not the app's database singleton) -- requires `DATABASE_URL` env var
