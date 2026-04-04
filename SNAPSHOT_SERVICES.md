@@ -1,281 +1,146 @@
+# SNAPSHOT_SERVICES.md
 Generated 2026-04-04
-
-# PartHawk Services & Managers Snapshot
 
 ## Core Services
 
-### PostScrapeService.js
-**Purpose:** Universal post-scrape enrichment pipeline — runs after any yard scraper completes.
-**Key methods:**
-- `async enrichYard(yardId)` — orchestrates decode + trim tier + scout alerts for a yard
-- `async decodeBatch(vins)` — batch VIN decode via LocalVinDecoder (offline, not NHTSA)
-- `async lookupTrimTier(year, make, model, trimName, engineDisplacement, transmission, drivetrain)`
-**Requires:** logger, database, TrimTierService, trim-tier-config, LocalVinDecoder
-**Clean Pipe:** `decodeBatch` calls `decodeBatchLocal` from `../lib/LocalVinDecoder` — no external NHTSA calls.
-
 ### AttackListService.js
-**Purpose:** Scores yard vehicles against inventory/sales data to prioritize what to pull.
-**Key methods:**
-- `async getAttackList(yardId, options)` — main entry, returns scored vehicle list
-- `async buildInventoryIndex()` — indexes your_listing by make/model/PN
-- `async buildSalesIndex(cutoff)` — indexes sold_item with Clean Pipe columns first
-- `async buildStockIndex()` — indexes your_listing using partNumberBase + extractedMake/Model
-- `async buildPlatformIndex()` — platform compatibility cross-reference
-- `async scoreManualVehicles(vehicles, options)` — score ad-hoc vehicle list
-- `async getAllYardsAttackList(options)` — attack list across all active yards
-- `async loadValidationCache()` — caches validation data
-**Requires:** logger, database, platformMatch, partIntelligence, trim-tier-config, TrimTierService, priceResolver
-**Clean Pipe:** `buildStockIndex` and `buildSalesIndex` read `partNumberBase`, `extractedMake`, `extractedModel` columns first, fall back to title parsing. PN_EXACT_YEAR_TYPES enforces exact year for ECM/PCM/BCM/TIPM etc.
+- Purpose: Scores yard vehicles by pull value — matches yard vehicles against Auto+Item inventory, YourSale history, and YourListing stock
+- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `scoreVehicle()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`
+- Clean Pipe: `buildStockIndex` + `buildSalesIndex` read `extractedMake`/`extractedModel`/`partNumberBase` columns first, title-parsing fallback only when null
+- Scoring upgrades:
+  - Stock penalty scaling: 1 in stock=-5%, 2=-15%, 3=-30%, 4=-50%, 5+=-70%
+  - Fresh arrival bonus: <=3 days=+10%, <=7 days=+5%, <=14 days=+2%
+  - COGS yard factor: cheaper yards get +/-5% via `_yardCostFactor`
+  - Mark boost: parts matching `the_mark` get +15 score bonus
+- Price resolution: market_demand_cache first, conservative sell estimates fallback (never Item.price)
+- Part filtering: PN-specific parts require exact year; generational parts get +/-1 tolerance; engine/drivetrain/fuel validated
 
-### CacheService.js
-**Purpose:** Full claim lifecycle for parts — from claim through resolution to history.
-**Key methods:**
-- `async claim({ partType, partDescription, partNumber, vehicle, yard, ... })` — sources: daily_feed, scout_alert, hawk_eye, flyway, manual
-- `async returnToAlerts(cacheId, reason)` — unclaim and return to alert pool
-- `async deleteClaim(cacheId)` — hard delete
-- `async manualResolve(cacheId, ebayItemId)` — link claim to eBay listing
-- `async resolveFromListings()` — batch auto-resolve claims against your_listing
-- `async getActiveClaims({ source, claimedBy, sortBy })` / `async getHistory({ days, limit })`
-- `async getStats()` — counts by status/source
-- `async checkCacheStock({ partNumber, make, model, year, partType })` — duplicate check
-**Requires:** logger, database, uuid, partNumberUtils
+### CacheService.js (The Cache)
+- Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
+- Key methods: `claim()`, `returnToAlerts()`, `deleteClaim()`, `manualResolve()`, `resolveFromListings()`, `getActiveClaims()`, `getStats()`, `checkCacheStock()`
+- Sources: daily_feed, scout_alert, hawk_eye, flyway, manual
+- Statuses: claimed -> listed / returned / deleted
+- Auto-resolve: `resolveFromListings()` matches cache entries against YourListing by PN or make+model+partType (listing must be created AFTER claim). Runs after every sync (4x/day)
 
-### VinDecodeService.js
-**Purpose:** VIN decoding with caching — delegates to LocalVinDecoder (offline corgi + VDS).
-**Key methods:**
-- `async decode(vin)` — returns {year, make, model, trim, engine, engineType, drivetrain, bodyStyle}
-- `async decodeAllUndecoded()` — batch decode un-decoded VINs in DB
-**Requires:** logger, database, LocalVinDecoder
-**Clean Pipe:** No NHTSA dependency. axios removed. All decoding offline via LocalVinDecoder.
+### COGSService.js
+- Purpose: True COGS = parts cost + gate fee (no tax, no mileage). Target spend 30%, ceiling 35%, per-part color coding
+- Key methods: `getYardProfile()`, `calculateGateMax()`, `calculateSession()`
 
-### AutolumenImportService.js
-**Purpose:** CSV import for Autolumen eBay store — active listings, sales history, transactions.
-**Key methods:**
-- `async importActiveListings(csvText)` — parse CSV, extract structured fields, upsert
-- `async importSalesHistory(csvText)` — import sold items
-- `async importTransactions(csvText)` — import payment transactions
-- `async getStats()` — counts for autolumen store
-**Requires:** logger, database, csv-parse/sync, partIntelligence.extractStructuredFields
-**Clean Pipe:** Uses `extractStructuredFields` on titles to populate partNumberBase, partType, extractedMake, extractedModel.
-
-### ItemLookupService.js
-**Purpose:** CRUD for inventory items with eBay compatibility.
-**Key methods:**
-- `async getItemsForAuto({ year, make, model, trim, engine })` / `async getAutosForItem({ partNumber })`
-- `async createItem({ body })` / `async update({ body })` / `async deleteItemById({ id })`
-- `async searchItems({ constraints })` / `async getFilter({ field })`
-**Requires:** logger, objection, Auto, Item, uuid, AutoService, CacheManager, partNumberUtils
-
-### AutoService.js
-**Purpose:** Vehicle (Auto) CRUD and eBay taxonomy compatibility lookups.
-**Key methods:**
-- `async getDistinctList({ constraints })` / `async getCompatibilityTaxonomy({ constraints })`
-- `async createAuto({ body })` / `async updateAuto({ id, body })` / `async getOrCreateAutos({ autos })`
-**Requires:** logger, Joi, lodash, TaxonomyAPI, Auto model, CacheManager, EbayQueryCacheManager
+### FlywayService.js
+- Purpose: Multi-yard trip planning CRUD — trips, yard routing, trip-specific attack lists, auto-complete expired trips
+- Key methods: `getTrips()`, `createTrip()`, `getFlywayAttackList()`, `cleanupExpiredTripVehicles()`
 
 ## Intelligence Services
 
 ### PhoenixService.js
-**Purpose:** SoldItem matching — finds rebuild/relist opportunities from competitor sold data.
-**Key methods:**
-- `async getRebuildSellers()` / `async addRebuildSeller(name)` / `async removeRebuildSeller(name)`
-- `async getPhoenixStats({ days, seller })` — summary stats
-- `async getPhoenixList({ days, limit, seller })` — scored relist candidates
-**Requires:** database
-**Clean Pipe:** Groups by `partNumberBase`. Fast path: direct `partNumberBase` column lookup on sold_item. Slow path: title scan fallback for records without it.
+- Purpose: Rebuild seller intelligence — groups competitor catalog by partNumberBase, matches against SoldItem velocity, enriches with market_demand_cache
+- Key methods: `getRebuildSellers()`, `addRebuildSeller()`, `getPhoenixStats()`, `getPhoenixList()`
+- SoldItem matching: FAST PATH uses `partNumberBase` column lookup (E5) for direct PN match; SLOW PATH title scan fallback for records without partNumberBase
+- Scoring: `calcPhoenixScore()` — velocity (35pts), revenue (25pts), price sweet spot (20pts), market demand (20pts)
+- Three layers: (1) Item catalog with fitment, (2) SoldItem velocity, (3) market_demand_cache
 
-### ListingIntelligenceService.js
-**Purpose:** Aggregates intelligence for a single listing — programming, trim tier, fitment, sales.
-**Key methods:**
-- `async getIntelligence({ partNumber, year, make, model, engine, trim, partType })`
-- `async lookupProgramming(make, year, partType, trim)` / `async lookupTrimTier(...)`
-- `async lookupFitmentCache(pnBase, pnExact)` / `async lookupSalesHistory(pnBase, pnExact)`
-**Requires:** database, partNumberUtils, TrimTierService
-
-### FitmentIntelligenceService.js
-**Purpose:** Deduces fitment negations — what is in taxonomy but NOT in compatibility = does not fit.
-**Key methods:**
-- `async fetchItemCompatibility(ebayItemId)` / `async fetchTaxonomy(make, model, year)`
-- `async buildFitmentProfile(compatEntries, make, model, yearStart, yearEnd)`
-- `async lookupFitment({ partType, make, model, year, partNumber })` / `async storeFitmentProfile(data)`
-**Requires:** database, TradingAPI, TaxonomyAPI, xml2js
+### ScoutAlertService.js
+- Purpose: Generates yard-vehicle alerts by matching want-list parts, sold history, and marks against active yard inventory
+- Key methods: `generateAlerts()` (concurrency-guarded, one-at-a-time)
+- Reads: `the_mark` (active marks, highest priority PERCH alerts) + `restock_want_list` (Hunters Perch) + `YourSale` (bone pile, sold items with low/no stock) + `restock_flag`
+- Matching: make+model required, year within range; confidence HIGH/MEDIUM based on engine/trim verification
+- Stock filter: skips bone_pile parts that have matching active YourListing PNs
+- Atomic refresh: deletes + re-inserts in transaction, preserves claimed status
 
 ### CompetitorMonitorService.js
-**Purpose:** Advisory alerts when competitors undercut, drop out, or we are underpriced.
-**Key methods:**
-- `async scan()` / `async createAlert(...)` / `async getAlerts({ limit, dismissed })` / `async dismiss(id)`
-**Requires:** logger, database, partNumberUtils
+- Purpose: Advisory alerts — underpriced vs market, competitor dropout, competitor undercut
 
-### DemandAnalysisService.js
-**Purpose:** Market demand analytics — sell-through rates, velocity, stale detection.
-**Key methods:**
-- `async calculateSellThroughRate(daysBack)` / `async analyzeSalesVelocity(daysBack)`
-- `async findStaleInventory(daysThreshold, limit)` / `async getTopPerformers(limit, daysBack)`
-- `async analyzeCompetition(keywords)` / `async getMarketHealthDashboard()`
-**Requires:** logger, SoldItem, CompetitorListing, YourSale, YourListing
+### FitmentIntelligenceService.js
+- Purpose: Fitment negations via "subtraction" — what's in eBay taxonomy but NOT in compatibility table = does not fit
 
-### PricePredictionService.js
-**Purpose:** ML-based pricing from historical sales, competitors, and market data.
-**Key methods:**
-- `async predictOptimalPrice(listingId)` / `async batchPredictPrices(limit)`
-- `async findUnderpricedItems(limit)` / `async findOverpricedItems(limit)`
-- `async analyzePriceVelocity(keywords)`
-**Requires:** logger, SoldItem, CompetitorListing, YourSale, YourListing
+### MarketPricingService.js
+- Purpose: Batch market pricing for Daily Feed — dedupes by PN, checks market_demand_cache (90-day TTL), scrapes uncached via PriceCheckServiceV2 (axios+cheerio); V1 Playwright fallback
 
-### TrimIntelligenceService.js
-**Purpose:** One-time Claude API + web_search to research premium parts for a trim package.
-**Key methods:** `async getTrimIntelligence({ year, make, model, trim })` / `async researchTrim(...)`
-**Requires:** logger, database
+### ListingIntelligenceService.js
+- Purpose: Aggregates intelligence for a single listing — programming, trim tier, fitment cache, sales history
 
-### ReturnIntelligenceService.js
-**Purpose:** Return analytics — rates by part type, problem parts, repeat returners, INAD stats.
-**Key methods:**
-- `async getSummary()` / `async getReturnRateByPartType({ months })`
-- `async getProblemParts(...)` / `async getRepeatReturners(...)` / `async getReturnsByMake(...)`
-- `async getMonthlyTrend({ months })` / `async getINADStats({ months })`
-**Requires:** logger, database
+## Restock & Inventory
 
-### OpportunityService.js
-**Purpose:** Surfaces parts with strong market demand we have NEVER sold. Max score 100.
-**Requires:** database (reads market_demand_cache, YourListing, YourSale)
+### restockReport.js (THE QUARRY) — `service/routes/restockReport.js`
+- Purpose: Restock intelligence using Clean Pipe columns only (no Item table, no title scanning)
+- Key methods: `GET /report` (velocity scoring), `quarrySync()` (auto-adds to want list)
+- Urgency tiers: CRITICAL (ratio>=4 or 0 stock+sold 3x+$100+), LOW (ratio>=2 or 0 stock), WATCH (ratio>=1)
+- Scoring: price (35pts), stock gap (30pts), velocity (20pts), recency (15pts); floor overrides for high-value zero-stock
+- `quarrySync()`: auto-adds CRITICAL+LOW to `restock_want_list` with `[quarry_auto]` notes; cleans entries where velocity dropped below LOW. Called by YourDataManager after syncAll (4x/day)
 
-### LearningsService.js
-**Purpose:** Aggregates patterns from dead inventory, returns, and stale outcomes.
-**Key methods:** `async getLearnings()` / `async getDeadPatterns()` / `async getReturnPatterns()` / `async getStaleOutcomes()`
+### RestockService.js
+- Purpose: Flags parts where sold >= 2x active stock in 90 days. Writes to `restock_flag` table
+- Key methods: `scanAndFlag()`, `getFlags()`, `acknowledge()`
 
-### LifecycleService.js
-**Purpose:** Part lifecycle metrics — time-to-sell, seasonal patterns.
-**Key methods:** `async getLifecycleMetrics({ daysBack })` / `async getSeasonalPatterns({ yearsBack })`
+### DeadInventoryService.js
+- Purpose: Identifies stale listings needing action based on days listed, market demand, competition
 
-## Managers
+### OverstockCheckService.js
+- Purpose: Monitors overstock watch groups — triggers alerts when stock thresholds exceeded
+- Key methods: `checkAll()` — runs after every YourData sync
 
-### YourDataManager.js
-**Purpose:** Syncs YOUR eBay seller data (orders + listings) to database.
-**Key methods:**
-- `async syncAll({ daysBack })` / `async syncOrders({ daysBack })` / `async syncListings()` / `async getStats()`
-**Requires:** logger, SellerAPI, YourSale, YourListing, partIntelligence.extractStructuredFields
-**Note:** syncListings uses Clean Pipe structured fields. Triggers OverstockCheckService + CacheService.resolveFromListings after sync.
+### StaleInventoryService.js
+- Purpose: Automated price reductions via TradingAPI. 60d=-10% through 270d=-30%. No comps = hold and flag
 
-### MarketResearchManager.js
-**Purpose:** Orchestrates market research — scrapes competitors and sold items, calculates price snapshots.
-**Key methods:**
-- `async researchAllInventory(...)` / `async researchSingleItem(...)` / `async researchByKeywords(...)`
-- `async storeActiveListings(...)` / `async storeSoldItems(...)` / `async calculatePriceSnapshot(...)`
-**Requires:** MarketResearchScraper, MarketResearchRun, CompetitorListing, SoldItem, YourListing, PriceSnapshot
+## Data Sync & Import
 
-### SoldItemsManager.js
-**Purpose:** Scrapes competitor sold items via Playwright. Uses extractStructuredFields on store.
-**Key methods:**
-- `async scrapeAllCompetitors(...)` / `async scrapeCompetitor({ seller, ... })`
-- `async enrichWithCompatibility(ebayItemId)` / `async scrapeByKeywords({ keywords, ... })`
-**Requires:** SoldItemsScraper, TradingAPI, SoldItemSeller, SoldItem, partIntelligence
+### YourDataManager.js — `service/managers/YourDataManager.js`
+- Purpose: Syncs YOUR eBay seller data (orders + listings) via SellerAPI
+- Key methods: `syncAll()`, `syncOrders()`, `syncListings()`, `getStats()`
+- Clean Pipe: both `syncOrders` and `syncListings` call `extractStructuredFields(title)` to populate partNumberBase, partType, extractedMake, extractedModel
+- Post-sync chain in `syncAll`: (1) OverstockCheckService.checkAll(), (2) CacheService.resolveFromListings(), (3) **quarrySync()** — auto-adds CRITICAL+LOW velocity parts to want list
+- Deactivation: marks dynatrack listings not in current sync as Ended
 
-### ItemDetailsManager.js
-**Purpose:** Fetches eBay item details — compatibility tables, specifics, duplicate detection.
-**Key methods:**
-- `async getDetailsForItem({ itemId })` / `async checkForDuplicate(item)` / `async processItems()`
-- `async getItemCompatibility(...)` / `async getItemSpecifics(...)`
-**Requires:** TradingAPI, Auto, Item, uuid, lodash
+### AutolumenImportService.js
+- Purpose: CSV import for Autolumen (second eBay store) — active listings, sales history, transactions
+- Key methods: `importActiveListings()`, `importSalesHistory()`, `importTransactions()`, `getStats()`
+- Clean Pipe: calls `extractStructuredFields(title)` on every insert for partNumberBase, partType, extractedMake, extractedModel
 
-### SellerItemManager.js
-**Purpose:** Fetches competitor seller listings from eBay via FindingsAPI/BrowseAPI.
-**Key methods:** `async getItemsForSellers(sellers)` / `async getItemsForSeller({ seller })` / `async processResponse(...)`
-**Requires:** FindingsAPI, BrowseAPI, Item
+### SoldItemsManager.js — `service/managers/SoldItemsManager.js`
+- Purpose: Scrapes competitor sold items via Playwright, stores in SoldItem. Uses `extractStructuredFields()` on store
 
-### UserManager.js
-**Purpose:** Firebase user CRUD — get/create/modify/delete.
-**Key methods:** `async getOrCreateUser(...)` / `async getUser(...)` / `async getAllUsers()` / `async modifyUser(...)` / `async deleteUser(...)`
-**Requires:** User model, CacheManager
+## VIN & Vehicle Services
 
-### CompetitorManager.js
-**Purpose:** Returns all enabled competitor sellers. Single method wrapper.
-**Key methods:** `async getAllCompetitors()`
+### PostScrapeService.js
+- Purpose: Universal post-scrape enrichment — runs after ANY yard scraper completes
+- Key methods: `enrichYard(yardId)`
+- Pipeline: (1) Batch VIN decode via `LocalVinDecoder.decodeBatchLocal()` (50/call, offline), (2) Trim tier matching (TrimTierService + trim_catalog + static config), (3) Scout alerts (non-blocking)
+- Uses LocalVinDecoder — NOT NHTSA API
+
+### VinDecodeService.js
+- Purpose: Single-VIN and batch decode with caching
+- Key methods: `decode(vin)`, `decodeAllUndecoded()`
+- Delegates to LocalVinDecoder (offline corgi + VDS enrichment) — no external API calls
+
+### TrimTierService.js
+- Purpose: Trim tier lookup — 3-tier cascade: trim_tier_reference (curated), trim_catalog (eBay Taxonomy), static config fallback
+
+## Pricing Services
+
+### PriceCheckServiceV2.js
+- Purpose: eBay sold comp scraper — axios+cheerio, no Chromium/OOM risk. Pipeline: buildSearchQuery -> scrapeSoldComps -> filterRelevantItems -> calculateMetrics
+
+### PriceCheckService.js (V1)
+- Purpose: Original Playwright-based eBay price check — persistent browser with stealth plugin
+
+### PricingService.js / PricePredictionService.js
+- Purpose: Optimal price suggestions and ML-based price prediction from historical/competitor/market data
+
+## Other Managers
+
+### CompetitorManager.js — returns all enabled competitor sellers (single method)
+### ItemDetailsManager.js — fetches full eBay item details via Trading API (compatibility, specifics)
+### MarketResearchManager.js — orchestrates market research: scrape competitors + sold items, store linked data
+### SellerItemManager.js — fetches competitor listings from eBay Findings/Browse API
+### UserManager.js — Firebase user CRUD with CacheManager
 
 ## Utility Services
 
-### PriceCheckService.js (V1)
-**Purpose:** Playwright-based eBay sold comp scraper. Persistent browser with stealth plugin.
-**Key methods:** `async checkPrice(listingId, title, currentPrice, forceRefresh)` / `async runPipeline(title, yourPrice)` / `async scrapeSoldItems(searchQuery)`
-**Requires:** playwright-extra, stealth, smart-query-builder, relevance-scorer, PriceCheck model, database
-
-### PriceCheckServiceV2.js
-**Purpose:** Lightweight eBay sold comp scraper — axios+cheerio, no Chromium. Same pipeline as V1.
-**Requires:** axios, cheerio, smart-query-builder, relevance-scorer
-
-### MarketPricingService.js
-**Purpose:** Batch market pricing for daily feed — dedupes by PN, checks cache, scrapes uncached.
-**Requires:** logger, database, partIntelligence. Primary: V2; fallback: V1.
-
-### PricingService.js
-**Purpose:** Optimal price suggestions from market, competitor, and historical data.
-**Key methods:** `async getRecommendations({ ebayItemId, all, daysBack })` / `async getMarketPriceData(...)` / `async getCompetitorPrices()` / `async getYourHistoricalPrices(...)`
-
-### COGSService.js
-**Purpose:** True COGS = parts cost + gate fee. No tax, no mileage. Color-coded spend tracking.
-**Key methods:** `static async getYardProfile(yardId)` / `static async calculateGateMax(yardId, plannedParts)` / `static async calculateSession(session)`
-
-### FlywayService.js
-**Purpose:** Multi-yard trip planning — CRUD trips, attach yards, generate trip-specific attack lists.
-**Key methods:**
-- `static async getTrips(status)` / `static async createTrip(...)` / `static async updateTrip(...)` / `static async deleteTrip(id)`
-- `static async getFlywayAttackList(tripId)` / `static async getActiveScrapableYards()`
-- `static async cleanupExpiredTripVehicles()` / `static async autoCompleteExpiredTrips()`
-**Requires:** database, AttackListService
-
-### TrimTierService.js
-**Purpose:** Trim tier lookup — maps trim names to BASE/CHECK/PREMIUM/PERFORMANCE (tiers 1-4).
-**Key methods:** `async lookup(year, make, model, trimName, engineDisplacement, transmission, drivetrain)`
-**Note:** Handles make aliases (Dodge/Ram, Chevy/Chevrolet, Mercedes variants).
-
-### PartNumberService.js
-**Purpose:** Part number normalization — strips revision suffixes (AA/AB/AC map to same base).
-**Key methods:** `static normalize(pn)` / `static areEquivalent(pn1, pn2)` / `static getSuffix(pn)` / `static groupByBase(pns)` / `static deduplicateKey(pn, vehicleApp)`
-**Note:** Pure utility, no dependencies.
-
-### ScoutAlertService.js
-**Purpose:** Generates scout alerts from yard inventory matched against sales/inventory data.
-**Key methods:** `async generateAlerts()` — concurrency-guarded, one-at-a-time.
-**Alert sources:** Hunters Perch (want list), Bone Pile (recent sales), The Mark (priority marks).
-**Requires:** database, logger, partMatcher, partIntelligence
-
-### PartLocationService.js
-**Purpose:** Where to find a part on a vehicle — research-backed location tips for pullers.
-**Key methods:** `async getLocation(...)` / `async findRecord(...)` / `async researchLocation(...)` / `async confirmLocation(id, ...)` / `async flagWrong(id)`
-
-### EbayMessagingService.js
-**Purpose:** Queue-based post-purchase eBay buyer messaging with templates and retry logic.
-**Key methods:** `async queuePostPurchase(order, ebayStore)` / `async processQueue()` / `async pollNewOrders()` / `async getQueueStatus()` / `async getTemplates()`
-**Requires:** logger, database, SellerAPI
-
-### StaleInventoryService.js
-**Purpose:** Automated price reductions via TradingAPI. Standard: 60d=-10% through 270d=-30%. Programmed listings use slower schedule.
-**Key methods:** `async runAutomation()` / `async checkCompsExist(listing)` / `async revisePrice(ebayItemId, newPrice)`
-**Note:** No comps = hold and flag, do not reduce.
-
-### DeadInventoryService.js
-**Purpose:** Identifies dead inventory with market demand cross-reference.
-**Key methods:** `async getDeadInventory(...)` / `async getMarketDemandData()` / `async getCompetitorData()` / `async scanAndLog()` / `async getWarning(pn)`
-
-### RestockService.js
-**Purpose:** Flags parts needing restock — sold >= 2x active stock in 90 days.
-**Key methods:** `async scanAndFlag()` / `async getFlags({ acknowledged, limit })` / `async acknowledge(id)`
-
-### ReturnIntakeService.js
-**Purpose:** Auto-relist returned parts by grade (A=full, B=discount, C=review/scrap).
-**Key methods:** `async intakeReturn(...)` / `async getPendingRelists()` / `async markRelisted(id, newEbayItemId)` / `async markScrapped(id)`
-
-### OverstockCheckService.js
-**Purpose:** Monitors overstock groups and flags when stock exceeds thresholds.
-**Key methods:** `async checkAll()`
-
-### WhatToPullService.js
-**Purpose:** Recommends parts to pull based on demand, history, and competition.
-**Key methods:** `async getRecommendations(...)` / `async getMarketDemand(...)` / `async getYourSalesHistory(...)` / `async getCompetitionData(...)`
-
-### InstantResearchService.js
-**Purpose:** On-demand vehicle research — scrapes eBay sold for a YMM to discover sellable parts.
-**Key methods:** `async researchVehicle({ year, make, model, engine, drivetrain, refresh })`
-
-### ApifyResearchService.js
-**Purpose:** Vehicle research via PriceCheckServiceV2 (primary) or Apify actor (optional).
-**Key methods:** `async researchVehicle(vehicle, options)` / `async _scrapeViaPriceCheck(...)` / `async _scrapeViaApify(...)` / `async _enrichMarketCache(parts)` / `async _saveToSkyWatch(...)`
+### PartNumberService.js / PartLocationService.js — PN normalization + location/bin tracking for pullers
+### ReturnIntakeService.js / ReturnIntelligenceService.js — return processing (grade A/B/C relist) + return pattern analysis
+### EbayMessagingService.js — queue-based post-purchase buyer messaging with templates and retry
+### DemandAnalysisService.js / OpportunityService.js / TrimIntelligenceService.js — demand scoring, opportunity detection, trim-level research
+### WhatToPullService.js / InstantResearchService.js / ApifyResearchService.js — part-pull recommendations, on-demand vehicle research, batch scraping
+### LifecycleService.js / LearningsService.js — lifecycle metrics (time-to-sell, seasonal) + aggregated learnings from dead/return/stale patterns
+### AutoService.js — Auto (vehicle) table CRUD and eBay taxonomy compatibility
+### ItemLookupService.js — inventory item CRUD with eBay compatibility lookups

@@ -1,176 +1,133 @@
 # SNAPSHOT_SCRAPERS.md
-Generated 2026-04-04
+Generated 2026-04-01
 
 ## Scraper Overview Table
 
-| Scraper | Target | Method | IP Restriction | VIN Available | Schedule |
+| Scraper | Chain | Method | IP Requirement | VIN? | Locations |
 |---|---|---|---|---|---|
-| LKQScraper | pyp.com (7 locations) | curl + cheerio (HTML) | None (curl bypasses CF TLS) | Yes | Local Task Scheduler (CF blocks Railway) |
-| PullAPartScraper | pullapart.com (25+ locations) | Playwright headed + REST API | None (headed browser required) | Yes | Daily 6am UTC via FlywayScrapeRunner |
-| FossScraper | fossupullit.com (2 NC locations) | Playwright headless | None | No | Daily 6am UTC via FlywayScrapeRunner |
-| CarolinaPickNPullScraper | carolinapicknpull.com (3 locations) | Playwright + stealth | Residential IP only (403 on datacenter) | No | FlywayScrapeRunner (skipped on Railway) |
-| UPullAndSaveScraper | upullandsave.com (4 KY/TN locations) | axios POST (YardSmart AJAX) | None | Yes | Daily 6am UTC via FlywayScrapeRunner |
-| ChesterfieldScraper | chesterfieldauto.com (3 VA locations) | Playwright + stealth | None | No | Daily 6am UTC via FlywayScrapeRunner |
-| PickAPartVAScraper | pickapartva.com (2 VA locations) | Playwright + stealth | Residential IP only (CF 403) | Maybe | FlywayScrapeRunner (local-only when CF active) |
-| SoldItemsScraper | ebay.com sold listings | Playwright + stealth | None | N/A | 4x daily via CompetitorDripRunner |
-| MarketResearchScraper | ebay.com active + sold listings | Playwright + stealth | None | N/A | On-demand (PriceCheckService, yard sniper) |
+| LKQScraper | LKQ Pick Your Part | curl + cheerio (no browser) | Datacenter OK | Yes | Raleigh, Durham, Greensboro, East NC, Tampa, Largo, Clearwater |
+| PullAPartScraper | Pull-A-Part | Playwright headed + REST API | Datacenter OK (headed required) | Yes | 25+ locations (Birmingham, Charlotte, Nashville, etc.) |
+| UPullAndSaveScraper | U Pull & Save / Bessler's | axios POST (YardSmart AJAX) | Datacenter OK | Yes | Hebron KY, Louisville KY, Lexington KY, Savannah TN |
+| ChesterfieldScraper | Chesterfield Auto Parts | Playwright (form iteration) | Datacenter OK | No | Richmond, Midlothian, Fort Lee (VA) |
+| CarolinaPickNPullScraper | Carolina PNP | Playwright + stealth | Residential ONLY (403 on DC) | No | Wilmington, Fayetteville, Conway SC |
+| PickAPartVAScraper | Pick-A-Part VA | Playwright + stealth | Residential ONLY (Cloudflare) | Maybe | Fredericksburg, Stafford (VA) |
+| FossScraper | Foss U-Pull-It | Playwright (multi-strategy) | Datacenter OK | Maybe | La Grange NC, Jacksonville NC |
 
-## Scrape Flow
+## Scrape Flow Diagram
 
 ```
-FlywayScrapeRunner (daily 6am UTC)
-  -> auto-complete expired Flyway trips
-  -> cleanup expired trip vehicles (24h grace)
-  -> get active scrapable yards (non-LKQ only)
-  -> dispatch to per-chain scraper (PullAPart / Foss / Carolina / UPull / Chesterfield / PickAPart)
-  -> PostScrapeService.enrichYard(yardId) per yard
-       -> VinDecodeService (LocalVinDecoder)
-       -> trim tier assignment
-       -> scout alerts
-
-LKQ runs separately via local Windows Task Scheduler (CloudFlare blocks Railway IPs)
-  -> scrape-local.js + run-scrape.bat handle enrichment separately
+                    ┌──────────────────────────┐
+                    │  FlywayScrapeRunner       │  Daily 6am UTC (Railway cron)
+                    │  service/lib/             │
+                    └──────────┬───────────────┘
+                               │ delegates by chain
+         ┌────────┬────────┬───┴───┬──────────┬──────────┐
+         v        v        v       v          v          v
+    PullAPart  Foss  Carolina  UPullSave  Chesterfield  PickAPartVA
+         │        │        │       │          │          │
+         └────────┴────────┴───┬───┴──────────┴──────────┘
+                               v
+                    yard_vehicle table (upsert)
+                               │
+                    PostScrapeService.enrichYard()
+                        │         │          │
+                  LocalVinDecoder  TrimTier  ScoutAlerts
 ```
 
 ## Per-Scraper Details
 
-### LKQScraper.js
-- **Path:** `service/scrapers/LKQScraper.js`
-- **Purpose:** Scrapes LKQ Pick Your Part (pyp.com) server-rendered HTML inventory pages
-- **Key methods:** `scrapeAll()`, `scrapeLocation(location)`, `fetchAllPages(location)`, `fetchWithCurl(url)`, `parseInventoryPage(html)`
-- **Target:** `https://www.pyp.com/inventory/{slug}/?page={N}`
-- **Locations:** Raleigh (1168), Durham (1142), Greensboro (1226), East NC (1227), Tampa (1180), Largo (1189), Clearwater (1190)
-- **Restrictions:** Uses curl subprocess to bypass CloudFlare TLS fingerprinting (axios gets 403). 500ms delay between pages. Max 100 pages per location. CF blocks Railway entirely -- must run from local machine.
-- **Data fields:** year, make, model, color, VIN, row, stock number, date added
+### LKQScraper (`service/scrapers/LKQScraper.js`)
+- Server-rendered HTML from pyp.com (DotNetNuke CMS). No JSON API.
+- Uses `curl` subprocess to bypass CloudFlare TLS fingerprinting (axios gets 403).
+- Parses `div.pypvi_resultRow[id]` elements with cheerio. Fields: year, make, model, color, VIN, row, stock#, date available.
+- Pagination via "Next Page" link detection, 500ms inter-page delay, max 100 pages.
+- Mark-all-inactive-then-reactivate pattern. Vehicles not seen stay inactive; 7-day TTL for attack list.
 
-### PullAPartScraper.js
-- **Path:** `service/scrapers/PullAPartScraper.js`
-- **Purpose:** Scrapes Pull-A-Part yards via their internal REST APIs through headed Playwright
-- **Key methods:** `scrapeYard(yard)`, `fetchInventoryViaAPI(yard)`, `resolveLocationId(name)`
-- **Target:** `inventoryservice.pullapart.com` REST APIs (Make/OnYard, Model, Vehicle/Search)
-- **Locations:** 25+ (Birmingham, Knoxville, Nashville, Charlotte, etc.) via resolveLocationId() map
-- **Restrictions:** Must use headed Playwright (`headless: false`) -- headless TLS rejected on Windows. 1s delay between makes. 120s timeout per make search. Browser window positioned off-screen (-2400,-2400).
-- **Data fields:** year, make, model, VIN, row, dateYardOn (no color)
+### PullAPartScraper (`service/scrapers/PullAPartScraper.js`)
+- Internal REST APIs at `inventoryservice.pullapart.com` and `enterpriseservice.pullapart.com`.
+- **Must run headed** (`headless: false`) -- API rejects headless TLS on Windows. Window positioned off-screen (`-2400,-2400`).
+- Flow: load pullapart.com/inventory -> wait 8s for `window.apiEndpoints` -> iterate makes via OnYard -> POST Vehicle/Search per make.
+- Deduplicates by VIN. 1s delay between makes.
 
-### FossScraper.js
-- **Path:** `service/scrapers/FossScraper.js`
-- **Purpose:** Scrapes Foss U-Pull-It inventory (La Grange, Jacksonville NC)
-- **Key methods:** `scrapeAll()`, `scrapeLocation(location)`, `fetchInventory(location)`
-- **Target:** `https://www.fossupullit.com/inventory`
-- **Restrictions:** Dynamic JS site, Playwright required (headless OK). Three extraction strategies (data attrs, table rows, regex cards). Max 20 pagination pages. Skipped on Sundays (PriceCheck uses Playwright at 2am).
-- **Data fields:** year, make, model, row, color (no VIN)
+### UPullAndSaveScraper (`service/scrapers/UPullAndSaveScraper.js`)
+- Pure AJAX via WordPress YardSmart plugin. POST to `/wp-admin/admin-ajax.php`.
+- Single request per yard (`length=5000` returns all). Clean JSON with VIN, color, row, stock.
+- Retry logic: 401 rate-limit -> 10s/20s exponential backoff, max 3 attempts.
 
-### CarolinaPickNPullScraper.js
-- **Path:** `service/scrapers/CarolinaPickNPullScraper.js`
-- **Purpose:** Scrapes Carolina Pick N Pull via WordPress AJAX + Playwright
-- **Key methods:** `scrapeYard(yard)`, `fetchInventory(locationId, yardName)`
-- **Target:** `https://carolinapicknpull.com/inventory/` + `inventorySelectUpdater.php` AJAX
-- **Locations:** Wilmington (3), Fayetteville (10), Conway SC (9)
-- **Restrictions:** IP-blocked on cloud/datacenter IPs (nginx 403). MUST run from residential IP. Iterates 40 makes x N models. Uses playwright-extra stealth plugin.
-- **Data fields:** year, make, model, row, dateIn (no VIN, no color)
+### ChesterfieldScraper (`service/scrapers/ChesterfieldScraper.js`)
+- WordPress site. Playwright iterates make dropdown -> model dropdown -> parses result table.
+- Fields: Make, Model, Year, Color, Body, Engine, Yard Row. No VIN.
 
-### UPullAndSaveScraper.js
-- **Path:** `service/scrapers/UPullAndSaveScraper.js`
-- **Purpose:** Scrapes U Pull & Save / Bessler's via YardSmart WordPress AJAX API
-- **Key methods:** `scrapeYard(yard)`, `fetchInventory(yardSmartId, vehicleTypeId, yardName)`
-- **Target:** `https://upullandsave.com/wp-admin/admin-ajax.php` (YardSmart integration)
-- **Locations:** Hebron KY (232), Louisville KY (265), Lexington KY (595), Savannah TN (298)
-- **Restrictions:** Pure AJAX, no browser needed. Returns 401 if hit too fast -- 10s/20s exponential backoff, 3 retries. Works from datacenter IPs.
-- **Data fields:** year, make, model, VIN, color, row, stock number
+### CarolinaPickNPullScraper (`service/scrapers/CarolinaPickNPullScraper.js`)
+- **Local-only** (datacenter IPs blocked). FlywayScrapeRunner skips if `RAILWAY_ENVIRONMENT` is set.
+- Iterates 40 common makes via AJAX endpoint, then per-model search pages.
+- Normalizes make: strips "TRUCK" suffix, MERCEDES -> MERCEDES-BENZ, MINI COOPER -> MINI.
 
-### ChesterfieldScraper.js
-- **Path:** `service/scrapers/ChesterfieldScraper.js`
-- **Purpose:** Scrapes Chesterfield Auto Parts via form-driven search pages
-- **Key methods:** `scrapeYard(yard)`, `fetchInventory(storeName, yardName)`
-- **Target:** `https://chesterfieldauto.com/search-our-inventory-by-location/`
-- **Locations:** Richmond, Southside (Midlothian), Ft. Lee
-- **Restrictions:** Playwright required (JS form interaction). Iterates all makes x models via URL params. Works from datacenter IPs.
-- **Data fields:** year, make, model, color, row, body, engine (no VIN)
+### PickAPartVAScraper (`service/scrapers/PickAPartVAScraper.js`)
+- Cloudflare-protected. Auto-discovers page structure (table, cards, or form strategies).
+- Tries primary URL then fallback. Logs CF detection and aborts if challenged.
 
-### PickAPartVAScraper.js
-- **Path:** `service/scrapers/PickAPartVAScraper.js`
-- **Purpose:** Scrapes Pick-A-Part Virginia inventory (Fredericksburg, Stafford)
-- **Key methods:** `scrapeYard(yard)`, `fetchInventory(locationName, yardName)`
-- **Target:** `https://pickapartva.com/inventory-search/` (fallback: `/inventory/`)
-- **Restrictions:** Cloudflare-protected -- MUST run from residential IP (datacenter gets 403). Auto-discovers page structure (table, cards, or form). Uses playwright-extra stealth.
-- **Data fields:** year, make, model, VIN (maybe), color, row
+### FossScraper (`service/scrapers/FossScraper.js`)
+- Multi-strategy extraction: data attributes, table rows, then regex card parsing.
+- Pagination up to 20 pages. Skipped on Sundays by FlywayScrapeRunner (PriceCheck day conflict).
 
-## eBay Scrapers
+## eBay API Clients (`service/ebay/`)
 
-### SoldItemsScraper.js
-- **Path:** `service/ebay/SoldItemsScraper.js`
-- **Purpose:** Scrapes eBay sold/completed listing pages for competitor intelligence
-- **Key methods:** `scrapeSoldItems({seller, keywords, categoryId, maxPages})`, `scrapeSoldItemsByKeywords({keywords})`, `scrapeMultipleSellers(sellers)`, `extractItemsFromPage(page, seller)`
-- **Target:** `https://www.ebay.com/sch/i.html?LH_Sold=1&LH_Complete=1`
-- **Restrictions:** Playwright stealth, 2-4s random delay between pages, UA rotation (5 agents), scrolls to trigger lazy loading. Handles both `.s-card__*` (2024+) and `.s-item__*` (legacy) layouts.
-- **Data fields:** ebayItemId, title, soldPrice, soldDate, condition, seller, pictureUrl
+| Client | Protocol | Auth | Purpose |
+|---|---|---|---|
+| TokenManager | OAuth2 Client Credentials | AppName + CertName | Manages cached access tokens (env var with expiry) |
+| BrowseAPI | REST (Buy API) | Bearer token | Item search by category + seller filter |
+| FindingsAPI | SOAP XML | AppName header | findItemsAdvanced, findCompletedItems (seller sold data) |
+| TradingAPI | SOAP XML | IAF-TOKEN header | GetItem, ReviseItem (price), EndItem, RelistItem |
+| SellerAPI | SOAP XML | eBayAuthToken in XML body | GetOrders (90d max), GetMyeBaySelling, SendMessageToPartner |
+| TaxonomyAPI | REST (Commerce API) | Bearer token | Category compatibility property values (category 33563) |
+| SoldItemsScraper | Playwright + stealth | None (browser scrape) | Scrape ebay.com/sch sold listings, dual layout (.s-card + .s-item) |
+| MarketResearchScraper | Playwright + stealth | None (browser scrape) | Full research: active listings + sold items by keyword |
 
-### MarketResearchScraper.js
-- **Path:** `service/ebay/MarketResearchScraper.js`
-- **Purpose:** Full market research -- scrapes both active listings (competitor prices) and sold items
-- **Key methods:** `fullMarketResearch({keywords, categoryId})`, `scrapeActiveListings({keywords})`, `scrapeSoldItems({keywords})`, `extractActiveListings(page)`, `extractSoldItems(page)`
-- **Target:** `https://www.ebay.com/sch/i.html` (active + sold filters)
-- **Restrictions:** No eBay API tokens used (browser-only to avoid attribution). 2-4s random delay, 3-5s delay between active and sold phases. Extracts seller feedback scores and shipping costs.
-- **Data fields:** ebayItemId, title, currentPrice/soldPrice, seller, sellerFeedbackScore, condition, shippingCost, freeShipping, location
+## Cron Runners + Schedules (Railway, `service/index.js`)
 
-## Cron Runners
+| Runner | Schedule (UTC) | What it does |
+|---|---|---|
+| YourDataManager.syncAll | `0 1,7,13,19 * * *` (4x/day) | eBay orders + listings sync (30d window) |
+| CompetitorDripRunner | `0 0,5,12,18 * * *` (4x/day) | Random 0-45min jitter, picks least-recently-scraped seller, 1-2 pages via SoldItemsScraper |
+| PriceCheckCronRunner | `0 2 * * 0` (Sun 2am) | Weekly batch of 35 listings, priority queue (never-checked first, then stalest, highest price), 3-6s delay |
+| FlywayScrapeRunner | `0 6 * * *` (daily 6am) | Scrapes non-LKQ yards on active Flyway trips, then enrichYard() per yard |
+| VIN decode (3am) | `0 3 * * *` | Post-scrape batch: 5 rounds x 200 VINs via LocalVinDecoder, then trim tier enrichment |
+| VIN decode (8:40am) | `40 8 * * *` | Mop-up decode for morning scrape window |
+| StaleInventoryService | `0 3 * * 3` (Wed 3am) | Weekly stale inventory automation |
+| DeadInventoryService | `0 4 * * 1` (Mon 4am) | Weekly dead inventory scan |
+| RestockService | `0 4 * * 2` (Tue 4am) | Weekly restock scan |
+| CompetitorMonitorService | `0 4 * * 4` (Thu 4am) | Weekly competitor monitoring |
+| EbayMessagingService poll | `*/15 * * * *` | Poll new orders for messaging |
+| EbayMessagingService process | `*/2 * * * *` | Process message queue |
+| CronWorkRunner | **DISABLED** | Was eBay seller processing via FindingsAPI (dead since Feb 2025). Item table frozen at 21K. |
+| MarketDemandCronRunner | **DISABLED** | Was nightly market_demand_cache via Finding API. Replaced by Market Drip + yard sniper. |
 
-### FlywayScrapeRunner.js
-- **Path:** `service/lib/FlywayScrapeRunner.js`
-- **Schedule:** Daily 6:00 AM UTC (`0 6 * * *`)
-- **Purpose:** Orchestrates daily scraping of all non-LKQ yards with active Flyway trips
-- **Flow:** Auto-complete expired trips -> cleanup 24h-old vehicle data -> scrape each unique yard -> PostScrapeService.enrichYard() per yard
-- **Restrictions:** 5-minute timeout per yard. 3s delay between yards. Skips Carolina PNP on Railway. Skips Foss on Sundays. Mutex via `this.running` flag.
+## Sniper Scripts (Local Machine, Task Scheduler)
 
-### CompetitorDripRunner.js
-- **Path:** `service/lib/CompetitorDripRunner.js`
-- **Schedule:** 4x daily at 5am, noon, 6pm, midnight UTC (+ 0-45min random jitter)
-- **Purpose:** Randomized micro-scrape of eBay competitor sold items (1-2 pages per run)
-- **Flow:** Random 0-45min delay -> pick least-recently-scraped enabled seller -> scrape 1-2 pages via SoldItemsManager -> update seller stats
-- **Restrictions:** Skips if all sellers scraped within 6 hours. Category 6030 (auto parts).
+### run-importapart-drip.js (Market Drip)
+- **Location:** repo root
+- **Schedule:** 6 AM, 1 PM, 9 PM via `run-importapart-drip.bat` (Windows Task Scheduler)
+- **3-bucket priority queue:** Bucket 1 = active inventory PNs (YourListing), Bucket 2 = sold-not-restocked (YourSale 365d, no active listing), Bucket 3 = importapart catalog (Item table). Deduped, highest bucket wins.
+- **Comp quality filter:** Regex excludes AS-IS, FOR PARTS, UNTESTED, NOT WORKING, CORE ONLY, NEEDS PROGRAMMING, etc.
+- **Mechanics:** sanitizePartNumberForSearch from partIntelligence.js, Playwright primary with stealth, PriceCheckServiceV2 cheerio fallback.
+- **Pacing:** 3s delay between PNs, 200/batch, 3 runs/day = 600/day, ~17-day full cycle.
+- **Output:** Upserts market_demand_cache with `source=market_drip`, writes PriceSnapshot for price history.
+- **State:** File-based offset tracking (`importapart-drip-offset.json`), wraps when queue exhausted, skips PNs with fresh cache (<7d).
 
-### CronWorkRunner.js -- DISABLED
-- **Path:** `service/lib/CronWorkRunner.js`
-- **Purpose:** Legacy eBay seller item processing (import + process via ItemDetailsManager)
-- **Notes:** Commented out in index.js. Item table frozen at 21K records. Replaced by CompetitorDripRunner + YourData sync.
-
-### MarketDemandCronRunner.js -- DISABLED
-- **Path:** `service/lib/MarketDemandCronRunner.js`
-- **Purpose:** Nightly update of market_demand_cache via eBay Finding API (findCompletedItems + findItemsByKeywords)
-- **Notes:** Commented out in index.js. Cache now populated by PriceCheckService (weekly), yard sniper (on-demand), importapart drip (manual). 100ms delay between API calls. 24h cache TTL.
-
-### PriceCheckCronRunner.js
-- **Path:** `service/lib/PriceCheckCronRunner.js`
-- **Schedule:** Sunday 2:00 AM UTC (`0 2 * * 0`)
-- **Purpose:** Weekly price check for active eBay listings against market comps
-- **Flow:** Get oldest unchecked active listings -> PriceCheckService.checkPrice() each -> 3-6s random delay between checks
-- **Restrictions:** Batch size 15. 7-day cache window. Async-lock prevents concurrent runs.
+### run-yard-market-sniper.js (Yard Sniper)
+- **Location:** `service/scripts/run-yard-market-sniper.js`
+- **Trigger:** Manual via `run-yard-market-sniper.bat` after LKQ scrape
+- **Pipeline:** active yard_vehicles (7d) -> match to inventory via Auto+AIC+Item join -> extractPartNumbers + sanitizePartNumberForSearch + deduplicatePNQueue from partIntelligence.js -> filter against fresh cache -> scrape via PriceCheckServiceV2 (quoted exact PN match).
+- **Filters:** shouldExclude() from OpportunityService (skips complete engines/transmissions/body panels), price >= $50, stripSuffix for Chrysler/Ford revision codes.
+- **Pacing:** 2-3s between scrapes, default 50 PNs/run, sorted by price descending.
+- **Output:** Upserts market_demand_cache with `source=yard_sniper`, writes PriceSnapshot.
 
 ## Key Notes
 
-- NHTSA eliminated -- all VIN decode via LocalVinDecoder (`service/lib/LocalVinDecoder.js`)
-- SoldItemsManager extracts Clean Pipe fields on insert (Phase C)
-- MarketDemandCronRunner DISABLED -- Finding API dead, cache populated by PriceCheckService weekly + on-demand
-- CronWorkRunner DISABLED -- Item table frozen at 21K records
-- LKQ scraping runs from local Windows machine only (CloudFlare blocks Railway IPs)
-- CarolinaPickNPull and PickAPartVA require residential IP (local machine)
-- VIN decode crons at 3:00 AM and 8:40 AM UTC chase local scrapes
-- YourData sync (orders + listings) runs 4x daily at 1, 7, 13, 19 UTC
-
-## Sniper Scripts
-
-### service/scripts/run-yard-market-sniper.js
-- **Purpose:** Fill market_demand_cache for parts matched to recent yard vehicles. PN-only search, no keyword fallback.
-- **Usage:** `node service/scripts/run-yard-market-sniper.js --dry-run` (default) or `--execute --limit=50`
-- **Queue building flow:**
-  1. Get active yard vehicles (last 7 days)
-  2. Match to inventory parts via `Auto + AIC + Item` join
-  3. Extract PNs from matched Item titles (`extractPartNumbers`)
-  4. **Sanitize + dedup** via `sanitizePartNumberForSearch()` and `deduplicatePNQueue()` from partIntelligence.js (Phase E1) -- strips junk PNs, Ford ECU suffixes, dash-variant duplicates
-  5. Filter against `market_demand_cache` (skip fresh entries <7d)
-  6. Sort by Item.price descending, cap at `--limit`
-  7. Scrape eBay sold comps via `PriceCheckServiceV2.scrapeSoldComps()` (quoted exact match, retry once)
-  8. Write results to `market_demand_cache` with `key_type='pn'`, `source='yard_sniper'`
-- **Dependencies:** `partIntelligence.js` (PN extraction + sanitization), `OpportunityService.shouldExclude` (skip engines/trans/panels), `PriceCheckServiceV2` (cheerio scraper)
-- **Rate limit:** 2-3s random delay between scrapes
-- **Gotcha:** Uses its own Knex instance (not the app's database singleton) -- requires `DATABASE_URL` env var
+1. **NHTSA eliminated** -- all VIN decoding uses LocalVinDecoder (`@cardog/corgi` offline, sub-15ms, zero network). Enrichment pipeline: corgi decode -> VDS trim lookup -> engine code lookup -> vin_cache write.
+2. **FlywayScrapeRunner.enrichYard()** delegates to PostScrapeService which runs LocalVinDecoder + trim tier assignment + scout alert generation per yard after scrape.
+3. **SoldItemsManager** extracts Clean Pipe fields on insert (Phase C) when storing competitor sold items from CompetitorDripRunner.
+4. **PriceCheckCronRunner** batch size increased from 15 to 35/week. Priority queue: never-checked listings first, then stalest, both sorted by currentPrice DESC.
+5. **LKQ scraper** is the only yard scraper that runs from the **yards.js route handler** (on-demand via UI). All other yards scrape via FlywayScrapeRunner daily cron or local scripts.
+6. **market_demand_cache** is the pricing source of truth (see priceResolver.js). Three feeders: Market Drip (primary, source=market_drip), Yard Sniper (source=yard_sniper), PriceCheckService (source=weekly cron).
