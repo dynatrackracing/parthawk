@@ -28,9 +28,9 @@
 
 ## Open items
 - The Mark table empty
-- Unauthenticated write endpoints
 
 ## Closed items (this session)
+- Unauthenticated write endpoints: RESOLVED — authGate (global cookie-based password middleware, deployed 2026-04-03) protects all routes. Verified 7 critical write endpoints return 401 without auth. No per-route changes needed.
 - instrumentclusterstore scraper: NOT broken. 427 SoldItems, last scraped 2026-04-04. False alarm from stale diagnostic query.
 - QUARRY data source: rewritten to pure SQL with Clean Pipe columns (no more frozen Item table)
 
