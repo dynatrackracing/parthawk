@@ -48,10 +48,10 @@ function dhNav(activePage) {
     <span style="font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.1em;padding:5px 4px;white-space:nowrap">FIELD</span>
     ${field.map(f => linkHTML(f, true)).join('')}
   </div>
-  <div id="dh-intel-row" style="display:flex;justify-content:center;gap:4px;padding:5px 10px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+  <div id="dh-intel-row" style="display:flex;justify-content:center;gap:4px;padding:5px 10px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;position:relative">
     <span style="font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.1em;padding:5px 4px;white-space:nowrap">INTEL</span>
     ${intel.map(f => linkHTML(f, false)).join('')}
-    <a href="/auth/logout" style="color:#6B7280;text-decoration:none;padding:5px 10px;white-space:nowrap;font-size:10px;margin-left:auto">Logout</a>
+    <a href="/auth/logout" style="color:#6B7280;text-decoration:none;padding:5px 10px;white-space:nowrap;font-size:10px;position:absolute;right:10px;top:50%;transform:translateY(-50%)">Logout</a>
   </div>
 </div>`;
 

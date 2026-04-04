@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Sniper: Batch Size 15→35, Priority Queue, Preview — 2026-04-04
+- PriceCheckCronRunner batch size 15→35 (70 weeks full coverage vs 163)
+- Queue priority: never-checked first, highest price first, oldest check last
+- Single LEFT JOIN SQL replaces ORM two-query approach
+- GET /pricing/sniper-preview for dry-run queue inspection
+- 2,449 active listings, all never-checked
+
+---
+
 ## Attack List Scoring Upgrades — 2026-04-04
 - Stock penalty scaling: 5% (1 in stock) → 70% (5+ in stock) multiplicative reduction on score
 - Fresh arrival bonus: +10% for ≤3 days, +5% for ≤7, +2% for ≤14 days
