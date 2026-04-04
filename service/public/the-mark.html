@@ -8,29 +8,186 @@
 <title>DarkHawk — THE MARK</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh;display:flex;flex-direction:column}
-.container{padding:12px;max-width:800px;margin:0 auto;width:100%;flex:1;display:flex;flex-direction:column}
-.header-card{background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:12px}
-.tool-frame{flex:1;min-height:calc(100vh - 250px);border:1px solid #2a2a2a;border-radius:10px;overflow:hidden;background:#141414}
-.tool-frame iframe{width:100%;height:100%;border:none;min-height:calc(100vh - 250px)}
+:root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--g:#22c55e;--y:#eab308;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:60px}
+.c{padding:12px;max-width:600px;margin:0 auto}
+.card{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:10px}
+.section-title{font-size:10px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.stat-bar{display:flex;gap:12px;font-size:11px;color:var(--tf);margin-bottom:12px;flex-wrap:wrap}
+.stat-bar b{color:var(--tm)}
+.mark-card{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:12px;margin-bottom:8px}
+.mark-title{font-size:13px;font-weight:600;line-height:1.3}
+.mark-meta{font-size:10px;color:var(--tf);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.mark-actions{display:flex;gap:6px;margin-top:8px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px}
+.b-sky{background:#1e3a5f;color:#60a5fa}
+.b-perch{background:#422006;color:#f59e0b}
+.b-yard{background:#064e3b;color:#22c55e}
+.b-sold{background:#064e3b;color:#22c55e}
+.b-listed{background:#064e3b;color:#22c55e}
+.b-hunting{background:#7f1d1d;color:#dc2626}
+.b-wl{background:#4c1d95;color:#a78bfa}
+.btn{padding:6px 12px;border-radius:6px;border:1px solid var(--b);background:var(--s);color:var(--tm);font-size:10px;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.3}
+.btn-red{background:var(--r);color:#fff;border-color:var(--r)}
+.btn-green{border-color:#065f46;color:var(--g)}
+.btn-purple{border-color:#6d28d9;color:#a78bfa}
+input,textarea{padding:8px 10px;border:1px solid var(--b);border-radius:6px;background:var(--s2);color:var(--t);font-size:13px;width:100%;outline:none}
+input:focus,textarea:focus{border-color:var(--r)}
+.empty{text-align:center;color:var(--tf);padding:30px;font-size:13px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#064e3b;color:#22c55e;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:700;z-index:999;display:none}
 </style>
 </head>
 <body>
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js?v=2"></script><script>dhNav('mark')</script>
-<div class="container">
-  <div class="header-card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div style="font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:0.06em">THE MARK</div>
-        <div style="font-size:11px;color:#6B7280;margin-top:2px">Listing Intelligence</div>
-      </div>
-      <a href="https://listcleaner.dynatrackracingnc.workers.dev" target="_blank" rel="noopener" style="padding:6px 12px;font-size:11px;border-radius:4px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;cursor:pointer;text-decoration:none">Open in new tab</a>
+<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('mark')</script>
+
+<div class="c">
+  <div class="stat-bar" id="stats">Loading...</div>
+
+  <!-- Manual entry -->
+  <div class="card">
+    <div class="section-title">ADD TO WANT LIST</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="wlTitle" placeholder="Part description (e.g. 2015 Jeep Grand Cherokee ECM)" style="flex:1;min-width:200px">
+      <button class="btn btn-green" onclick="addToWantList()">Add</button>
     </div>
+    <div id="wlResult" style="margin-top:6px;font-size:11px"></div>
   </div>
-  <div class="tool-frame">
-    <iframe src="https://listcleaner.dynatrackracingnc.workers.dev" allow="clipboard-read; clipboard-write"></iframe>
-  </div>
+
+  <!-- Marks list -->
+  <div class="section-title" style="padding:0 0 4px">ACTIVE MARKS (<span id="markCount">0</span>)</div>
+  <div id="marksList"></div>
 </div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function timeAgo(ds){if(!ds)return'';var ms=Date.now()-new Date(ds).getTime();var m=Math.floor(ms/60000);if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago'}
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(function(){t.style.display='none'},2500)}
+
+var _marks = [];
+var _wantListTitles = new Set();
+
+async function loadMarks() {
+  try {
+    var [markResp, wlResp] = await Promise.all([
+      fetch('/competitors/marks').then(function(r){return r.json()}),
+      fetch('/restock-want-list/items').then(function(r){return r.json()}).catch(function(){return{items:[]}})
+    ]);
+
+    _marks = markResp.marks || [];
+    _wantListTitles = new Set((wlResp.items||[]).map(function(e){return(e.title||'').substring(0,40).toLowerCase()}));
+
+    document.getElementById('markCount').textContent = _marks.length;
+
+    // Stats
+    var hunting=0, inYard=0, listed=0, sold=0;
+    _marks.forEach(function(m){
+      if(m.status==='in-yard')inYard++;
+      else if(m.status==='listed')listed++;
+      else if(m.status==='sold')sold++;
+      else hunting++;
+    });
+    document.getElementById('stats').innerHTML =
+      'Total: <b>' + _marks.length + '</b> · Hunting: <b>' + hunting + '</b> · In yard: <b style="color:#22c55e">' + inYard + '</b> · Listed: <b style="color:#22c55e">' + listed + '</b> · Sold: <b style="color:#22c55e">' + sold + '</b>';
+
+    // Render
+    var h = '';
+    if (_marks.length === 0) {
+      h = '<div class="empty">No marks yet. Use Sky Watch or Hunters Perch to mark parts, or add directly to the want list above.</div>';
+    }
+    _marks.forEach(function(m) {
+      var srcBadge = m.source === 'SKY' ? '<span class="badge b-sky">SKY WATCH</span>' :
+                     m.source === 'PERCH' ? '<span class="badge b-perch">PERCH</span>' : '<span class="badge" style="background:#333;color:#9CA3AF">' + esc(m.source||'?') + '</span>';
+      var statusBadge = m.status === 'in-yard' ? '<span class="badge b-yard">IN YARD</span>' :
+                        m.status === 'listed' ? '<span class="badge b-listed">LISTED</span>' :
+                        m.status === 'sold' ? '<span class="badge b-sold">SOLD</span>' :
+                        '<span class="badge b-hunting">HUNTING</span>';
+
+      var wlKey = (m.originalTitle||'').substring(0,40).toLowerCase();
+      var inWantList = _wantListTitles.has(wlKey);
+
+      h += '<div class="mark-card" id="mark-' + m.id + '">';
+      h += '<div class="mark-title">' + esc(m.originalTitle) + '</div>';
+      h += '<div class="mark-meta">';
+      h += srcBadge + ' ' + statusBadge;
+      if (m.partType) h += ' <span>' + esc(m.partType) + '</span>';
+      if (m.medianPrice) h += ' <span style="color:#22c55e;font-weight:700">$' + m.medianPrice + '</span>';
+      if (m.partNumber) h += ' <span style="font-family:monospace">' + esc(m.partNumber) + '</span>';
+      h += ' <span>' + timeAgo(m.markedAt) + '</span>';
+      if (inWantList) h += ' <span class="badge b-wl">IN WANT LIST</span>';
+      h += '</div>';
+      h += '<div class="mark-actions">';
+      if (!inWantList) {
+        h += '<button class="btn btn-purple" onclick="pushToWantList(\'' + m.id + '\',\'' + esc(m.originalTitle).replace(/'/g,"\\'") + '\',this)">Send to want list</button>';
+      }
+      h += '<button class="btn" onclick="deleteMark(\'' + m.id + '\',this)">Remove</button>';
+      if (m.notes) h += '<span style="font-size:10px;color:#6B7280;margin-left:auto">' + esc(m.notes) + '</span>';
+      h += '</div></div>';
+    });
+    document.getElementById('marksList').innerHTML = h;
+  } catch (err) {
+    document.getElementById('marksList').innerHTML = '<div class="empty">Error loading marks: ' + esc(err.message) + '</div>';
+  }
+}
+
+async function deleteMark(id, btn) {
+  btn.disabled = true;
+  try {
+    var resp = await fetch('/competitors/mark/' + id, { method: 'DELETE' });
+    var d = await resp.json();
+    if (d.success) {
+      var el = document.getElementById('mark-' + id);
+      if (el) { el.style.opacity = '0'; setTimeout(function(){ el.remove(); }, 300); }
+      showToast('Mark removed — item returned to source list');
+      setTimeout(loadMarks, 500);
+    }
+  } catch (e) { btn.disabled = false; }
+}
+
+async function pushToWantList(markId, title, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    var resp = await fetch('/restock-want-list/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, notes: '[mark_push] From The Mark', auto_generated: false }),
+    });
+    var d = await resp.json();
+    if (d.success) {
+      btn.textContent = 'In want list';
+      btn.style.color = '#a78bfa';
+      btn.style.borderColor = '#6d28d9';
+      showToast('Added to want list');
+    } else { btn.disabled = false; btn.textContent = 'Send to want list'; }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Send to want list'; }
+}
+
+async function addToWantList() {
+  var title = document.getElementById('wlTitle').value.trim();
+  if (!title || title.length < 5) { document.getElementById('wlResult').innerHTML = '<span style="color:#dc2626">Enter a description (min 5 chars)</span>'; return; }
+  try {
+    var resp = await fetch('/restock-want-list/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, notes: '[manual] Direct entry from The Mark page', auto_generated: false }),
+    });
+    var d = await resp.json();
+    if (d.success) {
+      document.getElementById('wlTitle').value = '';
+      document.getElementById('wlResult').innerHTML = '<span style="color:#22c55e">Added to want list</span>';
+      showToast('Added to Scour Stream want list');
+    } else {
+      document.getElementById('wlResult').innerHTML = '<span style="color:#dc2626">' + esc(d.error || 'Failed') + '</span>';
+    }
+  } catch (e) {
+    document.getElementById('wlResult').innerHTML = '<span style="color:#dc2626">Error: ' + esc(e.message) + '</span>';
+  }
+}
+
+loadMarks();
+</script>
 </body>
 </html>
