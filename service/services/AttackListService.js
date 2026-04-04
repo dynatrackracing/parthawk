@@ -488,24 +488,27 @@ class AttackListService {
       const sales = await database('YourSale')
         .where('soldDate', '>=', cutoff)
         .whereNotNull('title')
-        .select('title', 'salePrice', 'soldDate');
+        .select('title', 'salePrice', 'soldDate', 'extractedMake', 'extractedModel', 'partType as cpPartType');
 
       for (const sale of sales) {
         const title = (sale.title || '');
-        const titleLower = title.toLowerCase();
         const price = parseFloat(sale.salePrice) || 0;
 
-        // Extract make from title
-        let make = null;
-        for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-          if (titleLower.includes(alias)) { make = canonical; break; }
+        // Use Clean Pipe columns first, title parsing fallback
+        let make = sale.extractedMake || null;
+        if (!make) {
+          const titleLower = title.toLowerCase();
+          for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+            if (titleLower.includes(alias)) { make = canonical; break; }
+          }
         }
         if (!make) continue;
 
-        const model = this.extractModelFromTitle(title, make);
+        let model = sale.extractedModel || null;
+        if (!model) model = this.extractModelFromTitle(title, make);
         if (!model) continue;
 
-        const partType = detectPartType(title) || 'OTHER';
+        const partType = (sale.cpPartType && sale.cpPartType !== 'OTHER') ? sale.cpPartType : (detectPartType(title) || 'OTHER');
         const yearRange = this.extractYearRange(title);
 
         const key = `${make.toLowerCase()}|${model.toLowerCase()}`;
