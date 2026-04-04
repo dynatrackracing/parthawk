@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## The Mark Management Page + Want List Push — 2026-04-04
+- the-mark.html rebuilt: shows active marks with source badges (SKY/PERCH), status (HUNTING/IN-YARD/LISTED/SOLD)
+- 'Send to want list' pushes mark to Scour Stream (restock_want_list)
+- 'Remove' deletes mark, item returns to source list automatically
+- Manual text entry adds directly to want list
+- Sky Watch + Hunters Perch mark buttons confirmed working (already existed)
+- Gap-intel already excludes marked items (already existed)
+
+---
+
 ## QUARRY Velocity Scoring + Want List Auto-Sync — 2026-04-04
 - Velocity ratio: sold_count / in_stock, urgency tiers CRITICAL/LOW/WATCH/FINE
 - CRITICAL + LOW auto-added to restock_want_list (518 entries on first run)
