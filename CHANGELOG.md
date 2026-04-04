@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe E2] Stock Index Optimization — 2026-04-04
+- buildStockIndex() reads new columns first (partNumberBase, extractedMake, extractedModel)
+- Falls back to title parsing only when columns are NULL
+- Eliminates ~2,400 regex parses per attack list load
+- Verified: 574 make/model combos, 4,322 PNs indexed
+
+---
+
 ## [Clean Pipe E1] Sniper PN Cleanup — 2026-04-04
 - sanitizePartNumberForSearch() and deduplicatePNQueue() added to partIntelligence.js
 - Strips Ford ECU suffixes to searchable base (12A650, 14A067 patterns)
