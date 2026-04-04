@@ -1,6 +1,6 @@
 # LAST SESSION — 2026-04-04
 
-## Clean Pipe Phases A+B+C+D (ALL DEPLOYED)
+## Clean Pipe Phases A+B+C+D+E1 (ALL DEPLOYED)
 
 ### Phase A: Schema + Extraction Utility
 - Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
@@ -14,16 +14,21 @@
 - YourDataManager, SoldItemsManager, AutolumenImportService — all 8 insert paths wired
 
 ### Phase D: Cache Key Standardization
-- Added key_type column (pn/ymm) to market_demand_cache
-- Normalized all 582 PN keys (stripped spaces/dashes/dots, uppercased). 74 renamed, 0 dupes.
-- Tagged 8 YMM pipe-delimited keys
-- Updated MarketPricingService, PriceCheckService, MarketDemandCronRunner writers to normalize before insert
-- Updated priceResolver.js reader to normalize lookup keys
-- Cache keys now joinable with partNumberBase columns
+- Normalized market_demand_cache keys, added key_type column, updated all readers/writers
+
+### Phase E1: Sniper PN Cleanup
+- sanitizePartNumberForSearch(): strips junk PNs, normalizes format, strips Ford ECU suffixes
+- deduplicatePNQueue(): removes duplicate dash variants, keeps highest-value entry
+- Wired into run-yard-market-sniper.js queue builder
+- Ford ECU base extraction: F81F-12A650-AEAWA3 → F81F12A650
+- Rejects: model names, concatenated junk, short/long garbage, engine specs
+- 16/17 test cases pass (1 edge case: orphan internal ID)
 
 ## What's next
-1. Clean Pipe Phase E: Service query upgrades (Gap Intel, Phoenix, Competitor Monitor use new columns)
-2. Sniper PN dedup/cleanup (strip Ford suffixes, reject non-PNs, deduplicate dash variants)
+1. Clean Pipe E2: Stock index optimization (buildStockIndex uses new columns)
+2. Clean Pipe E3: Attack list demand queries (YourSale ILIKE → column match)
+3. Clean Pipe E4: Competitor intel routes (Gap Intel, Best Sellers GROUP BY partNumberBase)
+4. Clean Pipe E5: Phoenix PN joins
 
 ## Open items unchanged
 - instrumentclusterstore scraper returning 0 items
@@ -36,6 +41,6 @@
 - Item.price is FROZEN — never use as display/scoring price
 - extractStructuredFields() is in partIntelligence.js, NOT AttackListService
 - detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
-- market_demand_cache keys are now normalized (no dashes/spaces/dots for PN keys)
-- key_type column: 'pn' for part numbers, 'ymm' for pipe-delimited year|make|model|type keys
-- priceResolver normalizes lookup keys before querying cache
+- sanitizePartNumberForSearch() rejects JUNK_WORDS set + length/pattern checks
+- Ford 12A650/14A067 patterns get suffix-stripped to base in sanitize function
+- market_demand_cache keys normalized (Phase D), sniper writes normalized keys (Phase E1)

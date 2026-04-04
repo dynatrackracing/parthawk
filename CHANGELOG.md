@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe E1] Sniper PN Cleanup — 2026-04-04
+- sanitizePartNumberForSearch() and deduplicatePNQueue() added to partIntelligence.js
+- Strips Ford ECU suffixes to searchable base (12A650, 14A067 patterns)
+- Rejects junk PNs: model names, VIN fragments, concatenated keywords, short/long garbage
+- Wired into run-yard-market-sniper.js — sanitizes + deduplicates queue before scraping
+- Expected: dramatically improved sniper hit rate (was 1/50 due to junk PNs)
+
+---
+
 ## [Clean Pipe Phase D] Cache Key Standardization — 2026-04-04
 - market_demand_cache: added key_type column (pn/ymm), normalized all PN keys (stripped spaces/dashes/dots)
 - 74 keys renamed, 0 duplicates found, 582 PN + 8 YMM total
