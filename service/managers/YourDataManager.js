@@ -5,6 +5,7 @@ const SellerAPI = require('../ebay/SellerAPI');
 const YourSale = require('../models/YourSale');
 const YourListing = require('../models/YourListing');
 const Promise = require('bluebird');
+const { extractStructuredFields } = require('../utils/partIntelligence');
 
 /**
  * YourDataManager - Syncs YOUR eBay seller data (orders and listings) to database
@@ -102,6 +103,13 @@ class YourDataManager {
               store: 'dynatrack',
             };
 
+            // Clean Pipe: extract structured fields from title
+            const extracted = extractStructuredFields(toInsert.title);
+            toInsert.partNumberBase = extracted.partNumberBase || null;
+            toInsert.partType = extracted.partType || 'OTHER';
+            toInsert.extractedMake = extracted.extractedMake || null;
+            toInsert.extractedModel = extracted.extractedModel || null;
+
             // Upsert on conflict (order ID + item ID)
             // id omitted from insert so DB generates it via gen_random_uuid(),
             // and .merge() won't touch id on conflict — preserving FK references
@@ -154,6 +162,13 @@ class YourDataManager {
             store: 'dynatrack',
             syncedAt: new Date(),
           };
+
+          // Clean Pipe: extract structured fields from title
+          const extracted = extractStructuredFields(toInsert.title);
+          toInsert.partNumberBase = extracted.partNumberBase || null;
+          toInsert.partType = extracted.partType || 'OTHER';
+          toInsert.extractedMake = extracted.extractedMake || null;
+          toInsert.extractedModel = extracted.extractedModel || null;
 
           // Upsert on conflict (item ID)
           // id omitted from insert so DB generates it via gen_random_uuid(),

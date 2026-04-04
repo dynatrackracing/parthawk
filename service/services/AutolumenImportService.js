@@ -3,6 +3,7 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const csv = require('csv-parse/sync');
+const { extractStructuredFields } = require('../utils/partIntelligence');
 
 const STORE = 'autolumen';
 
@@ -25,6 +26,7 @@ class AutolumenImportService {
 
       if (!itemId && !title) return null;
 
+      const cpFields = extractStructuredFields(title || '');
       return {
         ebayItemId: itemId || `autolumen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         title: title || '',
@@ -34,6 +36,10 @@ class AutolumenImportService {
         listingStatus: 'Active',
         startTime: startDate,
         store: STORE,
+        partNumberBase: cpFields.partNumberBase || null,
+        partType: cpFields.partType || 'OTHER',
+        extractedMake: cpFields.extractedMake || null,
+        extractedModel: cpFields.extractedModel || null,
         syncedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -97,6 +103,7 @@ class AutolumenImportService {
         if (!price || price <= 0) { skipped++; continue; }
 
         const ebayOrderId = orderId || `autolumen-sale-${itemId}-${saleDate?.toISOString()?.slice(0, 10) || 'unknown'}`;
+        const cpFields = extractStructuredFields(title);
 
         await database('YourSale')
           .insert({
@@ -104,6 +111,10 @@ class AutolumenImportService {
             salePrice: price, quantity: qty, soldDate: saleDate || new Date(),
             buyerUsername: buyer || null, transactionId: transactionId || null,
             trackingNumber: tracking || null, store: STORE,
+            partNumberBase: cpFields.partNumberBase || null,
+            partType: cpFields.partType || 'OTHER',
+            extractedMake: cpFields.extractedMake || null,
+            extractedModel: cpFields.extractedModel || null,
             createdAt: new Date(), updatedAt: new Date(),
           })
           .onConflict('ebayOrderId')
@@ -145,13 +156,19 @@ class AutolumenImportService {
         if (!price || price <= 0) { skipped++; continue; }
 
         const ebayOrderId = orderId || `autolumen-txn-${itemId || ''}-${saleDate?.toISOString()?.slice(0, 10) || Date.now()}`;
+        const cpFields = extractStructuredFields(title);
 
         await database('YourSale')
           .insert({
             ebayOrderId, ebayItemId: itemId || null, title, sku: sku || null,
             salePrice: price, quantity: qty, soldDate: saleDate || new Date(),
             buyerUsername: buyer || null, transactionId: transactionId || null,
-            store: STORE, createdAt: new Date(), updatedAt: new Date(),
+            store: STORE,
+            partNumberBase: cpFields.partNumberBase || null,
+            partType: cpFields.partType || 'OTHER',
+            extractedMake: cpFields.extractedMake || null,
+            extractedModel: cpFields.extractedModel || null,
+            createdAt: new Date(), updatedAt: new Date(),
           })
           .onConflict('ebayOrderId')
           .merge({ title, sku: sku || null, salePrice: price, store: STORE, updatedAt: new Date() });

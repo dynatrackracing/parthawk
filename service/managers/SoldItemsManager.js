@@ -7,6 +7,7 @@ const SoldItemSeller = require('../models/SoldItemSeller');
 const SoldItem = require('../models/SoldItem');
 const Promise = require('bluebird');
 const { v4: uuidv4 } = require('uuid');
+const { extractStructuredFields } = require('../utils/partIntelligence');
 
 // All categories for competitor intel (not just ECU)
 const DEFAULT_CATEGORY_ID = '0';
@@ -176,6 +177,13 @@ class SoldItemsManager {
             }
           }
 
+          // Clean Pipe: extract structured fields from title
+          const cpFields = extractStructuredFields(toInsert.title);
+          toInsert.partNumberBase = cpFields.partNumberBase || null;
+          toInsert.partType = cpFields.partType || 'OTHER';
+          toInsert.extractedMake = cpFields.extractedMake || null;
+          toInsert.extractedModel = cpFields.extractedModel || null;
+
           // Check if we already have this item - track consecutive dupes
           const existing = await SoldItem.query().where('ebayItemId', item.ebayItemId).first();
           if (existing) {
@@ -331,6 +339,13 @@ class SoldItemsManager {
             interchangeNumbers: null,
             scrapedAt: now,
           };
+
+          // Clean Pipe: extract structured fields from title
+          const cpFields = extractStructuredFields(toInsert.title);
+          toInsert.partNumberBase = cpFields.partNumberBase || null;
+          toInsert.partType = cpFields.partType || 'OTHER';
+          toInsert.extractedMake = cpFields.extractedMake || null;
+          toInsert.extractedModel = cpFields.extractedModel || null;
 
           await SoldItem.query()
             .insert(toInsert)
