@@ -50,6 +50,33 @@
     </div>
 
     <div class="card">
+      <h2>Active Inventory CSV</h2>
+      <p style="color:#888;font-size:12px;margin-bottom:16px">Upload eBay Seller Hub "Active Listings" CSV to sync inventory for any store. Use this for Autolumen or any store without API credentials.</p>
+
+      <label>Store</label>
+      <select id="listingStore">
+        <option value="autolumen">Autolumen (second store)</option>
+        <option value="dynatrack">Dynatrack Racing (primary store)</option>
+      </select>
+
+      <label>Active Listings CSV File</label>
+      <input type="file" id="listingCsvFile" accept=".csv" onchange="parseListingCSV()" />
+
+      <div id="listingPreview" style="display:none">
+        <div id="listingCount" style="display:inline-block;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;margin-bottom:12px"></div>
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr id="listingPreviewHead" style="color:#999;border-bottom:1px solid #333"></tr></thead>
+            <tbody id="listingPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button id="listingImportBtn" onclick="importListingCSV()" disabled>Import Listings</button>
+      <div class="result" id="listingResult"></div>
+    </div>
+
+    <div class="card">
       <h2>How to export from eBay</h2>
       <ol style="padding-left: 20px; color: #999; font-size: 13px; line-height: 2;">
         <li>Go to eBay Seller Hub</li>
@@ -112,6 +139,182 @@
       result.className = `result ${type}`;
       result.innerHTML = html;
       result.style.display = 'block';
+    }
+
+    // ── Active Inventory CSV ──────────────────────────────
+
+    // Flexible column name mapping
+    const COL_MAP = {
+      ebayItemId: ['item number', 'item id', 'itemid', 'item_number', 'listing id'],
+      title: ['title', 'item title', 'listing title'],
+      sku: ['custom label', 'sku', 'custom_label'],
+      quantityAvailable: ['available quantity', 'quantity available', 'quantity', 'qty'],
+      currentPrice: ['current price', 'price', 'start price', 'buy it now price'],
+      startTime: ['start date', 'listed date', 'start time', 'date listed'],
+      viewItemUrl: ['item url', 'view item url', 'url', 'link'],
+    };
+
+    let parsedListings = [];
+
+    function findCol(headers, aliases) {
+      const lower = headers.map(h => h.toLowerCase().trim());
+      for (const alias of aliases) {
+        const idx = lower.indexOf(alias);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    }
+
+    function parsePrice(val) {
+      if (!val) return null;
+      return parseFloat(String(val).replace(/[$,]/g, '')) || null;
+    }
+
+    function parseDate(val) {
+      if (!val) return null;
+      // eBay format: "Mar-17-26" or "Mar-17-2026" or ISO
+      const ebayMatch = String(val).match(/^([A-Za-z]{3})-(\d{1,2})-(\d{2,4})$/);
+      if (ebayMatch) {
+        const [, mon, day, yr] = ebayMatch;
+        const year = yr.length === 2 ? '20' + yr : yr;
+        return new Date(mon + ' ' + day + ', ' + year).toISOString();
+      }
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+
+    async function parseListingCSV() {
+      const file = document.getElementById('listingCsvFile').files[0];
+      if (!file) return;
+
+      const text = await file.text();
+      // Strip BOM
+      const clean = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+      const lines = clean.split(/\r?\n/);
+      if (lines.length < 2) { showListingResult('error', 'CSV has no data rows'); return; }
+
+      const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+
+      // Map columns
+      const colIdx = {};
+      for (const [field, aliases] of Object.entries(COL_MAP)) {
+        colIdx[field] = findCol(headers, aliases);
+      }
+
+      if (colIdx.ebayItemId === -1) {
+        showListingResult('error', 'Could not find Item Number column. Found: ' + headers.slice(0, 8).join(', '));
+        return;
+      }
+
+      // Parse rows (simple CSV split — handles most eBay exports)
+      parsedListings = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        // Handle quoted fields with commas
+        const row = [];
+        let inQuote = false, field = '';
+        for (const ch of lines[i]) {
+          if (ch === '"') { inQuote = !inQuote; }
+          else if (ch === ',' && !inQuote) { row.push(field.trim()); field = ''; }
+          else { field += ch; }
+        }
+        row.push(field.trim());
+
+        const itemId = colIdx.ebayItemId >= 0 ? row[colIdx.ebayItemId] : null;
+        if (!itemId || !/^\d+$/.test(itemId)) continue;
+
+        parsedListings.push({
+          ebayItemId: itemId,
+          title: colIdx.title >= 0 ? row[colIdx.title] : null,
+          sku: colIdx.sku >= 0 ? row[colIdx.sku] : null,
+          quantityAvailable: colIdx.quantityAvailable >= 0 ? parseInt(row[colIdx.quantityAvailable]) || 1 : 1,
+          currentPrice: colIdx.currentPrice >= 0 ? parsePrice(row[colIdx.currentPrice]) : null,
+          startTime: colIdx.startTime >= 0 ? parseDate(row[colIdx.startTime]) : null,
+          viewItemUrl: colIdx.viewItemUrl >= 0 ? row[colIdx.viewItemUrl] : null,
+          listingStatus: 'Active',
+        });
+      }
+
+      // Show preview
+      const preview = document.getElementById('listingPreview');
+      const countEl = document.getElementById('listingCount');
+      const headEl = document.getElementById('listingPreviewHead');
+      const bodyEl = document.getElementById('listingPreviewBody');
+
+      if (parsedListings.length === 0) {
+        preview.style.display = 'none';
+        showListingResult('error', 'No valid listings found in CSV');
+        document.getElementById('listingImportBtn').disabled = true;
+        return;
+      }
+
+      countEl.textContent = parsedListings.length + ' listings found';
+      headEl.innerHTML = '<th style="padding:6px 8px;text-align:left">Item #</th><th style="padding:6px 8px;text-align:left">Title</th><th style="padding:6px 8px;text-align:left">SKU</th><th style="padding:6px 8px;text-align:right">Price</th><th style="padding:6px 8px;text-align:right">Qty</th>';
+
+      let rows = '';
+      parsedListings.slice(0, 5).forEach(function(r) {
+        rows += '<tr style="border-bottom:1px solid #222">';
+        rows += '<td style="padding:4px 8px;font-family:monospace;font-size:10px;color:#9CA3AF">' + (r.ebayItemId || '') + '</td>';
+        rows += '<td style="padding:4px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.title || '').substring(0, 50) + '</td>';
+        rows += '<td style="padding:4px 8px;font-size:10px;color:#9CA3AF">' + (r.sku || '-') + '</td>';
+        rows += '<td style="padding:4px 8px;text-align:right">' + (r.currentPrice ? '$' + r.currentPrice.toFixed(2) : '-') + '</td>';
+        rows += '<td style="padding:4px 8px;text-align:right">' + (r.quantityAvailable || 1) + '</td>';
+        rows += '</tr>';
+      });
+      if (parsedListings.length > 5) {
+        rows += '<tr><td colspan="5" style="padding:4px 8px;color:#666;font-size:11px">... and ' + (parsedListings.length - 5) + ' more</td></tr>';
+      }
+      bodyEl.innerHTML = rows;
+      preview.style.display = 'block';
+      document.getElementById('listingImportBtn').disabled = false;
+      document.getElementById('listingResult').style.display = 'none';
+    }
+
+    async function importListingCSV() {
+      if (parsedListings.length === 0) return;
+      const store = document.getElementById('listingStore').value;
+      const btn = document.getElementById('listingImportBtn');
+
+      btn.disabled = true;
+      btn.textContent = 'Importing ' + parsedListings.length + ' listings...';
+
+      // Add store to each record
+      const records = parsedListings.map(function(r) {
+        return Object.assign({}, r, { store: store });
+      });
+
+      try {
+        const response = await fetch('/sync/import-listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records: records }),
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showListingResult('success',
+            '<div class="stat"><span class="stat-label">Store</span><span class="stat-value">' + store + '</span></div>' +
+            '<div class="stat"><span class="stat-label">New listings</span><span class="stat-value">' + (data.imported || 0) + '</span></div>' +
+            '<div class="stat"><span class="stat-label">Updated</span><span class="stat-value">' + (data.updated || 0) + '</span></div>' +
+            '<div class="stat"><span class="stat-label">Errors</span><span class="stat-value">' + (data.errors || 0) + '</span></div>' +
+            '<div class="stat"><span class="stat-label">Total</span><span class="stat-value">' + (data.total || records.length) + '</span></div>'
+          );
+        } else {
+          showListingResult('error', data.error || 'Import failed');
+        }
+      } catch (err) {
+        showListingResult('error', 'Request failed: ' + err.message);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Import Listings';
+    }
+
+    function showListingResult(type, html) {
+      const el = document.getElementById('listingResult');
+      el.className = 'result ' + type;
+      el.innerHTML = html;
+      el.style.display = 'block';
     }
   </script>
 </body>

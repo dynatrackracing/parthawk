@@ -699,7 +699,7 @@ router.post('/import-listings', async (req, res) => {
     try {
       const existing = await database('YourListing').where('ebayItemId', itemId).first();
       if (existing) {
-        await database('YourListing').where('ebayItemId', itemId).update({
+        const upd = {
           title: r.title || existing.title,
           sku: r.sku || existing.sku,
           quantityAvailable: parseInt(r.quantityAvailable || r.quantity) || existing.quantityAvailable,
@@ -709,7 +709,9 @@ router.post('/import-listings', async (req, res) => {
           viewItemUrl: r.viewItemUrl || r.url || existing.viewItemUrl,
           syncedAt: new Date(),
           updatedAt: new Date(),
-        });
+        };
+        if (r.store) upd.store = r.store.toLowerCase().trim();
+        await database('YourListing').where('ebayItemId', itemId).update(upd);
         updated++;
         continue;
       }
@@ -722,6 +724,7 @@ router.post('/import-listings', async (req, res) => {
         listingStatus: r.listingStatus || r.status || 'Active',
         startTime: r.startTime ? new Date(r.startTime) : new Date(),
         viewItemUrl: r.viewItemUrl || r.url || null,
+        store: r.store ? r.store.toLowerCase().trim() : 'dynatrack',
         syncedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
