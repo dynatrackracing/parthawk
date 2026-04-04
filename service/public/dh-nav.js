@@ -57,4 +57,22 @@ function dhNav(activePage) {
 
   const el = document.getElementById('dh-nav');
   if (el) { el.innerHTML = html; }
+
+  // Random splash background (1 of 8) + dark overlay
+  var sn = Math.floor(Math.random() * 8) + 1;
+  document.body.style.backgroundImage = "url('/admin/images/splash-" + sn + ".jpg')";
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundRepeat = 'no-repeat';
+  document.body.style.backgroundAttachment = 'fixed';
+  if (!document.getElementById('dh-bg-overlay')) {
+    var ov = document.createElement('div');
+    ov.id = 'dh-bg-overlay';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:0;pointer-events:none';
+    document.body.insertBefore(ov, document.body.firstChild);
+  }
+  // Ensure nav and content sit above overlay
+  if (el) { el.style.position = 'relative'; el.style.zIndex = '1'; }
+  var nextSib = el ? el.nextElementSibling : null;
+  while (nextSib) { nextSib.style.position = 'relative'; nextSib.style.zIndex = '1'; nextSib = nextSib.nextElementSibling; }
 }

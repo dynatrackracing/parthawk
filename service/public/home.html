@@ -9,7 +9,9 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--rd:#7f1d1d;--y:#eab308;--yd:#713f12;--g:#22c55e;--gd:#064e3b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh;padding-bottom:60px;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background-color:var(--bg);background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed;color:var(--t);min-height:100vh;padding-bottom:60px;-webkit-tap-highlight-color:transparent}
+.bg-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:0;pointer-events:none}
+.c{position:relative;z-index:1}
 .c{padding:12px;max-width:520px;margin:0 auto}
 .section-title{font-size:9px;font-weight:700;color:var(--tf);text-transform:uppercase;letter-spacing:.12em;padding:14px 0 6px}
 .link-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -29,8 +31,9 @@ select,input[type="file"]{font-size:12px;color:var(--tf)}
 </style>
 </head>
 <body>
+<div class="bg-overlay"></div>
 
-<div style="text-align:center;padding:24px 16px 12px;background:var(--bg)">
+<div style="text-align:center;padding:24px 16px 12px;position:relative;z-index:1">
   <img src="/admin/darkhawk-logo-sm.png" style="height:60px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(220,38,38,0.5))" alt="DH">
   <div style="font-size:24px;font-weight:900;letter-spacing:3px;margin-top:8px">DARK<span style="color:var(--r)">HAWK</span></div>
 </div>
@@ -181,6 +184,9 @@ async function uploadAutolumenSales() {
 }
 
 loadAutolumenStats();
+// Random splash background (1 of 8)
+var sn = Math.floor(Math.random() * 8) + 1;
+document.body.style.backgroundImage = "url('/admin/images/splash-" + sn + ".jpg')";
 </script>
 </body>
 </html>
