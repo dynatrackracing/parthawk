@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe Phase C] Wire Insert Paths — 2026-04-04
+- Wired extractStructuredFields() into all insert/upsert paths
+- YourDataManager: syncOrders (YourSale) + syncListings (YourListing)
+- SoldItemsManager: competitor scrape inserts (SoldItem) — scrapeCompetitor + scrapeByKeywords
+- AutolumenImportService: CSV import inserts (YourListing + YourSale) — all 3 import methods
+- All new records automatically get partNumberBase, partType, extractedMake, extractedModel
+
+---
+
 ## [Clean Pipe Phase B] Backfill Existing Records — 2026-04-04
 - Backfilled partNumberBase, partType, extractedMake, extractedModel on all YourSale (14,603), YourListing (4,365), SoldItem (1,248) rows
 - Script: service/scripts/backfill-clean-pipe.js (rerunnable, skips already-processed rows)

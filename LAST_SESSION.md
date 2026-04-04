@@ -1,26 +1,26 @@
 # LAST SESSION — 2026-04-04
 
-## Clean Pipe Phase A+B (DEPLOYED)
+## Clean Pipe Phases A+B+C (ALL DEPLOYED)
 
 ### Phase A: Schema + Extraction Utility
 - Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
 - Created 8 indexes for cross-table joins
 - Built extractStructuredFields() in partIntelligence.js
-- Make normalization (47 makes), model patterns (200+ models)
 
 ### Phase B: Backfill Existing Records
-- Backfilled all existing rows with extracted data
-- YourSale: 14,603 rows (81% PN, 89% type, 97% make, 84% model)
-- YourListing: 4,365 rows (75% PN, 86% type, 98% make, 79% model)
-- SoldItem: 1,248 rows (43% PN, 83% type, 83% make, 70% model)
-- Cross-table PN joins now work (verified: Ford ECM 623 sales / 77 competitor / 110 in stock)
-- Script: service/scripts/backfill-clean-pipe.js (rerunnable, skips already-processed rows)
+- Backfilled all existing rows (~20K total). Cross-table PN joins verified working.
+- YourSale: 14,603 rows | YourListing: 4,365 rows | SoldItem: 1,248 rows
+
+### Phase C: Wire Insert Paths
+- YourDataManager: syncOrders (YourSale) + syncListings (YourListing) now extract structured fields
+- SoldItemsManager: competitor scrape inserts (SoldItem) — both scrapeCompetitor and scrapeByKeywords
+- AutolumenImportService: all 3 CSV import paths (listings, sales, transactions) extract structured fields
+- All new data auto-normalized at write time — no backfill needed going forward
 
 ## What's next
-1. Clean Pipe Phase C: Wire extractStructuredFields into all insert/update paths (YourDataManager, AutolumenImportService, SoldItemsManager)
-2. Clean Pipe Phase D: market_demand_cache key standardization
-3. Clean Pipe Phase E: Service query upgrades to use new columns
-4. Sniper PN dedup/cleanup
+1. Clean Pipe Phase D: market_demand_cache key standardization (key_type column, consistent PN format)
+2. Clean Pipe Phase E: Service query upgrades to use new columns instead of runtime title parsing
+3. Sniper PN dedup/cleanup (strip Ford suffixes to base, reject non-PNs, deduplicate dash variants)
 
 ## Open items unchanged
 - instrumentclusterstore scraper returning 0 items
@@ -33,7 +33,6 @@
 - Item.price is FROZEN — never use as display/scoring price
 - extractStructuredFields() is in partIntelligence.js, NOT AttackListService
 - detectPartType() now exists in BOTH AttackListService and partIntelligence.js — keep in sync
-- All 3 tables fully backfilled — new inserts need Phase C wiring to stay populated
+- All 3 tables fully backfilled + insert paths wired — new data auto-normalized
 - market_demand_cache has mixed keys (raw PNs AND pipe-delimited) — do NOT touch yet
 - partType='OTHER' is the processed sentinel for rows with no detectable part type
-- 2 SoldItem rows had empty-string titles — manually set to OTHER
