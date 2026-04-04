@@ -60,8 +60,9 @@ function buildSearchQuery(part) {
  */
 async function getCachedPrice(cacheKey) {
   try {
+    const normalizedLookup = cacheKey.includes('|') ? cacheKey : cacheKey.replace(/[\s\-\.]/g, '').toUpperCase();
     const row = await database('market_demand_cache')
-      .where('part_number_base', cacheKey)
+      .where('part_number_base', normalizedLookup)
       .whereRaw(`last_updated > NOW() - INTERVAL '${CACHE_TTL_HOURS} hours'`)
       .first();
 
@@ -89,23 +90,27 @@ async function getCachedPrice(cacheKey) {
  */
 async function cachePrice(cacheKey, part, result) {
   try {
-    // Table columns: id, part_number_base, ebay_sold_90d, ebay_avg_price,
-    // ebay_active_listings, market_score, last_updated, createdAt
+    // Normalize cache key — strip dashes, spaces, dots for PN keys
+    const normalizedKey = cacheKey.includes('|') ? cacheKey : cacheKey.replace(/[\s\-\.]/g, '').toUpperCase();
+    const keyType = cacheKey.includes('|') ? 'ymm' : 'pn';
+
     await database.raw(`
       INSERT INTO market_demand_cache
-        (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+        (id, part_number_base, key_type, ebay_avg_price, ebay_sold_90d,
          last_updated, "createdAt")
       VALUES (
-        gen_random_uuid(), ?, ?, ?,
+        gen_random_uuid(), ?, ?, ?, ?,
         NOW(), NOW()
       )
       ON CONFLICT (part_number_base)
       DO UPDATE SET
         ebay_avg_price = EXCLUDED.ebay_avg_price,
         ebay_sold_90d = EXCLUDED.ebay_sold_90d,
+        key_type = EXCLUDED.key_type,
         last_updated = NOW()
     `, [
-      cacheKey,
+      normalizedKey,
+      keyType,
       result.median || result.avg || 0,
       result.count || 0,
     ]);

@@ -70,14 +70,14 @@ class PriceCheckService {
       try {
         const pns = extractPartNumbers(title);
         if (pns.length > 0) {
-          const basePn = pns[0].base;
+          const basePn = pns[0].base.replace(/[\s\-\.]/g, '').toUpperCase();
           const m = result.metrics;
           // UPSERT — only overwrite if existing data is >3 days stale (fresher data wins)
           await database.raw(`
             INSERT INTO market_demand_cache
-              (id, part_number_base, ebay_avg_price, ebay_sold_90d, ebay_median_price,
+              (id, part_number_base, key_type, ebay_avg_price, ebay_sold_90d, ebay_median_price,
                ebay_min_price, ebay_max_price, sales_per_week, source, search_query, last_updated, "createdAt")
-            VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, ?, 'price_check', ?, NOW(), NOW())
+            VALUES (gen_random_uuid(), ?, 'pn', ?, ?, ?, ?, ?, ?, 'price_check', ?, NOW(), NOW())
             ON CONFLICT (part_number_base) DO UPDATE SET
               ebay_avg_price = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_avg_price ELSE market_demand_cache.ebay_avg_price END,
               ebay_sold_90d = CASE WHEN market_demand_cache.last_updated < NOW() - INTERVAL '3 days' THEN EXCLUDED.ebay_sold_90d ELSE market_demand_cache.ebay_sold_90d END,

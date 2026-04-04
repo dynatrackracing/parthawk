@@ -162,7 +162,8 @@ class MarketDemandCronRunner {
     return { soldCount, avgPrice, activeListings };
   }
 
-  async upsertCache(partNumberBase, { soldCount, avgPrice, activeListings }) {
+  async upsertCache(rawPartNumberBase, { soldCount, avgPrice, activeListings }) {
+    const partNumberBase = rawPartNumberBase.replace(/[\s\-\.]/g, '').toUpperCase();
     // Seasonal weight: recent 30-day sales weighted heavier (spec: Phase 5)
     // Approximate: if 90d count is known, estimate 30d as ~33% unless higher
     const est30d = Math.round(soldCount / 3);

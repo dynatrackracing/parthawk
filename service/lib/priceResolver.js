@@ -30,7 +30,7 @@ async function resolvePricesBatch(partNumbers, options = {}) {
   const results = new Map();
   if (!partNumbers || partNumbers.length === 0) return results;
 
-  const unique = [...new Set(partNumbers.filter(Boolean))];
+  const unique = [...new Set(partNumbers.filter(Boolean).map(pn => pn.replace(/[\s\-\.]/g, '').toUpperCase()))];
 
   // Step 1: market_demand_cache (best source)
   let cacheMap = options.cacheIndex || new Map();
