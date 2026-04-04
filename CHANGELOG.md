@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe E5] Phoenix PN Joins — 2026-04-04
+- Phoenix SoldItem matching uses partNumberBase column for direct lookup (replaces title scanning)
+- Standalone group creation uses extractedMake/partType columns
+- pnBaseSet keys normalized to match Clean Pipe format
+- Verified: 10 results with healthy scores (TIPM 80, CLUSTER 80, HVAC 68)
+
+---
+
 ## [Clean Pipe E4] Competitor Intel Routes — 2026-04-04
 - gap-intel, best-sellers, emerging routes now group SoldItems by partNumberBase (exact) with normalizeTitle fallback
 - Added partNumberBase/partType to query SELECTs for all 3 routes

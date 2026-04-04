@@ -1,36 +1,69 @@
 # LAST SESSION — 2026-04-04
 
-## What was done
-1. Active Inventory CSV Import — new section on /admin/import page
-   - Store selector (dynatrack/autolumen), CSV file picker, client-side parse with flexible column mapping
-   - Preview table (first 5 rows), count badge, import button, results display
-   - Backend: POST /sync/import-listings now accepts and persists store field
-   - 368 Autolumen listings imported — stock index now sees both stores
+## Clean Pipe — COMPLETE (Phases A through E5)
 
-2. Zero Quantity = Ended (universal fix, both sync paths)
-   - YourDataManager.syncListings() (API sync): qty 0 → listingStatus Ended
-   - CSV import endpoint: qty 0 → Ended + deactivation pass for listings missing from file
-   - One-time DB cleanup: 290 Active rows with qty=0/NULL → Ended
-   - Universal rule: Active status requires quantity > 0
+### Phase A: Schema + Extraction Utility
+- Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
+- Created extractStructuredFields() in partIntelligence.js
+- 8 indexes created for cross-table joins
 
-## Current state
-- Autolumen: 368 listings in YourListing (store: 'autolumen')
-- Zero qty=0 Active listings in either store
-- CSV import includes deactivation pass (missing = Ended)
-- All 9 phases complete through Phase 9
+### Phase B: Backfill Existing Records
+- Backfilled ~20K existing rows across 3 tables
+- Cross-table PN joins verified working
 
-## DB snapshot update
-- YourListing: ~2,371 dynatrack + 368 autolumen active listings
-- 290 ghost listings deactivated (were qty 0 but Active)
+### Phase C: Wire Insert Paths
+- YourDataManager, SoldItemsManager, AutolumenImportService — all 8 insert paths wired
+- All new data auto-normalized at write time
 
-## Next up
-- Intelligence tuning (5 items from 4/3 diagnostics)
-- Clean Pipe data normalization (Phase A-E, unblocked since Phase 9)
-- instrumentclusterstore scraper debug (returning 0 items)
-- The Mark table still empty
-- QUARRY showing ~365 unique parts — open diagnostic
+### Phase D: Cache Key Standardization
+- Normalized 590 market_demand_cache keys (stripped spaces/dashes/dots)
+- Added key_type column (pn/ymm)
+- Updated all cache readers and writers
 
-## Files changed
-- service/public/import.html (Active Inventory CSV section)
-- service/routes/sync.js (import-listings store field + qty logic + deactivation pass)
-- service/managers/YourDataManager.js (syncListings qty 0 = Ended)
+### Phase E1: Sniper PN Cleanup
+- sanitizePartNumberForSearch(): strips junk PNs, Ford ECU suffix stripping
+- deduplicatePNQueue(): removes dash variant duplicates
+- Wired into sniper queue builder
+
+### Phase E2: Stock Index Optimization
+- buildStockIndex() reads columns first, ~2,400 fewer regex parses per load
+
+### Phase E3: Attack List Demand Queries
+- buildSalesIndex() reads columns first, ~14,600 fewer regex parses per load
+
+### Phase E4: Competitor Intel Routes
+- gap-intel, best-sellers, emerging group by partNumberBase with title fallback
+
+### Phase E5: Phoenix PN Joins
+- SoldItem matching uses partNumberBase column lookup, title scan fallback
+- Standalone group creation uses extractedMake/partType columns
+
+## Also done this session
+- Active Inventory CSV Import on /admin/import (368 Autolumen listings imported)
+- Zero quantity = Ended (universal fix across API sync and CSV import)
+
+## Summary Impact
+- ~17,000 fewer regex parses per attack list load
+- Cross-table joins by partNumberBase across YourSale, YourListing, SoldItem, market_demand_cache
+- Sniper queue cleaned of junk PNs and duplicates
+- All new data auto-normalized at write time via extractStructuredFields()
+- All existing data backfilled
+
+## What's next
+- Run sniper again to validate improved hit rate
+- Monitor attack list performance improvement
+- Intelligence tuning (5 diagnostic items from 4/3 session)
+
+## Open items
+- instrumentclusterstore scraper returning 0 items
+- The Mark table empty
+- Unauthenticated write endpoints
+- QUARRY data source needs rethink (queries frozen Item table)
+
+## Architecture reminders
+- extractStructuredFields() is in partIntelligence.js — single source of truth for title extraction
+- sanitizePartNumberForSearch() is in partIntelligence.js — single source for PN validation
+- Make normalization: title case matching corgi VIN decoder (Chevrolet, Toyota, Jeep)
+- market_demand_cache keys normalized (no dashes/spaces/dots for PN type)
+- key_type column: 'pn' for part numbers, 'ymm' for pipe-delimited keys
+- detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
