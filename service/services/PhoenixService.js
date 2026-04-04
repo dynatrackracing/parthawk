@@ -249,49 +249,76 @@ class PhoenixService {
       .whereIn('seller', soldNames)
       .where('soldDate', '>=', cutoff)
       .orderBy('soldDate', 'desc')
-      .select('title', 'soldPrice', 'soldDate', 'seller');
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'partNumberBase', 'partType', 'extractedMake', 'extractedModel');
 
-    // Match sold items to catalog groups by PN in title
-    const pnBaseSet = new Map(); // pnBase → groupKey
+    // Match sold items to catalog groups by PN
+    const pnBaseSet = new Map(); // normalized pnBase → groupKey
     for (const [key, g] of groups) {
-      if (g.partNumberBase) pnBaseSet.set(g.partNumberBase.toUpperCase(), key);
+      if (g.partNumberBase) {
+        const norm = g.partNumberBase.replace(/[\s\-\.]/g, '').toUpperCase();
+        pnBaseSet.set(norm, key);
+      }
     }
 
     for (const sold of soldItems) {
-      const title = (sold.title || '').toUpperCase();
       let matched = false;
 
-      // Try to match by partNumberBase appearing in the title
-      for (const [pn, gKey] of pnBaseSet) {
-        if (title.includes(pn) || title.includes(pn.replace(/-/g, ''))) {
-          const g = groups.get(gKey);
+      // FAST PATH: direct partNumberBase column lookup
+      if (sold.partNumberBase) {
+        const normSoldPn = sold.partNumberBase.replace(/[\s\-\.]/g, '').toUpperCase();
+        if (pnBaseSet.has(normSoldPn)) {
+          const g = groups.get(pnBaseSet.get(normSoldPn));
           g.salesCount++;
           g.soldPrices.push(parseFloat(sold.soldPrice) || 0);
           if (!g.lastSoldDate) g.lastSoldDate = sold.soldDate;
           g.soldSellers.add(sold.seller);
           g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
           matched = true;
-          break;
         }
       }
 
-      // Fallback: create standalone group from SoldItem title
-      // Use partType + make + model for granular grouping (not just partType + seller)
+      // SLOW PATH: title scan fallback for records without partNumberBase
       if (!matched) {
-        const pt = extractPartTypeFromTitle(sold.title);
+        const title = (sold.title || '').toUpperCase();
+        for (const [pn, gKey] of pnBaseSet) {
+          if (title.includes(pn)) {
+            const g = groups.get(gKey);
+            g.salesCount++;
+            g.soldPrices.push(parseFloat(sold.soldPrice) || 0);
+            if (!g.lastSoldDate) g.lastSoldDate = sold.soldDate;
+            g.soldSellers.add(sold.seller);
+            g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
+            matched = true;
+            break;
+          }
+        }
+      }
+
+      // Fallback: create standalone group from SoldItem
+      if (!matched) {
+        const pt = sold.partType && sold.partType !== 'OTHER' ? sold.partType : extractPartTypeFromTitle(sold.title);
         if (pt !== 'OTHER') {
-          const { make, model } = extractMakeModelFromTitle(sold.title);
+          const make = sold.extractedMake ? sold.extractedMake.toUpperCase() : null;
+          const model = sold.extractedModel ? sold.extractedModel.toUpperCase() : null;
+          if (!make) {
+            const extracted = extractMakeModelFromTitle(sold.title);
+            var fallbackMake = extracted.make;
+            var fallbackModel = extracted.model;
+          } else {
+            var fallbackMake = make;
+            var fallbackModel = model;
+          }
           // Include make/model when available for granular groups; fall back to seller-only
-          const fallbackKey = make
-            ? 'SOLD|' + pt + '|' + make + '|' + (model || 'UNK')
+          const fallbackKey = fallbackMake
+            ? 'SOLD|' + pt + '|' + fallbackMake + '|' + (fallbackModel || 'UNK')
             : 'SOLD|' + pt + '|' + sold.seller;
           if (!groups.has(fallbackKey)) {
             groups.set(fallbackKey, {
               groupKey: fallbackKey, groupType: 'sold_only', partNumberBase: null,
               manufacturerPartNumber: null, partType: pt,
               fitment: [], fitmentSet: new Set(),
-              makes: make ? new Set([make]) : new Set(),
-              models: model ? new Set([model]) : new Set(),
+              makes: fallbackMake ? new Set([fallbackMake]) : new Set(),
+              models: fallbackModel ? new Set([fallbackModel]) : new Set(),
               years: [],
               catalogCount: 0, catalogItemIds: new Set(), catalogImage: null,
               sampleTitles: [sold.title], listingPrice: null,
@@ -306,8 +333,8 @@ class PhoenixService {
           g.soldSellers.add(sold.seller);
           g.sellerCounts[sold.seller] = (g.sellerCounts[sold.seller] || 0) + 1;
           if (g.sampleTitles.length < 3) g.sampleTitles.push(sold.title);
-          if (make) g.makes.add(make);
-          if (model) g.models.add(model);
+          if (fallbackMake) g.makes.add(fallbackMake);
+          if (fallbackModel) g.models.add(fallbackModel);
         }
       }
     }
