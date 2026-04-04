@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe E4] Competitor Intel Routes — 2026-04-04
+- gap-intel, best-sellers, emerging routes now group SoldItems by partNumberBase (exact) with normalizeTitle fallback
+- Added partNumberBase/partType to query SELECTs for all 3 routes
+- gap-intel and emerging use Clean Pipe partNumberBase and partType in output
+- Same scoring formulas, same API response shape, backward compatible
+
+---
+
 ## 2026-04-04 — Active Inventory CSV Import + Zero Qty Fix
 - **Active Inventory CSV import** on /admin/import — store selector, flexible column mapping, preview, upsert to YourListing
 - 368 Autolumen listings imported — stock index now sees both stores (fixes Autolumen blind spot)
