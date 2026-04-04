@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Market Drip Rewrite — 2026-04-04
+- Expanded importapart drip to 3-bucket priority queue: active inventory (1,151) + sold-not-restocked (1,583) + importapart catalog (9,009) = 10,912 unique PNs
+- Comp quality filter: regex excludes as-is/untested/for-parts/core before averaging
+- DELAY_MS: 15000 → 3000, batch: 34 → 200, cycle: 72 days → 18 days
+- source: importapart_drip → market_drip
+- Cache keys normalized to Clean Pipe, key_type='pn' on all upserts
+- Fixed dirty keys in market_demand_cache
+
+---
+
 ## QUARRY: Pure SQL rewrite with Clean Pipe columns — 2026-04-04
 - restockReport.js rewritten: pure SQL grouping by partNumberBase/extractedMake/extractedModel
 - No runtime title parsing — all extraction done at write time via Clean Pipe
