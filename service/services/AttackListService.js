@@ -1153,14 +1153,32 @@ class AttackListService {
     if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
     // Bonus: any part on The Mark want list
     if (filteredParts.some(p => p.isMarked)) score += 15;
-    // Bonus: fresh arrival (within 2 days by date_added or createdAt)
+
+    // === STOCK PENALTY SCALING — more stock = harder suppression ===
+    // Max in_stock across all parts on this vehicle
+    const maxStock = filteredParts.reduce((mx, p) => Math.max(mx, p.in_stock || 0), 0);
+    if (maxStock === 1) score = Math.round(score * 0.95);       // -5%
+    else if (maxStock === 2) score = Math.round(score * 0.85);  // -15%
+    else if (maxStock === 3) score = Math.round(score * 0.70);  // -30%
+    else if (maxStock === 4) score = Math.round(score * 0.50);  // -50%
+    else if (maxStock >= 5) score = Math.round(score * 0.30);   // -70%
+
+    // === FRESH ARRIVAL BONUS — newer arrivals score higher ===
     const arrivalDate = vehicle.date_added || vehicle.createdAt;
     if (arrivalDate) {
       const daysSinceAdded = Math.floor((Date.now() - new Date(arrivalDate).getTime()) / 86400000);
-      if (daysSinceAdded <= 1) score += 5;
+      if (daysSinceAdded <= 3) score = Math.round(score * 1.10);       // +10%
+      else if (daysSinceAdded <= 7) score = Math.round(score * 1.05);  // +5%
+      else if (daysSinceAdded <= 14) score = Math.round(score * 1.02); // +2%
     }
 
-    score = Math.min(100, score);
+    // === COGS YARD FACTOR — cheaper yards get slight boost ===
+    // Applied via _yardCostFactor set by getAllYardsAttackList before scoring
+    if (vehicle._yardCostFactor) {
+      score = Math.round(score * (1 + vehicle._yardCostFactor));
+    }
+
+    score = Math.max(0, Math.min(100, score));
 
     // Color based on TOTAL ESTIMATED VALUE, not score number
     let color = 'gray';
@@ -1350,6 +1368,19 @@ class AttackListService {
       const vehicles = await vQuery;
 
       if (vehicles.length === 0) continue;
+
+      // COGS yard factor — cheaper yards get a slight boost
+      const entryFee = parseFloat(yard.entry_fee) || 2;
+      const taxRate = parseFloat(yard.tax_rate) || 0.07;
+      const costIndex = (entryFee / 2) * (1 + taxRate) / (1 + 0.07);
+      let yardCostFactor = 0;
+      if (costIndex <= 0.8) yardCostFactor = 0.05;       // cheap yard +5%
+      else if (costIndex <= 1.0) yardCostFactor = 0;      // baseline
+      else if (costIndex <= 1.3) yardCostFactor = -0.03;  // somewhat expensive -3%
+      else yardCostFactor = -0.05;                         // expensive -5%
+
+      // Attach yard cost factor to vehicles before scoring
+      for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
       const scored = vehicles.map(v =>
         this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex)
