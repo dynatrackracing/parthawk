@@ -633,34 +633,40 @@ class AttackListService {
       const listings = await database('YourListing')
         .where('listingStatus', 'Active')
         .whereNotNull('title')
-        .select('title', 'sku', 'quantityAvailable');
+        .select('title', 'sku', 'quantityAvailable', 'partNumberBase', 'extractedMake', 'extractedModel');
 
       const { normalizePartNumber } = require('../lib/partNumberUtils');
 
       for (const listing of listings) {
         const qty = parseInt(listing.quantityAvailable) || 1;
         const title = listing.title || '';
-        const titleLower = title.toLowerCase();
 
-        // Index by make|model
-        let make = null;
-        for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
-          if (titleLower.includes(alias)) { make = canonical; break; }
+        // Index by make|model — use Clean Pipe columns first, title parsing fallback
+        let make = listing.extractedMake || null;
+        if (!make) {
+          const titleLower = title.toLowerCase();
+          for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+            if (titleLower.includes(alias)) { make = canonical; break; }
+          }
         }
         if (make) {
-          const model = this.extractModelFromTitle(title, make);
+          let model = listing.extractedModel || null;
+          if (!model) model = this.extractModelFromTitle(title, make);
           if (model) {
             const key = `${make.toLowerCase()}|${model.toLowerCase()}`;
             byMakeModel[key] = (byMakeModel[key] || 0) + qty;
           }
         }
 
-        // Index by part number (from SKU and title)
+        // Index by part number — use Clean Pipe column first
+        if (listing.partNumberBase && listing.partNumberBase.length >= 5) {
+          byPartNumber[listing.partNumberBase] = (byPartNumber[listing.partNumberBase] || 0) + qty;
+        }
+        // Also index from SKU and title PNs (backward compatible, catches edge cases)
         if (listing.sku) {
           const base = normalizePartNumber(listing.sku);
           if (base && base.length >= 5) byPartNumber[base] = (byPartNumber[base] || 0) + qty;
         }
-        // Extract PNs from title using shared partIntelligence
         const pns = piExtractPNs(title);
         for (const pn of pns) {
           byPartNumber[pn.normalized] = (byPartNumber[pn.normalized] || 0) + qty;
