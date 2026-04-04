@@ -1,37 +1,36 @@
 # LAST SESSION — 2026-04-04
 
-## Clean Pipe Phases A-D + E1-E3 (ALL DEPLOYED)
+## What was done
+1. Active Inventory CSV Import — new section on /admin/import page
+   - Store selector (dynatrack/autolumen), CSV file picker, client-side parse with flexible column mapping
+   - Preview table (first 5 rows), count badge, import button, results display
+   - Backend: POST /sync/import-listings now accepts and persists store field
+   - 368 Autolumen listings imported — stock index now sees both stores
 
-### Phases A-D: Foundation
-- Schema, backfill, insert wiring, cache key normalization
+2. Zero Quantity = Ended (universal fix, both sync paths)
+   - YourDataManager.syncListings() (API sync): qty 0 → listingStatus Ended
+   - CSV import endpoint: qty 0 → Ended + deactivation pass for listings missing from file
+   - One-time DB cleanup: 290 Active rows with qty=0/NULL → Ended
+   - Universal rule: Active status requires quantity > 0
 
-### Phase E1: Sniper PN Cleanup
-- sanitizePartNumberForSearch + deduplicatePNQueue wired into sniper queue
+## Current state
+- Autolumen: 368 listings in YourListing (store: 'autolumen')
+- Zero qty=0 Active listings in either store
+- CSV import includes deactivation pass (missing = Ended)
+- All 9 phases complete through Phase 9
 
-### Phase E2: Stock Index Optimization
-- buildStockIndex() uses columns first — 574 make/model combos, 4,322 PNs
+## DB snapshot update
+- YourListing: ~2,371 dynatrack + 368 autolumen active listings
+- 290 ghost listings deactivated (were qty 0 but Active)
 
-### Phase E3: Sales Index Optimization
-- buildSalesIndex() uses extractedMake, extractedModel, partType from YourSale columns
-- Falls back to title regex parsing only when columns are NULL
-- Eliminates ~14,600 regex parses per attack list load
-- Verified: 351 make/model combos, 1,616 sales indexed
+## Next up
+- Intelligence tuning (5 items from 4/3 diagnostics)
+- Clean Pipe data normalization (Phase A-E, unblocked since Phase 9)
+- instrumentclusterstore scraper debug (returning 0 items)
+- The Mark table still empty
+- QUARRY showing ~365 unique parts — open diagnostic
 
-## What's next
-1. Clean Pipe E4: Competitor intel routes (Gap Intel, Best Sellers GROUP BY partNumberBase)
-2. Clean Pipe E5: Phoenix PN joins
-3. Regenerate SNAPSHOT_SERVICES.md (AttackListService changed in E2+E3)
-
-## Open items unchanged
-- instrumentclusterstore scraper returning 0 items
-- Autolumen has 0 YourListing records
-- The Mark table empty
-- Unauthenticated write endpoints
-
-## Critical reminders for next session
-- DO NOT modify AttackListService.js without reading it completely first
-- Item.price is FROZEN — never use as display/scoring price
-- buildStockIndex() and buildSalesIndex() both use columns first, title fallback
-- YourSale.partType column aliased as cpPartType in buildSalesIndex select (avoids collision with detectPartType local)
-- detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
-- market_demand_cache keys normalized, sniper writes normalized keys
+## Files changed
+- service/public/import.html (Active Inventory CSV section)
+- service/routes/sync.js (import-listings store field + qty logic + deactivation pass)
+- service/managers/YourDataManager.js (syncListings qty 0 = Ended)

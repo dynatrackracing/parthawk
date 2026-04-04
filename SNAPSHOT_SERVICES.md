@@ -1,6 +1,6 @@
-# SNAPSHOT_SERVICES.md — DarkHawk Service Layer
+# SNAPSHOT_SERVICES.md — PartHawk Service Layer
 
-> Generated: 2026-04-01 | Source: `service/services/` (37 files)
+> Generated: 2026-04-04 | Source: `service/services/` (37 files), `service/managers/` (7 files)
 
 ## Service Index
 
@@ -24,7 +24,7 @@
 | `OpportunityService.js` | Untapped opportunity detection from market gaps |
 | `RestockService.js` | Restock recommendations from sales velocity |
 | `PhoenixService.js` | Phoenix competitor dead-listing harvesting |
-| `EbayMessagingService.js` | eBay message polling and auto-response |
+| `EbayMessagingService.js` | eBay post-purchase messaging queue (template-based, auto-send via TradingAPI) |
 | `ReturnIntelligenceService.js` | Return pattern analysis by part type/make |
 | `FitmentIntelligenceService.js` | Fitment data and cross-reference intelligence |
 | `ListingIntelligenceService.js` | Listing optimization intelligence |
@@ -43,6 +43,18 @@
 | `ApifyResearchService.js` | Apify integration for eBay research |
 | `PriceCheckServiceV2.js` | Next-gen price check service |
 | `ReturnIntakeService.js` | Return intake processing |
+
+## Manager Index
+
+| Manager | Purpose |
+|---------|---------|
+| `YourDataManager.js` | Syncs YOUR eBay seller data (orders + listings) to database |
+| `SoldItemsManager.js` | Fetches competitor sold items via Playwright scraping |
+| `MarketResearchManager.js` | Orchestrates market research (comps, pricing, competitors) for inventory |
+| `ItemDetailsManager.js` | eBay GetItem detail fetching + interchange number parsing |
+| `SellerItemManager.js` | Competitor active-listing ingestion via BrowseAPI |
+| `CompetitorManager.js` | Competitor seller CRUD (enabled/disabled) |
+| `UserManager.js` | Firebase user auth + verification + caching |
 
 ---
 
@@ -168,9 +180,132 @@
 
 **Key Methods:**
 - `generateAlerts()` -- main entry (concurrency-guarded, single instance)
+- `_generateAlertsInner()` -- actual logic, called inside concurrency guard
 
-**Safety:** Checks DB size before running -- skips if >4GB (on 5GB Railway volume)
+**Alert Sources:**
+1. **Hunters Perch** (`restock_want_list`) -- manual want list items matched against yard vehicles
+2. **Bone Pile** (`YourSale` last 90 days, >= $50) -- recently sold items matched against yard vehicles, filtered to exclude parts already in stock
+3. **The Mark** (`the_mark` table) -- highest-priority active marks matched against vehicles
+
+**Bone Pile Stock Filter:** Extracts part numbers from active `YourListing` titles, skips bone_pile parts where any extracted PN matches current stock. Logs filter stats.
+
+**Safety:**
+- Concurrency guard: module-level `_running` flag prevents overlapping runs
+- Disk space check: skips if DB > 4GB (on 5GB Railway volume)
+- Snapshots claimed alerts before wipe so they can be restored after regeneration
 
 **Dependencies:** `database`, `logger`, `partMatcher`, `partIntelligence`
 
-**Gotchas:** Uses module-level `_running` flag as concurrency guard (not async-lock)
+---
+
+## EbayMessagingService.js
+
+**Purpose:** Queue-based eBay buyer messaging system. Queues post-purchase thank-you messages with a 15-minute delay, then processes them via TradingAPI `AddMemberMessageAAQToPartner`.
+
+**Key Methods:**
+- `queuePostPurchase(order, ebayStore)` -- queues a `post_purchase` message with 15min delay; idempotent via `ON CONFLICT DO NOTHING`
+- `processQueue()` -- claims pending rows (limit 20), renders templates, sends via TradingAPI, logs results. Called by cron every 2 minutes.
+- `_processQueueEntry(entry)` -- single entry: fetch template -> build variables -> render -> send -> log
+- `_renderTemplate(templateText, variables)` -- `{VAR}` placeholder replacement
+- `_buildTemplateVariables(entry)` -- resolves `ITEM_TITLE`, `ITEM_ID`, `ORDER_ID`, `BUYER_USER_ID` from YourSale/YourListing
+
+**Queue Lifecycle:** `pending` -> `claimed` (by worker) -> `sent` | `failed` (retry up to 3x) | `pending` (auth token 932 auto-retry)
+
+**Safety:** Stale claim recovery -- entries claimed > 10 minutes ago are reset to pending (crashed worker protection).
+
+**Tables:** `ebay_message_queue`, `ebay_message_templates`, `ebay_messages` (log)
+
+**Dependencies:** `database`, `SellerAPI`, `logger`
+
+---
+
+## YourDataManager.js
+
+**Purpose:** Syncs YOUR eBay seller data (orders and listings) to the database. Central sync orchestrator.
+
+**Key Methods:**
+- `syncAll({ daysBack })` -- full sync: orders + listings + overstock check + cache auto-resolve
+- `syncOrders({ daysBack })` -- fetches orders via SellerAPI, upserts each line item as YourSale record
+- `syncListings()` -- fetches active listings via SellerAPI, upserts as YourListing records
+- `getStats()` -- sync statistics (counts, recent activity)
+
+**syncListings() Behavior:**
+- Upserts listings with structured field extraction (Clean Pipe: partNumberBase, partType, make, model)
+- Marks qty 0 listings as `Ended` at insert time (`quantityAvailable <= 0` -> `listingStatus: 'Ended'`)
+- After sync, marks any dynatrack listings NOT in the sync batch as `Ended` (stale deactivation)
+- Triggers `OverstockCheckService.checkAll()` after every listing sync
+- Triggers `CacheService.resolveFromListings()` for auto-resolve of claimed cache entries
+
+**Dependencies:** `SellerAPI`, `YourSale`, `YourListing`, `partIntelligence`, `OverstockCheckService`, `CacheService`
+
+---
+
+## SoldItemsManager.js
+
+**Purpose:** Fetches competitor sold items via Playwright scraping (FindingsAPI decommissioned Feb 2025).
+
+**Key Methods:**
+- `scrapeAllCompetitors({ categoryId, maxPagesPerSeller, enrichCompatibility })` -- scrapes all enabled sellers from `SoldItemSeller` table
+- Stores results as `SoldItem` records with structured field extraction
+
+**Dependencies:** `SoldItemsScraper`, `TradingAPI`, `SoldItemSeller`, `SoldItem`, `partIntelligence`
+
+---
+
+## MarketResearchManager.js
+
+**Purpose:** Orchestrates market research for inventory items -- searches eBay for active comps and sold items, stores data, calculates price stats.
+
+**Key Methods:**
+- `researchAllInventory({ limit, maxActivePages, maxSoldPages, categoryId })` -- runs research for items not researched in last 24h
+
+**Flow:** Get YourListing items -> extract keywords -> search eBay active + sold -> store as CompetitorListing/SoldItem -> calculate PriceSnapshot
+
+**Dependencies:** `MarketResearchScraper`, `MarketResearchRun`, `CompetitorListing`, `SoldItem`, `YourListing`, `PriceSnapshot`
+
+---
+
+## ItemDetailsManager.js
+
+**Purpose:** Fetches full item details from eBay TradingAPI (GetItem) including compatibility and specifics.
+
+**Key Methods:**
+- `getDetailsForItem({ itemId })` -- returns raw eBay item object
+- `getInterchangeNumbers(string)` -- parses interchange/OEM number strings (comma or space delimited)
+
+**Dependencies:** `TradingAPI`, `Auto`, `Item`
+
+---
+
+## SellerItemManager.js
+
+**Purpose:** Ingests competitor active listings via eBay BrowseAPI. Paginated fetch + store.
+
+**Key Methods:**
+- `getItemsForSellers(sellers)` -- iterates all sellers
+- `getItemsForSeller({ seller })` -- paginated BrowseAPI fetch per category
+- `processResponse(response, seller)` -- stores items in DB
+
+**Dependencies:** `FindingsAPI`, `BrowseAPI`, `Item`
+
+---
+
+## CompetitorManager.js
+
+**Purpose:** Simple CRUD for competitor sellers.
+
+**Key Methods:**
+- `getAllCompetitors()` -- returns all enabled competitors
+
+**Dependencies:** `Competitor`
+
+---
+
+## UserManager.js
+
+**Purpose:** Firebase user authentication, verification, and caching.
+
+**Key Methods:**
+- `getOrCreateUser({ user }, { trx })` -- find or create user by email; returns user if verified, null if not
+
+**Dependencies:** `User`, `CacheManager`

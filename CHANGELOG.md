@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## 2026-04-04 — Active Inventory CSV Import + Zero Qty Fix
+- **Active Inventory CSV import** on /admin/import — store selector, flexible column mapping, preview, upsert to YourListing
+- 368 Autolumen listings imported — stock index now sees both stores (fixes Autolumen blind spot)
+- **Zero quantity = Ended** — universal rule across API sync and CSV import paths
+- CSV import deactivation pass — listings missing from file marked Ended
+- One-time cleanup: 290 ghost Active listings with qty=0 deactivated
+
+---
+
 ## [Clean Pipe E3] Sales Index Optimization — 2026-04-04
 - buildSalesIndex() reads extractedMake, extractedModel, partType from YourSale columns first
 - Falls back to title parsing only when columns are NULL

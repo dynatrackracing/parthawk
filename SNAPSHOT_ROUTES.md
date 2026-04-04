@@ -1,11 +1,13 @@
 # SNAPSHOT_ROUTES.md — DarkHawk Route Layer
 
-> Generated: 2026-04-01 | Source: `service/index.js`, `service/routes/`
+> Generated: 2026-04-04 | Source: `service/index.js`, `service/routes/`
 
 ## Route Mounts (from index.js)
 
 | Prefix | Route File | Auth |
 |--------|-----------|------|
+| `/auth` | `routes/auth.js` | **public** (login/logout) |
+| `/login` | inline (serves login.html) | **public** |
 | `/items` | `routes/items.js` | authMiddleware |
 | `/cron` | `routes/cron.js` | authMiddleware + isAdmin |
 | `/autos` | `routes/autos.js` | authMiddleware |
@@ -48,7 +50,9 @@
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/health-check` | Health check (public) |
+| -- | `authGate middleware` | Cookie-based password gate (all routes) |
+| GET | `/login` | Login page (public, serves login.html) |
+| GET | `/api/health-check` | Health check (public, bypasses authGate) |
 | GET | `/api/debug/market-cache` | Debug market cache lookup |
 | GET | `/api/test-lkq` | Test LKQ fetch via curl/axios |
 | POST | `/api/decode-vins` | Decode all undecoded yard_vehicle VINs |
@@ -180,3 +184,10 @@
 - `GET /your-sales/trends` -- sales trend data
 - `GET /stats` -- sync status/stats
 - `POST /trigger` -- trigger sync
+- `POST /import-listings` -- CSV import (upsert + store + qty→status + deactivation pass)
+- `POST /import-sales` -- bulk import sales records
+- `POST /import-items` -- bulk import competitor items
+
+### `/auth` (public)
+- `POST /login` -- password check, set session cookie
+- `GET /logout` -- clear session cookie, redirect to /login
