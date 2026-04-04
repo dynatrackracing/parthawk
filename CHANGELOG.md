@@ -4,6 +4,18 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe Phase A] Schema + Extraction Utility — 2026-04-04
+- Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
+- 8 indexes for cross-table joins (partNumberBase, partType, extractedMake)
+- extractStructuredFields() in partIntelligence.js: extracts PN base, part type, make, model from any title
+- Make normalization map (47 entries) with title-case output matching corgi VIN decoder
+- Model pattern list (200+ models) with multi-word priority (Grand Cherokee before Cherokee)
+- detectPartType() added to partIntelligence.js (self-contained copy from AttackListService)
+- Tested 11 titles: Grand Cherokee, Silverado 1500, BMW 5 Series, Datsun 280ZX all correct
+- Columns exist on prod, all NULL — backfill (Phase B) and insert wiring (Phase C) coming next
+
+---
+
 ## [Phase 9] Local VIN Decoder — 2026-04-03
 - Installed @cardog/corgi for offline VIN decoding (eliminates all NHTSA API calls)
 - Created vin_decoder schema with manufacturers, vds_trim_lookup, engine_codes, name_aliases tables
