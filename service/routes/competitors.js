@@ -86,13 +86,13 @@ router.get('/gap-intel', async (req, res) => {
     const competitorItems = await competitorQuery
       .orderBy('soldDate', 'desc')
       .limit(5000)
-      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId');
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId', 'partNumberBase', 'partType', 'extractedMake', 'extractedModel');
 
-    // Group competitor items by normalized title
+    // Group by partNumberBase (exact) or normalizeTitle (fallback)
     const compGroups = {};
     for (const item of competitorItems) {
-      const key = normalizeTitle(item.title);
-      if (!key || key.length < 10) continue;
+      const key = item.partNumberBase || normalizeTitle(item.title);
+      if (!key || key.length < 3) continue;
       if (!compGroups[key]) {
         compGroups[key] = {
           title: item.title,
@@ -102,6 +102,8 @@ router.get('/gap-intel', async (req, res) => {
           prices: [],
           lastSold: null,
           ebayItemId: item.ebayItemId,
+          _partNumberBase: item.partNumberBase || null,
+          _partType: item.partType || null,
         };
       }
       const g = compGroups[key];
@@ -159,8 +161,7 @@ router.get('/gap-intel', async (req, res) => {
         ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
         : sorted[Math.floor(sorted.length / 2)];
 
-      // Extract part number from title - common OEM patterns
-      const partNumber = extractPartNumber(group.title);
+      const partNumber = group._partNumberBase || extractPartNumber(group.title);
 
       const sellerCount = group.sellers.size;
       const isConfluence = sellerCount >= 2;
@@ -193,7 +194,7 @@ router.get('/gap-intel', async (req, res) => {
         score,
         ebayItemId: group.ebayItemId,
         partNumber: partNumber,
-        partType: extractPartType(group.title),
+        partType: group._partType || extractPartType(group.title),
         confluence: isConfluence,
         sellerCount: sellerCount,
         yardMatch: titleMatchesYard(group.title, yardMakes),
@@ -252,14 +253,14 @@ router.get('/emerging', async (req, res) => {
     const items = await emergingQuery
       .orderBy('soldDate', 'desc')
       .limit(5000)
-      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId');
+      .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId', 'partNumberBase', 'partType');
 
     const groups = {};
     for (const item of items) {
-      const key = normalizeTitle(item.title);
-      if (!key || key.length < 10) continue;
+      const key = item.partNumberBase || normalizeTitle(item.title);
+      if (!key || key.length < 3) continue;
       if (!groups[key]) {
-        groups[key] = { title: item.title, sellers: new Set(), firstSeen: new Date(item.soldDate), recentCount: 0, olderCount: 0, totalCount: 0, prices: [], ebayItemId: item.ebayItemId };
+        groups[key] = { title: item.title, sellers: new Set(), firstSeen: new Date(item.soldDate), recentCount: 0, olderCount: 0, totalCount: 0, prices: [], ebayItemId: item.ebayItemId, _partNumberBase: item.partNumberBase || null, _partType: item.partType || null };
       }
       const g = groups[key];
       g.sellers.add(item.seller);
@@ -292,7 +293,7 @@ router.get('/emerging', async (req, res) => {
 
       const sorted = group.prices.sort(function(a, b) { return a - b; });
       const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
-      const partNumber = extractPartNumber(group.title);
+      const partNumber = group._partNumberBase || extractPartNumber(group.title);
 
       let signal = null;
       let signalStrength = 0;
@@ -312,7 +313,7 @@ router.get('/emerging', async (req, res) => {
       if (!signal) continue;
 
       emerging.push({
-        title: group.title, partNumber, partType: extractPartType(group.title), signal, signalStrength: Math.round(signalStrength),
+        title: group.title, partNumber, partType: group._partType || extractPartType(group.title), signal, signalStrength: Math.round(signalStrength),
         sellers: Array.from(group.sellers), totalCount: group.totalCount, recentCount: group.recentCount,
         olderCount: group.olderCount, medianPrice: Math.round(median),
         totalRevenue: Math.round(group.prices.reduce(function(a, b) { return a + b; }, 0)),
@@ -872,14 +873,15 @@ router.get('/:sellerId/best-sellers', async (req, res) => {
       .where('seller', sellerId)
       .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${days} days'`))
       .orderBy('soldPrice', 'desc')
-      .select('title', 'soldPrice', 'soldDate', 'ebayItemId', 'condition', 'manufacturerPartNumber');
+      .select('title', 'soldPrice', 'soldDate', 'ebayItemId', 'condition', 'manufacturerPartNumber', 'partNumberBase');
 
-    // Group by approximate title (first 40 chars) to find repeated sellers
+    // Group by partNumberBase (exact) or normalizeTitle (fallback)
     const groups = {};
     for (const item of items) {
-      const key = normalizeTitle(item.title);
+      const key = item.partNumberBase || normalizeTitle(item.title);
+      if (!key || key.length < 3) continue;
       if (!groups[key]) {
-        groups[key] = { title: item.title, count: 0, totalRevenue: 0, prices: [], lastSold: null, pn: item.manufacturerPartNumber, ebayItemId: item.ebayItemId };
+        groups[key] = { title: item.title, count: 0, totalRevenue: 0, prices: [], lastSold: null, pn: item.partNumberBase || item.manufacturerPartNumber, ebayItemId: item.ebayItemId };
       }
       const g = groups[key];
       g.count++;
