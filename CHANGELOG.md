@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## QUARRY: Pure SQL rewrite with Clean Pipe columns — 2026-04-04
+- restockReport.js rewritten: pure SQL grouping by partNumberBase/extractedMake/extractedModel
+- No runtime title parsing — all extraction done at write time via Clean Pipe
+- Stock lookup: exact key (pn+make+model) then pn-only fallback, both from SQL aggregation
+- Market enrichment from market_demand_cache by partNumberBase
+- Verified: 100 results, 93 green tier, 1,632 sales analyzed
+
+---
+
 ## Sniper: Batch Size 15→35, Priority Queue, Preview — 2026-04-04
 - PriceCheckCronRunner batch size 15→35 (70 weeks full coverage vs 163)
 - Queue priority: never-checked first, highest price first, oldest check last
