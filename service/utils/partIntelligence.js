@@ -240,6 +240,180 @@ function lookupStockFromIndex(index, title) {
   return { count: 0, method: 'NO_MATCH' };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// STRUCTURED FIELD EXTRACTION — Clean Pipe Phase A
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * detectPartType(title) — Detect part type from title.
+ * Self-contained copy matching AttackListService.detectPartType().
+ */
+function detectPartType(title) {
+  var t = (title || '').toUpperCase();
+  if (t.includes('TCM') || t.includes('TCU') || t.includes('TRANSMISSION CONTROL')) return 'TCM';
+  if (t.includes('BCM') || t.includes('BODY CONTROL')) return 'BCM';
+  if (t.includes('ECM') || t.includes('ECU') || t.includes('PCM') || t.includes('ENGINE CONTROL') || t.includes('ENGINE COMPUTER')) return 'ECM';
+  if (t.includes('ABS') || t.includes('ANTI LOCK') || t.includes('ANTI-LOCK') || t.includes('BRAKE MODULE')) return 'ABS';
+  if (t.includes('TIPM') || t.includes('FUSE BOX') || t.includes('JUNCTION') || t.includes('RELAY BOX') || t.includes('IPDM')) return 'TIPM';
+  if (t.includes('AMPLIFIER') || t.includes('AMP ') || t.includes(' AMP') || t.includes('BOSE') || t.includes('HARMAN') || t.includes('ALPINE') || t.includes('JBL')) return 'AMP';
+  if (t.includes('CLUSTER') || t.includes('SPEEDOMETER') || t.includes('INSTRUMENT') || t.includes('GAUGE')) return 'CLUSTER';
+  if (t.includes('RADIO') || t.includes('HEAD UNIT') || t.includes('INFOTAINMENT') || t.includes('STEREO') || t.includes('RECEIVER')) return 'RADIO';
+  if (t.includes('THROTTLE')) return 'THROTTLE';
+  if (t.includes('STEERING') || t.includes('EPS')) return 'STEERING';
+  if (t.includes('WINDOW') && (t.includes('REGULATOR') || t.includes('MOTOR'))) return 'REGULATOR';
+  if (t.includes('MIRROR')) return 'MIRROR';
+  if (t.includes('SUNROOF') || t.includes('MOONROOF') || t.includes('SUN ROOF')) return 'SUNROOF';
+  if (t.includes('FUEL PUMP DRIVER') || t.includes('FUEL PUMP MODULE') || t.includes('FUEL PUMP CONTROL')) return 'FUEL_MODULE';
+  if (t.includes('CAMERA') || t.includes('BACKUP CAM') || t.includes('MONOCULAR')) return 'CAMERA';
+  if ((t.includes('CLIMATE') || t.includes('HVAC') || t.includes('HEATER')) && t.includes('CONTROL')) return 'HVAC';
+  if (t.includes('HEADLIGHT') || t.includes('HEAD LIGHT') || t.includes('XENON') || t.includes('HID')) return 'HEADLIGHT';
+  if (t.includes('TAIL LIGHT') || t.includes('TAILLIGHT') || t.includes('TAIL LAMP')) return 'TAILLIGHT';
+  if (t.includes('BLIND SPOT') || t.includes('RADAR')) return 'BLIND_SPOT';
+  if (t.includes('PARK ASSIST') || t.includes('PARKING SENSOR')) return 'PARK_SENSOR';
+  if (t.includes('AIR RIDE') || t.includes('AIR SUSPENSION')) return 'AIR_RIDE';
+  if (t.includes('CLOCK SPRING') || t.includes('CLOCKSPRING')) return 'CLOCK_SPRING';
+  if (t.includes('DOOR LOCK') || t.includes('LATCH') || t.includes('KEYLESS ENTRY')) return 'LOCK';
+  if (t.includes('IGNITION') || t.includes('IMMOBILIZER')) return 'IGNITION';
+  if ((t.includes('LIFTGATE') || t.includes('TAILGATE') || t.includes('HATCH')) && (t.includes('MOTOR') || t.includes('MODULE') || t.includes('ACTUATOR'))) return 'LIFTGATE';
+  if (t.includes('ALTERNATOR')) return 'ALTERNATOR';
+  if (t.includes('STARTER')) return 'STARTER';
+  if (t.includes('BLOWER MOTOR')) return 'BLOWER';
+  if (t.includes('NAVIGATION') || (t.includes('NAV') && t.includes('MODULE'))) return 'NAV';
+  if (t.includes('SUN VISOR') || t.includes('SUNVISOR') || t.includes('SUN-VISOR')) return 'VISOR';
+  return null;
+}
+
+// Make normalization — title case, matching corgi VIN decoder output
+var MAKE_NORMALIZE = {
+  'chevrolet': 'Chevrolet', 'chevy': 'Chevrolet', 'dodge': 'Dodge', 'ram': 'Ram',
+  'chrysler': 'Chrysler', 'jeep': 'Jeep', 'ford': 'Ford', 'gmc': 'GMC',
+  'toyota': 'Toyota', 'honda': 'Honda', 'nissan': 'Nissan', 'bmw': 'BMW',
+  'mercedes': 'Mercedes-Benz', 'mercedes-benz': 'Mercedes-Benz', 'mazda': 'Mazda',
+  'kia': 'Kia', 'hyundai': 'Hyundai', 'subaru': 'Subaru', 'mitsubishi': 'Mitsubishi',
+  'infiniti': 'Infiniti', 'lexus': 'Lexus', 'acura': 'Acura', 'cadillac': 'Cadillac',
+  'buick': 'Buick', 'lincoln': 'Lincoln', 'volvo': 'Volvo', 'audi': 'Audi',
+  'volkswagen': 'Volkswagen', 'vw': 'Volkswagen', 'mini': 'Mini', 'pontiac': 'Pontiac',
+  'saturn': 'Saturn', 'mercury': 'Mercury', 'scion': 'Scion', 'land rover': 'Land Rover',
+  'porsche': 'Porsche', 'jaguar': 'Jaguar', 'saab': 'Saab', 'fiat': 'Fiat',
+  'genesis': 'Genesis', 'suzuki': 'Suzuki', 'isuzu': 'Isuzu', 'oldsmobile': 'Oldsmobile',
+  'hummer': 'Hummer', 'plymouth': 'Plymouth', 'datsun': 'Datsun', 'renault': 'Renault',
+};
+
+// Multi-word models must come before their single-word components
+var MODEL_PATTERNS = [
+  // Multi-word (check first — Grand Cherokee BEFORE Cherokee)
+  'Grand Cherokee', 'Grand Caravan', 'Grand Prix', 'Grand Marquis', 'Grand Vitara',
+  'Town & Country', 'Town and Country', 'Transit Connect',
+  'Crown Victoria', 'Monte Carlo', 'El Camino', 'Park Avenue',
+  'Land Cruiser', 'Rav4', 'RAV4', '4Runner',
+  'Santa Fe', 'Wrangler Unlimited',
+  'PT Cruiser', 'Pt Cruiser',
+  'CR-V', 'CR-Z', 'HR-V', 'BR-V',
+  'C-Max', 'E-Series', 'F-Super Duty',
+  'Seville', 'Deville', 'DeVille',
+  'XC90', 'XC60', 'XC70', 'XC40', 'S60', 'S80', 'S40', 'V60', 'V70',
+  'IS250', 'IS350', 'ES350', 'ES300', 'GS350', 'GS300', 'LS460', 'LS430', 'RX350', 'RX330', 'RX300', 'GX470', 'GX460', 'LX570', 'LX470', 'NX200', 'NX300',
+  'TL', 'TLX', 'TSX', 'MDX', 'RDX', 'RSX', 'ZDX', 'ILX', 'CDX', 'RL',
+  'G35', 'G37', 'G25', 'M35', 'M45', 'M37', 'Q50', 'Q60', 'Q70', 'QX4', 'QX56', 'QX60', 'QX80', 'FX35', 'FX45', 'EX35',
+  '3 Series', '5 Series', '7 Series', 'X3', 'X5', 'X1', 'X6', 'X4', 'Z3', 'Z4',
+  // Trucks with tonnage
+  'Silverado 3500', 'Silverado 2500', 'Silverado 1500',
+  'Sierra 3500', 'Sierra 2500', 'Sierra 1500',
+  'Ram 3500', 'Ram 2500', 'Ram 1500',
+  'F-350', 'F-250', 'F-150', 'F350', 'F250', 'F150',
+  'E-150', 'E-250', 'E-350', 'E150', 'E250', 'E350',
+  // Single-word models
+  'Silverado', 'Sierra', 'Tahoe', 'Suburban', 'Yukon', 'Avalanche', 'Colorado', 'Canyon',
+  'Equinox', 'Traverse', 'Trailblazer', 'Blazer', 'Trax', 'Envoy', 'Acadia', 'Terrain',
+  'Enclave', 'Encore', 'LaCrosse', 'Regal', 'Verano', 'Lucerne', 'LeSabre', 'Rendezvous',
+  'Impala', 'Malibu', 'Cruze', 'Cobalt', 'Sonic', 'Spark', 'Bolt', 'Camaro', 'Corvette',
+  'Escalade', 'CTS', 'ATS', 'XTS', 'SRX', 'XT5', 'XT4', 'CT5', 'CT4',
+  'Navigator', 'Aviator', 'Corsair', 'Nautilus', 'Continental', 'MKZ', 'MKX', 'MKC', 'MKT',
+  'Explorer', 'Expedition', 'Escape', 'Edge', 'Flex', 'Fusion', 'Focus', 'Taurus',
+  'Mustang', 'Ranger', 'Bronco', 'Maverick', 'Excursion', 'Windstar', 'Freestar', 'Freestyle',
+  'Charger', 'Challenger', 'Durango', 'Dakota', 'Magnum', 'Caliber', 'Avenger', 'Dart',
+  'Caravan', 'Journey', 'Nitro', 'Neon', 'Stratus', 'Sebring', 'Intrepid', '300', '200',
+  'Cherokee', 'Wrangler', 'Compass', 'Renegade', 'Gladiator', 'Liberty', 'Commander', 'Patriot',
+  'Pacifica', 'Voyager', 'Aspen',
+  'Camry', 'Corolla', 'Prius', 'Avalon', 'Celica', 'Solara', 'Yaris', 'Matrix', 'Echo',
+  'Highlander', 'Sequoia', 'Sienna', 'Venza', 'Tacoma', 'Tundra',
+  'Civic', 'Accord', 'Pilot', 'Passport', 'Odyssey', 'Ridgeline', 'Element', 'Fit', 'Insight',
+  'Altima', 'Maxima', 'Sentra', 'Versa', 'Rogue', 'Murano', 'Pathfinder', 'Frontier',
+  'Armada', 'Titan', 'Juke', 'Kicks', 'Xterra', '350Z', '370Z',
+  'Sonata', 'Elantra', 'Tucson', 'Veloster', 'Accent', 'Genesis', 'Azera', 'Veracruz',
+  'Sportage', 'Sorento', 'Optima', 'Forte', 'Soul', 'Rio', 'Telluride', 'Seltos', 'Stinger',
+  'Outback', 'Forester', 'Impreza', 'Legacy', 'Crosstrek', 'Ascent', 'WRX', 'BRZ', 'Tribeca',
+  'Lancer', 'Outlander', 'Eclipse', 'Galant', 'Montero', 'Endeavor',
+  'Jetta', 'Passat', 'Beetle', 'Tiguan', 'Atlas', 'Golf', 'GTI', 'CC', 'Touareg', 'Routan',
+  'Cooper',
+  'Mazda3', 'Mazda6', 'CX-5', 'CX-9', 'CX-7', 'CX-3', 'MX-5', 'Tribute', 'Protege',
+  '3', '5', '6', 'RX-8',
+  'Montego', 'Mariner', 'Mountaineer', 'Sable', 'Milan',
+  '280ZX', 'Stanza', 'Pulsar',
+];
+
+function extractMake(titleLower) {
+  // Check multi-word makes first
+  var multiWord = ['land rover', 'mercedes-benz'];
+  for (var i = 0; i < multiWord.length; i++) {
+    if (titleLower.includes(multiWord[i])) return MAKE_NORMALIZE[multiWord[i]];
+  }
+  // Then single-word makes via word boundary
+  var keys = Object.keys(MAKE_NORMALIZE);
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    if (key.includes(' ')) continue; // skip multi-word, already checked
+    var re = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (re.test(titleLower)) return MAKE_NORMALIZE[key];
+  }
+  return null;
+}
+
+function extractModel(title, make) {
+  if (!title || !make) return null;
+  var titleUpper = title.toUpperCase();
+  // Try multi-word patterns first, then single-word
+  for (var i = 0; i < MODEL_PATTERNS.length; i++) {
+    var pattern = MODEL_PATTERNS[i];
+    var patUpper = pattern.toUpperCase();
+    var re = new RegExp('\\b' + patUpper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+    if (re.test(titleUpper)) {
+      // Return title-case version from patterns array
+      return pattern;
+    }
+  }
+  return null;
+}
+
+/**
+ * extractStructuredFields(title) — Clean Pipe Phase A
+ *
+ * Extracts normalized structured data from any eBay listing title.
+ * Used at WRITE TIME on YourListing, YourSale, SoldItem inserts/updates.
+ *
+ * Returns: { partNumberBase, partType, extractedMake, extractedModel }
+ * All values are nullable. Make/model output in title case to match corgi VIN decoder.
+ */
+function extractStructuredFields(title) {
+  if (!title) return { partNumberBase: null, partType: null, extractedMake: null, extractedModel: null };
+
+  // A) Part number base
+  var pns = extractPartNumbers(title);
+  var partNumberBase = pns.length > 0 ? pns[0].base : null;
+
+  // B) Part type
+  var partType = detectPartType(title);
+
+  // C) Make
+  var titleLower = title.toLowerCase();
+  var extractedMake = extractMake(titleLower);
+
+  // D) Model (only if make was found)
+  var extractedModel = extractModel(title, extractedMake);
+
+  return { partNumberBase: partNumberBase, partType: partType, extractedMake: extractedMake, extractedModel: extractedModel };
+}
+
 module.exports = {
   extractPartNumbers,
   stripRevisionSuffix,
@@ -248,4 +422,6 @@ module.exports = {
   modelMatches,
   buildStockIndex,
   lookupStockFromIndex,
+  extractStructuredFields,
+  detectPartType,
 };
