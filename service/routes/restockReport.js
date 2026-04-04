@@ -173,17 +173,18 @@ router.get('/report', async (req, res) => {
       .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${clampedDays} days'`))
       .whereNotNull('title')
       .whereRaw('"salePrice"::numeric >= 50')
-      .select('title', 'salePrice', 'soldDate', 'sku');
+      .select('title', 'salePrice', 'soldDate', 'sku', 'partNumberBase', 'partType as cpPartType', 'extractedMake', 'extractedModel');
 
     const groups = {};
     for (const sale of sales) {
       const title = sale.title || '';
-      const make = extractMake(title);
-      const model = make ? extractModel(title, make) : null;
-      let pt = extractPartType(title);
+      // Use Clean Pipe columns first, title parsing fallback
+      const make = sale.extractedMake || extractMake(title);
+      const model = sale.extractedModel || (make ? extractModel(title, make) : null);
+      let pt = (sale.cpPartType && sale.cpPartType !== 'OTHER') ? sale.cpPartType : extractPartType(title);
       if (!pt) pt = getPartLabel(title, make, model);
-      const pns = piExtractPNs(title);
-      const basePn = pns.length > 0 ? pns[0].base : null;
+      let basePn = sale.partNumberBase || null;
+      if (!basePn) { const pns = piExtractPNs(title); basePn = pns.length > 0 ? pns[0].base : null; }
       const key = `${make || '?'}|${model || ''}|${pt}|${basePn || title.substring(0, 30)}`;
 
       if (!groups[key]) {
@@ -192,23 +193,28 @@ router.get('/report', async (req, res) => {
       const g = groups[key];
       g.sold++;
       g.totalPrice += parseFloat(sale.salePrice) || 0;
-      for (const pn of pns) g.allPns.add(pn.raw);
+      if (basePn) g.allPns.add(basePn);
+      const titlePns = piExtractPNs(title);
+      for (const pn of titlePns) g.allPns.add(pn.raw);
       if (!g.lastSold || new Date(sale.soldDate) > new Date(g.lastSold)) g.lastSold = sale.soldDate;
     }
 
-    const listings = await database('YourListing').where('listingStatus', 'Active').whereNotNull('title').select('title', 'quantityAvailable', 'sku');
+    const listings = await database('YourListing').where('listingStatus', 'Active').whereNotNull('title').select('title', 'quantityAvailable', 'sku', 'partNumberBase');
     const stockByBasePn = {};
     const listingTitles = [];
     for (const l of listings) {
       const qty = parseInt(l.quantityAvailable) || 1;
       listingTitles.push({ title: (l.title || '').toUpperCase(), qty });
-      // Use shared part number extractor (handles all OEM formats)
+      // Use Clean Pipe partNumberBase column first
+      if (l.partNumberBase && l.partNumberBase.length >= 5) {
+        stockByBasePn[l.partNumberBase] = (stockByBasePn[l.partNumberBase] || 0) + qty;
+      }
+      // Also index from title PNs and SKU (backward compatible fallback)
       const pns = piExtractPNs(l.title || '');
       for (const pn of pns) {
         if (pn.base) stockByBasePn[pn.base] = (stockByBasePn[pn.base] || 0) + qty;
         if (pn.raw && pn.raw !== pn.base) stockByBasePn[pn.raw] = (stockByBasePn[pn.raw] || 0) + qty;
       }
-      // Also index by SKU as part number
       if (l.sku) {
         const skuBase = normalizePartNumber(l.sku);
         if (skuBase && skuBase.length >= 5) stockByBasePn[skuBase] = (stockByBasePn[skuBase] || 0) + qty;
