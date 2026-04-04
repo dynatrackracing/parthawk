@@ -162,6 +162,30 @@ async function _generateAlertsInner() {
     log.warn({ err: e.message }, 'Failed to load marks for alert generation');
   }
 
+  // RESTOCK FLAGS — parts flagged for restock matched against yard vehicles
+  try {
+    const restockFlags = await database('restock_flag')
+      .where('acknowledged', false)
+      .select('part_number_base', 'title', 'avg_sold_price', 'sold_90d', 'active_stock', 'restock_score');
+
+    for (const flag of restockFlags) {
+      const parsed = parseTitle(flag.title);
+      if (!parsed || parsed.models.length === 0) continue;
+      partsToMatch.push({
+        source: 'restock',
+        title: flag.title,
+        value: Math.round(parseFloat(flag.avg_sold_price) || 0),
+        make: parsed.make,
+        models: parsed.models,
+        yearStart: parsed.yearStart,
+        yearEnd: parsed.yearEnd,
+      });
+    }
+    log.info({ restockFlags: restockFlags.length, matched: partsToMatch.filter(p => p.source === 'restock').length }, 'Restock flags loaded');
+  } catch (e) {
+    log.warn({ err: e.message }, 'Failed to load restock flags (table may not exist)');
+  }
+
   // 3. Match want list / quarry parts against yard vehicles
   const alerts = [];
   for (const part of partsToMatch) {

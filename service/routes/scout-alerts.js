@@ -64,6 +64,12 @@ router.get('/list', async (req, res) => {
       }).orWhere(function() {
         // OVERSTOCK alerts — always show, no date filtering
         this.where('source', 'OVERSTOCK');
+      }).orWhere(function() {
+        // RESTOCK alerts — restocking flags, use bone_pile age ceiling
+        this.where('source', 'restock').andWhere(function() {
+          this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days > 0 ? Math.min(days, BONE_MAX_DAYS) : BONE_MAX_DAYS} days'`))
+            .orWhereNull('vehicle_set_date');
+        });
       });
     });
     if (yard && yard !== 'all') {
@@ -87,11 +93,14 @@ router.get('/list', async (req, res) => {
         WHEN source = 'bone_pile' AND confidence = 'high' THEN 2
         WHEN source = 'bone_pile' AND confidence = 'medium' THEN 3
         WHEN source = 'bone_pile' AND confidence = 'low' THEN 4
-        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 5
-        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 6
-        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 7
+        WHEN source = 'restock' AND confidence = 'high' THEN 5
+        WHEN source = 'restock' AND confidence = 'medium' THEN 6
+        WHEN source = 'restock' AND confidence = 'low' THEN 7
+        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 8
+        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 9
+        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 10
         WHEN source = 'OVERSTOCK' THEN 1
-        ELSE 8
+        ELSE 11
       END
     `)
     .orderBy('part_value', 'desc')
@@ -134,6 +143,7 @@ router.get('/list', async (req, res) => {
   const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).unique_parts) || 0;
   const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).unique_parts) || 0;
   const overstockCount = parseInt((sourceCounts.find(s => s.source === 'OVERSTOCK') || {}).unique_parts) || 0;
+  const restockCount = parseInt((sourceCounts.find(s => s.source === 'restock') || {}).unique_parts) || 0;
 
   // Tag perch alerts with recent sales
   let justSoldCount = 0;
@@ -165,7 +175,7 @@ router.get('/list', async (req, res) => {
     success: true,
     alerts: byYard,
     yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
-    boneCount, perchCount, markCount, overstockCount, justSoldCount,
+    boneCount, perchCount, markCount, overstockCount, restockCount, justSoldCount,
     total, page, totalPages: Math.ceil(total / perPage),
     lastGenerated
   });
