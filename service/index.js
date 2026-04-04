@@ -768,21 +768,8 @@ app.use('/return-intelligence', require('./routes/return-intelligence'));
 app.use('/flyway', require('./routes/flyway'));
 app.use('/phoenix', require('./routes/phoenix'));
 
-// ═══ SPA CATCH-ALL — MUST BE LAST ═══
-// All API routes are registered above this point.
-// Static files + SPA fallback below catches everything else.
-app.use(express.static(path.resolve(__dirname, '../client/build'), {
-  maxAge: '1h',
-  setHeaders: (res, filePath) => {
-    if (filePath.includes('/static/js/') || filePath.includes('/static/css/')) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    }
-  }
-}));
+// ═══ ROOT REDIRECT ═══
 app.get('/', (req, res) => res.redirect('/login'));
-app.get('/*', (req, res) => {
-  res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
-});
 
 
 async function start() {
