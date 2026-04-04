@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## [Clean Pipe Phase B] Backfill Existing Records — 2026-04-04
+- Backfilled partNumberBase, partType, extractedMake, extractedModel on all YourSale (14,603), YourListing (4,365), SoldItem (1,248) rows
+- Script: service/scripts/backfill-clean-pipe.js (rerunnable, skips already-processed rows)
+- partType='OTHER' used as processed sentinel for rows with no detectable part type
+- Cross-table joins by partNumberBase now functional (verified: Ford ECM 623 sales / 77 competitor / 110 in stock)
+
+---
+
 ## [Clean Pipe Phase A] Schema + Extraction Utility — 2026-04-04
 - Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
 - 8 indexes for cross-table joins (partNumberBase, partType, extractedMake)
