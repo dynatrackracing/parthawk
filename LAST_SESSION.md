@@ -1,57 +1,22 @@
 # LAST SESSION — 2026-04-04
 
-## Clean Pipe — COMPLETE (Phases A through E5)
-
-### Phase A: Schema + Extraction Utility
-- Added partNumberBase, partType, extractedMake, extractedModel to YourListing, YourSale, SoldItem
-- Created extractStructuredFields() in partIntelligence.js
-- 8 indexes created for cross-table joins
-
-### Phase B: Backfill Existing Records
-- Backfilled ~20K existing rows across 3 tables
-- Cross-table PN joins verified working
-
-### Phase C: Wire Insert Paths
-- YourDataManager, SoldItemsManager, AutolumenImportService — all 8 insert paths wired
-- All new data auto-normalized at write time
-
-### Phase D: Cache Key Standardization
-- Normalized 590 market_demand_cache keys (stripped spaces/dashes/dots)
-- Added key_type column (pn/ymm)
-- Updated all cache readers and writers
-
-### Phase E1: Sniper PN Cleanup
-- sanitizePartNumberForSearch(): strips junk PNs, Ford ECU suffix stripping
-- deduplicatePNQueue(): removes dash variant duplicates
-- Wired into sniper queue builder
-
-### Phase E2: Stock Index Optimization
-- buildStockIndex() reads columns first, ~2,400 fewer regex parses per load
-
-### Phase E3: Attack List Demand Queries
-- buildSalesIndex() reads columns first, ~14,600 fewer regex parses per load
-
-### Phase E4: Competitor Intel Routes
-- gap-intel, best-sellers, emerging group by partNumberBase with title fallback
-
-### Phase E5: Phoenix PN Joins
-- SoldItem matching uses partNumberBase column lookup, title scan fallback
-- Standalone group creation uses extractedMake/partType columns
+## Attack List Scoring Upgrades (DEPLOYED)
+- **Stock penalty scaling**: 5% (1 in stock) → 70% (5+ in stock) multiplicative reduction
+- **Fresh arrival bonus**: +10% for ≤3 days, +5% for ≤7, +2% for ≤14 days old
+- **COGS yard factor**: cheap yards (low entry fee + tax) get +5%, expensive get -5%
+- All 3 factors applied multiplicatively after additive scoring
+- Yard profiles loaded once per getAllYardsAttackList() call (entry_fee + tax_rate)
+- _yardCostFactor attached to vehicles before scoreVehicle() is called
+- Verified: 0 NaN scores, healthy G/Y/O/R distribution across 1,500 vehicles
 
 ## Also done this session
-- Active Inventory CSV Import on /admin/import (368 Autolumen listings imported)
-- Zero quantity = Ended (universal fix across API sync and CSV import)
-
-## Summary Impact
-- ~17,000 fewer regex parses per attack list load
-- Cross-table joins by partNumberBase across YourSale, YourListing, SoldItem, market_demand_cache
-- Sniper queue cleaned of junk PNs and duplicates
-- All new data auto-normalized at write time via extractStructuredFields()
-- All existing data backfilled
+- Clean Pipe Phases A-E5 complete (see previous LAST_SESSION for details)
+- Active Inventory CSV Import (368 Autolumen listings)
+- Zero quantity = Ended universal rule
 
 ## What's next
-- Run sniper again to validate improved hit rate
-- Monitor attack list performance improvement
+- Run sniper again to validate improved hit rate (Clean Pipe E1)
+- Monitor stock penalty impact on puller behavior
 - Intelligence tuning (5 diagnostic items from 4/3 session)
 
 ## Open items
@@ -61,10 +26,9 @@
 - QUARRY data source needs rethink (queries frozen Item table)
 
 ## Architecture reminders
-- extractStructuredFields() is in partIntelligence.js — single source of truth for title extraction
-- sanitizePartNumberForSearch() is in partIntelligence.js — single source for PN validation
-- Make normalization: title case matching corgi VIN decoder (Chevrolet, Toyota, Jeep)
-- market_demand_cache keys normalized (no dashes/spaces/dots for PN type)
-- key_type column: 'pn' for part numbers, 'ymm' for pipe-delimited keys
-- detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
-- Universal rule: Active listing status requires quantity > 0. qty=0 → Ended (enforced in syncListings + CSV import)
+- Stock penalty uses max in_stock across all parts on the vehicle
+- Fresh arrival uses vehicle.date_added (when yard first listed it), not last_seen
+- COGS factor only applies in getAllYardsAttackList() (multi-yard), not getAttackList() (single-yard)
+- _yardCostFactor is a transient property set on vehicle objects before scoring — not persisted
+- Score still capped at 0-100 after all multiplicative factors
+- Color codes driven by totalValue, not score (green=$800+, yellow=$500+, orange=$250+)

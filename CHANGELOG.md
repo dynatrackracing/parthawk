@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Attack List Scoring Upgrades — 2026-04-04
+- Stock penalty scaling: 5% (1 in stock) → 70% (5+ in stock) multiplicative reduction on score
+- Fresh arrival bonus: +10% for ≤3 days, +5% for ≤7, +2% for ≤14 days
+- COGS yard factor: cheap yards +5%, expensive -5% (uses entry_fee + tax_rate)
+- All factors multiplicative, applied after additive scoring, capped 0-100
+- Yard profiles loaded once per call (no per-vehicle queries)
+- Verified: 0 NaN, healthy distribution across 1,500 vehicles
+
+---
+
 ## [Clean Pipe E5] Phoenix PN Joins — 2026-04-04
 - Phoenix SoldItem matching uses partNumberBase column for direct lookup (replaces title scanning)
 - Standalone group creation uses extractedMake/partType columns
