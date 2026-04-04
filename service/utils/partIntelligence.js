@@ -414,6 +414,99 @@ function extractStructuredFields(title) {
   return { partNumberBase: partNumberBase, partType: partType, extractedMake: extractedMake, extractedModel: extractedModel };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SNIPER PN CLEANUP — Clean Pipe Phase E1
+// ═══════════════════════════════════════════════════════════════
+
+// Known make/model names that are NOT part numbers
+var JUNK_WORDS = new Set([
+  'SILVERADO','TAHOE','SUBURBAN','YUKON','SIERRA','CAMARO','CORVETTE','IMPALA','MALIBU',
+  'EQUINOX','TRAVERSE','TRAILBLAZER','BLAZER','COLORADO','CANYON','ACADIA','TERRAIN',
+  'ENCLAVE','ENCORE','ESCALADE','AVALANCHE','ENVOY','DENALI',
+  'CAMRY','COROLLA','HIGHLANDER','SEQUOIA','TACOMA','TUNDRA','PRIUS','SIENNA','AVALON',
+  'CIVIC','ACCORD','PILOT','ODYSSEY','RIDGELINE','ELEMENT','PASSPORT',
+  'MUSTANG','EXPLORER','EXPEDITION','ESCAPE','EDGE','FUSION','FOCUS','RANGER','BRONCO',
+  'CHARGER','CHALLENGER','DURANGO','DAKOTA','MAGNUM','WRANGLER','CHEROKEE','COMPASS',
+  'RENEGADE','GLADIATOR','LIBERTY','COMMANDER','PATRIOT','PACIFICA','JOURNEY','CALIBER',
+  'ALTIMA','MAXIMA','SENTRA','ROGUE','MURANO','PATHFINDER','FRONTIER','ARMADA','TITAN',
+  'SONATA','ELANTRA','TUCSON','SPORTAGE','SORENTO','OPTIMA','FORTE','SOUL',
+  'OUTBACK','FORESTER','IMPREZA','LEGACY','CROSSTREK','ASCENT',
+  'JETTA','PASSAT','BEETLE','TIGUAN','GOLF','TOUAREG',
+  'LANCER','OUTLANDER','ECLIPSE','GALANT',
+  'NAVIGATOR','AVIATOR','CORSAIR','NAUTILUS',
+  'RX400H','RX350','IS250','GS350','ES350','LS460','GX470','NX200',
+  'FORD','CHEVY','CHEVROLET','DODGE','CHRYSLER','JEEP','RAM','TOYOTA','HONDA','NISSAN',
+  'BMW','MAZDA','KIA','HYUNDAI','SUBARU','MITSUBISHI','INFINITI','LEXUS','ACURA',
+  'CADILLAC','BUICK','LINCOLN','VOLVO','AUDI','VOLKSWAGEN','PONTIAC','SATURN','MERCURY',
+  'MODULE','CONTROL','ASSEMBLY','TESTED','PROGRAMMED','GENUINE','REPLACEMENT',
+]);
+
+/**
+ * sanitizePartNumberForSearch(pn) — Clean Pipe Phase E1
+ *
+ * Takes a raw partNumberBase and returns a clean, searchable version.
+ * Returns null if the PN is junk (not searchable on eBay).
+ */
+function sanitizePartNumberForSearch(pn) {
+  if (!pn) return null;
+
+  // A) Normalize: strip dashes, spaces, dots, uppercase
+  var norm = pn.replace(/[\s\-\.]/g, '').toUpperCase();
+
+  // B) Reject junk
+  if (norm.length < 5) return null;
+  if (norm.length > 20) return null;
+  if (JUNK_WORDS.has(norm)) return null;
+  // Purely numeric year (4 digits, 1900-2099)
+  if (/^\d{4}$/.test(norm) && parseInt(norm) >= 1900 && parseInt(norm) <= 2099) return null;
+  // Purely numeric and too short (< 6 digits)
+  if (/^\d+$/.test(norm) && norm.length < 6) return null;
+  // Only letters, no digits — likely a word not a PN
+  if (/^[A-Z]+$/.test(norm)) return null;
+  // Looks like a VIN (17 chars alphanumeric)
+  if (norm.length === 17 && /^[A-HJ-NPR-Z0-9]+$/.test(norm)) return null;
+
+  // C) Ford ECU suffix stripping
+  var ford12A650 = norm.indexOf('12A650');
+  if (ford12A650 >= 0) {
+    norm = norm.substring(0, ford12A650 + 6); // keep through "12A650"
+  }
+  var ford14A067 = norm.indexOf('14A067');
+  if (ford14A067 >= 0) {
+    norm = norm.substring(0, ford14A067 + 6); // keep through "14A067"
+  }
+
+  // D) Final length check after stripping
+  if (norm.length < 5) return null;
+
+  return norm;
+}
+
+/**
+ * deduplicatePNQueue(entries) — Clean Pipe Phase E1
+ *
+ * Takes an array of {base, raw, price, ...} objects.
+ * Sanitizes PNs, removes junk, deduplicates (keeps highest price).
+ * Returns filtered, deduped array with sanitized .base values.
+ */
+function deduplicatePNQueue(entries) {
+  var groups = {};
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var clean = sanitizePartNumberForSearch(entry.base);
+    if (!clean) continue;
+    if (!groups[clean] || (entry.price || 0) > (groups[clean].price || 0)) {
+      groups[clean] = { base: clean, raw: entry.raw, price: entry.price, sampleTitle: entry.sampleTitle };
+    }
+  }
+  var result = [];
+  var keys = Object.keys(groups);
+  for (var k = 0; k < keys.length; k++) {
+    result.push(groups[keys[k]]);
+  }
+  return result;
+}
+
 module.exports = {
   extractPartNumbers,
   stripRevisionSuffix,
@@ -424,4 +517,6 @@ module.exports = {
   lookupStockFromIndex,
   extractStructuredFields,
   detectPartType,
+  sanitizePartNumberForSearch,
+  deduplicatePNQueue,
 };

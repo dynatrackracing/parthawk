@@ -38,7 +38,7 @@ const knex = require('knex')({
   pool: { min: 1, max: 3 },
 });
 
-const { extractPartNumbers } = require('../utils/partIntelligence');
+const { extractPartNumbers, sanitizePartNumberForSearch, deduplicatePNQueue } = require('../utils/partIntelligence');
 // Reuse the same exclude filter from OpportunityService — single source of truth
 // This skips complete engines, complete transmissions, and body panels
 // Everything else (modules, sensors, pumps, etc.) passes through
@@ -154,22 +154,29 @@ async function main() {
 
   console.log(`   ${items.rows.length} inventory items → ${skippedExcluded} excluded (engines/trans/panels) → ${matchedPNs.size} unique part numbers\n`);
 
-  // 4. Filter to PNs not in cache (or stale >7 days) — batch lookup
-  console.log('3. Checking market_demand_cache for stale/missing...');
-  const staleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // 4. Sanitize and deduplicate PNs, then filter against cache
+  console.log('3. Sanitizing and deduplicating PNs...');
 
-  // Load all fresh cache entries in one query
+  // Build raw queue from matchedPNs
+  const rawQueue = [];
+  for (const [base, data] of matchedPNs) {
+    if (data.price < 50) continue;
+    rawQueue.push({ base, raw: data.raw, price: data.price, sampleTitle: data.titles[0] || base });
+  }
+
+  // Sanitize + deduplicate (strips junk, Ford ECU suffixes, dash variants)
+  const cleanQueue = deduplicatePNQueue(rawQueue);
+  const junkRemoved = rawQueue.length - cleanQueue.length;
+  console.log(`   ${rawQueue.length} raw PNs → ${cleanQueue.length} after sanitize+dedup (${junkRemoved} junk/dupes removed)`);
+
+  // Check against cache
+  const staleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const freshCache = await knex('market_demand_cache')
     .where('last_updated', '>=', staleCutoff)
     .select('part_number_base');
   const freshSet = new Set(freshCache.map(r => r.part_number_base));
 
-  const toScrape = [];
-  for (const [base, data] of matchedPNs) {
-    if (data.price < 50) continue;
-    if (freshSet.has(base)) continue;
-    toScrape.push({ base, raw: data.raw, price: data.price, sampleTitle: data.titles[0] || base });
-  }
+  const toScrape = cleanQueue.filter(entry => !freshSet.has(entry.base));
 
   // Sort by price descending (highest value first)
   toScrape.sort((a, b) => b.price - a.price);
@@ -216,11 +223,12 @@ async function main() {
         // Write to cache
         await knex.raw(`
           INSERT INTO market_demand_cache
-            (id, part_number_base, ebay_avg_price, ebay_sold_90d,
+            (id, part_number_base, key_type, ebay_avg_price, ebay_sold_90d,
              ebay_median_price, ebay_min_price, ebay_max_price, sales_per_week,
              source, last_updated, "createdAt")
-          VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, ?, 'yard_sniper', NOW(), NOW())
+          VALUES (gen_random_uuid(), ?, 'pn', ?, ?, ?, ?, ?, ?, 'yard_sniper', NOW(), NOW())
           ON CONFLICT (part_number_base) DO UPDATE SET
+            key_type = 'pn',
             ebay_avg_price = EXCLUDED.ebay_avg_price,
             ebay_sold_90d = EXCLUDED.ebay_sold_90d,
             ebay_median_price = EXCLUDED.ebay_median_price,
