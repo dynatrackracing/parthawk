@@ -67,6 +67,15 @@ class YourDataManager {
       this.log.warn({ err: err.message }, 'Cache auto-resolution failed (non-fatal)');
     }
 
+    // Auto-sync QUARRY velocity → want list (CRITICAL + LOW parts)
+    try {
+      const { quarrySync } = require('../routes/restockReport');
+      const quarryResult = await quarrySync();
+      this.log.info({ quarryResult }, 'QUARRY auto-sync complete after YourData sync');
+    } catch (err) {
+      this.log.warn({ err: err.message }, 'QUARRY auto-sync failed (non-fatal)');
+    }
+
     this.log.info({ results }, 'Completed full sync of your eBay data');
     return results;
   }

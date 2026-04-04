@@ -2,17 +2,31 @@
 
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
+const { log } = require('../lib/logger');
 
 /**
  * THE QUARRY — Restock Intelligence
  *
  * Data source: YourSale (own sales) cross-referenced against YourListing (active stock).
- * Groups by Clean Pipe columns: partNumberBase, extractedMake, extractedModel.
- * Shows parts sold in last N days that are currently out of stock.
- * Sorted by revenue impact (times_sold x avg_price DESC).
+ * Velocity ratio: sold_count / in_stock over N days.
+ * CRITICAL (ratio>=4 or 0 stock+sold 3x+$100+): auto-add to want list
+ * LOW (ratio>=2 or 0 stock): auto-add to want list
+ * WATCH (ratio>=1): show on page, manual add
+ * FINE (ratio<1): filtered out
  *
  * No Item table dependency. No title scanning. Clean Pipe only.
  */
+
+function getUrgency(soldCount, inStock, avgPrice) {
+  if (inStock === 0 && soldCount >= 3 && avgPrice >= 100) return 'CRITICAL';
+  if (inStock === 0 && soldCount >= 2) return 'CRITICAL';
+  if (inStock === 0) return 'LOW';
+  var ratio = soldCount / inStock;
+  if (ratio >= 4) return 'CRITICAL';
+  if (ratio >= 2) return 'LOW';
+  if (ratio >= 1) return 'WATCH';
+  return null;
+}
 
 router.get('/report', async (req, res) => {
   try {
@@ -116,55 +130,53 @@ router.get('/report', async (req, res) => {
         yearRange = s[0] === s[s.length - 1] ? String(s[0]) : s[0] + '-' + s[s.length - 1];
       }
 
+      // Velocity ratio
+      const velocityRatio = stock === 0 ? 999 : Math.round((timesSold / stock) * 100) / 100;
+      const urgency = getUrgency(timesSold, stock, avgPrice);
+
       // === SCORING: price is king ===
       let score = 0;
-      // Price (dominant factor, max 35)
       score += avgPrice >= 500 ? 35 : avgPrice >= 300 ? 28 : avgPrice >= 200 ? 22 : avgPrice >= 150 ? 15 : avgPrice >= 100 ? 10 : 5;
-      // Stock urgency (max 30)
       score += stock === 0 ? 30 : stock === 1 ? 20 : (timesSold > stock ? 10 : 0);
-      // Demand volume (max 20)
       score += timesSold >= 4 ? 20 : timesSold >= 3 ? 15 : timesSold >= 2 ? 10 : 5;
-      // Recency (max 15)
       const daysSince = lastSold ? Math.floor((Date.now() - new Date(lastSold).getTime()) / 86400000) : 99;
       score += daysSince <= 3 ? 15 : daysSince <= 7 ? 12 : daysSince <= 14 ? 8 : 4;
       score = Math.min(100, score);
-
-      // Floor rules: high-value parts always surface
       if (avgPrice >= 500 && timesSold >= 1 && stock <= 1) score = Math.max(score, 85);
       if (avgPrice >= 300 && timesSold >= 1 && stock <= 1) score = Math.max(score, 75);
       if (avgPrice >= 200 && timesSold >= 2 && stock === 0) score = Math.max(score, 75);
 
-      const action = stock === 0 ? 'RESTOCK NOW' : stock === 1 ? 'LOW STOCK' : (timesSold > stock ? 'SELLING FAST' : 'MONITOR');
+      // Filter out parts where velocity is FINE
+      if (!urgency) continue;
 
       items.push({
-        score, action, make, model, partType,
+        score, urgency, make, model, partType,
         basePn: pn, variantPns: [], yearRange,
-        sold7d: timesSold, activeStock: stock, avgPrice,
+        timesSold, inStock: stock, velocityRatio, avgPrice,
         revenue: Math.round(totalRevenue),
         daysSinceSold: daysSince, sampleTitle,
         marketPrice, lastSold,
       });
     }
 
-    // Filter: out of stock, low stock, high-value, or selling faster than stocked
-    const filtered = items.filter(i => i.activeStock <= 1 || i.sold7d > i.activeStock || i.avgPrice >= 300);
-    filtered.sort((a, b) => b.score - a.score || b.revenue - a.revenue);
-    const top = filtered.slice(0, 100);
+    // Sort: urgency tier (CRITICAL first), then revenue impact
+    const urgencyOrder = { CRITICAL: 0, LOW: 1, WATCH: 2 };
+    items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.revenue - a.revenue);
+    const top = items.slice(0, 200);
 
     // Tier assignment
-    const tiers = { green: [], yellow: [], orange: [] };
+    const tiers = { critical: [], low: [], watch: [] };
     for (const item of top) {
-      if (item.score >= 75) { item.tier = 'green'; tiers.green.push(item); }
-      else if (item.score >= 60) { item.tier = 'yellow'; tiers.yellow.push(item); }
-      else { item.tier = 'orange'; tiers.orange.push(item); }
+      tiers[item.urgency.toLowerCase()].push(item);
     }
 
     res.json({
       success: true, generatedAt: new Date().toISOString(), days,
       period: days === 1 ? 'Last 24 hours' : `Last ${days} days`,
       tiers,
+      items: top,
       summary: {
-        green: tiers.green.length, yellow: tiers.yellow.length, orange: tiers.orange.length,
+        critical: tiers.critical.length, low: tiers.low.length, watch: tiers.watch.length,
         total: top.length, salesAnalyzed, activeListings: activeListingCount,
       },
     });
@@ -172,6 +184,130 @@ router.get('/report', async (req, res) => {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
+
+/**
+ * POST /restock/quarry-sync
+ * Auto-sync CRITICAL and LOW velocity parts → restock_want_list.
+ * Removes quarry_auto entries that have been restocked (velocity dropped below LOW).
+ */
+router.post('/quarry-sync', async (req, res) => {
+  try {
+    const result = await quarrySync();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    log.error({ err: err.message }, 'quarry-sync failed');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+async function quarrySync() {
+  const days = 90;
+
+  // Run velocity query
+  const salesResult = await database.raw(`
+    SELECT ys."partNumberBase", ys."partType", ys."extractedMake", ys."extractedModel",
+      COUNT(*)::int AS times_sold,
+      ROUND(AVG(ys."salePrice"::numeric), 2) AS avg_price,
+      MAX(ys."soldDate") AS last_sold,
+      MIN(ys.title) AS sample_title
+    FROM "YourSale" ys
+    WHERE ys."soldDate" >= NOW() - INTERVAL '1 day' * ?
+      AND ys."partNumberBase" IS NOT NULL AND ys."partNumberBase" != ''
+      AND ys."salePrice"::numeric >= 50
+    GROUP BY ys."partNumberBase", ys."partType", ys."extractedMake", ys."extractedModel"
+  `, [days]);
+
+  const stockResult = await database.raw(`
+    SELECT yl."partNumberBase", yl."extractedMake", yl."extractedModel",
+      SUM(COALESCE(yl."quantityAvailable"::int, 1))::int AS stock
+    FROM "YourListing" yl
+    WHERE yl."listingStatus" = 'Active'
+      AND yl."partNumberBase" IS NOT NULL AND yl."partNumberBase" != ''
+    GROUP BY yl."partNumberBase", yl."extractedMake", yl."extractedModel"
+  `);
+
+  const stockByPn = {};
+  for (const row of (stockResult.rows || [])) {
+    const key = `${row.partNumberBase}|${row.extractedMake || ''}|${row.extractedModel || ''}`;
+    stockByPn[key] = parseInt(row.stock) || 0;
+  }
+
+  let criticalCount = 0, lowCount = 0, watchCount = 0, autoAdded = 0;
+
+  for (const g of (salesResult.rows || [])) {
+    const pn = g.partNumberBase;
+    const make = g.extractedMake || '';
+    const model = g.extractedModel || '';
+    const timesSold = parseInt(g.times_sold) || 0;
+    const avgPrice = parseFloat(g.avg_price) || 0;
+    const key = `${pn}|${make}|${model}`;
+    const stock = stockByPn[key] || 0;
+
+    const urgency = getUrgency(timesSold, stock, avgPrice);
+    if (!urgency) continue;
+
+    if (urgency === 'CRITICAL') criticalCount++;
+    else if (urgency === 'LOW') lowCount++;
+    else if (urgency === 'WATCH') watchCount++;
+
+    // Auto-add CRITICAL and LOW to want list
+    if (urgency === 'CRITICAL' || urgency === 'LOW') {
+      // Build a title that parseTitle() in ScoutAlertService can match to yard vehicles
+      const sampleTitle = g.sample_title || '';
+      const titleForWantList = sampleTitle || [make, model, g.partType, pn].filter(Boolean).join(' ');
+
+      try {
+        // Check if already exists (by title prefix match — same dedup as ScoutAlertService)
+        const existing = await database('restock_want_list')
+          .whereRaw('LOWER(LEFT(title, 40)) = LOWER(LEFT(?, 40))', [titleForWantList])
+          .first();
+
+        if (!existing) {
+          await database('restock_want_list').insert({
+            title: titleForWantList,
+            active: true,
+            auto_generated: true,
+            notes: `[quarry_auto] ${urgency} — sold ${timesSold}x / ${stock} stock @ $${avgPrice} avg`,
+            created_at: new Date(),
+          });
+          autoAdded++;
+        }
+      } catch (e) { /* duplicate or constraint — skip */ }
+    }
+  }
+
+  // Cleanup: remove quarry_auto entries where velocity dropped below LOW (restocked)
+  let cleaned = 0;
+  try {
+    const autoEntries = await database('restock_want_list')
+      .where('auto_generated', true)
+      .where('active', true)
+      .whereRaw("notes LIKE '[quarry_auto]%'")
+      .select('id', 'title');
+
+    for (const entry of autoEntries) {
+      // Check if the part is now adequately stocked by checking current velocity
+      // Simple heuristic: if the title's first 40 chars no longer match any CRITICAL/LOW urgency item, deactivate
+      const titlePrefix = (entry.title || '').substring(0, 40).toLowerCase();
+      const stillNeeded = (salesResult.rows || []).some(function(g) {
+        const sTitle = (g.sample_title || '').substring(0, 40).toLowerCase();
+        if (sTitle !== titlePrefix) return false;
+        const key = `${g.partNumberBase}|${g.extractedMake || ''}|${g.extractedModel || ''}`;
+        const stock = stockByPn[key] || 0;
+        const urg = getUrgency(parseInt(g.times_sold) || 0, stock, parseFloat(g.avg_price) || 0);
+        return urg === 'CRITICAL' || urg === 'LOW';
+      });
+
+      if (!stillNeeded) {
+        await database('restock_want_list').where('id', entry.id).update({ active: false });
+        cleaned++;
+      }
+    }
+  } catch (e) { /* table issue — non-fatal */ }
+
+  log.info({ criticalCount, lowCount, watchCount, autoAdded, cleaned }, 'quarry-sync complete');
+  return { critical: criticalCount, low: lowCount, watch: watchCount, autoAdded, cleaned };
+}
 
 /**
  * GET /restock/found-items
@@ -202,4 +338,5 @@ router.get('/found-items', async (req, res) => {
   }
 });
 
+router.quarrySync = quarrySync;
 module.exports = router;
