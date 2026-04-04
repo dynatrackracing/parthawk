@@ -67,3 +67,4 @@
 - market_demand_cache keys normalized (no dashes/spaces/dots for PN type)
 - key_type column: 'pn' for part numbers, 'ymm' for pipe-delimited keys
 - detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
+- Universal rule: Active listing status requires quantity > 0. qty=0 → Ended (enforced in syncListings + CSV import)
