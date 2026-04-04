@@ -691,20 +691,27 @@ router.post('/import-listings', async (req, res) => {
   }
 
   const { database } = require('../database/database');
+  const store = (records[0]?.store || 'dynatrack').toLowerCase().trim();
   let imported = 0, updated = 0, errors = 0;
+  const uploadedIds = [];
 
   for (const r of records) {
     const itemId = r.ebayItemId || r.itemId;
     if (!itemId) { errors++; continue; }
+    uploadedIds.push(String(itemId));
+
+    const qty = parseInt(r.quantityAvailable || r.quantity) || 0;
+    const status = qty > 0 ? (r.listingStatus || r.status || 'Active') : 'Ended';
+
     try {
       const existing = await database('YourListing').where('ebayItemId', itemId).first();
       if (existing) {
         const upd = {
           title: r.title || existing.title,
           sku: r.sku || existing.sku,
-          quantityAvailable: parseInt(r.quantityAvailable || r.quantity) || existing.quantityAvailable,
+          quantityAvailable: qty || existing.quantityAvailable,
           currentPrice: parseFloat(r.currentPrice || r.price || 0) || existing.currentPrice,
-          listingStatus: r.listingStatus || r.status || existing.listingStatus,
+          listingStatus: status,
           startTime: r.startTime ? new Date(r.startTime) : existing.startTime,
           viewItemUrl: r.viewItemUrl || r.url || existing.viewItemUrl,
           syncedAt: new Date(),
@@ -719,9 +726,9 @@ router.post('/import-listings', async (req, res) => {
         ebayItemId: itemId,
         title: r.title || null,
         sku: r.sku || null,
-        quantityAvailable: parseInt(r.quantityAvailable || r.quantity) || 1,
+        quantityAvailable: qty || 1,
         currentPrice: parseFloat(r.currentPrice || r.price || 0) || null,
-        listingStatus: r.listingStatus || r.status || 'Active',
+        listingStatus: status,
         startTime: r.startTime ? new Date(r.startTime) : new Date(),
         viewItemUrl: r.viewItemUrl || r.url || null,
         store: r.store ? r.store.toLowerCase().trim() : 'dynatrack',
@@ -736,7 +743,24 @@ router.post('/import-listings', async (req, res) => {
     }
   }
 
-  res.json({ success: true, imported, updated, errors, total: records.length });
+  // Deactivation pass: end listings in this store that weren't in the upload
+  let deactivated = 0;
+  if (uploadedIds.length > 0 && store) {
+    try {
+      deactivated = await database('YourListing')
+        .where('store', store)
+        .where('listingStatus', 'Active')
+        .whereNotIn('ebayItemId', uploadedIds)
+        .update({ listingStatus: 'Ended', updatedAt: new Date() });
+      if (deactivated > 0) {
+        log.info({ store, deactivated }, 'CSV import: deactivated listings missing from file');
+      }
+    } catch (e) {
+      log.warn({ err: e.message }, 'CSV import: deactivation pass failed');
+    }
+  }
+
+  res.json({ success: true, imported, updated, deactivated, errors, total: records.length });
 });
 
 /**

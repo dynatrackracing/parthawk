@@ -156,7 +156,7 @@ class YourDataManager {
             sku: listing.sku,
             quantityAvailable: listing.quantityAvailable,
             currentPrice: listing.currentPrice,
-            listingStatus: listing.listingStatus,
+            listingStatus: (parseInt(listing.quantityAvailable) || 0) <= 0 ? 'Ended' : (listing.listingStatus || 'Active'),
             startTime: listing.startTime ? new Date(listing.startTime) : null,
             viewItemUrl: listing.viewItemUrl,
             store: 'dynatrack',
