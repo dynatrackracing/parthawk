@@ -859,7 +859,7 @@ async function start() {
     const priceCheckJob = schedule.scheduleJob('0 2 * * 0', async function (scheduledTime) {
       log.info({ scheduledTime }, 'Starting weekly price check cron');
       const priceCheckRunner = new PriceCheckCronRunner();
-      await priceCheckRunner.work({ batchSize: 15 });
+      await priceCheckRunner.work(); // default 35 (was 15)
     });
 
     // DISABLED: MarketDemandCronRunner used findCompletedItems (Finding API dead since Feb 2025).

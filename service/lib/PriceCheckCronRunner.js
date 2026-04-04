@@ -15,7 +15,7 @@ class PriceCheckCronRunner {
     this.lock = lock;
   }
 
-  async work({ batchSize = 15 } = {}) {
+  async work({ batchSize = 35 } = {}) {
     const key = 'priceCheckCron';
 
     if (this.lock.isBusy(key)) {
@@ -97,37 +97,41 @@ class PriceCheckCronRunner {
 
   /**
    * Get listings that need price checks, prioritized by:
-   * 1. Never checked (no PriceCheck record)
-   * 2. Most stale (oldest checkedAt)
+   * 1. Never checked (no PriceCheck record) — highest value first
+   * 2. Most stale (oldest checkedAt) — highest value first
    *
    * Omitted listings are always excluded.
    * Cache window is 7 days — cron runs weekly so each listing gets checked once per week.
    */
   async getListingsNeedingPriceCheck(limit) {
-    const cacheMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-    const cutoff = new Date(Date.now() - cacheMaxAge);
+    const { database } = require('../database/database');
 
-    // Get IDs of listings with a price check within the last 7 days
-    const recentChecks = await PriceCheck.query()
-      .select('listingId')
-      .where('checkedAt', '>', cutoff)
-      .groupBy('listingId');
+    const rows = await database.raw(`
+      SELECT yl.id, yl.title, yl."currentPrice", yl."ebayItemId",
+        MAX(pc."checkedAt") as last_checked
+      FROM "YourListing" yl
+      LEFT JOIN "PriceCheck" pc ON pc."listingId" = yl.id
+      WHERE yl."listingStatus" = 'Active'
+        AND yl."priceCheckOmitted" = false
+        AND yl."quantityAvailable" > 0
+      GROUP BY yl.id
+      HAVING MAX(pc."checkedAt") IS NULL
+        OR MAX(pc."checkedAt") < NOW() - INTERVAL '7 days'
+      ORDER BY
+        MAX(pc."checkedAt") IS NULL DESC,
+        yl."currentPrice" DESC NULLS LAST,
+        MAX(pc."checkedAt") ASC NULLS FIRST
+      LIMIT ?
+    `, [limit]);
 
-    const recentlyCheckedIds = recentChecks.map(r => r.listingId);
+    return rows.rows || [];
+  }
 
-    // Get active, non-omitted, in-stock listings that haven't been checked in the last 7 days
-    let query = YourListing.query()
-      .where('listingStatus', 'Active')
-      .where('priceCheckOmitted', false)
-      .where('quantityAvailable', '>', 0)
-      .orderBy('startTime', 'asc') // Older listings first
-      .limit(limit);
-
-    if (recentlyCheckedIds.length > 0) {
-      query = query.whereNotIn('id', recentlyCheckedIds);
-    }
-
-    return query;
+  /**
+   * Build queue for preview (same logic as getListingsNeedingPriceCheck).
+   */
+  async buildQueue(limit = 35) {
+    return this.getListingsNeedingPriceCheck(limit);
   }
 
   sleep(ms) {

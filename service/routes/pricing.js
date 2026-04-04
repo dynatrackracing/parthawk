@@ -238,4 +238,33 @@ router.get('/market-summary', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * GET /pricing/sniper-preview
+ * Dry-run: show what the next sniper batch would contain without scraping.
+ */
+router.get('/sniper-preview', async (req, res) => {
+  try {
+    const PriceCheckCronRunner = require('../lib/PriceCheckCronRunner');
+    const runner = new PriceCheckCronRunner();
+    const batchSize = parseInt(req.query.size) || 35;
+    const queue = await runner.buildQueue(batchSize);
+
+    res.json({
+      success: true,
+      batchSize,
+      queueLength: queue.length,
+      items: queue.map(item => ({
+        id: item.id,
+        ebayItemId: item.ebayItemId,
+        title: item.title,
+        currentPrice: item.currentPrice,
+        lastChecked: item.last_checked || 'never',
+      })),
+    });
+  } catch (err) {
+    log.error({ err }, 'Sniper preview error');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
