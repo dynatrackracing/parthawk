@@ -9,6 +9,13 @@
 - _yardCostFactor attached to vehicles before scoreVehicle() is called
 - Verified: 0 NaN scores, healthy G/Y/O/R distribution across 1,500 vehicles
 
+## Sniper Upgrades (DEPLOYED)
+- Batch size 15→35 (70 weeks full coverage vs 163 at old rate)
+- Queue priority: never-checked first, highest price, oldest check
+- Single LEFT JOIN SQL replaces ORM two-query approach
+- GET /pricing/sniper-preview for dry-run queue inspection
+- 2,449 active listings, all never-checked (22 total price checks ever)
+
 ## Also done this session
 - Clean Pipe Phases A-E5 complete (see previous LAST_SESSION for details)
 - Active Inventory CSV Import (368 Autolumen listings)
