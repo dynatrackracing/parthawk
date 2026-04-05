@@ -58,8 +58,9 @@ function dhNav(activePage) {
   const el = document.getElementById('dh-nav');
   if (el) { el.innerHTML = html; }
 
-  // Random splash background (1 of 8) + body::before dim layer
-  var sn = Math.floor(Math.random() * 8) + 1;
+  // Splash background — persists per session + body::before dim layer
+  var sn = sessionStorage.getItem('splash');
+  if (!sn) { sn = Math.floor(Math.random() * 8) + 1; sessionStorage.setItem('splash', sn); }
   document.body.style.backgroundImage = "url('/admin/images/splash-" + sn + ".jpg')";
   document.body.style.backgroundSize = 'cover';
   document.body.style.backgroundPosition = 'center';
@@ -72,7 +73,7 @@ function dhNav(activePage) {
   if (!document.getElementById('dh-bg-style')) {
     var s = document.createElement('style');
     s.id = 'dh-bg-style';
-    s.textContent = 'body::before{content:\"\";position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:0;pointer-events:none}body>*{position:relative;z-index:1}';
+    s.textContent = 'body::before{content:\"\";position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:0;pointer-events:none}body>*{position:relative;z-index:1}';
     document.head.appendChild(s);
   }
 }
