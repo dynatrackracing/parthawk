@@ -130,10 +130,14 @@
   .pd-verdict {
     font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; margin-left: 8px;
   }
-  .verdict-great { background: #064e3b; color: #22c55e; }
-  .verdict-good { background: #713f12; color: #eab308; }
-  .verdict-fair { background: #7c2d12; color: #f97316; }
-  .verdict-poor { background: #7f1d1d; color: #ef4444; }
+  .verdict-elite { background: #3d2e00; color: #FFD700; animation: pulse-gold 2s ease-in-out infinite; }
+  .verdict-premium { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
+  .verdict-high { background: #1a2a3d; color: #3498DB; }
+  .verdict-solid { background: #0a2e0a; color: #2ECC40; }
+  .verdict-base { background: #3d3200; color: #F1C40F; }
+  .verdict-low { background: #3d0a0a; color: #FF4136; }
+  @keyframes pulse-gold { 0%,100% { background: #3d2e00; color: #FFD700; box-shadow: 0 0 4px rgba(255,215,0,0.3); } 50% { background: #4a3800; color: #FFF0A0; box-shadow: 0 0 8px rgba(255,215,0,0.5); } }
+  @keyframes pulse-purple { 0%,100% { background: #2d1a3e; color: #C39BD3; box-shadow: 0 0 4px rgba(155,89,182,0.3); } 50% { background: #3a2250; color: #D7BDE2; box-shadow: 0 0 8px rgba(155,89,182,0.5); } }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
   .pd-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
   .pd-actions { display: flex; gap: 6px; margin-top: 6px; }
@@ -808,8 +812,8 @@
       const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
       const isEst = p.priceSource === 'estimate';
       const displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
-      const badgeVerdict = isEst ? 'EST' : displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
-      const vc = badgeVerdict === 'EST' ? 'verdict-poor' : badgeVerdict === 'GREAT' ? 'verdict-great' : badgeVerdict === 'GOOD' ? 'verdict-good' : badgeVerdict === 'FAIR' ? 'verdict-fair' : 'verdict-poor';
+      const badgeVerdict = isEst ? 'EST' : displayPrice >= 500 ? 'ELITE' : displayPrice >= 350 ? 'PREMIUM' : displayPrice >= 250 ? 'HIGH' : displayPrice >= 150 ? 'SOLID' : displayPrice >= 100 ? 'BASE' : 'LOW';
+      const vc = badgeVerdict === 'EST' ? 'verdict-low' : 'verdict-' + badgeVerdict.toLowerCase();
       const price = displayPrice;
       const pricePrefix = isEst ? '~$' : '$';
       const inStock = p.in_stock != null ? p.in_stock : 0;
@@ -1471,8 +1475,8 @@
     if (parts.length > 0) {
       parts.forEach(function(p) {
         var price = p.avg || p.mp || 0; tot += price;
-        var vd = price >= 250 ? 'GREAT' : price >= 150 ? 'GOOD' : price >= 100 ? 'FAIR' : 'POOR';
-        var cls = vd === 'GREAT' ? 'chip-green' : vd === 'GOOD' ? 'chip-yellow' : vd === 'FAIR' ? 'chip-orange' : 'chip-red';
+        var vd = price >= 500 ? 'ELITE' : price >= 350 ? 'PREMIUM' : price >= 250 ? 'HIGH' : price >= 150 ? 'SOLID' : price >= 100 ? 'BASE' : 'LOW';
+        var cls = vd === 'ELITE' ? 'chip-green' : vd === 'PREMIUM' ? 'chip-green' : vd === 'HIGH' ? 'chip-green' : vd === 'SOLID' ? 'chip-yellow' : vd === 'BASE' ? 'chip-orange' : 'chip-red';
         var badge = '';
         if (p.stk === 0 && p.sold >= 2) badge = '<span class="chip chip-green" style="font-size:9px">PULL THIS</span> ';
         else if (p.stk === 0 && p.sold >= 1) badge = '<span class="chip chip-yellow" style="font-size:9px">NEED</span> ';
