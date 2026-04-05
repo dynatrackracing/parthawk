@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix: Reject Concatenated Year Ranges as Part Numbers — 2026-04-05
+- extractPartNumbers() 8-digit regex captured "20012003" etc. as PNs from stripped year ranges
+- Added /^(19|20)\d{2}(19|20)\d{2}$/ rejection after isSkipWord check
+- Cleanup script NULLs bad partNumberBase across YourListing, YourSale, SoldItem
+- Files: partIntelligence.js, cleanup-year-range-pns.js (new)
+
+---
+
 ## Bidirectional Model Matching + Compound Models — 2026-04-05
 - COMPOUND_MODEL_MAP: F-250 Super Duty→F-250, Explorer Sport Trac→Explorer, etc.
 - getModelVariants() tries compound, base, and dash/no-dash variants

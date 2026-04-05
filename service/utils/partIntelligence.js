@@ -148,6 +148,8 @@ function extractPartNumbers(text) {
       const normalized = raw.toUpperCase().replace(/[\s.\-]/g, '');
       if (seen.has(normalized)) continue;
       if (isSkipWord(raw)) continue;
+      // Reject concatenated year ranges (20012003, 20072009, etc.)
+      if (/^(19|20)\d{2}(19|20)\d{2}$/.test(normalized)) continue;
       seen.add(normalized);
       candidates.push({ raw, normalized, base: computeBase(raw) });
     }

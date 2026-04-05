@@ -94,3 +94,9 @@
 - Added getModelVariants(): returns ordered list of model names to try, plus dash/no-dash variants
 - Bidirectional fuzzy in 3 places: findMatchedParts, sales index lookup, stock index lookup
 - Protected pairs maintained: Grand Cherokee, Transit Connect, Grand Caravan never collapse
+
+## 20:30 — Fix: Reject concatenated year ranges as part numbers
+- extractPartNumbers() 8-digit regex was capturing "20012003", "20112014" etc. as PNs
+- Added rejection: /^(19|20)\d{2}(19|20)\d{2}$/ after isSkipWord check
+- Cleanup script: service/scripts/cleanup-year-range-pns.js — NULLs bad partNumberBase values
+- Run on prod: node service/scripts/cleanup-year-range-pns.js
