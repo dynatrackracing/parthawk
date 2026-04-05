@@ -671,19 +671,23 @@ class AttackListService {
           }
         }
 
-        // Index by part number — use Clean Pipe column first
+        // Index by part number — dedup: each listing contributes qty ONCE per unique PN
+        const pnsForListing = new Set();
+
         if (listing.partNumberBase && listing.partNumberBase.length >= 5) {
-          byPartNumber[listing.partNumberBase] = (byPartNumber[listing.partNumberBase] || 0) + qty;
+          pnsForListing.add(listing.partNumberBase.toUpperCase());
         }
-        // Also index from SKU and title PNs (backward compatible, catches edge cases)
         if (listing.sku) {
           const base = normalizePartNumber(listing.sku);
-          if (base && base.length >= 5) byPartNumber[base] = (byPartNumber[base] || 0) + qty;
+          if (base && base.length >= 5) pnsForListing.add(base.toUpperCase());
         }
         const pns = piExtractPNs(title);
         for (const pn of pns) {
-          byPartNumber[pn.normalized] = (byPartNumber[pn.normalized] || 0) + qty;
-          if (pn.base !== pn.normalized) byPartNumber[pn.base] = (byPartNumber[pn.base] || 0) + qty;
+          if (pn.base && pn.base.length >= 5) pnsForListing.add(pn.base.toUpperCase());
+        }
+
+        for (const pn of pnsForListing) {
+          byPartNumber[pn] = (byPartNumber[pn] || 0) + qty;
         }
       }
     } catch (err) {

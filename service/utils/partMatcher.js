@@ -93,7 +93,7 @@ function extractPartNumbers(title) {
 // PART NUMBER NORMALIZATION (suffix stripping)
 // ============================================================
 
-const FORD_SUFFIX = /^([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,2}$/;
+const FORD_SUFFIX = /^([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,3}$/;
 const CHRYSLER_SUFFIX = /^(\d{7,})[A-Z]{2}$/;
 const HONDA_SUFFIX = /^(\d{5}-[A-Z]{2,4})-[A-Z0-9]{1,4}$/;
 // Toyota/Lexus: 89661-04840-AA → 89661-04840 (strip 2-char revision after last dash)

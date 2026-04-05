@@ -91,6 +91,25 @@ function stripRevisionSuffix(pn) {
   return pn;
 }
 
+// Use normalizePartNumber from partMatcher for canonical base computation
+const { normalizePartNumber: _normPN } = require('./partMatcher');
+
+/**
+ * Compute base PN using the canonical normalizer (keeps Ford prefix, strips only revision suffix).
+ * Falls back to stripRevisionSuffix for dashless PNs.
+ */
+function computeBase(raw) {
+  if (!raw) return raw;
+  // If the raw PN has dashes, use normalizePartNumber (handles Ford/Toyota/Honda properly)
+  if (raw.includes('-')) {
+    const normed = _normPN(raw);
+    // normalizePartNumber keeps dashes — strip them for the base
+    return normed ? normed.replace(/-/g, '') : stripRevisionSuffix(raw.toUpperCase().replace(/[\s.\-]/g, ''));
+  }
+  // Dashless: use stripRevisionSuffix
+  return stripRevisionSuffix(raw.toUpperCase().replace(/[\s.]/g, ''));
+}
+
 /**
  * Extract OEM part numbers from text.
  * @param {string} text
@@ -103,9 +122,12 @@ function extractPartNumbers(text) {
   const t = text.replace(/\s+/g, ' ').trim();
 
   const patterns = [
-    /\b[A-Z0-9]{2}\d{2}[A-Z]?-\d[A-Z]\d{3,4}-[A-Z]{1,2}\b/gi,
-    /\b[A-Z0-9]{2}\d{2}[A-Z]?\d[A-Z]\d{3,4}[A-Z]{1,2}\b/gi,
-    /\b[A-Z]{2}\d[A-Z]-\d{2}[A-Z]\d{3}-[A-Z]{1,2}\b/gi,
+    // Ford 3-segment dash: 7L3A-12A650-GJH, AL3T-15604-BD, BL3T-19H332-AB
+    /\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}-[A-Z]{1,3}\b/gi,
+    // Ford 3-segment dashless: 7L3A12A650GJH, AL3T15604BD
+    /\b[A-Z0-9]{3,5}[0-9][A-Z][0-9]{3,5}[A-Z]{1,3}\b/gi,
+    // Ford 2-segment dash: AL3Z-12A650, 7L3Z-12A650
+    /\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}\b/gi,
     /\b[A-Z]?\d{7,8}[A-Z]{2}\b/gi,
     /\b\d{5}-[A-Z0-9]{4,6}\b/gi,
     /\b\d{5}-[A-Z0-9]{2,4}-[A-Z0-9]{2,4}\b/gi,
@@ -127,7 +149,7 @@ function extractPartNumbers(text) {
       if (seen.has(normalized)) continue;
       if (isSkipWord(raw)) continue;
       seen.add(normalized);
-      candidates.push({ raw, normalized, base: stripRevisionSuffix(normalized) });
+      candidates.push({ raw, normalized, base: computeBase(raw) });
     }
   }
   return candidates;
