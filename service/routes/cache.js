@@ -36,6 +36,21 @@ router.get('/history', async (req, res) => {
 });
 
 /**
+ * GET /cache/claimed-pns
+ * Lightweight endpoint for attack list sync.
+ * Returns normalized part numbers + cache IDs for active claims.
+ */
+router.get('/claimed-pns', async (req, res) => {
+  try {
+    const service = new CacheService();
+    const result = await service.getClaimedPNs();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /cache/stats
  * Dashboard stats: counts by status, source, avg time to list.
  */

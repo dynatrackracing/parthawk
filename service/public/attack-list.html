@@ -287,27 +287,52 @@
   const activeSessions = {};
   let _currentNewestDate = null; // set per-yard during render
 
-  // Cache state: key → cache entry id
-  const cachedParts = new Map(); // "partType|MAKE|MODEL" or "PN:partNumber" → cacheId
+  // Cache state: normalized PN → cache entry id
+  let claimedPNs = new Set();
+  let claimMap = {}; // normalizedPN → cacheId
 
-  function cacheKey(partType, make, model, partNumber) {
-    if (partNumber) return 'PN:' + partNumber.trim().toUpperCase();
-    return (partType || '').toUpperCase() + '|' + (make || '').toUpperCase() + '|' + (model || '').toUpperCase();
+  // Must match backend normalizePartNumber exactly (suffix stripping, keeps dashes for Ford/Toyota/Honda)
+  function normalizePN(pn) {
+    if (!pn || typeof pn !== 'string') return '';
+    pn = pn.trim().toUpperCase().replace(/\s+/g, '');
+    if (pn.length < 4) return pn;
+    if (pn.includes('-')) {
+      // Ford: AL3T-15604-BD → AL3T-15604
+      var ford = pn.match(/^([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,2}$/);
+      if (ford) return ford[1];
+      // Toyota/Lexus: 89661-04840-AA → 89661-04840
+      var toyota = pn.match(/^(\d{5}-[A-Z0-9]{4,6})-[A-Z]{1,2}$/);
+      if (toyota) return toyota[1];
+      // Honda: 37820-RCJ-A54 → 37820-RCJ
+      var honda = pn.match(/^(\d{5}-[A-Z]{2,4})-[A-Z0-9]{1,4}$/);
+      if (honda) return honda[1];
+      return pn;
+    }
+    // Chrysler/GM: 68269652AA → 68269652
+    var chrysler = pn.match(/^(\d{7,})[A-Z]{2}$/);
+    if (chrysler) return chrysler[1];
+    // Generic: strip trailing 2 alpha after 6+ chars
+    var generic = pn.match(/^(.{6,}?)[A-Z]{2}$/);
+    if (generic) return generic[1];
+    return pn;
+  }
+
+  // Get the first usable PN from a part (may contain " / " joined PNs)
+  function partPN(p) {
+    var raw = p && (p.partNumber || p.partNumberBase);
+    if (!raw) return '';
+    // Take first PN if joined
+    var first = raw.split(/\s*\/\s*/)[0];
+    return normalizePN(first);
   }
 
   async function loadCachedParts() {
     try {
-      const res = await fetch('/cache/active');
+      const res = await fetch('/cache/claimed-pns');
       const data = await res.json();
-      if (data.success && data.claims) {
-        cachedParts.clear();
-        for (const c of data.claims) {
-          if (c.part_number) {
-            cachedParts.set('PN:' + c.part_number.toUpperCase(), c.id);
-          } else if (c.part_type && c.vehicle_make && c.vehicle_model) {
-            cachedParts.set(c.part_type.toUpperCase() + '|' + c.vehicle_make.toUpperCase() + '|' + c.vehicle_model.toUpperCase(), c.id);
-          }
-        }
+      if (data.success) {
+        claimedPNs = new Set(data.claimedPNs || []);
+        claimMap = data.claimMap || {};
       }
     } catch (e) { /* non-fatal */ }
   }
@@ -797,8 +822,8 @@
       } else if (p.marketMedian > 0) {
         freshness = '✅';
       }
-      const ck = cacheKey(p.partType, v.make, v.model, p.partNumberBase || p.partNumber);
-      const isCached = cachedParts.has(ck);
+      const pnNorm = partPN(p);
+      const isCached = pnNorm && claimedPNs.has(pnNorm);
       html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${p.isMarked && !p.alertMatch ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
@@ -931,7 +956,6 @@
     const btn = el ? el.querySelector('.btn-pull') : null;
     if (!btn) return;
 
-    // Find vehicle and part data for cache claim
     const v = findVehicleById(vid);
     const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
 
@@ -939,8 +963,10 @@
     btn.disabled = true; btn.textContent = 'Caching...';
     el.classList.add('cached-part');
 
-    const pn = p ? (p.partNumberBase || p.partNumber) : null;
-    const ck = cacheKey(p ? p.partType : null, v ? v.make : null, v ? v.model : null, pn);
+    // Send the first raw PN (backend normalizes it)
+    const rawPn = p ? (p.partNumber || p.partNumberBase || '') : '';
+    const firstPn = rawPn.split(/\s*\/\s*/)[0] || null;
+    const pnNorm = normalizePN(firstPn);
 
     fetch('/cache/claim', {
       method: 'POST',
@@ -948,7 +974,7 @@
       body: JSON.stringify({
         partType: p ? p.partType : null,
         partDescription: p ? (p.title || p.category) : null,
-        partNumber: pn,
+        partNumber: firstPn,
         vehicle: {
           year: v ? v.year : null,
           make: v ? v.make : null,
@@ -967,8 +993,12 @@
       }),
     }).then(r => r.json()).then(data => {
       if (data.success || data.cached) {
-        const cacheId = (data.cached && data.cached.id) || data.id;
-        cachedParts.set(ck, cacheId);
+        const entry = data.cached || data;
+        const cacheId = entry.id;
+        if (pnNorm) {
+          claimedPNs.add(pnNorm);
+          claimMap[pnNorm] = cacheId;
+        }
         btn.className = 'btn-cached';
         btn.textContent = '✓ Cached';
         btn.disabled = false;
@@ -991,9 +1021,8 @@
 
     const v = findVehicleById(vid);
     const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
-    const pn = p ? (p.partNumberBase || p.partNumber) : null;
-    const ck = cacheKey(p ? p.partType : null, v ? v.make : null, v ? v.model : null, pn);
-    const cacheId = cachedParts.get(ck);
+    const pnNorm = partPN(p);
+    const cacheId = pnNorm ? claimMap[pnNorm] : null;
     if (!cacheId) return;
 
     // Optimistic UI
@@ -1006,7 +1035,8 @@
       body: JSON.stringify({ reason: 'unclaimed from attack list' }),
     }).then(r => r.json()).then(data => {
       if (data.success) {
-        cachedParts.delete(ck);
+        claimedPNs.delete(pnNorm);
+        delete claimMap[pnNorm];
         btn.className = 'btn-pull';
         btn.textContent = 'Pull';
         btn.disabled = false;

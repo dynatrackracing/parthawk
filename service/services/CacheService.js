@@ -26,25 +26,32 @@ class CacheService {
       throw new Error(`Invalid source: ${source}. Must be one of: ${validSources.join(', ')}`);
     }
 
-    // Deduplicate: check if an active claim already exists for this part+vehicle combo
-    const normPt = (partType || '').toUpperCase();
-    const normMake = (vehicle?.make || '').toUpperCase();
-    const normModel = (vehicle?.model || '').toUpperCase();
-    const normPn = partNumber ? partNumber.trim().toUpperCase() : null;
+    // Normalize PN using shared normalizer (strips dashes, spaces, Ford suffixes, etc.)
+    const normPn = partNumber ? normalizePartNumber(partNumber) : null;
 
-    let existingQuery = database('the_cache').where('status', 'claimed');
+    // Deduplicate: check if an active claim already exists
     if (normPn) {
-      existingQuery = existingQuery.whereRaw('UPPER(part_number) = ?', [normPn]);
-    } else if (normPt && normMake && normModel) {
-      existingQuery = existingQuery
-        .whereRaw('UPPER(part_type) = ?', [normPt])
-        .whereRaw('UPPER(vehicle_make) = ?', [normMake])
-        .whereRaw('UPPER(vehicle_model) = ?', [normModel]);
-    }
-    const existing = await existingQuery.first();
-    if (existing) {
-      this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
-      return existing;
+      const allClaimed = await database('the_cache')
+        .where('status', 'claimed')
+        .whereNotNull('part_number')
+        .select('id', 'part_number');
+      const existing = allClaimed.find(c => normalizePartNumber(c.part_number) === normPn);
+      if (existing) {
+        this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
+        const full = await database('the_cache').where('id', existing.id).first();
+        return { ...full, alreadyExists: true };
+      }
+    } else if (partType && vehicle?.make && vehicle?.model) {
+      const existing = await database('the_cache')
+        .where('status', 'claimed')
+        .whereRaw('UPPER(part_type) = ?', [(partType || '').toUpperCase()])
+        .whereRaw('UPPER(vehicle_make) = ?', [(vehicle.make || '').toUpperCase()])
+        .whereRaw('UPPER(vehicle_model) = ?', [(vehicle.model || '').toUpperCase()])
+        .first();
+      if (existing) {
+        this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
+        return { ...existing, alreadyExists: true };
+      }
     }
 
     const id = uuidv4();
@@ -265,6 +272,28 @@ class CacheService {
     const dir = sortBy === 'value' ? 'desc' : 'desc';
 
     return query.orderBy(sort, dir);
+  }
+
+  /**
+   * Get claimed part numbers as a lightweight map for attack list sync.
+   * Returns { claimedPNs: ["22928326", ...], claimMap: { "22928326": "uuid", ... } }
+   */
+  async getClaimedPNs() {
+    const rows = await database('the_cache')
+      .where('status', 'claimed')
+      .whereNotNull('part_number')
+      .select('id', 'part_number');
+
+    const claimedPNs = [];
+    const claimMap = {};
+    for (const r of rows) {
+      const norm = normalizePartNumber(r.part_number);
+      if (norm) {
+        claimedPNs.push(norm);
+        claimMap[norm] = r.id;
+      }
+    }
+    return { claimedPNs, claimMap };
   }
 
   /**
