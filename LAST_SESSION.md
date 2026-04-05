@@ -108,3 +108,10 @@
 - Frontend: collapsed "X parts don't match this vehicle" section with orange mismatch reason text
 - Example: 2014 Ford Focus SE 2.0L → ST Turbo parts now show "Part requires EcoBoost engine" or "Part is for ST trim" in mismatch section
 - Careful regex: ST avoids false positive on STEERING/START/STOCK; GT only flags when paired with specific makes; MT only when near TRANS/CLUTCH/SHIFT
+
+## 21:30 — Clean Pipe gaps: missing models, part types, dual-make titles
+- MODEL_PATTERNS: Added Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, Venture, Uplander, Montana, Terraza, Metris, ProMaster, NV200, Explorer Sport Trac, tonnage variants
+- detectPartType(): Added ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT_MODULE, DOOR_MODULE, WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE, LANE_ASSIST, ADAPTIVE_CRUISE
+- Backfill: 7,769 rows updated — YourListing 1,835 (409 models, 374 types, 1,431 PNs), YourSale 5,821, SoldItem 113
+- Rollover sensor fixed: PN=25845266 (was 20082015), Type=ROLLOVER_SENSOR (was OTHER), Model=Express (was null)
+- YourSale OTHER count dropped from ~7,600 candidates to 1,595 remaining

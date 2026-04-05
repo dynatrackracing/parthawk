@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Clean Pipe Gaps: Missing Models, Part Types, Dual-Make — 2026-04-05
+- MODEL_PATTERNS: +Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Explorer Sport Trac
+- detectPartType(): +ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT/DOOR/WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE
+- Backfill: 7,769 rows fixed (409 models, 374+ types, 5,740+ PNs across 3 tables)
+
+---
+
 ## Attack List: Trim/Engine/Trans Mismatch Filtering — 2026-04-05
 - extractPartSpecifics(title) detects: performance trims (ST/SRT/Raptor/AMG/etc.), forced induction (EcoBoost/Turbo/TSI), transmission type, diesel
 - Compares part title specifics against vehicle VIN data (decoded_trim, engine, decoded_transmission, diesel)
