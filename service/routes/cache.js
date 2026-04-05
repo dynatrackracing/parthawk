@@ -36,14 +36,14 @@ router.get('/history', async (req, res) => {
 });
 
 /**
- * GET /cache/claimed-pns
+ * GET /cache/claimed-keys
  * Lightweight endpoint for attack list sync.
- * Returns normalized part numbers + cache IDs for active claims.
+ * Returns two maps: PN-based (primary) and itemId-based (fallback for no-PN parts).
  */
-router.get('/claimed-pns', async (req, res) => {
+router.get('/claimed-keys', async (req, res) => {
   try {
     const service = new CacheService();
-    const result = await service.getClaimedPNs();
+    const result = await service.getClaimedKeys();
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

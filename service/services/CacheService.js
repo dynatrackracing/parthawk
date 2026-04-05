@@ -18,7 +18,7 @@ class CacheService {
    * For manual by PN: partNumber required, rest optional
    * For manual by YMM: vehicle info + partType/partDescription required
    */
-  async claim({ partType, partDescription, partNumber, vehicle, yard,
+  async claim({ partType, partDescription, partNumber, itemId, vehicle, yard,
                 estimatedValue, priceSource, claimedBy, source, sourceId, notes }) {
 
     const validSources = ['daily_feed', 'scout_alert', 'hawk_eye', 'flyway', 'manual'];
@@ -28,28 +28,29 @@ class CacheService {
 
     // Normalize PN using shared normalizer (strips dashes, spaces, Ford suffixes, etc.)
     const normPn = partNumber ? normalizePartNumber(partNumber) : null;
+    const numItemId = itemId ? parseInt(itemId) || null : null;
 
     // Deduplicate: check if an active claim already exists
     if (normPn) {
+      // Primary key: normalized part number
       const allClaimed = await database('the_cache')
         .where('status', 'claimed')
         .whereNotNull('part_number')
         .select('id', 'part_number');
       const existing = allClaimed.find(c => normalizePartNumber(c.part_number) === normPn);
       if (existing) {
-        this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
+        this.log.info({ id: existing.id, source }, 'Duplicate claim by PN — returning existing');
         const full = await database('the_cache').where('id', existing.id).first();
         return { ...full, alreadyExists: true };
       }
-    } else if (partType && vehicle?.make && vehicle?.model) {
+    } else if (numItemId) {
+      // Fallback key: itemId (for parts with no PN like sunroof glass, mirrors)
       const existing = await database('the_cache')
         .where('status', 'claimed')
-        .whereRaw('UPPER(part_type) = ?', [(partType || '').toUpperCase()])
-        .whereRaw('UPPER(vehicle_make) = ?', [(vehicle.make || '').toUpperCase()])
-        .whereRaw('UPPER(vehicle_model) = ?', [(vehicle.model || '').toUpperCase()])
+        .where('item_id', numItemId)
         .first();
       if (existing) {
-        this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
+        this.log.info({ id: existing.id, source }, 'Duplicate claim by itemId — returning existing');
         return { ...existing, alreadyExists: true };
       }
     }
@@ -60,6 +61,7 @@ class CacheService {
       part_type: partType || null,
       part_description: partDescription || null,
       part_number: normPn,
+      item_id: numItemId,
       vehicle_year: vehicle?.year || null,
       vehicle_make: vehicle?.make || null,
       vehicle_model: vehicle?.model || null,
@@ -275,25 +277,25 @@ class CacheService {
   }
 
   /**
-   * Get claimed part numbers as a lightweight map for attack list sync.
-   * Returns { claimedPNs: ["22928326", ...], claimMap: { "22928326": "uuid", ... } }
+   * Get claimed keys for attack list sync.
+   * Two maps: PN-based (primary) and itemId-based (fallback for no-PN parts).
    */
-  async getClaimedPNs() {
+  async getClaimedKeys() {
     const rows = await database('the_cache')
       .where('status', 'claimed')
-      .whereNotNull('part_number')
-      .select('id', 'part_number');
+      .select('id', 'part_number', 'item_id');
 
-    const claimedPNs = [];
-    const claimMap = {};
+    const claimedPNs = {};    // normalizedPN → cacheId
+    const claimedItemIds = {}; // itemId (string) → cacheId
     for (const r of rows) {
-      const norm = normalizePartNumber(r.part_number);
-      if (norm) {
-        claimedPNs.push(norm);
-        claimMap[norm] = r.id;
+      if (r.part_number) {
+        const norm = normalizePartNumber(r.part_number);
+        if (norm) claimedPNs[norm] = r.id;
+      } else if (r.item_id) {
+        claimedItemIds[String(r.item_id)] = r.id;
       }
     }
-    return { claimedPNs, claimMap };
+    return { claimedPNs, claimedItemIds };
   }
 
   /**

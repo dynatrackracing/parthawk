@@ -287,9 +287,9 @@
   const activeSessions = {};
   let _currentNewestDate = null; // set per-yard during render
 
-  // Cache state: normalized PN → cache entry id
-  let claimedPNs = new Set();
-  let claimMap = {}; // normalizedPN → cacheId
+  // Cache state: two maps for two-key matching
+  let claimedPNs = {};     // normalizedPN → cacheId
+  let claimedItemIds = {};  // itemId (string) → cacheId
 
   // Must match backend normalizePartNumber exactly (suffix stripping, keeps dashes for Ford/Toyota/Honda)
   function normalizePN(pn) {
@@ -321,18 +321,26 @@
   function partPN(p) {
     var raw = p && (p.partNumber || p.partNumberBase);
     if (!raw) return '';
-    // Take first PN if joined
     var first = raw.split(/\s*\/\s*/)[0];
     return normalizePN(first);
   }
 
+  // Check if a part is cached — returns cacheId or null
+  function getCachedId(p) {
+    var pn = partPN(p);
+    if (pn && claimedPNs[pn]) return claimedPNs[pn];
+    var iid = p && p.itemId ? String(p.itemId) : '';
+    if (iid && claimedItemIds[iid]) return claimedItemIds[iid];
+    return null;
+  }
+
   async function loadCachedParts() {
     try {
-      const res = await fetch('/cache/claimed-pns');
+      const res = await fetch('/cache/claimed-keys');
       const data = await res.json();
       if (data.success) {
-        claimedPNs = new Set(data.claimedPNs || []);
-        claimMap = data.claimMap || {};
+        claimedPNs = data.claimedPNs || {};
+        claimedItemIds = data.claimedItemIds || {};
       }
     } catch (e) { /* non-fatal */ }
   }
@@ -822,8 +830,7 @@
       } else if (p.marketMedian > 0) {
         freshness = '✅';
       }
-      const pnNorm = partPN(p);
-      const isCached = pnNorm && claimedPNs.has(pnNorm);
+      const isCached = !!getCachedId(p);
       html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${p.isMarked && !p.alertMatch ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
@@ -950,14 +957,14 @@
 
   // === Part actions ===
 
-  function markPulled(vid, itemId, evt) {
+  function markPulled(vid, pidStr, evt) {
     evt.stopPropagation();
-    const el = document.getElementById('pd-' + vid + '-' + itemId);
+    const el = document.getElementById('pd-' + vid + '-' + pidStr);
     const btn = el ? el.querySelector('.btn-pull') : null;
     if (!btn) return;
 
     const v = findVehicleById(vid);
-    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
+    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === pidStr) : null;
 
     // Optimistic UI
     btn.disabled = true; btn.textContent = 'Caching...';
@@ -967,6 +974,7 @@
     const rawPn = p ? (p.partNumber || p.partNumberBase || '') : '';
     const firstPn = rawPn.split(/\s*\/\s*/)[0] || null;
     const pnNorm = normalizePN(firstPn);
+    const partItemId = p ? p.itemId : null;
 
     fetch('/cache/claim', {
       method: 'POST',
@@ -975,6 +983,7 @@
         partType: p ? p.partType : null,
         partDescription: p ? (p.title || p.category) : null,
         partNumber: firstPn,
+        itemId: partItemId,
         vehicle: {
           year: v ? v.year : null,
           make: v ? v.make : null,
@@ -995,14 +1004,16 @@
       if (data.success || data.cached) {
         const entry = data.cached || data;
         const cacheId = entry.id;
+        // Add to the right map
         if (pnNorm) {
-          claimedPNs.add(pnNorm);
-          claimMap[pnNorm] = cacheId;
+          claimedPNs[pnNorm] = cacheId;
+        } else if (partItemId) {
+          claimedItemIds[String(partItemId)] = cacheId;
         }
         btn.className = 'btn-cached';
         btn.textContent = '✓ Cached';
         btn.disabled = false;
-        btn.setAttribute('onclick', `unclaimPart('${vid}','${itemId}',event)`);
+        btn.setAttribute('onclick', `unclaimPart('${vid}','${pidStr}',event)`);
       } else {
         el.classList.remove('cached-part');
         btn.disabled = false; btn.textContent = 'Pull';
@@ -1013,17 +1024,20 @@
     });
   }
 
-  function unclaimPart(vid, itemId, evt) {
+  function unclaimPart(vid, pidStr, evt) {
     evt.stopPropagation();
-    const el = document.getElementById('pd-' + vid + '-' + itemId);
+    const el = document.getElementById('pd-' + vid + '-' + pidStr);
     const btn = el ? el.querySelector('.btn-cached') : null;
     if (!btn) return;
 
     const v = findVehicleById(vid);
-    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
-    const pnNorm = partPN(p);
-    const cacheId = pnNorm ? claimMap[pnNorm] : null;
+    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === pidStr) : null;
+    const cacheId = getCachedId(p);
     if (!cacheId) return;
+
+    // Determine which map this entry is in for cleanup
+    const pnNorm = partPN(p);
+    const iid = p && p.itemId ? String(p.itemId) : '';
 
     // Optimistic UI
     btn.disabled = true; btn.textContent = 'Removing...';
@@ -1035,12 +1049,12 @@
       body: JSON.stringify({ reason: 'unclaimed from attack list' }),
     }).then(r => r.json()).then(data => {
       if (data.success) {
-        claimedPNs.delete(pnNorm);
-        delete claimMap[pnNorm];
+        if (pnNorm && claimedPNs[pnNorm]) delete claimedPNs[pnNorm];
+        if (iid && claimedItemIds[iid]) delete claimedItemIds[iid];
         btn.className = 'btn-pull';
         btn.textContent = 'Pull';
         btn.disabled = false;
-        btn.setAttribute('onclick', `markPulled('${vid}','${itemId}',event)`);
+        btn.setAttribute('onclick', `markPulled('${vid}','${pidStr}',event)`);
       } else {
         el.classList.add('cached-part');
         btn.disabled = false; btn.textContent = '✓ Cached';
