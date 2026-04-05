@@ -1,65 +1,57 @@
-# LAST SESSION — 2026-04-04 (merged — 2 parallel sessions)
+# LAST SESSION — 2026-04-05
 
-## Session A: Market Drip Rewrite
-- Expanded importapart drip to 3-bucket priority queue (10,912 unique PNs):
-  - Bucket 1: Active YourListing PNs (1,151)
-  - Bucket 2: Sold-not-restocked 60d+ (1,583)
-  - Bucket 3: Importapart catalog (9,009)
-- Comp quality filter: regex excludes as-is/untested/for-parts/core before averaging
-- Speed: 15s → 3s delay, 34 → 200/batch, 600 PNs/day, ~18 day cycle
-- source changed: importapart_drip → market_drip
-- Cache key normalization aligned to Clean Pipe standard
-- Dirty keys in market_demand_cache fixed
-- Employee Windows account (Office) created for office crew
-- VPN reconnect 3x/day between scrape runs
+## Sniper Overhaul
+- Diagnosed: PriceCheckServiceV2 (axios+cheerio) completely blocked by eBay "Pardon Our Interruption" challenge page. HTTP 200 but 13K chars of captcha HTML, zero search results.
+- Replaced dead cheerio scraper with Playwright+stealth (same config as working market drip)
+- Filtered to NC pull yards only (Raleigh, Durham, Greensboro) — was scraping all 7 yards including FL
+- Changed from 7-day rolling window to newest vehicles only (first_seen >= 24h, --hours flag for override)
+- Dry run: 192 new vehicles → 1,073 PNs → 804 after sanitize → 731 need scraping → top 50 queued
 
-## Session B: Intelligence Tuning + Cleanup (8 items from diagnostic)
-- Attack list upgrades deployed: stock penalty scaling (1→5%, 5+→70%), fresh arrival bonus (≤3d=+10%), COGS per yard factor (±5%)
-- Sniper expanded: batch 15→35/week, priority queue (never-checked + highest price first), preview endpoint added
-- QUARRY rewritten: frozen Item table → YourSale vs YourListing pure SQL, 100 real restock candidates
-- Restock flags → Scout Alerts: 49 flags wired as new source in ScoutAlertService
-- instrumentclusterstore scraper: NOT broken (427 SoldItems, false alarm from stale diagnostic query)
-- Auth on write endpoints: ALREADY RESOLVED — global authGate deployed 4/3 covers all routes
-- The Mark: confirmed empty, workflow adoption gap (not code)
-- dh-nav.js: FIELD and INTEL tabs centered (margin-left:auto → position:absolute fix)
+## Attack List Price Floors
+- PART_PRICE_FLOORS in AttackListService: ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP=$100
+- Mechanical parts (mirrors, visors, console lids) have no floor
+- Below-floor parts excluded from vehicle score, shown greyed out (opacity 0.4) in collapsed "X parts below price floor" section
+- Above-floor parts unchanged — GREAT/GOOD/FAIR/POOR badges work as before
 
-## Closed items
-- instrumentclusterstore scraper: false alarm
-- Unauthenticated write endpoints: resolved (global authGate)
-- QUARRY data source: rewritten to pure SQL with Clean Pipe columns
-- Restock → Scout Alerts: wired
-- Attack list scoring gaps: all 3 factors deployed
+## QUARRY Fix
+- Frontend field name mismatch after backend rewrite: green/yellow/orange → critical/low/watch
+- Row fields: sold7d→timesSold, activeStock→inStock, action→urgency
+- Summary cards now show real numbers
+
+## Cache ↔ Attack List Sync (3 iterations)
+- Iteration 1: Pull button swaps to checkmark, greys out row. But didn't persist on reload — matching key was unreliable (partType|MAKE|MODEL fallback)
+- Iteration 2: Proper architecture — GET /cache/claimed-keys endpoint returns normalized PNs + cache IDs. Frontend normalizePN() mirrors backend suffix stripping (Ford/Toyota/Honda/Chrysler). Two-key matching: PN primary, itemId fallback for no-PN parts (sunroof glass, mirrors). Backend dedup prevents duplicate claims.
+- Iteration 3: Added item_id column to the_cache table for parts without part numbers. Migration + CacheService.claim() accepts itemId + dedup by itemId when no PN.
+- Skip and Note buttons removal requested (confirm in next session)
+
+## Scout Alerts Cache Sync
+- Scout alerts now use same /cache/claimed-keys system as Daily Feed
+- Three matching strategies: alert ID, normalized PN, itemId
+- Cross-tool flow works: pull from Daily Feed → Scout Alerts shows checkmark, and vice versa
+- Unclaim syncs both cache entry and scout_alert claimed field
+
+## Architecture Confirmed
+- Backend wiring for scout alert sources already complete:
+  - THE MARK → ScoutAlertService reads the_mark ✅
+  - THE QUARRY → quarrySync() pushes to restock_want_list → Scout Alerts reads it ✅
+  - SCOUR STREAM → Scout Alerts reads restock_want_list ✅
+  - Phoenix stays standalone ✅
+- Hunters Perch → Mark link: NOT WORKING (fix pending)
+- Sky Watch: needs Hawk Eye search to be functional first
 
 ## What's next — priority order
-1. Let market drip run 5-7 days to fill cache (currently 590 → targeting 3,000+)
-2. Start using attack list daily — validate top vehicles against gut
-3. After 1 week: audit cache coverage, wire market signals into attack list
-4. Wire QUARRY output → Scour Stream want list (auto-populate restock candidates)
-5. Wire Phoenix output → Scout Alerts (rebuild opps matched to yard vehicles)
-6. Build Hunters Perch UI (competitor data exists, frontend is placeholder)
-7. Wire Prey-Cycle seasonal data into attack list scoring weights
-8. Stale inventory automation — validate pricing data accuracy first
+1. Verify Skip/Note buttons removed from attack list
+2. Scout alert source badges on Daily Feed parts (🎯 MARK, 🔄 RESTOCK, etc.)
+3. Fix Hunters Perch → Mark link
+4. Hawk Eye search functionality (enables Sky Watch workflow)
+5. Hawk Eye + Flyway cache sync (same claimed-keys pattern)
+6. Let market drip keep filling cache (targeting 3,000+ PNs)
+7. Stale inventory automation — validate pricing accuracy first
 
-## Architecture notes
-- run-importapart-drip.js queries YourListing, YourSale, AND Item for PN queue
-- market_demand_cache source field: 'market_drip' for new entries, 'importapart_drip' for legacy
-- Comp filter regex: /\b(AS[\s-]?IS|FOR\s+PARTS|UNTESTED|NOT\s+WORKING|PARTS\s+ONLY|CORE\s+(ONLY|CHARGE|RETURN)|NEEDS\s+PROGRAMMING|MAY\s+NEED|INOP(ERABLE)?|BROKEN|DAMAGED|SALVAGE|JUNK|SCRAP)\b/i
-- 3 bucket priority: active inventory refreshes fastest, importapart catalog fills remaining capacity
-- eBay rate limit: 100 req/min on search endpoints. Running at 20 req/min (20%)
-- extractStructuredFields() in partIntelligence.js — single source for title extraction
-- sanitizePartNumberForSearch() in partIntelligence.js — single source for PN validation
-- Make normalization: title case matching corgi VIN decoder
-- market_demand_cache keys normalized (no dashes/spaces/dots for PN type)
-- detectPartType() exists in BOTH AttackListService and partIntelligence.js — keep in sync
-- Universal rule: Active listing status requires quantity > 0
-
-## Open items (tech debt)
+## Open tech debt
 - StaleInventoryService has inline ReviseItem separate from TradingAPI.reviseItem()
-- CompetitorMonitorService Thu 4am reads frozen SoldItem (degraded until Sunday scrape)
+- CompetitorMonitorService Thu 4am reads frozen SoldItem
 - LifecycleService loads all YourSale into memory (watch at 50K+)
-- Hunters Perch frontend is placeholder
-- The Mark table empty (adoption)
-- QUARRY → Scour Stream not wired
-- Phoenix → Scout Alerts not wired
-- Sky Watch → Scout Alerts not wired
-- Prey-Cycle → attack list seasonal weighting not wired
+- The Mark table empty (adoption gap — Hunters Perch link broken)
+- instrumentclusterstore scraper: 0 items, needs debug-scrape diagnosis
+- MarketPricingService still references PriceCheckServiceV2 as fallback (dead on Railway too?)

@@ -4,6 +4,55 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout Alerts Cache Sync — 2026-04-05
+- Scout alerts now use /cache/claimed-keys for shared truth with Daily Feed
+- Three matching strategies: alertId, normalized PN (cross-tool), itemId (no-PN parts)
+- Claim/unclaim syncs both cache entry and scout_alert claimed field
+- Cross-tool: pull from Daily Feed → shows checkmark on Scout Alerts page
+
+---
+
+## Cache itemId Fallback — 2026-04-05
+- Added item_id column to the_cache table (migration)
+- CacheService.claim() accepts and stores itemId
+- Dedup by itemId when partNumber is empty (sunroof glass, mirrors, etc.)
+- GET /cache/claimed-keys returns both claimedPNs and claimedItemIds maps
+- Frontend getCachedId() checks PN first, falls back to itemId
+
+---
+
+## Cache ↔ Attack List Sync — 2026-04-05
+- GET /cache/claimed-keys endpoint — lightweight, returns normalized PNs + cache IDs
+- CacheService.claim() deduplicates by normalizePartNumber() (Ford/Toyota/Honda/Chrysler suffix stripping)
+- Frontend normalizePN() mirrors backend normalization exactly
+- Pull button toggles: Pull → checkmark (claimed), checkmark → Pull (unclaimed via DELETE /cache/:id)
+- Persists across page reloads — reads cache state on every page init
+
+---
+
+## QUARRY Frontend Fix — 2026-04-05
+- Summary cards: d.summary.green/yellow/orange → d.summary.critical/low/watch
+- Row fields: sold7d→timesSold, activeStock→inStock, action→urgency
+- TIER_CONFIG keys updated from color names to urgency names
+
+---
+
+## Attack List Price Floors — 2026-04-05
+- PART_PRICE_FLOORS constant in AttackListService: ABS=$150, electronic modules=$100
+- Mechanical parts have no floor
+- Below-floor parts flagged belowFloor:true, excluded from vehicle totalValue
+- Frontend: collapsed "X parts below price floor" section, greyed at opacity 0.4
+
+---
+
+## Sniper Overhaul — 2026-04-05
+- Replaced dead PriceCheckServiceV2 (eBay blocks axios) with Playwright+stealth
+- Filtered to NC pull yards only (Raleigh, Durham, Greensboro)
+- Newest vehicles only (first_seen >= 24h default, --hours CLI flag)
+- Dry run verified: 192 vehicles → 50 PNs queued by price descending
+
+---
+
 ## The Mark Management Page + Want List Push — 2026-04-04
 - the-mark.html rebuilt: shows active marks with source badges (SKY/PERCH), status (HUNTING/IN-YARD/LISTED/SOLD)
 - 'Send to want list' pushes mark to Scour Stream (restock_want_list)
