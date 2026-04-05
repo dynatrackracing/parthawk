@@ -30,3 +30,51 @@
 - The Mark table empty (adoption gap — Hunters Perch link broken)
 - instrumentclusterstore scraper: 0 items, needs debug-scrape diagnosis
 - MarketPricingService still references PriceCheckServiceV2 as fallback (dead on Railway too?)
+
+## 17:00 — Global Part Value Colors + Exclusion Filter
+- Created dh-parts.js + dh-parts.css — shared 6-tier color system across all 6 field pages
+- getPartTier(price), renderPriceBadge(price, prefix), isExcludedPart(title)
+- Tiers: ELITE $500+ gold pulse, PREMIUM $350+ purple pulse, HIGH $250+ blue, SOLID $150+ green, BASE $100+ orange, LOW <$100 red
+- Exclusions: complete engines/transmissions/body panels filtered; all modules/trim/glass/steering allowed
+- Backend isExcludedPart() updated: removed transfer case + steering rack (sellable), added trunk lid/roof panel/bumper assembly
+- Inline tierColor() kept on attack-list.html for vehicle score chip CSS (separate from part badges)
+
+## 17:30 — Scout Alerts: Flyway Trip Filter
+- ScoutAlertService yard_vehicle query now filters by trip status
+- Core yards (is_core=true) always generate alerts
+- Road trip yards only generate alerts when their flyway_trip status = 'active'
+
+## 17:45 — Scout Alerts: Confidence Matching Overhaul
+- scoreMatch() was checking if vehicle.engine EXISTS, not if it MATCHES — a 3.6L V6 got HIGH confidence for a HEMI part
+- Added PART_TYPE_SENSITIVITY map: ECM/PCM/THROTTLE=engine, TCM=engine+drivetrain, ABS=drivetrain, AMP/RADIO/NAV=trim, BCM/TIPM/CLUSTER=universal
+- Real engine verification: displacement extraction, named engine matching (HEMI vs Pentastar), cylinder count
+- Real drivetrain verification: 4WD/AWD vs 2WD/FWD
+- Trim verification: premium audio brands vs base trim
+- Confidence now means: HIGH=verified match, MEDIUM=attribute unknown on vehicle, LOW=attribute mismatch
+- confidenceReason field added to alerts
+- Model conflict rejection: Cherokee≠Grand Cherokee, Caravan≠Grand Caravan, Transit≠Transit Connect
+- isExcludedPart() applied to alert generation — no alerts for engines/transmissions/body panels
+- SELECT expanded: +decoded_drivetrain, decoded_transmission, transmission_speeds, diesel, trim_tier, body_style
+
+## 18:00 — Scout Alerts: is_core Yard Flag
+- Added is_core boolean column to yard table (migration)
+- Set true for 4 LKQ NC yards only: Raleigh, Durham, Greensboro, East NC
+- Foss and Young's set to is_core=false (not actively scraped)
+- FL LKQ yards (Tampa/Largo/Clearwater) correctly treated as road trip yards now
+- FlywayService.getCoreYardIds() reads from DB instead of hardcoded array
+- ScoutAlertService WHERE: yard.is_core = true OR yard on active trip
+
+## 18:15 — Cache + Scour Stream Inline Edit
+- PATCH /cache/:id — partial update on cache entries (partNumber re-normalized, partDescription, partType, make, model, year, notes)
+- PATCH /restock-want-list/:id — partial update on want list entries (title, notes)
+- PATCH /restock-want-list/by-title — update by title match + syncs scout_alert.source_title
+- cache.html: tap PN or description to edit inline, "+ add PN" placeholder for empty fields, green flash on save
+- restock-list.html: tap title or notes to edit inline on WANT LIST tab
+- scout-alerts.html: STREAM alert titles tap-to-edit, saves to both want list and alert source_title
+
+## PENDING — Ford partNumberBase Over-Stripped + Stock Index Triple-Count
+- DIAGNOSED but NOT YET FIXED
+- extractStructuredFields() strips Ford PNs to generic position codes (7L3A-12A650-GJH → 12A650)
+- All Ford ECMs share partNumberBase '12A650' — stock shows 241 instead of 4
+- buildStockIndex() triple-counts same listing via partNumberBase + SKU + title extraction
+- Fix ready: align extractPartNumbers().base with normalizePartNumber() output, dedup stock index per listing

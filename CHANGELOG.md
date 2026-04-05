@@ -4,6 +4,37 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Cache + Scour Stream Inline Edit — 2026-04-05
+- PATCH /cache/:id, PATCH /restock-want-list/:id, PATCH /restock-want-list/by-title
+- cache.html, restock-list.html, scout-alerts.html: tap-to-edit inline with green flash save
+
+---
+
+## Scout Alerts: is_core Yard Flag — 2026-04-05
+- is_core boolean on yard table, set true for 4 LKQ NC yards only
+- Foss/Young's/FL LKQ correctly non-core, FlywayService.getCoreYardIds() reads DB
+
+---
+
+## Scout Alerts: Confidence Matching Overhaul — 2026-04-05
+- Part-type sensitivity: engine/drivetrain/trim verification per part type
+- Real value comparison replaces existence checking
+- Model conflict rejection, isExcludedPart() on alert generation
+
+---
+
+## Scout Alerts: Flyway Trip Filter — 2026-04-05
+- Yard vehicle query filters by is_core OR active flyway trip
+- Road trip yards no longer generate alerts after trip completion
+
+---
+
+## Global Part Value Colors + Exclusion Filter — 2026-04-05
+- dh-parts.js/css: shared 6-tier system + isExcludedPart() across all 6 field pages
+- Replaces inline badge CSS/JS on attack-list, adds badges to scout-alerts/cache/vin-scanner/gate/flyway
+
+---
+
 ## Inline Edit: Cache Part Numbers + Scour Stream Want List — 2026-04-05
 - PATCH /cache/:id — update partNumber (re-normalized via normalizePartNumber), partDescription, partType, make, model, year, notes
 - PATCH /restock-want-list/:id — update title, notes on want list entries

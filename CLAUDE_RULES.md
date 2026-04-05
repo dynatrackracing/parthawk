@@ -14,7 +14,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 4. **COMMIT FORMAT:** `git add -A && git commit -m "descriptive message" && git push origin main`
 
-5. **UPDATE LAST_SESSION.md** at the end of every session with: what was changed, what files were touched, what's still broken, what's next.
+5. **UPDATE LAST_SESSION.md** at the end of every session with: what was changed, what files were touched, what's still broken, what's next. **LAST_SESSION.md is append-only.** Never delete old entries. Append `## HH:MM UTC — Description` for each build. Date headers separate days.
 
 6. **APPEND TO CHANGELOG.md** at the end of every session with: date, summary, files touched.
 
