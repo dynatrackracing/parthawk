@@ -115,3 +115,11 @@
 - Backfill: 7,769 rows updated — YourListing 1,835 (409 models, 374 types, 1,431 PNs), YourSale 5,821, SoldItem 113
 - Rollover sensor fixed: PN=25845266 (was 20082015), Type=ROLLOVER_SENSOR (was OTHER), Model=Express (was null)
 - YourSale OTHER count dropped from ~7,600 candidates to 1,595 remaining
+
+## 22:00 — VinDecodeService write gap + vin_cache transmission storage
+- VinDecodeService.decodeAllUndecoded() now writes decoded_engine, decoded_drivetrain, decoded_transmission to yard_vehicle
+- LocalVinDecoder: vin_cache INSERT now includes transmission_style from corgi transHint
+- Migration: transmission_style + transmission_speeds columns added to vin_cache
+- AttackListService.scoreVehicle() return now includes decoded_drivetrain (was missing — broke 4WD/AWD badges)
+- Backfill script processes 3,243 vehicles missing decoded_transmission, fills from vin_cache or re-decodes
+- Impact: 4WD/AWD badges will show on ~6,946 vehicles (was ~3,390 from scraper only)

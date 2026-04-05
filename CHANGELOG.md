@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## VinDecodeService Write Gap + vin_cache Transmission — 2026-04-05
+- VinDecodeService writes decoded_engine/drivetrain/transmission to yard_vehicle
+- vin_cache stores transmission_style from corgi transHint
+- AttackListService.scoreVehicle() passes decoded_drivetrain to frontend (fixes 4WD/AWD badges)
+- Backfill: 3,243 vehicles missing decoded_transmission processed
+
+---
+
 ## Clean Pipe Gaps: Missing Models, Part Types, Dual-Make — 2026-04-05
 - MODEL_PATTERNS: +Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Explorer Sport Trac
 - detectPartType(): +ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT/DOOR/WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE
