@@ -114,6 +114,68 @@ var currentDays = 7;
 var hidePulled = false;
 var _alertLookup = {};
 
+// Cache state — shared truth across all puller tools
+var claimedPNs = {};       // normalizedPN → cacheId
+var claimedItemIds = {};    // itemId (string) → cacheId
+var claimedAlertIds = {};   // scout alert id (string) → cacheId
+
+// Must match backend normalizePartNumber exactly
+function normalizePN(pn) {
+  if (!pn || typeof pn !== 'string') return '';
+  pn = pn.trim().toUpperCase().replace(/\s+/g, '');
+  if (pn.length < 4) return pn;
+  if (pn.includes('-')) {
+    var ford = pn.match(/^([A-Z0-9]+-[A-Z0-9]+)-[A-Z]{1,2}$/);
+    if (ford) return ford[1];
+    var toyota = pn.match(/^(\d{5}-[A-Z0-9]{4,6})-[A-Z]{1,2}$/);
+    if (toyota) return toyota[1];
+    var honda = pn.match(/^(\d{5}-[A-Z]{2,4})-[A-Z0-9]{1,4}$/);
+    if (honda) return honda[1];
+    return pn;
+  }
+  var chrysler = pn.match(/^(\d{7,})[A-Z]{2}$/);
+  if (chrysler) return chrysler[1];
+  var generic = pn.match(/^(.{6,}?)[A-Z]{2}$/);
+  if (generic) return generic[1];
+  return pn;
+}
+
+// Try to extract a PN from the alert's source_title (e.g. "2019 Ram 1500 ECM 68269652AA")
+function extractPN(title) {
+  if (!title) return '';
+  // Match common OEM PN patterns in titles
+  var m = title.match(/\b([A-Z]{1,3}\d[A-Z0-9]-[A-Z0-9]+-?[A-Z0-9]*)\b/); // Ford: AL3T-15604-BD
+  if (m) return normalizePN(m[1]);
+  m = title.match(/\b(\d{5}-[A-Z0-9]{4,6}(?:-[A-Z]{1,2})?)\b/); // Toyota/Honda: 89661-04840
+  if (m) return normalizePN(m[1]);
+  m = title.match(/\b(\d{7,}[A-Z]{0,2})\b/); // Chrysler/GM: 68269652AA
+  if (m) return normalizePN(m[1]);
+  return '';
+}
+
+// Check if an alert is cached — returns cacheId or null
+function getAlertCacheId(alert) {
+  // 1. Direct match: this alert ID was claimed via cache
+  var aid = String(alert.id);
+  if (claimedAlertIds[aid]) return claimedAlertIds[aid];
+  // 2. PN match: extract PN from title, check PN map (cross-tool sync)
+  var pn = extractPN(alert.source_title);
+  if (pn && claimedPNs[pn]) return claimedPNs[pn];
+  return null;
+}
+
+async function loadCacheKeys() {
+  try {
+    var res = await fetch('/cache/claimed-keys');
+    var data = await res.json();
+    if (data.success) {
+      claimedPNs = data.claimedPNs || {};
+      claimedItemIds = data.claimedItemIds || {};
+      claimedAlertIds = data.claimedAlertIds || {};
+    }
+  } catch (e) { /* non-fatal */ }
+}
+
 function setYard(yard, el) {
   currentYard = yard;
   document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); });
@@ -136,32 +198,96 @@ function toggleHidePulled() {
   load(1);
 }
 
-function claimAlert(id, claimed, alertData) {
-  if (!claimed && !confirm('Unmark this as pulled?')) return;
-  if (claimed && alertData) {
-    // Route through The Cache — CacheService marks the alert as claimed server-side
-    fetch('/cache/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      partDescription: alertData.source_title || null,
-      vehicle: { year: alertData.vehicle_year || null, make: alertData.vehicle_make || null, model: alertData.vehicle_model || null },
-      yard: { name: alertData.yard_name || null, row: alertData.row || null },
-      estimatedValue: alertData.part_value || null,
-      source: 'scout_alert',
-      sourceId: String(id),
-    }) })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { if (d.success) load(currentPage); })
-      .catch(function(err) { alert('Error: ' + err.message); });
-  } else {
-    // Unclaim — route through original endpoint
-    fetch('/scout-alerts/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, claimed: false }) })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { if (d.success) load(currentPage); })
-      .catch(function(err) { alert('Error: ' + err.message); });
+function claimAlert(id, alertData) {
+  var el = document.getElementById('alert-' + id);
+  var btn = el ? el.querySelector('.claim-check') : null;
+
+  // Optimistic UI
+  if (el) el.classList.add('claimed');
+  if (btn) {
+    btn.classList.add('checked');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="#22c55e" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
   }
+
+  fetch('/cache/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    partDescription: alertData.source_title || null,
+    vehicle: { year: alertData.vehicle_year || null, make: alertData.vehicle_make || null, model: alertData.vehicle_model || null },
+    yard: { name: alertData.yard_name || null, row: alertData.row || null },
+    estimatedValue: alertData.part_value || null,
+    source: 'scout_alert',
+    sourceId: String(id),
+  }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success || d.cached) {
+        var entry = d.cached || d;
+        claimedAlertIds[String(id)] = entry.id;
+        // Also update PN map if the title has a PN
+        var pn = extractPN(alertData.source_title);
+        if (pn) claimedPNs[pn] = entry.id;
+        // Update button to unclaim mode
+        if (btn) btn.setAttribute('onclick', 'unclaimAlert(' + id + ')');
+      } else {
+        // Revert
+        if (el) el.classList.remove('claimed');
+        if (btn) {
+          btn.classList.remove('checked');
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
+        }
+      }
+    })
+    .catch(function() {
+      if (el) el.classList.remove('claimed');
+      if (btn) {
+        btn.classList.remove('checked');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
+      }
+    });
 }
 
-function load(page) {
+function unclaimAlert(id) {
+  var el = document.getElementById('alert-' + id);
+  var btn = el ? el.querySelector('.claim-check') : null;
+  var alertData = _alertLookup[id];
+
+  var cacheId = claimedAlertIds[String(id)];
+  if (!cacheId && alertData) {
+    var pn = extractPN(alertData.source_title);
+    if (pn) cacheId = claimedPNs[pn];
+  }
+  if (!cacheId) return;
+
+  // Optimistic UI
+  if (el) el.classList.remove('claimed');
+  if (btn) {
+    btn.classList.remove('checked');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
+  }
+
+  // Unclaim from cache + mark scout_alert as unclaimed
+  Promise.all([
+    fetch('/cache/' + cacheId + '/return', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'unclaimed from scout alerts' }) }),
+    fetch('/scout-alerts/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, claimed: false }) }),
+  ]).then(function() {
+    delete claimedAlertIds[String(id)];
+    if (alertData) {
+      var pn = extractPN(alertData.source_title);
+      if (pn) delete claimedPNs[pn];
+    }
+    if (btn) btn.setAttribute('onclick', 'claimAlert(' + id + ',_alertLookup[' + id + '])');
+  }).catch(function() {
+    // Revert
+    if (el) el.classList.add('claimed');
+    if (btn) {
+      btn.classList.add('checked');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="#22c55e" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    }
+  });
+}
+
+async function load(page) {
   currentPage = page || 1;
+  await loadCacheKeys();
   var url = '/scout-alerts/list?page=' + currentPage;
   if (currentYard !== 'all') url += '&yard=' + encodeURIComponent(currentYard);
   if (currentDays > 0) url += '&days=' + currentDays;
@@ -219,13 +345,17 @@ function load(page) {
             setStr = 'set ' + (days <= 0 ? 'today' : days + 'd ago');
           }
 
-          var isClaimed = a.claimed;
+          // Check cache for claimed state (cross-tool: covers claims from Daily Feed, Hawk Eye, etc.)
+          var isClaimed = !!getAlertCacheId(a) || a.claimed;
           var checkSvg = isClaimed
             ? '<svg viewBox="0 0 24 24" fill="#22c55e" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
+          var claimAction = isClaimed
+            ? 'unclaimAlert(' + a.id + ')'
+            : 'claimAlert(' + a.id + ',_alertLookup[' + a.id + '])';
 
-          h += '<div class="alert-row' + (isClaimed ? ' claimed' : '') + '">';
-          h += '<div class="claim-check' + (isClaimed ? ' checked' : '') + '" onclick="claimAlert(' + a.id + ',' + !isClaimed + ',_alertLookup[' + a.id + '])">' + checkSvg + '</div>';
+          h += '<div class="alert-row' + (isClaimed ? ' claimed' : '') + '" id="alert-' + a.id + '">';
+          h += '<div class="claim-check' + (isClaimed ? ' checked' : '') + '" onclick="' + claimAction + '">' + checkSvg + '</div>';
           h += '<div class="alert-info">';
           if (a.source === 'OVERSTOCK') {
             h += '<div class="alert-part">' + esc(a.source_title) + '</div>';

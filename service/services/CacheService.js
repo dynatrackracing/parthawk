@@ -277,16 +277,17 @@ class CacheService {
   }
 
   /**
-   * Get claimed keys for attack list sync.
-   * Two maps: PN-based (primary) and itemId-based (fallback for no-PN parts).
+   * Get claimed keys for puller tool sync (attack list, scout alerts, etc.).
+   * Three maps: PN-based (primary), itemId-based (fallback), alertId-based (scout alerts).
    */
   async getClaimedKeys() {
     const rows = await database('the_cache')
       .where('status', 'claimed')
-      .select('id', 'part_number', 'item_id');
+      .select('id', 'part_number', 'item_id', 'source', 'source_id');
 
-    const claimedPNs = {};    // normalizedPN → cacheId
-    const claimedItemIds = {}; // itemId (string) → cacheId
+    const claimedPNs = {};      // normalizedPN → cacheId
+    const claimedItemIds = {};   // itemId (string) → cacheId
+    const claimedAlertIds = {};  // scout alert id (string) → cacheId
     for (const r of rows) {
       if (r.part_number) {
         const norm = normalizePartNumber(r.part_number);
@@ -294,8 +295,11 @@ class CacheService {
       } else if (r.item_id) {
         claimedItemIds[String(r.item_id)] = r.id;
       }
+      if (r.source === 'scout_alert' && r.source_id) {
+        claimedAlertIds[r.source_id] = r.id;
+      }
     }
-    return { claimedPNs, claimedItemIds };
+    return { claimedPNs, claimedItemIds, claimedAlertIds };
   }
 
   /**
