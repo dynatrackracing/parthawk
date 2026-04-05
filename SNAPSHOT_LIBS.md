@@ -5,17 +5,18 @@ Generated 2026-04-05
 
 ### partIntelligence.js
 **Purpose:** Unified matching engine for DarkHawk. Single source for PN extraction, stock counting, model matching, year parsing. Used by DAILY FEED, HAWK EYE, THE QUARRY, SCOUR STREAM, SCOUT ALERTS. Replaces partNumberExtractor.js and partMatcher.extractPartNumbers().
-**Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
-**Dependencies:** None (pure logic, no DB or external imports).
+**Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `computeBase`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
+**Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`).
 **Key behavior:**
-- `extractPartNumbers(text)` — 13 regex patterns cover Ford, Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}`. Filters via SKIP_WORDS + MAKES_MODELS sets.
-- `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Calls extractPartNumbers, detectPartType, extractMake, extractModel in sequence.
-- `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Normalizes, rejects junk (JUNK_WORDS set, VINs, years, pure-alpha), strips Ford ECU suffixes (12A650, 14A067). Returns null for unsearchable PNs.
+- `extractPartNumbers(text)` — Ford 3-segment dash patterns + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets.
+- `computeBase(raw)` — Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs. This is the canonical base PN used for `partNumberBase` column.
+- `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` from `extractPartNumbers` for partNumberBase.
+- `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Normalizes, rejects junk (JUNK_WORDS set, VINs, years, pure-alpha), strips Ford ECU suffixes (12A650, 14A067). Returns null for unsearchable PNs. **Intentionally aggressive — for search queries, NOT for storage.**
 - `deduplicatePNQueue(entries)` — Phase E1. Sanitizes, dedupes by base, keeps highest-price entry per PN.
 - `detectPartType(title)` — Keyword detection for 30+ part types (ECM, BCM, TCM, ABS, TIPM, AMP, CLUSTER, RADIO, etc.).
 - `MAKE_NORMALIZE` — Map of lowercase make strings to title-case canonical names (matches corgi VIN decoder output). ~50 entries.
 - `MODEL_PATTERNS` — Ordered array of ~200 model strings. Multi-word models listed first for greedy matching.
-- `stripRevisionSuffix(pn)` — Strips trailing 2-letter revision suffix (Chrysler 56044691AA -> 56044691, Ford AL3T15604BD -> AL3T15604).
+- `stripRevisionSuffix(pn)` — Strips trailing revision suffix. Chrysler 56044691AA → 56044691, GM A12345678AA → A12345678, Ford dashless patterns.
 
 ### partMatcher.js
 **Purpose:** Shared part number recognition and matching. Still used for `normalizePartNumber()` by CacheService, priceResolver, and other services.
@@ -23,7 +24,7 @@ Generated 2026-04-05
 **Dependencies:** `../database/database`, `../lib/logger`
 **Key behavior:**
 - `extractPartNumbers(title)` — OEM-specific regex patterns (chrysler, ford, honda, toyota, nissan, gm, bosch, bmw). Returns `{raw, base, format}`. Deduplicates by base, keeps longer raw match.
-- `normalizePartNumber(pn)` — Strips OEM revision suffixes. Ford dash-style (AL3T-15604-BD → AL3T-15604), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **This is the canonical normalizer used by CacheService for dedup and by the frontend normalizePN() for matching.**
+- `normalizePartNumber(pn)` — Strips OEM revision suffixes. Ford dash-style with 1-3 char suffix (AL3T-15604-BD → AL3T-15604, 7L3A-12A650-GJH → 7L3A-12A650), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **This is the canonical normalizer used by CacheService for dedup, by computeBase() in partIntelligence.js, and by the frontend normalizePN() for matching.**
 - `loadModelsFromDB()` — Loads Auto table models into cache organized by make. Sorted longest-first. Falls back to FALLBACK_MODELS (~120 entries).
 - `MODEL_IMPLIES_MAKE` — Reverse lookup: model name -> make (e.g. "charger" -> "dodge"). ~100 entries.
 

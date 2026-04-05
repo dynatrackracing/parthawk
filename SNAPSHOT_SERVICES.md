@@ -5,16 +5,19 @@ Generated 2026-04-05
 
 ### AttackListService.js
 - Purpose: Scores yard vehicles by pull value — matches yard vehicles against Auto+Item inventory, YourSale history, and YourListing stock
-- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `scoreVehicle()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`
+- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `scoreVehicle()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`, `getModelVariants()`
 - Clean Pipe: `buildStockIndex` + `buildSalesIndex` read `extractedMake`/`extractedModel`/`partNumberBase` columns first, title-parsing fallback only when null
 - Scoring upgrades:
   - Stock penalty scaling: 1 in stock=-5%, 2=-15%, 3=-30%, 4=-50%, 5+=-70%
   - Fresh arrival bonus: <=3 days=+10%, <=7 days=+5%, <=14 days=+2%
   - COGS yard factor: cheaper yards get +/-5% via `_yardCostFactor`
   - Mark boost: parts matching `the_mark` get +15 score bonus
-- Price resolution: market_demand_cache first, conservative sell estimates fallback (never Item.price)
+- Price resolution: market_demand_cache first, Item.price fallback (REF prefix), no price if neither (NO DATA badge). CONSERVATIVE_SELL_ESTIMATES removed.
 - Part filtering: PN-specific parts require exact year; generational parts get +/-1 tolerance; engine/drivetrain/fuel validated
 - **Price floors:** `PART_PRICE_FLOORS` constant — ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/ECU=$100. Parts below floor flagged `belowFloor:true`, excluded from vehicle `totalValue`. Mechanical parts (mirrors, visors, console lids) have no floor.
+- **Model matching:** `COMPOUND_MODEL_MAP` maps compound models to base variants (F-250 Super Duty → [F-250, F250], Explorer Sport Trac → [Explorer]). `getModelVariants()` generates all variants to try. Bidirectional fuzzy matching in `findMatchedParts()`, sales index, and stock index — tests both directions with word-boundary regex. Protected pairs: Grand Cherokee, Transit Connect, Grand Caravan never collapse.
+- **Stock index:** `buildStockIndex()` stores `{ total, fullPNs: Set }` per base key. Per-listing Set dedup prevents triple-counting. `resolveStock()` returns matchType (exact vs base) — base matches shown as "⚠ verify PN" on frontend.
+- **Part exclusion:** `isExcludedPart()` filters complete engines/transmissions/body panels. Allows all modules, trim, glass, lighting, steering, differentials.
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
@@ -44,11 +47,16 @@ Generated 2026-04-05
 
 ### ScoutAlertService.js
 - Purpose: Generates yard-vehicle alerts by matching want-list parts, sold history, and marks against active yard inventory
-- Key methods: `generateAlerts()` (concurrency-guarded, one-at-a-time)
+- Key methods: `generateAlerts()` (concurrency-guarded, one-at-a-time), `scoreMatch()`, `scoreMarkMatch()`, `hasModelConflict()`
 - Reads: `the_mark` (active marks, highest priority PERCH alerts) + `restock_want_list` (Hunters Perch) + `YourSale` (bone pile, sold items with low/no stock) + `restock_flag`
-- Matching: make+model required, year within range; confidence HIGH/MEDIUM based on engine/trim verification
+- **Yard filtering:** Only core yards (`yard.is_core = true`) + yards on active Flyway trips generate alerts. Road trip yards excluded after trip completion.
+- **Part-type-sensitive confidence:** `PART_TYPE_SENSITIVITY` map — ECM/PCM/THROTTLE=engine-sensitive, ABS=drivetrain-sensitive, AMP/RADIO/NAV=trim-sensitive, BCM/TIPM/CLUSTER=universal. Real verification: engine displacement + named engine + cylinder count comparison. Drivetrain 4WD/AWD vs 2WD check. Trim: premium audio brand vs base trim.
+- **Confidence levels:** HIGH=verified match, MEDIUM=attribute unknown on vehicle, LOW=attribute mismatch (wrong engine/drivetrain/trim)
+- **Model conflict guard:** Cherokee≠Grand Cherokee, Caravan≠Grand Caravan, Transit≠Transit Connect, Wrangler≠Gladiator
+- **Part exclusion:** `isExcludedPart()` filters engines/transmissions/body panels before alert generation
 - Stock filter: skips bone_pile parts that have matching active YourListing PNs
 - Atomic refresh: deletes + re-inserts in transaction, preserves claimed status
+- SELECT includes: decoded_drivetrain, decoded_transmission, diesel, trim_tier, body_style (VIN-decoded fields)
 
 ### CompetitorMonitorService.js
 - Purpose: Advisory alerts — underpriced vs market, competitor dropout, competitor undercut
