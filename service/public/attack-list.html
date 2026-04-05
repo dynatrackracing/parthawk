@@ -818,9 +818,10 @@
       return pB - pA;
     });
 
-    // Split parts: above floor first, below floor in collapsed section
-    const aboveFloor = parts.filter(p => p && !p.belowFloor);
-    const belowFloor = parts.filter(p => p && p.belowFloor);
+    // Split parts: good parts first, then mismatched, then below floor
+    const aboveFloor = parts.filter(p => p && !p.belowFloor && !p.specMismatch);
+    const specMismatch = parts.filter(p => p && p.specMismatch && !p.belowFloor);
+    const belowFloor = parts.filter(p => p && p.belowFloor && !p.specMismatch);
 
     // Pullable parts (above floor)
     for (const p of aboveFloor) {
@@ -879,6 +880,23 @@
             : `<button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>`}
         </div>
       </div>`;
+    }
+
+    // Spec-mismatched parts — collapsed, greyed out with orange reason
+    if (specMismatch.length > 0) {
+      const smId = 'sm-' + v.id;
+      html += `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);">
+        <div onclick="var el=document.getElementById('${smId}');el.style.display=el.style.display==='none'?'':'none';this.querySelector('span').textContent=el.style.display==='none'?'▸':'▾'" style="font-size:10px;font-weight:700;color:#ea580c;cursor:pointer;padding:4px 0;user-select:none"><span>▸</span> ${specMismatch.length} part${specMismatch.length > 1 ? 's' : ''} don't match this vehicle</div>
+        <div id="${smId}" style="display:none">`;
+      for (const p of specMismatch) {
+        const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
+        const displayPrice = (p.sold_90d || 0) > 0 && p.price > 0 ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
+        html += `<div style="opacity:0.4;padding:6px 0;display:flex;justify-content:space-between;align-items:center;font-size:11px;border-bottom:1px solid var(--border)">
+          <span style="color:#6B7280">${p.partType ? '[' + p.partType + '] ' : ''}${(p.title || 'Part').substring(0, 50)}</span>
+          <span style="white-space:nowrap"><span style="color:#ea580c;font-size:9px;font-weight:600">${p.mismatchReason || 'Wrong spec'}</span> <span style="color:#6B7280;font-weight:600;margin-left:4px">$${displayPrice}</span></span>
+        </div>`;
+      }
+      html += `</div></div>`;
     }
 
     // Below-floor parts — collapsed, greyed out

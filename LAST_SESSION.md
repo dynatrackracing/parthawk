@@ -100,3 +100,11 @@
 - Added rejection: /^(19|20)\d{2}(19|20)\d{2}$/ after isSkipWord check
 - Cleanup script: service/scripts/cleanup-year-range-pns.js — NULLs bad partNumberBase values
 - Run on prod: node service/scripts/cleanup-year-range-pns.js
+
+## 21:00 — Attack list trim/engine/trans mismatch filtering
+- Added extractPartSpecifics(title) — detects performance trims (ST, SRT, Raptor, AMG, etc.), forced induction (EcoBoost, Turbo, TSI), transmission (MT/AT/DCT/CVT), diesel
+- After VIN filter pass, compares specifics against vehicle.decoded_trim, vehicle.engine, vehicle.decoded_transmission, vehicle.diesel
+- Mismatched parts flagged specMismatch=true, excluded from totalValue (same as belowFloor)
+- Frontend: collapsed "X parts don't match this vehicle" section with orange mismatch reason text
+- Example: 2014 Ford Focus SE 2.0L → ST Turbo parts now show "Part requires EcoBoost engine" or "Part is for ST trim" in mismatch section
+- Careful regex: ST avoids false positive on STEERING/START/STOCK; GT only flags when paired with specific makes; MT only when near TRANS/CLUTCH/SHIFT

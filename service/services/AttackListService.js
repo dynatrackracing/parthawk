@@ -42,6 +42,66 @@ function isExcludedPart(title) {
   return false;
 }
 
+/**
+ * Extract trim/engine/transmission specifics from a part title.
+ * Returns null if no specifics detected, otherwise { trim, forcedInduction, transmission, diesel }.
+ */
+function extractPartSpecifics(title) {
+  if (!title) return null;
+  const t = title.toUpperCase();
+  let trim = null, forcedInduction = null, transmission = null, diesel = false;
+
+  // Performance trim indicators — word-boundary to avoid false positives
+  // "ST" needs careful handling: must be word boundary, not inside "STEERING", "START", "STOCK" etc.
+  if (/\bST\b/.test(t) && !/STEER|START|STOCK|STABIL|STANDARD|STRUT|STRAP|STATOR/.test(t)) trim = 'ST';
+  if (/\b(RS)\b/.test(t) && !/SENSOR/.test(t)) trim = 'RS';
+  if (/\bSS\b/.test(t)) trim = 'SS';
+  if (/\bSRT[- ]?[0-9]*\b/.test(t)) trim = 'SRT';
+  if (/\bTYPE[- ]?[RS]\b/.test(t)) trim = t.match(/TYPE[- ]?([RS])/)[0].replace(/[- ]/g, ' ');
+  if (/\b(SI)\b/.test(t) && !/SIGNAL|SILICON|SIDE|SIT/.test(t)) trim = 'Si';
+  if (/\bTRD\b/.test(t)) trim = 'TRD';
+  if (/\bNISMO\b/.test(t)) trim = 'Nismo';
+  if (/\bAMG\b/.test(t)) trim = 'AMG';
+  if (/\bSHELBY\b/.test(t)) trim = 'Shelby';
+  if (/\bRAPTOR\b/.test(t)) trim = 'Raptor';
+  if (/\bTRAIL BOSS\b/.test(t)) trim = 'Trail Boss';
+  if (/\bZR2\b/.test(t)) trim = 'ZR2';
+  if (/\bS[- ]?LINE\b/.test(t)) trim = 'S-Line';
+  if (/\bR[- ]?LINE\b/.test(t)) trim = 'R-Line';
+  // GT: only flag when paired with specific makes (Ford, VW, Pontiac) — too generic otherwise
+  if (/\bGT\b/.test(t) && /\b(MUSTANG|FOCUS|GOLF|GTO|PONTIAC)\b/.test(t)) trim = 'GT';
+
+  // Forced induction indicators
+  if (/\bECOBOOST\b/.test(t)) forcedInduction = 'EcoBoost';
+  else if (/\bTWIN\s*TURBO\b/.test(t)) forcedInduction = 'Twin Turbo';
+  else if (/\bTURBOCHARGED\b/.test(t)) forcedInduction = 'Turbocharged';
+  else if (/\bSUPERCHARGED?\b/.test(t)) forcedInduction = 'Supercharged';
+  else if (/\bTFSI\b/.test(t)) forcedInduction = 'TFSI';
+  else if (/\bTSI\b/.test(t) && !/TRANSMIS/.test(t)) forcedInduction = 'TSI';
+  // "2.0T" or "1.5T" pattern — T suffix means turbo
+  else if (/\b\d+\.\d[T]\b/.test(t)) forcedInduction = 'Turbo';
+  // Bare "TURBO" — but not "TURBO TIMER", "TURBOCHARGER" (the actual turbo part itself is generic)
+  else if (/\bTURBO\b/.test(t) && !/TURBOCHARGER|TURBO TIMER|TURBO ACTUATOR|TURBO WASTEGATE/.test(t)) forcedInduction = 'Turbo';
+
+  // Transmission indicators
+  if (/\bMANUAL TRANS(MISSION)?\b/.test(t)) transmission = 'manual';
+  else if (/\bMT\b/.test(t) && /TRANS|CLUTCH|SHIFT|GEAR/.test(t)) transmission = 'manual';
+  else if (/\bDCT\b/.test(t) || /\bDUAL CLUTCH\b/.test(t) || /\bPOWERSHIFT\b/.test(t)) transmission = 'automatic';
+  else if (/\bCVT\b/.test(t) && !/BOOT/.test(t)) transmission = 'automatic';
+  else if (/\bAUTOMATIC TRANS(MISSION)?\b/.test(t)) transmission = 'automatic';
+
+  // Diesel indicators
+  if (/\bDIESEL\b/.test(t)) diesel = true;
+  if (/\bTDI\b/.test(t)) diesel = true;
+  if (/\bDURAMAX\b/.test(t)) diesel = true;
+  if (/\bCUMMINS\b/.test(t)) diesel = true;
+  if (/\bPOWER\s*STROKE\b/.test(t)) diesel = true;
+  if (/\bECODIESEL\b/.test(t)) diesel = true;
+
+  if (!trim && !forcedInduction && !transmission && !diesel) return null;
+  return { trim, forcedInduction, transmission, diesel };
+}
+
 // Part types that require EXACT year matching (no ±1 tolerance)
 // These are PN-specific electronic modules — a 2013 TIPM is NOT a 2014 TIPM
 const PN_EXACT_YEAR_TYPES = new Set([
@@ -1217,6 +1277,58 @@ class AttackListService {
       return true;
     });
 
+    // === TRIM/ENGINE/TRANS SPECIFICS CHECK ===
+    // Flag parts whose title indicates a specific trim, turbo, trans, or diesel
+    // that doesn't match this vehicle's VIN-decoded attributes.
+    const vehicleTrimRaw = (cleanNHTSATrim(vehicle.decoded_trim) || cleanNHTSATrim(vehicle.trim_level) || vehicle.trim || '').toUpperCase();
+    const vehicleEngineRaw = (vehicle.engine || vehicle.decoded_engine || '').toUpperCase();
+    const vehicleTransRaw = (vehicle.decoded_transmission || '').toUpperCase();
+    const vehicleIsDiesel = vehicle.diesel || /DIESEL|DURAMAX|CUMMINS|POWERSTROKE|POWER STROKE|TDI|ECODIESEL/i.test(vehicleEngineRaw);
+    const vehicleHasTurbo = /TURBO|ECOBOOST|TSI|TFSI|SUPERCHARG|TWIN.?TURBO|BI.?TURBO/i.test(vehicleEngineRaw);
+
+    for (const p of filteredParts) {
+      const specifics = extractPartSpecifics(p.title || '');
+      if (!specifics) continue;
+
+      // TRIM: part mentions a performance trim, vehicle must have it
+      if (specifics.trim) {
+        if (!vehicleTrimRaw.includes(specifics.trim.toUpperCase())) {
+          p.specMismatch = true;
+          p.mismatchReason = `Part is for ${specifics.trim} trim`;
+        }
+      }
+
+      // FORCED INDUCTION: part says Turbo/EcoBoost, vehicle engine must indicate turbo
+      if (specifics.forcedInduction && !p.specMismatch) {
+        if (!vehicleHasTurbo) {
+          p.specMismatch = true;
+          p.mismatchReason = `Part requires ${specifics.forcedInduction} engine`;
+        }
+      }
+
+      // TRANSMISSION: part says Manual/MT, vehicle trans must match
+      if (specifics.transmission && !p.specMismatch) {
+        if (vehicleTransRaw) {
+          if (specifics.transmission === 'manual' && /AUTO|CVT/i.test(vehicleTransRaw) && !/MANUAL/i.test(vehicleTransRaw)) {
+            p.specMismatch = true;
+            p.mismatchReason = 'Part is for manual transmission';
+          }
+          if (specifics.transmission === 'automatic' && /MANUAL/i.test(vehicleTransRaw) && !/AUTO|CVT|DCT|DUAL/i.test(vehicleTransRaw)) {
+            p.specMismatch = true;
+            p.mismatchReason = 'Part is for automatic transmission';
+          }
+        }
+      }
+
+      // DIESEL: part is for diesel, vehicle is not diesel
+      if (specifics.diesel && !p.specMismatch) {
+        if (!vehicleIsDiesel) {
+          p.specMismatch = true;
+          p.mismatchReason = 'Part is for diesel engine';
+        }
+      }
+    }
+
     filteredParts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
 
     // === TRIM INTELLIGENCE: adjust trim-dependent part scores ===
@@ -1267,8 +1379,8 @@ class AttackListService {
       }
     }
 
-    // === TOTAL VALUE: sum of parts ABOVE their price floor ===
-    const totalValue = filteredParts.filter(p => !p.belowFloor).reduce((sum, p) => sum + (p.price || 0), 0);
+    // === TOTAL VALUE: sum of parts ABOVE their price floor AND not mismatched ===
+    const totalValue = filteredParts.filter(p => !p.belowFloor && !p.specMismatch).reduce((sum, p) => sum + (p.price || 0), 0);
 
     // Market data enrichment happens in getAttackList() after scoring (async context)
 

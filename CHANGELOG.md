@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Attack List: Trim/Engine/Trans Mismatch Filtering — 2026-04-05
+- extractPartSpecifics(title) detects: performance trims (ST/SRT/Raptor/AMG/etc.), forced induction (EcoBoost/Turbo/TSI), transmission type, diesel
+- Compares part title specifics against vehicle VIN data (decoded_trim, engine, decoded_transmission, diesel)
+- Mismatched parts excluded from totalValue, shown in collapsed "X parts don't match this vehicle" section
+- Frontend: orange mismatch reason text, greyed out at opacity 0.4
+- Files: AttackListService.js, attack-list.html
+
+---
+
 ## Fix: Reject Concatenated Year Ranges as Part Numbers — 2026-04-05
 - extractPartNumbers() 8-digit regex captured "20012003" etc. as PNs from stripped year ranges
 - Added /^(19|20)\d{2}(19|20)\d{2}$/ rejection after isSkipWord check
