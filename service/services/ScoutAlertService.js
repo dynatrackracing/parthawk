@@ -56,11 +56,25 @@ async function _generateAlertsInner() {
   // Ensure models are loaded from Auto table before parsing
   await loadModelsFromDB();
 
-  // 1. Get all active yard vehicles (include id for mark matching)
+  // 1. Get active yard vehicles from ELIGIBLE yards only:
+  //    - Core yards (not on any flyway trip — scraped independently)
+  //    - Yards on an ACTIVE flyway trip
+  //    Excludes vehicles from completed/expired trips that haven't been cleaned up yet.
   const vehicles = await database('yard_vehicle')
     .join('yard', 'yard.id', 'yard_vehicle.yard_id')
     .where('yard_vehicle.active', true)
     .where('yard.enabled', true)
+    .where(function() {
+      // Core yards: not in flyway_trip_yard at all
+      this.whereNotIn('yard.id', database('flyway_trip_yard').select('yard_id'))
+        // OR yards on an active trip
+        .orWhereIn('yard.id',
+          database('flyway_trip_yard')
+            .join('flyway_trip', 'flyway_trip.id', 'flyway_trip_yard.trip_id')
+            .where('flyway_trip.status', 'active')
+            .select('flyway_trip_yard.yard_id')
+        );
+    })
     .select(
       'yard_vehicle.id as yard_vehicle_id',
       'yard_vehicle.year', 'yard_vehicle.make', 'yard_vehicle.model',

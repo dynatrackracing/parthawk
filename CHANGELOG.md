@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout Alerts Trip Filtering — 2026-04-05
+- generateAlerts() yard_vehicle query now filters by trip status
+- Core yards (not in flyway_trip_yard) always generate alerts
+- Flyway yards only generate alerts when their trip is active
+- Vehicles from completed/expired trips excluded immediately (no 24h wait)
+
+---
+
 ## Global Part Value Colors + Exclusion Filter — 2026-04-05
 - Created dh-parts.js + dh-parts.css: shared 6-tier color system (getPartTier, renderPriceBadge, isExcludedPart)
 - Wired into all 6 field pages: attack-list, scout-alerts, cache, vin-scanner, gate, flyway

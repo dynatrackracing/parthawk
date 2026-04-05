@@ -57,6 +57,11 @@
 - LOW (<$100): red
 - Applied to: part badges, category chips, vehicle score number
 
+## Scout Alerts Trip Filtering
+- generateAlerts() was querying ALL active yard_vehicles from ALL enabled yards — no trip awareness
+- Fixed: yard_vehicle query now filters to core yards (not in flyway_trip_yard) OR yards on active trips
+- Vehicles from completed/expired Flyway trips no longer generate alerts even before the 24h cleanup window
+
 ## Architecture Confirmed
 - Backend wiring for scout alert sources already complete:
   - THE MARK → ScoutAlertService reads the_mark ✅
