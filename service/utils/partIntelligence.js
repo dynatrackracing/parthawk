@@ -304,6 +304,16 @@ function detectPartType(title) {
   if (t.includes('BLOWER MOTOR')) return 'BLOWER';
   if (t.includes('NAVIGATION') || (t.includes('NAV') && t.includes('MODULE'))) return 'NAV';
   if (t.includes('SUN VISOR') || t.includes('SUNVISOR') || t.includes('SUN-VISOR')) return 'VISOR';
+  if (/\bROLLOVER\s*(SENSOR|MODULE)\b/.test(t)) return 'ROLLOVER_SENSOR';
+  if (/\bYAW\s*(RATE\s*)?(SENSOR|MODULE)\b/.test(t)) return 'YAW_SENSOR';
+  if (/\bOCCUPANT\s*(SENSOR|MODULE|CLASSIFICATION)\b/.test(t)) return 'OCCUPANT_SENSOR';
+  if (/\bSEAT\s*(CONTROL\s*)?(MODULE|COMPUTER)\b/.test(t)) return 'SEAT_MODULE';
+  if (/\bDOOR\s*(CONTROL\s*)?(MODULE|COMPUTER)\b/.test(t) && !t.includes('DOOR LOCK')) return 'DOOR_MODULE';
+  if (/\bWIPER\s*(CONTROL\s*)?(MODULE|MOTOR)\b/.test(t)) return 'WIPER_MODULE';
+  if (/\bBLEND\s*DOOR\s*(ACTUATOR|MOTOR)\b/.test(t)) return 'BLEND_DOOR';
+  if (/\bTRAILER\s*(BRAKE\s*)?(MODULE|CONTROL)\b/.test(t)) return 'TRAILER_MODULE';
+  if (/\bLANE\s*(DEPARTURE|KEEP)\b/.test(t)) return 'LANE_ASSIST';
+  if (/\bADAPTIVE\s*CRUISE\b/.test(t)) return 'ADAPTIVE_CRUISE';
   return null;
 }
 
@@ -329,6 +339,11 @@ var MODEL_PATTERNS = [
   'Grand Cherokee', 'Grand Caravan', 'Grand Prix', 'Grand Marquis', 'Grand Vitara',
   'Town & Country', 'Town and Country', 'Transit Connect',
   'Crown Victoria', 'Monte Carlo', 'El Camino', 'Park Avenue',
+  'Explorer Sport Trac', 'Explorer Sport',
+  'Express 3500', 'Express 2500', 'Express 1500',
+  'Savana 3500', 'Savana 2500', 'Savana 1500',
+  'NV 3500', 'NV 2500', 'NV 1500', 'NV200',
+  'Sprinter 2500', 'Sprinter 3500',
   'Land Cruiser', 'Rav4', 'RAV4', '4Runner',
   'Santa Fe', 'Wrangler Unlimited',
   'PT Cruiser', 'Pt Cruiser',
@@ -348,13 +363,14 @@ var MODEL_PATTERNS = [
   'E-150', 'E-250', 'E-350', 'E150', 'E250', 'E350',
   // Single-word models
   'Silverado', 'Sierra', 'Tahoe', 'Suburban', 'Yukon', 'Avalanche', 'Colorado', 'Canyon',
+  'Express', 'Savana', 'Astro', 'Safari', 'Venture', 'Uplander', 'Montana', 'Terraza',
   'Equinox', 'Traverse', 'Trailblazer', 'Blazer', 'Trax', 'Envoy', 'Acadia', 'Terrain',
   'Enclave', 'Encore', 'LaCrosse', 'Regal', 'Verano', 'Lucerne', 'LeSabre', 'Rendezvous',
   'Impala', 'Malibu', 'Cruze', 'Cobalt', 'Sonic', 'Spark', 'Bolt', 'Camaro', 'Corvette',
   'Escalade', 'CTS', 'ATS', 'XTS', 'SRX', 'XT5', 'XT4', 'CT5', 'CT4',
   'Navigator', 'Aviator', 'Corsair', 'Nautilus', 'Continental', 'MKZ', 'MKX', 'MKC', 'MKT',
   'Explorer', 'Expedition', 'Escape', 'Edge', 'Flex', 'Fusion', 'Focus', 'Taurus',
-  'Mustang', 'Ranger', 'Bronco', 'Maverick', 'Excursion', 'Windstar', 'Freestar', 'Freestyle',
+  'Mustang', 'Ranger', 'Bronco', 'Maverick', 'Excursion', 'Windstar', 'Freestar', 'Freestyle', 'Econoline', 'Transit',
   'Charger', 'Challenger', 'Durango', 'Dakota', 'Magnum', 'Caliber', 'Avenger', 'Dart',
   'Caravan', 'Journey', 'Nitro', 'Neon', 'Stratus', 'Sebring', 'Intrepid', '300', '200',
   'Cherokee', 'Wrangler', 'Compass', 'Renegade', 'Gladiator', 'Liberty', 'Commander', 'Patriot',
@@ -363,7 +379,7 @@ var MODEL_PATTERNS = [
   'Highlander', 'Sequoia', 'Sienna', 'Venza', 'Tacoma', 'Tundra',
   'Civic', 'Accord', 'Pilot', 'Passport', 'Odyssey', 'Ridgeline', 'Element', 'Fit', 'Insight',
   'Altima', 'Maxima', 'Sentra', 'Versa', 'Rogue', 'Murano', 'Pathfinder', 'Frontier',
-  'Armada', 'Titan', 'Juke', 'Kicks', 'Xterra', '350Z', '370Z',
+  'Armada', 'Titan', 'Juke', 'Kicks', 'Xterra', '350Z', '370Z', 'NV200',
   'Sonata', 'Elantra', 'Tucson', 'Veloster', 'Accent', 'Genesis', 'Azera', 'Veracruz',
   'Sportage', 'Sorento', 'Optima', 'Forte', 'Soul', 'Rio', 'Telluride', 'Seltos', 'Stinger',
   'Outback', 'Forester', 'Impreza', 'Legacy', 'Crosstrek', 'Ascent', 'WRX', 'BRZ', 'Tribeca',
@@ -374,6 +390,7 @@ var MODEL_PATTERNS = [
   '3', '5', '6', 'RX-8',
   'Montego', 'Mariner', 'Mountaineer', 'Sable', 'Milan',
   '280ZX', 'Stanza', 'Pulsar',
+  'Sprinter', 'Metris', 'ProMaster',
 ];
 
 function extractMake(titleLower) {
