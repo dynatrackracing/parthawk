@@ -139,35 +139,10 @@
   .pd-actions { display: flex; gap: 6px; margin-top: 6px; }
   .btn-pull { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #22c55e; background: transparent; color: #22c55e; cursor: pointer; font-family: var(--font); }
   .btn-pull:active { opacity: 0.7; }
-  .btn-skip { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: var(--font); }
-  .btn-note { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: var(--font); }
-  .skip-dropdown { display: none; }
-  .note-input { display: none; }
+  .btn-cached { padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #065f46; background: #064e3b; color: #22c55e; cursor: pointer; font-family: var(--font); }
+  .btn-cached:active { opacity: 0.7; }
+  .part-detail.cached-part { opacity: 0.55; }
 
-  /* Skip dropdown */
-  .skip-dropdown {
-    display: none; margin-top: 6px; background: var(--surface2);
-    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
-  }
-  .skip-dropdown.open { display: block; }
-  .skip-option {
-    padding: 10px 12px; font-size: 12px; color: var(--text-mid);
-    cursor: pointer; border-bottom: 1px solid var(--border);
-  }
-  .skip-option:last-child { border-bottom: none; }
-  .skip-option:active { background: var(--border); }
-
-  /* Note input */
-  .note-input {
-    display: none; margin-top: 6px;
-  }
-  .note-input.open { display: flex; gap: 6px; }
-  .note-input input {
-    flex: 1; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 6px; color: var(--text); font-size: 12px; outline: none;
-  }
-  .note-input input:focus { border-color: var(--red); }
-  .note-input button { padding: 8px 12px; }
 
   /* Location section */
   .loc-section {
@@ -312,6 +287,31 @@
   const activeSessions = {};
   let _currentNewestDate = null; // set per-yard during render
 
+  // Cache state: key → cache entry id
+  const cachedParts = new Map(); // "partType|MAKE|MODEL" or "PN:partNumber" → cacheId
+
+  function cacheKey(partType, make, model, partNumber) {
+    if (partNumber) return 'PN:' + partNumber.trim().toUpperCase();
+    return (partType || '').toUpperCase() + '|' + (make || '').toUpperCase() + '|' + (model || '').toUpperCase();
+  }
+
+  async function loadCachedParts() {
+    try {
+      const res = await fetch('/cache/active');
+      const data = await res.json();
+      if (data.success && data.claims) {
+        cachedParts.clear();
+        for (const c of data.claims) {
+          if (c.part_number) {
+            cachedParts.set('PN:' + c.part_number.toUpperCase(), c.id);
+          } else if (c.part_type && c.vehicle_make && c.vehicle_model) {
+            cachedParts.set(c.part_type.toUpperCase() + '|' + c.vehicle_make.toUpperCase() + '|' + c.vehicle_model.toUpperCase(), c.id);
+          }
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+
   // Parse date-only strings as local time, timestamps normally
   function parseLocalDate(d) {
     if (!d) return null;
@@ -418,6 +418,7 @@
   async function loadData() {
     document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Scoring vehicles...</div></div>';
     try {
+      await loadCachedParts();
       const res = await fetch('/attack-list');
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
@@ -796,7 +797,9 @@
       } else if (p.marketMedian > 0) {
         freshness = '✅';
       }
-      html += `<div class="part-detail" id="pd-${v.id}-${pid}">
+      const ck = cacheKey(p.partType, v.make, v.model, p.partNumberBase || p.partNumber);
+      const isCached = cachedParts.has(ck);
+      html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${p.isMarked && !p.alertMatch ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
           <div class="pd-verdict ${vc}">${badgeVerdict} ${pricePrefix}${price} ${freshness}</div>
@@ -817,19 +820,9 @@
         </div>` : ''}
         ${p.deadWarning && p.deadWarning.failureReason && p.deadWarning.failureReason !== 'unknown' ? `<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600;">${p.deadWarning.failureReason === 'overpriced' ? 'Sat unsold — was overpriced vs market' : p.deadWarning.failureReason === 'low_demand' ? 'Sat unsold — low demand for this part' : p.deadWarning.failureReason}</div>` : ''}
         <div class="pd-actions">
-          <button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>
-          <button class="btn-skip" onclick="toggleSkip('${v.id}','${pid}')">Skip</button>
-          <button class="btn-note" onclick="toggleNote('${v.id}','${pid}')">Note</button>
-        </div>
-        <div class="skip-dropdown" id="skip-${v.id}-${pid}">
-          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','already_have')">Already have</div>
-          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','too_low_value')">Too low value</div>
-          <div style="padding:6px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="logSkip('${v.id}','${pid}','hard_to_pull')">Hard to pull</div>
-          <div style="padding:6px 10px;font-size:11px;cursor:pointer" onclick="logSkip('${v.id}','${pid}','other')">Other</div>
-        </div>
-        <div class="note-input" id="note-${v.id}-${pid}">
-          <input type="text" id="noteval-${v.id}-${pid}" placeholder="Add note..." style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;font-family:var(--font);outline:none;">
-          <button onclick="saveNote('${v.id}','${pid}')" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Save</button>
+          ${isCached
+            ? `<button class="btn-cached" onclick="unclaimPart('${v.id}','${pid}',event)">✓ Cached</button>`
+            : `<button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>`}
         </div>
       </div>`;
     }
@@ -942,14 +935,20 @@
     const v = findVehicleById(vid);
     const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
 
+    // Optimistic UI
     btn.disabled = true; btn.textContent = 'Caching...';
+    el.classList.add('cached-part');
+
+    const pn = p ? (p.partNumberBase || p.partNumber) : null;
+    const ck = cacheKey(p ? p.partType : null, v ? v.make : null, v ? v.model : null, pn);
+
     fetch('/cache/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         partType: p ? p.partType : null,
         partDescription: p ? (p.title || p.category) : null,
-        partNumber: p ? (p.partNumberBase || p.partNumber) : null,
+        partNumber: pn,
         vehicle: {
           year: v ? v.year : null,
           make: v ? v.make : null,
@@ -967,56 +966,59 @@
         sourceId: vid,
       }),
     }).then(r => r.json()).then(data => {
-      if (data.success) {
-        el.style.opacity = '0.4';
-        btn.textContent = 'Cached ✓';
-        btn.style.background = '#064e3b';
-        btn.style.color = '#22c55e';
-        btn.style.borderColor = '#065f46';
+      if (data.success || data.cached) {
+        const cacheId = (data.cached && data.cached.id) || data.id;
+        cachedParts.set(ck, cacheId);
+        btn.className = 'btn-cached';
+        btn.textContent = '✓ Cached';
+        btn.disabled = false;
+        btn.setAttribute('onclick', `unclaimPart('${vid}','${itemId}',event)`);
       } else {
+        el.classList.remove('cached-part');
         btn.disabled = false; btn.textContent = 'Pull';
       }
     }).catch(() => {
+      el.classList.remove('cached-part');
       btn.disabled = false; btn.textContent = 'Pull';
     });
   }
 
-  function toggleSkip(vid, itemId) {
-    const dd = document.getElementById('skip-' + vid + '-' + itemId);
-    dd.classList.toggle('open');
-  }
-
-  function logSkip(vid, itemId, reason) {
-    const dd = document.getElementById('skip-' + vid + '-' + itemId);
-    dd.classList.remove('open');
+  function unclaimPart(vid, itemId, evt) {
+    evt.stopPropagation();
     const el = document.getElementById('pd-' + vid + '-' + itemId);
-    if (el) {
-      el.style.opacity = '0.3';
-      const btn = el.querySelector('.btn-skip');
-      btn.textContent = '✗ ' + reason.replace('_', ' ');
-    }
-  }
+    const btn = el ? el.querySelector('.btn-cached') : null;
+    if (!btn) return;
 
-  function toggleNote(vid, itemId) {
-    const ni = document.getElementById('note-' + vid + '-' + itemId);
-    ni.classList.toggle('open');
-    if (ni.classList.contains('open')) {
-      ni.querySelector('input').focus();
-    }
-  }
+    const v = findVehicleById(vid);
+    const p = v && v.parts ? v.parts.find(pp => (pp.itemId || pp.partType) === itemId) : null;
+    const pn = p ? (p.partNumberBase || p.partNumber) : null;
+    const ck = cacheKey(p ? p.partType : null, v ? v.make : null, v ? v.model : null, pn);
+    const cacheId = cachedParts.get(ck);
+    if (!cacheId) return;
 
-  function saveNote(vid, itemId) {
-    const input = document.getElementById('noteval-' + vid + '-' + itemId);
-    const note = input.value.trim();
-    if (!note) return;
-    input.value = '';
-    document.getElementById('note-' + vid + '-' + itemId).classList.remove('open');
-    // Show confirmation
-    const el = document.getElementById('pd-' + vid + '-' + itemId);
-    const noteEl = document.createElement('div');
-    noteEl.style.cssText = 'font-size:11px;color:var(--yellow);margin-top:4px;';
-    noteEl.textContent = '📝 ' + note;
-    el.appendChild(noteEl);
+    // Optimistic UI
+    btn.disabled = true; btn.textContent = 'Removing...';
+    el.classList.remove('cached-part');
+
+    fetch('/cache/' + cacheId + '/return', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'unclaimed from attack list' }),
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        cachedParts.delete(ck);
+        btn.className = 'btn-pull';
+        btn.textContent = 'Pull';
+        btn.disabled = false;
+        btn.setAttribute('onclick', `markPulled('${vid}','${itemId}',event)`);
+      } else {
+        el.classList.add('cached-part');
+        btn.disabled = false; btn.textContent = '✓ Cached';
+      }
+    }).catch(() => {
+      el.classList.add('cached-part');
+      btn.disabled = false; btn.textContent = '✓ Cached';
+    });
   }
 
   // === Location loading ===

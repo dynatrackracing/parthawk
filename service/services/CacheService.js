@@ -26,12 +26,33 @@ class CacheService {
       throw new Error(`Invalid source: ${source}. Must be one of: ${validSources.join(', ')}`);
     }
 
+    // Deduplicate: check if an active claim already exists for this part+vehicle combo
+    const normPt = (partType || '').toUpperCase();
+    const normMake = (vehicle?.make || '').toUpperCase();
+    const normModel = (vehicle?.model || '').toUpperCase();
+    const normPn = partNumber ? partNumber.trim().toUpperCase() : null;
+
+    let existingQuery = database('the_cache').where('status', 'claimed');
+    if (normPn) {
+      existingQuery = existingQuery.whereRaw('UPPER(part_number) = ?', [normPn]);
+    } else if (normPt && normMake && normModel) {
+      existingQuery = existingQuery
+        .whereRaw('UPPER(part_type) = ?', [normPt])
+        .whereRaw('UPPER(vehicle_make) = ?', [normMake])
+        .whereRaw('UPPER(vehicle_model) = ?', [normModel]);
+    }
+    const existing = await existingQuery.first();
+    if (existing) {
+      this.log.info({ id: existing.id, source }, 'Duplicate claim — returning existing');
+      return existing;
+    }
+
     const id = uuidv4();
     const entry = {
       id,
       part_type: partType || null,
       part_description: partDescription || null,
-      part_number: partNumber ? partNumber.trim().toUpperCase() : null,
+      part_number: normPn,
       vehicle_year: vehicle?.year || null,
       vehicle_make: vehicle?.make || null,
       vehicle_model: vehicle?.model || null,
