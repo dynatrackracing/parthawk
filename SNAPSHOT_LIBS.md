@@ -13,9 +13,10 @@ Generated 2026-04-05
 - `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` from `extractPartNumbers` for partNumberBase.
 - `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Normalizes, rejects junk (JUNK_WORDS set, VINs, years, pure-alpha), strips Ford ECU suffixes (12A650, 14A067). Returns null for unsearchable PNs. **Intentionally aggressive — for search queries, NOT for storage.**
 - `deduplicatePNQueue(entries)` — Phase E1. Sanitizes, dedupes by base, keeps highest-price entry per PN.
-- `detectPartType(title)` — Keyword detection for 30+ part types (ECM, BCM, TCM, ABS, TIPM, AMP, CLUSTER, RADIO, etc.).
+- `detectPartType(title)` — Keyword detection for 40+ part types. Original: ECM, BCM, TCM, ABS, TIPM, AMP, CLUSTER, RADIO, THROTTLE, STEERING, REGULATOR, MIRROR, SUNROOF, FUEL_MODULE, CAMERA, HVAC, HEADLIGHT, TAILLIGHT, BLIND_SPOT, PARK_SENSOR, AIR_RIDE, CLOCK_SPRING, LOCK, IGNITION, LIFTGATE, ALTERNATOR, STARTER, BLOWER, NAV, VISOR. Added: ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT_MODULE, DOOR_MODULE, WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE, LANE_ASSIST, ADAPTIVE_CRUISE.
+- `extractPartNumbers()` rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/` check after isSkipWord).
 - `MAKE_NORMALIZE` — Map of lowercase make strings to title-case canonical names (matches corgi VIN decoder output). ~50 entries.
-- `MODEL_PATTERNS` — Ordered array of ~200 model strings. Multi-word models listed first for greedy matching.
+- `MODEL_PATTERNS` — Ordered array of ~220 model strings. Multi-word models listed first for greedy matching. Includes vans (Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Metris), tonnage variants (Express 2500, Savana 3500, etc.), and compound models (Explorer Sport Trac).
 - `stripRevisionSuffix(pn)` — Strips trailing revision suffix. Chrysler 56044691AA → 56044691, GM A12345678AA → A12345678, Ford dashless patterns.
 
 ### partMatcher.js

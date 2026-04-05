@@ -18,6 +18,7 @@ Generated 2026-04-05
 - **Model matching:** `COMPOUND_MODEL_MAP` maps compound models to base variants (F-250 Super Duty → [F-250, F250], Explorer Sport Trac → [Explorer]). `getModelVariants()` generates all variants to try. Bidirectional fuzzy matching in `findMatchedParts()`, sales index, and stock index — tests both directions with word-boundary regex. Protected pairs: Grand Cherokee, Transit Connect, Grand Caravan never collapse.
 - **Stock index:** `buildStockIndex()` stores `{ total, fullPNs: Set }` per base key. Per-listing Set dedup prevents triple-counting. `resolveStock()` returns matchType (exact vs base) — base matches shown as "⚠ verify PN" on frontend.
 - **Part exclusion:** `isExcludedPart()` filters complete engines/transmissions/body panels. Allows all modules, trim, glass, lighting, steering, differentials.
+- **Trim/engine/trans mismatch filter:** `extractPartSpecifics(title)` detects performance trims (ST/RS/SS/SRT/Raptor/AMG/etc.), forced induction (EcoBoost/Turbo/TSI), transmission type (MT/AT/DCT/CVT), diesel. Compares against vehicle VIN data. Mismatched parts flagged `specMismatch:true`, excluded from `totalValue`, shown collapsed with orange reason text. Context-aware regex: ST avoids STEERING/START/STOCK, GT only paired with specific makes, MT only near transmission context.
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
