@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout Alerts is_core Yard Flag — 2026-04-05
+- Added is_core boolean to yard table, set true for 7 NC local yards
+- ScoutAlertService: WHERE yard.is_core = true OR active trip (replaces broken trip-absence inference)
+- FlywayService.getCoreYardIds(): reads is_core flag instead of hardcoded name list
+- FL LKQ yards no longer incorrectly protected from vehicle cleanup
+
+---
+
 ## Scout Alerts Confidence Matching Rewrite — 2026-04-05
 - scoreMatch() now verifies engine/drivetrain/trim MATCH, not just existence
 - PART_TYPE_SENSITIVITY: engine-sensitive (ECM/PCM), drivetrain-sensitive (ABS), trim-sensitive (AMP/RADIO), universal (BCM/TIPM/etc.)

@@ -68,10 +68,10 @@
 - isExcludedPart() filters out engines/transmissions/body panels before alert generation
 - Confidence reasons stored in notes for display
 
-## Scout Alerts Trip Filtering
-- generateAlerts() was querying ALL active yard_vehicles from ALL enabled yards — no trip awareness
-- Fixed: yard_vehicle query now filters to core yards (not in flyway_trip_yard) OR yards on active trips
-- Vehicles from completed/expired Flyway trips no longer generate alerts even before the 24h cleanup window
+## Scout Alerts Yard Filtering (2 iterations)
+- Iteration 1: Filter by "NOT in flyway_trip_yard = core yard" — wrong, KY/TN road trip yards passed
+- Iteration 2: Added `is_core` boolean column to yard table. Migration sets true for 7 NC local yards (4 LKQ + 2 Foss + Young's). ScoutAlertService uses `WHERE yard.is_core = true OR active trip`. FlywayService.getCoreYardIds() reads flag instead of hardcoded list.
+- Side fix: FL LKQ yards (Tampa/Largo/Clearwater) were incorrectly protected from vehicle cleanup — they're road trip yards, not core
 
 ## Architecture Confirmed
 - Backend wiring for scout alert sources already complete:
