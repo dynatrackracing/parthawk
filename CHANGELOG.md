@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout Alerts Confidence Matching Rewrite — 2026-04-05
+- scoreMatch() now verifies engine/drivetrain/trim MATCH, not just existence
+- PART_TYPE_SENSITIVITY: engine-sensitive (ECM/PCM), drivetrain-sensitive (ABS), trim-sensitive (AMP/RADIO), universal (BCM/TIPM/etc.)
+- Engine: displacement + cylinder + named engine comparison (mismatch = LOW, unknown = MEDIUM)
+- Model conflicts: Cherokee ≠ Grand Cherokee, Transit ≠ Transit Connect, Wrangler ≠ Gladiator
+- isExcludedPart() filters excluded parts before alert generation
+- SELECT adds decoded_drivetrain, decoded_transmission, diesel, trim_tier, body_style
+
+---
+
 ## Scout Alerts Trip Filtering — 2026-04-05
 - generateAlerts() yard_vehicle query now filters by trip status
 - Core yards (not in flyway_trip_yard) always generate alerts

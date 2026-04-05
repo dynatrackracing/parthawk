@@ -57,6 +57,17 @@
 - LOW (<$100): red
 - Applied to: part badges, category chips, vehicle score number
 
+## Scout Alerts Confidence Matching Rewrite
+- scoreMatch() was checking if vehicle.engine EXISTS, not if it MATCHES — a 3.6L V6 got HIGH for a "5.7 HEMI" part
+- Added PART_TYPE_SENSITIVITY map: engine-sensitive (ECM/PCM/TCM/THROTTLE), drivetrain-sensitive (ABS), trim-sensitive (AMP/RADIO/NAV), universal (BCM/TIPM/CLUSTER/mirrors/etc.)
+- Engine matching: extracts displacement + cylinders + named engines from both sides, compares them
+- Drivetrain matching: 4WD/AWD part vs 2WD vehicle = LOW confidence
+- Trim matching: premium audio brand on base trim = LOW confidence
+- Model conflict checks: Cherokee ≠ Grand Cherokee, Transit ≠ Transit Connect, etc.
+- SELECT now includes decoded_drivetrain, decoded_transmission, diesel, trim_tier, body_style
+- isExcludedPart() filters out engines/transmissions/body panels before alert generation
+- Confidence reasons stored in notes for display
+
 ## Scout Alerts Trip Filtering
 - generateAlerts() was querying ALL active yard_vehicles from ALL enabled yards — no trip awareness
 - Fixed: yard_vehicle query now filters to core yards (not in flyway_trip_yard) OR yards on active trips
