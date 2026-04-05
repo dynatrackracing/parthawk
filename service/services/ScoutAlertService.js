@@ -3,10 +3,61 @@
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
 const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
-const { modelMatches: piModelMatches, parseYearRange: piParseYear, extractPartNumbers: piExtractPNs } = require('../utils/partIntelligence');
+const { modelMatches: piModelMatches, parseYearRange: piParseYear, extractPartNumbers: piExtractPNs, detectPartType } = require('../utils/partIntelligence');
 
 // Concurrency guard — only one generateAlerts() at a time
 let _running = false;
+
+// Which vehicle attributes matter for confidence, by part type
+const PART_TYPE_SENSITIVITY = {
+  // Engine-sensitive — wrong engine = wrong part
+  ECM: ['engine'], PCM: ['engine'], THROTTLE: ['engine'],
+  // Transmission-sensitive
+  TCM: ['engine', 'drivetrain'],
+  // Drivetrain-sensitive — 2WD/4WD ABS modules differ
+  ABS: ['drivetrain'],
+  // Trim-sensitive — premium audio on certain trims only
+  AMP: ['trim'], RADIO: ['trim'], NAV: ['trim'],
+  // Universal — same part across all variants
+  BCM: [], TIPM: [], CLUSTER: [], HEADLIGHT: [], TAILLIGHT: [],
+  MIRROR: [], VISOR: [], SUNROOF: [], STEERING: [], CAMERA: [],
+  BLIND_SPOT: [], HVAC: [], ALTERNATOR: [], STARTER: [], BLOWER: [],
+  AIR_RIDE: [], REGULATOR: [], LIFTGATE: [], LOCK: [], PARK_SENSOR: [],
+  CLOCK_SPRING: [], IGNITION: [], FUEL_MODULE: [],
+};
+
+// Model conflict pairs — one must NOT match the other
+const MODEL_CONFLICTS = [
+  ['cherokee', 'grand cherokee'],
+  ['caravan', 'grand caravan'],
+  ['transit', 'transit connect'],
+  ['wrangler', 'gladiator'],
+];
+
+// Engine names for matching
+const ENGINE_NAMES = ['hemi', 'ecoboost', 'coyote', 'pentastar', 'duratec', 'ecotec', 'skyactiv', 'vortec', 'duramax', 'powerstroke', 'triton'];
+
+// Part exclusion — same as AttackListService.isExcludedPart()
+function isExcludedPart(title) {
+  const t = (title || '').toUpperCase();
+  if (/\b(ENGINE|MOTOR) ASSEMBLY\b/.test(t)) return true;
+  if (/\b(LONG|SHORT) BLOCK\b/.test(t)) return true;
+  if (/\b(COMPLETE|CRATE|REMAN) ENGINE\b/.test(t)) return true;
+  if (/\bENGINE BLOCK\b/.test(t)) return true;
+  if (/\bCYLINDER HEAD\b/.test(t)) return true;
+  if (/\b(PISTON|CRANKSHAFT|CONNECTING ROD|HEAD GASKET)\b/.test(t)) return true;
+  if (/\b(OIL PAN|TIMING CHAIN|TIMING BELT|ROCKER ARM|LIFTER|PUSHROD)\b/.test(t)) return true;
+  if (/\b(OIL PUMP|FLYWHEEL|FLEXPLATE)\b/.test(t)) return true;
+  if (/\b(TRANSMISSION|TRANSAXLE) ASSEMBLY\b/.test(t)) return true;
+  if (/\b(COMPLETE|REMAN) TRANSMISSION\b/.test(t)) return true;
+  if (/\bFENDER\b/.test(t)) return true;
+  if (/\bBUMPER (COVER|ASSEMBLY)\b/.test(t)) return true;
+  if (/\bHOOD PANEL\b/.test(t)) return true;
+  if (/\bDOOR SHELL\b/.test(t)) return true;
+  if (/\b(QUARTER|ROCKER) PANEL\b/.test(t)) return true;
+  if (/\b(BED SIDE|TRUCK BED|TRUNK LID|ROOF PANEL)\b/.test(t)) return true;
+  return false;
+}
 
 // Known automotive makes for title parsing
 const KNOWN_MAKES = [
@@ -81,6 +132,8 @@ async function _generateAlertsInner() {
       'yard_vehicle.color', 'yard_vehicle.row_number', 'yard_vehicle.date_added',
       'yard_vehicle.engine', 'yard_vehicle.drivetrain', 'yard_vehicle.trim_level',
       'yard_vehicle.decoded_trim', 'yard_vehicle.decoded_engine',
+      'yard_vehicle.decoded_drivetrain', 'yard_vehicle.decoded_transmission',
+      'yard_vehicle.diesel', 'yard_vehicle.trim_tier', 'yard_vehicle.body_style',
       'yard.name as yard_name'
     );
 
@@ -203,6 +256,7 @@ async function _generateAlertsInner() {
   // 3. Match want list / quarry parts against yard vehicles
   const alerts = [];
   for (const part of partsToMatch) {
+    if (isExcludedPart(part.title)) continue;
     for (const v of vehicles) {
       const match = scoreMatch(part, v);
       if (match.confidence) {
@@ -459,6 +513,44 @@ function scoreMarkMatch(parsed, vehicle, mark) {
   return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };
 }
 
+// Extract engine displacement from a string like "3.6L V6" → "3.6"
+function extractDisplacement(s) {
+  if (!s) return null;
+  const m = s.match(/(\d+\.\d)\s*L/i);
+  return m ? m[1] : null;
+}
+
+// Extract cylinder count from a string like "V8" or "I4"
+function extractCylinders(s) {
+  if (!s) return null;
+  const m = s.match(/\b[VvIi](\d)\b/);
+  return m ? parseInt(m[1]) : null;
+}
+
+// Extract named engine from a string
+function extractEngineName(s) {
+  if (!s) return null;
+  const lower = s.toLowerCase();
+  for (const name of ENGINE_NAMES) {
+    if (lower.includes(name)) return name;
+  }
+  return null;
+}
+
+// Check for model conflicts — "Cherokee" must NOT match "Grand Cherokee"
+function hasModelConflict(partModels, vehicleModel) {
+  const vm = (vehicleModel || '').toLowerCase().replace(/[-]/g, ' ').trim();
+  for (const pm of partModels) {
+    const pmLower = pm.toLowerCase().replace(/[-]/g, ' ').trim();
+    for (const [a, b] of MODEL_CONFLICTS) {
+      // If part is the short name and vehicle is the long name (or vice versa), conflict
+      if ((pmLower === a && vm.includes(b)) || (pmLower === b && vm.includes(a) && !vm.includes(b))) return true;
+      if ((pmLower === a && !vm.includes(b) && vm.includes(a)) && pmLower !== vm) continue; // not a conflict
+    }
+  }
+  return false;
+}
+
 function scoreMatch(part, vehicle) {
   const vMake = (vehicle.make || '').toLowerCase();
   const vModel = (vehicle.model || '').toLowerCase();
@@ -468,9 +560,8 @@ function scoreMatch(part, vehicle) {
   const makeMatch = part.make && vMake.includes(part.make.toLowerCase());
   if (!makeMatch) return {};
 
-  // RULE 2: Model MUST match. No "no specific model" alerts.
+  // RULE 2: Model MUST match (word-boundary)
   if (part.models.length === 0) return {};
-
   let modelMatch = false;
   for (const m of part.models) {
     const mLower = m.toLowerCase();
@@ -482,37 +573,109 @@ function scoreMatch(part, vehicle) {
   }
   if (!modelMatch) return {};
 
-  // RULE 3: Year must be WITHIN range.
-  if (part.yearStart && part.yearEnd && vYear > 0) {
+  // RULE 2b: Model conflict check — Cherokee ≠ Grand Cherokee, etc.
+  if (hasModelConflict(part.models, vehicle.model)) return {};
+
+  // RULE 3: Year must be within range
+  const hasYearRange = part.yearStart && part.yearEnd;
+  if (hasYearRange && vYear > 0) {
     if (vYear < part.yearStart || vYear > part.yearEnd) return {};
   }
-  const hasYearRange = part.yearStart && part.yearEnd;
-  const yearVerified = hasYearRange && vYear >= part.yearStart && vYear <= part.yearEnd;
 
-  // RULE 4: Confidence based on what we can confirm
-  let confidence;
-  const notes = [];
+  // RULE 4: Part-type-sensitive attribute verification
   const titleLower = (part.title || '').toLowerCase();
-  const needsEngineVerify = /v8|5\.7|hemi|v6|3\.5|3\.8|2\.3|2\.7|4\.7/.test(titleLower);
-  const needsDriveVerify = /4x4|awd|4wd|fwd/.test(titleLower);
-  const needsTrimVerify = /type.?s|sport|limited|touring|ss\b|hybrid/i.test(titleLower);
+  const partType = detectPartType(part.title) || null;
+  const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || ['engine']) : ['engine'];
+  const notes = [];
+  let worstConfidence = 'high';
 
-  if (yearVerified || !hasYearRange) {
-    if (needsEngineVerify && !vehicle.engine) {
-      confidence = 'medium'; notes.push('Verify engine at yard');
-    } else if (needsDriveVerify && !vehicle.drivetrain) {
-      confidence = 'medium'; notes.push('Verify drivetrain at yard');
-    } else if (needsTrimVerify && !vehicle.trim_level) {
-      confidence = 'medium'; notes.push('Verify trim/hybrid at yard');
-    } else {
-      confidence = 'high';
+  function downgrade(level, reason) {
+    notes.push(reason);
+    if (level === 'low' || (level === 'medium' && worstConfidence === 'high')) {
+      worstConfidence = level;
     }
-    if (!hasYearRange) notes.push('No year range specified — verify fitment');
-  } else {
-    return {};
   }
 
-  return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };
+  // ENGINE CHECK — for engine-sensitive parts
+  if (sensitivity.includes('engine')) {
+    const partDisp = extractDisplacement(part.title);
+    const partCyl = extractCylinders(part.title);
+    const partEngine = extractEngineName(part.title);
+    const hasPartEngine = partDisp || partCyl || partEngine;
+
+    if (hasPartEngine) {
+      const vEngine = (vehicle.decoded_engine || vehicle.engine || '').toLowerCase();
+      const hasVehicleEngine = vEngine && vEngine !== 'n/a' && vEngine.length > 1;
+
+      if (hasVehicleEngine) {
+        const vDisp = extractDisplacement(vEngine);
+        const vCyl = extractCylinders(vEngine);
+        const vEngineName = extractEngineName(vEngine);
+
+        let mismatch = false;
+        // Displacement mismatch
+        if (partDisp && vDisp && partDisp !== vDisp) mismatch = true;
+        // Cylinder count mismatch (V8 vs V6)
+        if (!mismatch && partCyl && vCyl && partCyl !== vCyl) mismatch = true;
+        // Named engine mismatch (HEMI vs Pentastar)
+        if (!mismatch && partEngine && vEngineName && partEngine !== vEngineName) mismatch = true;
+
+        if (mismatch) {
+          downgrade('low', 'Engine mismatch: part requires ' + (partDisp ? partDisp + 'L' : '') + (partEngine ? ' ' + partEngine : '') + ', vehicle has ' + vEngine);
+        } else {
+          notes.push('Engine verified: ' + vEngine);
+        }
+      } else {
+        downgrade('medium', 'Engine not decoded — verify at yard');
+      }
+    }
+  }
+
+  // DRIVETRAIN CHECK — for drivetrain-sensitive parts
+  if (sensitivity.includes('drivetrain')) {
+    const part4wd = /\b(4wd|4x4|awd)\b/i.test(titleLower);
+    const part2wd = /\b(2wd|fwd|rwd)\b/i.test(titleLower);
+    const hasPartDrive = part4wd || part2wd;
+
+    if (hasPartDrive) {
+      const vDrive = (vehicle.decoded_drivetrain || vehicle.drivetrain || '').toLowerCase();
+      const hasVehicleDrive = vDrive && vDrive.length > 1;
+
+      if (hasVehicleDrive) {
+        const v4wd = /4wd|4x4|awd/i.test(vDrive);
+        if ((part4wd && !v4wd) || (part2wd && v4wd)) {
+          downgrade('low', 'Drivetrain mismatch: part is ' + (part4wd ? '4WD/AWD' : '2WD') + ', vehicle is ' + vDrive);
+        }
+      } else {
+        downgrade('medium', 'Drivetrain not decoded — verify at yard');
+      }
+    }
+  }
+
+  // TRIM CHECK — for trim-sensitive parts (premium audio, etc.)
+  if (sensitivity.includes('trim')) {
+    const premiumAudio = /\b(bose|alpine|harman|kardon|b&o|bang|olufsen|jbl|beats|infinity|burmester|meridian|mark levinson)\b/i;
+    const hasPremiumInTitle = premiumAudio.test(titleLower);
+
+    if (hasPremiumInTitle) {
+      const vTrim = (vehicle.decoded_trim || vehicle.trim_level || '').toLowerCase();
+      const vTier = (vehicle.trim_tier || '').toUpperCase();
+      const hasVehicleTrim = vTrim && vTrim.length > 1;
+
+      if (hasVehicleTrim || vTier) {
+        const isBaseTrim = vTier === 'BASE' || /\b(work|fleet|tradesman|ls\b|w\/t|wt\b)/i.test(vTrim);
+        if (isBaseTrim) {
+          downgrade('low', 'Premium audio part on base trim vehicle');
+        }
+      } else {
+        downgrade('medium', 'Trim not decoded — verify audio package at yard');
+      }
+    }
+  }
+
+  if (!hasYearRange) notes.push('No year range — verify fitment');
+
+  return { confidence: worstConfidence, notes: notes.length > 0 ? notes.join('; ') : null };
 }
 
 async function saveMeta() {
