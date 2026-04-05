@@ -13,6 +13,16 @@ Generated 2026-04-05
 **FIELD links:** feed, alerts, cache, vin, gate, flyway
 **INTEL links:** scour, quarry, sky, perch, mark, velocity, instincts, prey-cycle, carcass, phoenix
 
+### dh-parts.js + dh-parts.css (Part Value Utilities)
+- **Loaded by:** all 6 field pages (attack-list, scout-alerts, cache, vin-scanner, gate, flyway)
+- **CSS:** 6 tier classes (`.tier-elite` through `.tier-low`, `.tier-nodata`), `@keyframes pulse-gold`/`pulse-purple`, `.part-badge` base
+- **JS functions:**
+  - `getPartTier(price)` → `{ label, color, cssClass, pulses }` for 6 price tiers
+  - `renderPriceBadge(price, prefix)` → HTML badge string with tier color
+  - `isExcludedPart(title)` → true for engines/transmissions/body panels, false for modules/trim/glass
+- **Tiers:** ELITE $500+ gold pulse, PREMIUM $350+ purple pulse, HIGH $250+ blue, SOLID $150+ green, BASE $100+ orange, LOW <$100 red
+- **Exclusions:** complete engines/internals, complete transmissions, fenders, bumpers, hoods, door shells, quarter/rocker panels, bed sides, trunk lids, roof panels. ALLOWS all modules, trim, glass, lighting, steering, differentials.
+
 ---
 
 ## Field Pages

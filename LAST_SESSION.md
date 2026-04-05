@@ -30,6 +30,33 @@
 - Cross-tool flow works: pull from Daily Feed → Scout Alerts shows checkmark, and vice versa
 - Unclaim syncs both cache entry and scout_alert claimed field
 
+## Global Part Value Colors + Exclusion Filter
+- Created dh-parts.js + dh-parts.css — shared across all 6 field pages
+- getPartTier(price) returns tier info (ELITE/PREMIUM/HIGH/SOLID/BASE/LOW with colors)
+- renderPriceBadge(price, prefix) generates HTML badge with correct tier color
+- isExcludedPart(title) — global filter for engines, transmissions, body panels
+- Wired into: attack-list, scout-alerts, cache, vin-scanner, gate, flyway
+- Scout alerts: excluded parts filtered, prices use renderPriceBadge()
+- Cache: prices use renderPriceBadge() instead of flat green
+- Hawk Eye (vin-scanner): vd()/vc() updated to use 6-tier system
+- Gate (Nest Protector): stock check prices use renderPriceBadge()
+- Flyway: chips + part badges updated to 6-tier system
+- Backend isExcludedPart() updated: removed transfer case + steering rack exclusions (sellable), added trunk lid, roof panel, bumper assembly
+
+## Price Resolution Fix
+- Removed CONSERVATIVE_SELL_ESTIMATES entirely (misleading flat prices)
+- Price chain: market_demand_cache → Item.price (REF prefix) → no price (NO DATA badge)
+- BASE tier changed from yellow (#F1C40F) to orange (#FF8C00)
+
+## 6-Tier Part Value Badges
+- ELITE ($500+): pulsing gold
+- PREMIUM ($350-499): pulsing purple
+- HIGH ($250-349): blue
+- SOLID ($150-249): green
+- BASE ($100-149): orange
+- LOW (<$100): red
+- Applied to: part badges, category chips, vehicle score number
+
 ## Architecture Confirmed
 - Backend wiring for scout alert sources already complete:
   - THE MARK → ScoutAlertService reads the_mark ✅

@@ -4,6 +4,22 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Global Part Value Colors + Exclusion Filter — 2026-04-05
+- Created dh-parts.js + dh-parts.css: shared 6-tier color system (getPartTier, renderPriceBadge, isExcludedPart)
+- Wired into all 6 field pages: attack-list, scout-alerts, cache, vin-scanner, gate, flyway
+- Global exclusion: engines, transmissions, body panels filtered; modules/trim/glass/steering allowed
+- Backend isExcludedPart() updated: removed transfer case + steering rack (sellable), added trunk lid/roof panel
+
+---
+
+## Price Resolution + Badge Tiers — 2026-04-05
+- Removed CONSERVATIVE_SELL_ESTIMATES — price chain now: market_demand_cache → Item.price (REF prefix) → NO DATA
+- 6-tier part badges: ELITE gold pulse ($500+), PREMIUM purple pulse ($350+), HIGH blue, SOLID green, BASE orange, LOW red
+- Category chips + vehicle score use same 6-tier colors based on highest part value
+- BASE tier yellow→orange (#FF8C00) for visual distinction from gold
+
+---
+
 ## Scout Alerts Cache Sync — 2026-04-05
 - Scout alerts now use /cache/claimed-keys for shared truth with Daily Feed
 - Three matching strategies: alertId, normalized PN (cross-tool), itemId (no-PN parts)
