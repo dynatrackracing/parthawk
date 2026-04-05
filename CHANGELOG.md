@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Inline Edit: Cache Part Numbers + Scour Stream Want List — 2026-04-05
+- PATCH /cache/:id — update partNumber (re-normalized via normalizePartNumber), partDescription, partType, make, model, year, notes
+- PATCH /restock-want-list/:id — update title, notes on want list entries
+- PATCH /restock-want-list/by-title — update by title match + sync scout_alerts.source_title
+- cache.html: inline edit on part number and description (tap to edit, blur/Enter to save, green flash feedback)
+- restock-list.html: inline edit on want list title and notes in WANT LIST tab
+- scout-alerts.html: inline edit on STREAM alert source_title (patches want list + alert records)
+- Files: CacheService.js, cache.js, restock-want-list.js, cache.html, restock-list.html, scout-alerts.html
+
+---
+
 ## Scout Alerts is_core Yard Flag — 2026-04-05
 - Added is_core boolean to yard table, set true for 7 NC local yards
 - ScoutAlertService: WHERE yard.is_core = true OR active trip (replaces broken trip-absence inference)

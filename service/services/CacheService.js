@@ -117,6 +117,30 @@ class CacheService {
   }
 
   /**
+   * Update editable fields on a cache entry (partial update).
+   * Re-normalizes partNumber on save.
+   */
+  async updateEntry(cacheId, updates) {
+    const entry = await database('the_cache').where('id', cacheId).first();
+    if (!entry) throw new Error('Cache entry not found');
+
+    const patch = { updated_at: new Date() };
+    if (updates.partNumber !== undefined) {
+      patch.part_number = updates.partNumber ? normalizePartNumber(updates.partNumber) : null;
+    }
+    if (updates.partDescription !== undefined) patch.part_description = updates.partDescription || null;
+    if (updates.partType !== undefined) patch.part_type = updates.partType || null;
+    if (updates.make !== undefined) patch.vehicle_make = updates.make || null;
+    if (updates.model !== undefined) patch.vehicle_model = updates.model || null;
+    if (updates.year !== undefined) patch.vehicle_year = updates.year || null;
+    if (updates.notes !== undefined) patch.notes = updates.notes || null;
+
+    await database('the_cache').where('id', cacheId).update(patch);
+    this.log.info({ cacheId, fields: Object.keys(patch) }, 'Cache entry updated');
+    return { success: true, updated: patch };
+  }
+
+  /**
    * Return a claimed part back to alerts.
    * If source was scout_alert, re-activates the original alert.
    */

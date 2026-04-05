@@ -122,6 +122,14 @@ textarea.form-input{resize:vertical;min-height:60px;font-family:inherit}
 .empty{text-align:center;color:var(--tf);padding:40px 10px;font-size:13px}
 .loading{text-align:center;padding:40px}
 .loading .lbl{margin-top:8px;color:var(--tf);font-size:12px}
+
+/* Inline edit */
+.editable{cursor:pointer;border-bottom:1px dashed rgba(255,255,255,.15);padding-bottom:1px}
+.editable:hover{border-bottom-color:rgba(255,255,255,.4)}
+.inline-input{background:var(--s2);border:1px solid var(--r);border-radius:4px;color:var(--t);font-size:inherit;font-weight:inherit;font-family:inherit;padding:2px 6px;width:100%;outline:none}
+.inline-input.mono{font-family:SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.05em}
+.save-flash{animation:flashGreen .6s ease}
+@keyframes flashGreen{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}50%{box-shadow:0 0 8px 2px rgba(34,197,94,.4)}100%{box-shadow:none}}
 </style>
 </head>
 <body>
@@ -347,8 +355,10 @@ function loadActive() {
       if (it.part_type) html += '<div class="card-part">' + esc(it.part_type) + '</div>';
       else if (!it.part_number && !veh) html += '<div class="card-part" style="color:#6B7280">Manual entry</div>';
       if (veh) html += '<div class="card-vehicle">' + veh + '</div>';
-      if (it.part_number) html += '<div class="card-pn">' + esc(it.part_number) + '</div>';
-      if (it.part_description) html += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">' + esc(it.part_description) + '</div>';
+      if (it.part_number) html += '<div class="card-pn editable" onclick="inlineEdit(this,\'' + it.id + '\',\'partNumber\',true)" title="Tap to edit">' + esc(it.part_number) + '</div>';
+      else html += '<div class="card-pn editable" onclick="inlineEdit(this,\'' + it.id + '\',\'partNumber\',true)" title="Tap to add PN" style="color:#6B7280;font-style:italic">+ add PN</div>';
+      if (it.part_description) html += '<div class="editable" style="font-size:11px;color:#9CA3AF;margin-top:2px" onclick="inlineEdit(this,\'' + it.id + '\',\'partDescription\',false)" title="Tap to edit">' + esc(it.part_description) + '</div>';
+      else html += '<div class="editable" style="font-size:11px;color:#6B7280;margin-top:2px;font-style:italic" onclick="inlineEdit(this,\'' + it.id + '\',\'partDescription\',false)" title="Tap to add description">+ add description</div>';
       html += '</div>';
       html += '<span class="src-badge ' + srcClass + '">' + esc((it.source || 'manual').replace('_', ' ')) + '</span>';
       html += '</div>';
@@ -660,6 +670,53 @@ function clearAddForm() {
   document.getElementById('addVehYard').value = '';
   document.getElementById('addVehNotes').value = '';
   document.getElementById('stockResults').innerHTML = '';
+}
+
+/* ---- Inline Edit ---- */
+function inlineEdit(el, cacheId, field, isMono) {
+  if (el.querySelector('input')) return; // already editing
+  var orig = el.textContent;
+  if (orig === '+ add PN' || orig === '+ add description') orig = '';
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'inline-input' + (isMono ? ' mono' : '');
+  inp.value = orig;
+  el.textContent = '';
+  el.appendChild(inp);
+  inp.focus();
+  inp.select();
+
+  function save() {
+    var val = inp.value.trim();
+    if (val === orig) { restore(); return; }
+    var body = {};
+    body[field] = val;
+    fetch('/cache/' + cacheId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(r) {
+      if (r.ok) {
+        el.textContent = val || (field === 'partNumber' ? '+ add PN' : '+ add description');
+        if (!val) { el.style.color = '#6B7280'; el.style.fontStyle = 'italic'; }
+        else { el.style.color = ''; el.style.fontStyle = ''; }
+        var card = document.getElementById('card-' + cacheId);
+        if (card) { card.classList.add('save-flash'); setTimeout(function() { card.classList.remove('save-flash'); }, 700); }
+        showToast('Saved');
+      } else { restore(); showToast('Save failed'); }
+    }).catch(function() { restore(); showToast('Network error'); });
+  }
+
+  function restore() {
+    el.textContent = orig || (field === 'partNumber' ? '+ add PN' : '+ add description');
+    if (!orig) { el.style.color = '#6B7280'; el.style.fontStyle = 'italic'; }
+  }
+
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { inp.removeEventListener('blur', save); restore(); }
+  });
 }
 
 /* ---- Init ---- */

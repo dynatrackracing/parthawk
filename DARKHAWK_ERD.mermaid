@@ -1,0 +1,958 @@
+erDiagram
+  Auto {
+    text id
+    integer year PK
+    text make PK
+    text model PK
+    text trim PK
+    text engine PK
+    timestamptz createdAt
+    timestamptz updatedAt
+  }
+  AutoItemCompatibility {
+    text autoId FK
+    text itemId FK
+    timestamptz createdAt
+  }
+  Competitor {
+    text name PK
+    timestamptz createdAt
+    timestamptz updatedAt
+    bool enabled
+    bool isRepair
+  }
+  CompetitorListing {
+    uuid id PK
+    uuid researchRunId FK
+    uuid yourListingId FK
+    varchar(50) ebayItemId
+    text title
+    numeric currentPrice
+    numeric originalPrice
+    varchar(255) seller
+    integer sellerFeedbackScore
+    numeric sellerFeedbackPercent
+    varchar(100) condition
+    numeric shippingCost
+    bool freeShipping
+    bool freeReturns
+    varchar(255) location
+    bool isSponsored
+    text pictureUrl
+    text viewItemUrl
+    text keywords
+    timestamptz scrapedAt
+    timestamptz createdAt
+  }
+  Cron {
+    text id
+    integer total
+    integer processed
+    integer unprocessed
+    numeric elapsed
+    integer duplicate
+    integer apiCalls
+    timestamptz createdAt
+    timestamptz updatedAt
+  }
+  InterchangeNumber {
+    text id
+    text interchangeNumber PK
+    timestamptz createdAt
+    timestamptz updatedAt
+  }
+  Item {
+    text id
+    text ebayId PK
+    numeric price
+    integer quantity
+    text title
+    text categoryId
+    text categoryTitle
+    text seller
+    text manufacturerPartNumber
+    text manufacturerId
+    text pictureUrl
+    bool processed
+    timestamptz createdAt
+    timestamptz updatedAt
+    integer difficulty
+    integer salesEase
+    text notes
+    bool isRepair
+    text partNumberBase
+  }
+  ItemInterchangeNumber {
+    text manufacturerPartNumber
+    text interchangePartId
+    timestamptz createdAt
+  }
+  MarketResearchRun {
+    uuid id PK
+    uuid yourListingId FK
+    text keywords
+    varchar(50) status
+    timestamptz startedAt
+    timestamptz completedAt
+    integer activeListingsFound
+    integer soldItemsFound
+    text errorMessage
+    timestamptz createdAt
+  }
+  PriceCheck {
+    uuid id PK
+    uuid listingId FK
+    text title
+    numeric yourPrice
+    numeric marketMedian
+    numeric marketMin
+    numeric marketMax
+    numeric marketAvg
+    integer compCount
+    numeric salesPerWeek
+    text verdict
+    numeric priceDiffPercent
+    text partType
+    text make
+    text model
+    text years
+    text searchQuery
+    jsonb topComps
+    timestamptz checkedAt
+    timestamptz createdAt
+    timestamptz updatedAt
+  }
+  PriceSnapshot {
+    uuid id PK
+    text keywords
+    varchar(50) categoryId
+    integer soldCount
+    numeric soldPriceMin
+    numeric soldPriceMax
+    numeric soldPriceAvg
+    numeric soldPriceMedian
+    integer activeCount
+    numeric activePriceMin
+    numeric activePriceMax
+    numeric activePriceAvg
+    numeric activePriceMedian
+    timestamptz periodStart
+    timestamptz periodEnd
+    timestamptz createdAt
+    text part_number_base
+    numeric ebay_median_price
+    numeric ebay_min_price
+    numeric ebay_max_price
+    text source
+    timestamptz snapshot_date
+  }
+  SoldItem {
+    uuid id PK
+    text ebayItemId
+    text title
+    numeric soldPrice
+    timestamptz soldDate
+    text categoryId
+    text categoryTitle
+    text seller
+    text condition
+    text pictureUrl
+    jsonb compatibility
+    text manufacturerPartNumber
+    ARRAY interchangeNumbers
+    timestamptz createdAt
+    timestamptz updatedAt
+    uuid researchRunId FK
+    uuid yourListingId FK
+    text keywords
+    numeric originalPrice
+    integer sellerFeedbackScore
+    numeric sellerFeedbackPercent
+    numeric shippingCost
+    bool freeShipping
+    varchar(255) location
+    timestamptz scrapedAt
+    text partNumberBase
+    text partType
+    text extractedMake
+    text extractedModel
+  }
+  SoldItemSeller {
+    text name PK
+    bool enabled
+    integer itemsScraped
+    timestamptz lastScrapedAt
+    timestamptz createdAt
+    timestamptz updatedAt
+    text type
+  }
+  User {
+    integer id PK
+    text firstName
+    text lastName
+    text email
+    text imageUrl
+    bool isAdmin
+    bool isVerified
+    timestamptz createdAt
+    timestamptz updatedAt
+    bool canSeePrice
+  }
+  YourListing {
+    uuid id PK
+    text ebayItemId
+    text title
+    text sku
+    integer quantityAvailable
+    numeric currentPrice
+    text listingStatus
+    timestamptz startTime
+    text viewItemUrl
+    timestamptz syncedAt
+    timestamptz createdAt
+    timestamptz updatedAt
+    bool priceCheckOmitted
+    text store
+    bool isProgrammed
+    text partNumberBase
+    text partType
+    text extractedMake
+    text extractedModel
+  }
+  YourSale {
+    uuid id PK
+    text ebayOrderId
+    text ebayItemId
+    text title
+    text sku
+    integer quantity
+    numeric salePrice
+    timestamptz soldDate
+    text buyerUsername
+    timestamptz shippedDate
+    timestamptz createdAt
+    timestamptz updatedAt
+    text store
+    text partNumberBase
+    text partType
+    text extractedMake
+    text extractedModel
+  }
+  ai_vehicle_research {
+    integer id PK
+    integer year
+    varchar(50) make
+    varchar(100) model
+    varchar(50) engine
+    text research
+    timestamptz created_at
+  }
+  competitor_alert {
+    uuid id PK
+    text competitor_seller
+    text part_number_base
+    text title
+    text alert_type
+    numeric our_price
+    numeric competitor_price
+    numeric market_avg
+    text recommendation
+    bool dismissed
+    timestamptz createdAt
+  }
+  dead_inventory {
+    uuid id PK
+    text part_number_exact
+    text part_number_base
+    text description
+    text vehicle_application
+    date date_pulled
+    date date_listed
+    integer days_listed
+    bool sold
+    numeric final_price
+    numeric market_avg_at_time
+    numeric price_vs_market
+    text condition_grade
+    text failure_reason
+    text notes
+    timestamptz createdAt
+  }
+  dismissed_intel {
+    text normalizedTitle PK
+    text originalTitle
+    timestamptz dismissedAt
+  }
+  dismissed_opportunity {
+    integer id PK
+    text opportunity_key
+    text original_title
+    timestamptz dismissed_at
+  }
+  ebay_message_queue {
+    uuid id PK
+    varchar(64) order_id
+    varchar(64) item_id
+    varchar(128) buyer_user_id
+    varchar(32) template_key
+    timestamptz scheduled_at
+    varchar(16) status
+    varchar(64) claimed_by
+    timestamptz claimed_at
+    varchar(64) return_id
+    varchar(64) ebay_store
+    timestamptz created_at
+  }
+  ebay_message_templates {
+    integer id PK
+    varchar(32) template_key
+    text subject
+    text body
+    bool is_active
+    varchar(32) api_target
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ebay_messages {
+    uuid id PK
+    varchar(64) order_id
+    varchar(64) item_id
+    varchar(128) buyer_user_id
+    varchar(32) template_key
+    text subject
+    text body
+    text rendered_body
+    timestamptz sent_at
+    varchar(16) status
+    varchar(32) error_code
+    text error_detail
+    text api_response
+    integer retry_count
+    varchar(64) ebay_store
+    varchar(32) trigger_source
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  fitment_data {
+    integer id PK
+    varchar(100) part_number
+    varchar(100) part_number_base
+    varchar(200) part_name
+    varchar(50) category
+    integer year_start
+    integer year_end
+    ARRAY makes
+    ARRAY models
+    ARRAY engines
+    jsonb fits_vehicles
+    text does_not_fit
+    jsonb does_not_fit_vehicles
+    text drivetrain_specific
+    text transmission_specific
+    text engine_specific
+    varchar(20) programming_required
+    text programming_note
+    text programming_tool
+    text installation_notes
+    text installation_warning
+    varchar(20) confidence
+    varchar(50) source
+    ARRAY sources_checked
+    varchar(50) confirmed_by
+    integer confirmed_count
+    timestamp created_at
+    timestamp updated_at
+    timestamp last_scraped_at
+  }
+  fitment_intelligence {
+    uuid id PK
+    text part_type
+    text make
+    text model
+    integer year_start
+    integer year_end
+    jsonb fits_trims
+    jsonb fits_engines
+    jsonb fits_transmissions
+    jsonb does_not_fit_trims
+    jsonb does_not_fit_engines
+    jsonb does_not_fit_transmissions
+    jsonb part_number_variants
+    text negation_text
+    text part_number_warning
+    text source_seller
+    jsonb source_listings
+    text confidence
+    timestamp scraped_at
+    timestamp created_at
+    timestamp updated_at
+  }
+  fitment_scrape_queue {
+    integer id PK
+    varchar(100) part_number
+    varchar(100) part_number_base
+    varchar(50) category
+    integer priority
+    integer sales_count
+    varchar(20) status
+    integer attempts
+    timestamp last_attempt_at
+    timestamp completed_at
+    text error_message
+    timestamp created_at
+  }
+  flyway_trip {
+    integer id PK
+    varchar(255) name
+    date start_date
+    date end_date
+    varchar(20) status
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+    varchar(20) trip_type
+    timestamptz completed_at
+    bool cleaned_up
+  }
+  flyway_trip_yard {
+    integer id PK
+    integer trip_id FK
+    uuid yard_id FK
+    bool scrape_enabled
+    timestamptz created_at
+  }
+  instant_research_cache {
+    integer id PK
+    varchar(200) vehicle_key
+    varchar(200) vehicle_display
+    jsonb results
+    timestamptz last_updated
+  }
+  market_demand_cache {
+    uuid id PK
+    text part_number_base
+    integer ebay_sold_90d
+    numeric ebay_avg_price
+    integer ebay_active_listings
+    numeric market_score
+    timestamptz last_updated
+    timestamptz createdAt
+    numeric ebay_sold_30d
+    numeric seasonal_weight
+    varchar(20) source
+    text search_query
+    numeric ebay_median_price
+    numeric ebay_min_price
+    numeric ebay_max_price
+    varchar(20) market_velocity
+    numeric sales_per_week
+    jsonb top_comps
+    varchar(10) key_type
+  }
+  overstock_group {
+    integer id PK
+    varchar(256) name
+    varchar(128) part_type
+    integer restock_target
+    integer current_stock
+    integer initial_stock
+    varchar(32) group_type
+    varchar(32) status
+    timestamptz triggered_at
+    timestamptz acknowledged_at
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  overstock_group_item {
+    integer id PK
+    integer group_id FK
+    varchar(64) ebay_item_id
+    varchar(512) title
+    numeric current_price
+    bool is_active
+    timestamptz added_at
+  }
+  part_fitment_cache {
+    integer id PK
+    varchar(50) part_number_exact
+    varchar(50) part_number_base
+    text part_name
+    varchar(30) part_type
+    integer year
+    varchar(20) year_range
+    varchar(50) make
+    varchar(50) model
+    varchar(50) engine
+    varchar(50) trim
+    varchar(30) drivetrain
+    text does_not_fit
+    varchar(20) programming_required
+    text programming_note
+    varchar(30) source
+    timestamptz confirmed_at
+    timestamptz created_at
+  }
+  part_location {
+    uuid id PK
+    text part_type
+    integer year_start
+    integer year_end
+    text make
+    text model
+    text trim
+    text location_text
+    jsonb removal_steps
+    text tools
+    text hazards
+    integer avg_pull_minutes
+    text photo_url
+    integer confirmed_count
+    timestamptz createdAt
+    timestamptz updatedAt
+    text body_style
+    text confidence
+  }
+  platform_group {
+    integer id PK
+    varchar(100) name
+    varchar(100) platform
+    integer year_start
+    integer year_end
+    text notes
+    timestamp created_at
+  }
+  platform_shared_part {
+    integer id PK
+    integer platform_group_id FK
+    varchar(50) part_type
+    varchar(20) confidence
+    text notes
+  }
+  platform_vehicle {
+    integer id PK
+    integer platform_group_id FK
+    varchar(50) make
+    varchar(100) model
+    integer year_start
+    integer year_end
+    timestamp created_at
+  }
+  programming_reference {
+    integer id PK
+    text brand_group
+    text module_type
+    integer year
+    varchar(10) required
+    text notes
+    timestamptz created_at
+  }
+  pull_session {
+    uuid id PK
+    uuid yard_id FK
+    text puller_id
+    date date
+    numeric parts_cost
+    numeric gate_fee
+    numeric tax_paid
+    numeric mileage
+    numeric mileage_cost
+    numeric total_true_cogs
+    numeric total_market_value
+    numeric blended_cogs_pct
+    integer yield_rating
+    text notes
+    timestamptz createdAt
+    timestamptz updatedAt
+  }
+  restock_flag {
+    uuid id PK
+    text part_number_base
+    text title
+    text category
+    integer sold_90d
+    integer sold_30d
+    integer active_stock
+    numeric avg_sold_price
+    numeric avg_days_to_sell
+    numeric restock_score
+    text store
+    bool acknowledged
+    timestamptz last_checked
+    timestamptz createdAt
+  }
+  restock_want_list {
+    integer id PK
+    text title
+    text notes
+    timestamptz created_at
+    bool active
+    bool pulled
+    timestamptz pulled_date
+    text pulled_from
+    bool auto_generated
+  }
+  restock_watchlist {
+    integer id PK
+    varchar(50) part_number_base
+    text part_description
+    integer target_stock
+    varchar(20) priority
+    text notes
+    timestamp added_at
+    bool active
+  }
+  return_intake {
+    uuid id PK
+    text ebay_item_id
+    text listing_id
+    text title
+    text part_number
+    text sku
+    text puller_name
+    text yard_name
+    text vehicle_info
+    text condition_grade
+    text condition_notes
+    numeric original_price
+    numeric relist_price
+    text relist_status
+    text relist_ebay_item_id
+    timestamptz returned_at
+    timestamptz relisted_at
+    timestamptz createdAt
+  }
+  return_transaction {
+    integer id PK
+    date transaction_date
+    varchar(80) order_number
+    varchar(80) legacy_order_id
+    varchar(80) buyer_username
+    varchar(120) buyer_name
+    varchar(80) ship_city
+    varchar(80) ship_state
+    varchar(30) ship_zip
+    varchar(30) ship_country
+    numeric net_amount
+    numeric gross_amount
+    varchar(80) ebay_item_id
+    varchar(80) transaction_id
+    varchar(300) item_title
+    varchar(80) custom_label
+    numeric item_subtotal
+    numeric shipping_handling
+    numeric fvf_fixed
+    numeric fvf_variable
+    numeric regulatory_fee
+    numeric inad_fee
+    numeric international_fee
+    varchar(80) reference_id
+    varchar(80) payout_id
+    varchar(40) part_type
+    varchar(30) make
+    bool is_formal_return
+    bool has_inad_fee
+    numeric abs_gross
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  scout_alerts {
+    integer id PK
+    varchar(20) source
+    text source_title
+    numeric part_value
+    varchar(255) yard_name
+    varchar(10) vehicle_year
+    varchar(100) vehicle_make
+    varchar(100) vehicle_model
+    varchar(100) vehicle_color
+    varchar(50) row
+    varchar(10) confidence
+    text notes
+    date vehicle_set_date
+    timestamptz created_at
+    bool claimed
+    text claimed_by
+    timestamptz claimed_at
+  }
+  scout_alerts_meta {
+    varchar(50) key PK
+    text value
+  }
+  scrape_log {
+    uuid id PK
+    uuid yard_id FK
+    timestamptz scraped_at
+    integer vehicles_found
+    integer new_vehicles
+    integer pages_scraped
+    text termination_reason
+    text source
+  }
+  sky_watch_research {
+    integer id PK
+    integer vehicle_year
+    varchar(64) vehicle_make
+    varchar(128) vehicle_model
+    varchar(128) vehicle_engine
+    varchar(128) vehicle_trim
+    varchar(32) source
+    varchar(17) source_vin
+    jsonb results
+    numeric total_estimated_value
+    integer parts_found_count
+    integer high_value_count
+    varchar(32) status
+    timestamptz reviewed_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  stale_inventory_action {
+    uuid id PK
+    text ebay_item_id
+    text listing_id
+    text title
+    text action_type
+    numeric old_price
+    numeric new_price
+    integer days_listed
+    text tier
+    bool programmed_listing
+    bool executed
+    text execution_error
+    text notes
+    timestamptz scheduled_at
+    timestamptz executed_at
+    timestamptz createdAt
+  }
+  the_cache {
+    uuid id PK
+    varchar(100) part_type
+    text part_description
+    varchar(100) part_number
+    integer vehicle_year
+    varchar(100) vehicle_make
+    varchar(100) vehicle_model
+    varchar(100) vehicle_trim
+    varchar(17) vehicle_vin
+    varchar(200) yard_name
+    varchar(50) row_number
+    numeric estimated_value
+    varchar(50) price_source
+    varchar(100) claimed_by
+    timestamptz claimed_at
+    varchar(50) source
+    varchar(255) source_id
+    varchar(30) status
+    timestamptz resolved_at
+    varchar(50) resolved_by
+    varchar(50) ebay_item_id
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  the_mark {
+    uuid id PK
+    text normalizedTitle
+    text originalTitle
+    text partNumber
+    text partType
+    integer medianPrice
+    text sourceSignal
+    ARRAY sourceSellers
+    integer scoreAtMark
+    text notes
+    bool active
+    timestamptz graduatedAt
+    text graduatedReason
+    timestamptz markedAt
+    timestamptz createdAt
+    timestamptz updatedAt
+    varchar(32) source
+    varchar(16) match_confidence
+    integer matched_yard_vehicle_id
+    timestamptz matched_at
+  }
+  trim_catalog {
+    integer id PK
+    integer year
+    text make
+    text model
+    text trim_raw
+    text trim_name
+    text body_style
+    text tier
+    timestamptz created_at
+  }
+  trim_catalog_tracked {
+    integer id PK
+    integer year
+    text make
+    text model
+    integer trim_count
+    timestamptz cataloged_at
+  }
+  trim_intelligence {
+    uuid id PK
+    integer year
+    text make
+    text model
+    text trim
+    jsonb expected_parts
+    text confidence
+    timestamptz researched_at
+    timestamptz createdAt
+  }
+  trim_tier_reference {
+    integer id PK
+    text make
+    text model
+    integer gen_start
+    integer gen_end
+    text trim
+    integer tier
+    text tier_name
+    text top_engine
+    text audio_brand
+    text expected_parts
+    text notes
+    bool cult
+    text transmission
+    bool diesel
+  }
+  trim_value_validation {
+    uuid id PK
+    varchar(100) make
+    varchar(100) part_type
+    varchar(200) premium_keyword
+    numeric premium_avg_price
+    numeric base_avg_price
+    numeric delta
+    integer n_premium
+    integer n_base
+    varchar(20) verdict
+    varchar(20) source
+    timestamptz validated_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  vin_cache {
+    uuid id PK
+    text vin
+    integer year
+    text make
+    text model
+    text trim
+    text engine
+    text drivetrain
+    text body_style
+    text paint_code
+    jsonb raw_nhtsa
+    jsonb raw_enriched
+    timestamptz decoded_at
+    timestamptz createdAt
+  }
+  vin_scan_log {
+    integer id PK
+    varchar(17) vin
+    integer year
+    varchar(50) make
+    varchar(100) model
+    varchar(100) trim
+    varchar(50) engine
+    varchar(20) engine_type
+    varchar(20) drivetrain
+    varchar(20) paint_code
+    varchar(50) scanned_by
+    timestamptz scanned_at
+    varchar(20) source
+    text notes
+  }
+  yard {
+    uuid id PK
+    varchar(255) name
+    varchar(100) chain
+    varchar(500) address
+    numeric lat
+    numeric lng
+    numeric distance_from_base
+    numeric entry_fee
+    numeric tax_rate
+    varchar(1000) scrape_url
+    varchar(50) scrape_method
+    timestamptz last_scraped
+    timestamptz last_visited
+    numeric avg_yield
+    numeric avg_rating
+    bool flagged
+    text flag_reason
+    bool enabled
+    varchar(50) visit_frequency
+    text notes
+    timestamptz createdAt
+    timestamptz updatedAt
+    text entry_fee_notes
+    varchar(20) region
+  }
+  yard_vehicle {
+    uuid id PK
+    uuid yard_id FK
+    varchar(10) year
+    varchar(100) make
+    varchar(100) model
+    varchar(100) trim
+    varchar(100) color
+    varchar(50) row_number
+    varchar(20) vin
+    date date_added
+    timestamptz scraped_at
+    bool active
+    timestamptz createdAt
+    timestamptz updatedAt
+    timestamptz first_seen
+    timestamptz last_seen
+    varchar(30) stock_number
+    varchar(50) engine
+    varchar(20) engine_type
+    varchar(20) drivetrain
+    varchar(100) trim_level
+    varchar(50) body_style
+    bool vin_decoded
+    text decoded_trim
+    text decoded_engine
+    text decoded_drivetrain
+    text trim_tier
+    timestamptz vin_decoded_at
+    text audio_brand
+    text expected_parts
+    bool cult
+    text decoded_transmission
+    text transmission_speeds
+    bool diesel
+  }
+  yard_visit_feedback {
+    uuid id PK
+    uuid yard_id FK
+    varchar(255) puller_name
+    date visit_date
+    integer rating
+    text notes
+    timestamptz createdAt
+  }
+  Auto ||--o{ AutoItemCompatibility : "autoId"
+  Item ||--o{ AutoItemCompatibility : "itemId"
+  YourListing ||--o{ MarketResearchRun : "yourListingId"
+  MarketResearchRun ||--o{ CompetitorListing : "researchRunId"
+  YourListing ||--o{ CompetitorListing : "yourListingId"
+  MarketResearchRun ||--o{ SoldItem : "researchRunId"
+  YourListing ||--o{ SoldItem : "yourListingId"
+  YourListing ||--o{ PriceCheck : "listingId"
+  yard ||--o{ yard_vehicle : "yard_id"
+  yard ||--o{ yard_visit_feedback : "yard_id"
+  yard ||--o{ pull_session : "yard_id"
+  platform_group ||--o{ platform_vehicle : "platform_group_id"
+  platform_group ||--o{ platform_shared_part : "platform_group_id"
+  flyway_trip ||--o{ flyway_trip_yard : "trip_id"
+  yard ||--o{ flyway_trip_yard : "yard_id"
+  overstock_group ||--o{ overstock_group_item : "group_id"
+  yard ||--o{ scrape_log : "yard_id"

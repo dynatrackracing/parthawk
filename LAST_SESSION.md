@@ -1,95 +1,27 @@
 # LAST SESSION — 2026-04-05
 
-## Sniper Overhaul
-- Diagnosed: PriceCheckServiceV2 (axios+cheerio) completely blocked by eBay "Pardon Our Interruption" challenge page. HTTP 200 but 13K chars of captcha HTML, zero search results.
-- Replaced dead cheerio scraper with Playwright+stealth (same config as working market drip)
-- Filtered to NC pull yards only (Raleigh, Durham, Greensboro) — was scraping all 7 yards including FL
-- Changed from 7-day rolling window to newest vehicles only (first_seen >= 24h, --hours flag for override)
-- Dry run: 192 new vehicles → 1,073 PNs → 804 after sanitize → 731 need scraping → top 50 queued
+## Edit Part Numbers on Cache & Scour Stream Want List
+- Added PATCH /cache/:id — update partNumber (re-normalized), partDescription, partType, make, model, year, notes on cache entries
+- Added PATCH /restock-want-list/:id — update title, notes on want list entries
+- Added PATCH /restock-want-list/by-title — update want list entry by title match (used by scout-alerts inline edit), also updates scout_alerts.source_title
+- cache.html: part number and description are now inline-editable (tap to edit, save on blur/Enter, green flash on success). Empty fields show "+ add PN" / "+ add description" placeholders.
+- restock-list.html (Scour Stream): want list title and notes are inline-editable in the WANT LIST tab
+- scout-alerts.html: STREAM alert source_title is inline-editable — patches the underlying want list entry and syncs alert records
 
-## Attack List Price Floors
-- PART_PRICE_FLOORS in AttackListService: ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP=$100
-- Mechanical parts (mirrors, visors, console lids) have no floor
-- Below-floor parts excluded from vehicle score, shown greyed out (opacity 0.4) in collapsed "X parts below price floor" section
-- Above-floor parts unchanged — GREAT/GOOD/FAIR/POOR badges work as before
-
-## QUARRY Fix
-- Frontend field name mismatch after backend rewrite: green/yellow/orange → critical/low/watch
-- Row fields: sold7d→timesSold, activeStock→inStock, action→urgency
-- Summary cards now show real numbers
-
-## Cache ↔ Attack List Sync (3 iterations)
-- Iteration 1: Pull button swaps to checkmark, greys out row. But didn't persist on reload — matching key was unreliable (partType|MAKE|MODEL fallback)
-- Iteration 2: Proper architecture — GET /cache/claimed-keys endpoint returns normalized PNs + cache IDs. Frontend normalizePN() mirrors backend suffix stripping (Ford/Toyota/Honda/Chrysler). Two-key matching: PN primary, itemId fallback for no-PN parts (sunroof glass, mirrors). Backend dedup prevents duplicate claims.
-- Iteration 3: Added item_id column to the_cache table for parts without part numbers. Migration + CacheService.claim() accepts itemId + dedup by itemId when no PN.
-- Skip and Note buttons removal requested (confirm in next session)
-
-## Scout Alerts Cache Sync
-- Scout alerts now use same /cache/claimed-keys system as Daily Feed
-- Three matching strategies: alert ID, normalized PN, itemId
-- Cross-tool flow works: pull from Daily Feed → Scout Alerts shows checkmark, and vice versa
-- Unclaim syncs both cache entry and scout_alert claimed field
-
-## Global Part Value Colors + Exclusion Filter
-- Created dh-parts.js + dh-parts.css — shared across all 6 field pages
-- getPartTier(price) returns tier info (ELITE/PREMIUM/HIGH/SOLID/BASE/LOW with colors)
-- renderPriceBadge(price, prefix) generates HTML badge with correct tier color
-- isExcludedPart(title) — global filter for engines, transmissions, body panels
-- Wired into: attack-list, scout-alerts, cache, vin-scanner, gate, flyway
-- Scout alerts: excluded parts filtered, prices use renderPriceBadge()
-- Cache: prices use renderPriceBadge() instead of flat green
-- Hawk Eye (vin-scanner): vd()/vc() updated to use 6-tier system
-- Gate (Nest Protector): stock check prices use renderPriceBadge()
-- Flyway: chips + part badges updated to 6-tier system
-- Backend isExcludedPart() updated: removed transfer case + steering rack exclusions (sellable), added trunk lid, roof panel, bumper assembly
-
-## Price Resolution Fix
-- Removed CONSERVATIVE_SELL_ESTIMATES entirely (misleading flat prices)
-- Price chain: market_demand_cache → Item.price (REF prefix) → no price (NO DATA badge)
-- BASE tier changed from yellow (#F1C40F) to orange (#FF8C00)
-
-## 6-Tier Part Value Badges
-- ELITE ($500+): pulsing gold
-- PREMIUM ($350-499): pulsing purple
-- HIGH ($250-349): blue
-- SOLID ($150-249): green
-- BASE ($100-149): orange
-- LOW (<$100): red
-- Applied to: part badges, category chips, vehicle score number
-
-## Scout Alerts Confidence Matching Rewrite
-- scoreMatch() was checking if vehicle.engine EXISTS, not if it MATCHES — a 3.6L V6 got HIGH for a "5.7 HEMI" part
-- Added PART_TYPE_SENSITIVITY map: engine-sensitive (ECM/PCM/TCM/THROTTLE), drivetrain-sensitive (ABS), trim-sensitive (AMP/RADIO/NAV), universal (BCM/TIPM/CLUSTER/mirrors/etc.)
-- Engine matching: extracts displacement + cylinders + named engines from both sides, compares them
-- Drivetrain matching: 4WD/AWD part vs 2WD vehicle = LOW confidence
-- Trim matching: premium audio brand on base trim = LOW confidence
-- Model conflict checks: Cherokee ≠ Grand Cherokee, Transit ≠ Transit Connect, etc.
-- SELECT now includes decoded_drivetrain, decoded_transmission, diesel, trim_tier, body_style
-- isExcludedPart() filters out engines/transmissions/body panels before alert generation
-- Confidence reasons stored in notes for display
-
-## Scout Alerts Yard Filtering (2 iterations)
-- Iteration 1: Filter by "NOT in flyway_trip_yard = core yard" — wrong, KY/TN road trip yards passed
-- Iteration 2: Added `is_core` boolean column to yard table. Migration sets true for 7 NC local yards (4 LKQ + 2 Foss + Young's). ScoutAlertService uses `WHERE yard.is_core = true OR active trip`. FlywayService.getCoreYardIds() reads flag instead of hardcoded list.
-- Side fix: FL LKQ yards (Tampa/Largo/Clearwater) were incorrectly protected from vehicle cleanup — they're road trip yards, not core
-
-## Architecture Confirmed
-- Backend wiring for scout alert sources already complete:
-  - THE MARK → ScoutAlertService reads the_mark ✅
-  - THE QUARRY → quarrySync() pushes to restock_want_list → Scout Alerts reads it ✅
-  - SCOUR STREAM → Scout Alerts reads restock_want_list ✅
-  - Phoenix stays standalone ✅
-- Hunters Perch → Mark link: NOT WORKING (fix pending)
-- Sky Watch: needs Hawk Eye search to be functional first
+## Files touched
+- service/services/CacheService.js — added updateEntry()
+- service/routes/cache.js — added PATCH /:id
+- service/routes/restock-want-list.js — added PATCH /:id, PATCH /by-title
+- service/public/cache.html — inline edit CSS + JS for partNumber, partDescription
+- service/public/restock-list.html — inline edit CSS + JS for title, notes
+- service/public/scout-alerts.html — inline edit CSS + JS for STREAM source_title
 
 ## What's next — priority order
 1. Verify Skip/Note buttons removed from attack list
-2. Scout alert source badges on Daily Feed parts (🎯 MARK, 🔄 RESTOCK, etc.)
+2. Scout alert source badges on Daily Feed parts
 3. Fix Hunters Perch → Mark link
 4. Hawk Eye search functionality (enables Sky Watch workflow)
 5. Hawk Eye + Flyway cache sync (same claimed-keys pattern)
-6. Let market drip keep filling cache (targeting 3,000+ PNs)
-7. Stale inventory automation — validate pricing accuracy first
 
 ## Open tech debt
 - StaleInventoryService has inline ReviseItem separate from TradingAPI.reviseItem()

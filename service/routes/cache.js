@@ -90,6 +90,21 @@ router.post('/claim', async (req, res) => {
 });
 
 /**
+ * PATCH /cache/:id
+ * Update editable fields on a cache entry (partial update).
+ * Body: { partNumber, partDescription, partType, make, model, year, notes }
+ */
+router.patch('/:id', async (req, res) => {
+  try {
+    const service = new CacheService();
+    const result = await service.updateEntry(req.params.id, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /cache/:id/return
  * Return a claimed part back to alerts.
  * Body: { reason: "couldn't find it" }

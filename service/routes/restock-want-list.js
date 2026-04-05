@@ -312,6 +312,51 @@ router.post('/add', async (req, res) => {
   res.json({ success: true, item });
 });
 
+// Update want list entry by title match (used by scout-alerts inline edit)
+router.patch('/by-title', async (req, res) => {
+  const { oldTitle, title, notes } = req.body;
+  if (!oldTitle) return res.status(400).json({ error: 'oldTitle required' });
+
+  const entry = await database('restock_want_list').where({ title: oldTitle, active: true }).first();
+  if (!entry) return res.status(404).json({ error: 'Want list entry not found' });
+
+  const patch = {};
+  if (title !== undefined && title.trim()) patch.title = title.trim();
+  if (notes !== undefined) patch.notes = notes || null;
+
+  if (Object.keys(patch).length === 0) return res.json({ success: true, item: entry });
+
+  await database('restock_want_list').where({ id: entry.id }).update(patch);
+
+  // Also update source_title on scout_alerts that reference the old title
+  if (patch.title) {
+    await database('scout_alerts')
+      .where('source', 'hunters_perch')
+      .where('source_title', oldTitle)
+      .update({ source_title: patch.title });
+  }
+
+  const updated = await database('restock_want_list').where({ id: entry.id }).first();
+  res.json({ success: true, item: updated });
+});
+
+// Update want list entry by ID (partial update)
+router.patch('/:id', async (req, res) => {
+  const { id } = req.params;
+  const entry = await database('restock_want_list').where({ id }).first();
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+
+  const patch = {};
+  if (req.body.title !== undefined && req.body.title.trim()) patch.title = req.body.title.trim();
+  if (req.body.notes !== undefined) patch.notes = req.body.notes || null;
+
+  if (Object.keys(patch).length === 0) return res.json({ success: true, item: entry });
+
+  await database('restock_want_list').where({ id }).update(patch);
+  const updated = await database('restock_want_list').where({ id }).first();
+  res.json({ success: true, item: updated });
+});
+
 // Delete (soft) a part
 router.post('/delete', async (req, res) => {
   const { id } = req.body;
