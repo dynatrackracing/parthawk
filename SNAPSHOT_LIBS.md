@@ -1,5 +1,5 @@
 # SNAPSHOT_LIBS.md
-Generated 2026-04-01
+Generated 2026-04-05
 
 ## service/utils/
 
@@ -18,12 +18,12 @@ Generated 2026-04-01
 - `stripRevisionSuffix(pn)` — Strips trailing 2-letter revision suffix (Chrysler 56044691AA -> 56044691, Ford AL3T15604BD -> AL3T15604).
 
 ### partMatcher.js
-**Purpose:** DEPRECATED. Backward-compatible shared part number recognition and matching. New code should use partIntelligence.js.
+**Purpose:** Shared part number recognition and matching. Still used for `normalizePartNumber()` by CacheService, priceResolver, and other services.
 **Exports:** `extractPartNumbers`, `normalizePartNumber`, `loadModelsFromDB`, `getModels`, `MAKES`, `MAKE_ALIASES`, `MODEL_IMPLIES_MAKE`, `MODELS`, `PART_PHRASES`, plus parsing helpers.
 **Dependencies:** `../database/database`, `../lib/logger`
 **Key behavior:**
 - `extractPartNumbers(title)` — OEM-specific regex patterns (chrysler, ford, honda, toyota, nissan, gm, bosch, bmw). Returns `{raw, base, format}`. Deduplicates by base, keeps longer raw match.
-- `normalizePartNumber(pn)` — Strips OEM revision suffixes. Ford dash-style, Chrysler/GM trailing alpha, Honda sub-revision, Toyota revision, generic 2-alpha tail.
+- `normalizePartNumber(pn)` — Strips OEM revision suffixes. Ford dash-style (AL3T-15604-BD → AL3T-15604), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **This is the canonical normalizer used by CacheService for dedup and by the frontend normalizePN() for matching.**
 - `loadModelsFromDB()` — Loads Auto table models into cache organized by make. Sorted longest-first. Falls back to FALLBACK_MODELS (~120 entries).
 - `MODEL_IMPLIES_MAKE` — Reverse lookup: model name -> make (e.g. "charger" -> "dodge"). ~100 entries.
 

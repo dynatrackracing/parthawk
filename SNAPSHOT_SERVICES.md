@@ -1,5 +1,5 @@
 # SNAPSHOT_SERVICES.md
-Generated 2026-04-04
+Generated 2026-04-05
 
 ## Core Services
 
@@ -14,12 +14,15 @@ Generated 2026-04-04
   - Mark boost: parts matching `the_mark` get +15 score bonus
 - Price resolution: market_demand_cache first, conservative sell estimates fallback (never Item.price)
 - Part filtering: PN-specific parts require exact year; generational parts get +/-1 tolerance; engine/drivetrain/fuel validated
+- **Price floors:** `PART_PRICE_FLOORS` constant — ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/ECU=$100. Parts below floor flagged `belowFloor:true`, excluded from vehicle `totalValue`. Mechanical parts (mirrors, visors, console lids) have no floor.
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
-- Key methods: `claim()`, `returnToAlerts()`, `deleteClaim()`, `manualResolve()`, `resolveFromListings()`, `getActiveClaims()`, `getStats()`, `checkCacheStock()`
+- Key methods: `claim()`, `returnToAlerts()`, `deleteClaim()`, `manualResolve()`, `resolveFromListings()`, `getActiveClaims()`, `getClaimedKeys()`, `getHistory()`, `getStats()`, `checkCacheStock()`
 - Sources: daily_feed, scout_alert, hawk_eye, flyway, manual
 - Statuses: claimed -> listed / returned / deleted
+- **claim():** Accepts `itemId` field (for parts without PNs like sunroof glass, mirrors). Stores `item_id` on cache entry. Normalizes `partNumber` via `normalizePartNumber()` before storing. Dedup logic: if PN exists → match by normalized PN; if no PN but itemId → match by itemId; if both empty → allow (manual entries).
+- **getClaimedKeys():** Returns three maps for puller tool sync: `claimedPNs` (normalizedPN → cacheId), `claimedItemIds` (itemId string → cacheId for no-PN parts), `claimedAlertIds` (scout alert id → cacheId). Used by Daily Feed and Scout Alerts pages.
 - Auto-resolve: `resolveFromListings()` matches cache entries against YourListing by PN or make+model+partType (listing must be created AFTER claim). Runs after every sync (4x/day)
 
 ### COGSService.js
@@ -54,7 +57,7 @@ Generated 2026-04-04
 - Purpose: Fitment negations via "subtraction" — what's in eBay taxonomy but NOT in compatibility table = does not fit
 
 ### MarketPricingService.js
-- Purpose: Batch market pricing for Daily Feed — dedupes by PN, checks market_demand_cache (90-day TTL), scrapes uncached via PriceCheckServiceV2 (axios+cheerio); V1 Playwright fallback
+- Purpose: Batch market pricing for Daily Feed — dedupes by PN, checks market_demand_cache (90-day TTL), scrapes uncached via PriceCheckServiceV2 (axios+cheerio — blocked on Railway, works locally); V1 Playwright fallback
 
 ### ListingIntelligenceService.js
 - Purpose: Aggregates intelligence for a single listing — programming, trim tier, fitment cache, sales history
@@ -66,6 +69,7 @@ Generated 2026-04-04
 - Key methods: `GET /report` (velocity scoring), `quarrySync()` (auto-adds to want list)
 - Urgency tiers: CRITICAL (ratio>=4 or 0 stock+sold 3x+$100+), LOW (ratio>=2 or 0 stock), WATCH (ratio>=1)
 - Scoring: price (35pts), stock gap (30pts), velocity (20pts), recency (15pts); floor overrides for high-value zero-stock
+- Response shape: `{ tiers: { critical:[], low:[], watch:[] }, summary: { critical, low, watch, total, salesAnalyzed, activeListings }, items:[] }`
 - `quarrySync()`: auto-adds CRITICAL+LOW to `restock_want_list` with `[quarry_auto]` notes; cleans entries where velocity dropped below LOW. Called by YourDataManager after syncAll (4x/day)
 
 ### RestockService.js
@@ -119,6 +123,7 @@ Generated 2026-04-04
 
 ### PriceCheckServiceV2.js
 - Purpose: eBay sold comp scraper — axios+cheerio, no Chromium/OOM risk. Pipeline: buildSearchQuery -> scrapeSoldComps -> filterRelevantItems -> calculateMetrics
+- **Status:** Blocked by eBay "Pardon Our Interruption" challenge page on Railway (HTTP 200 but captcha HTML). Still referenced as fallback by MarketPricingService. Yard sniper replaced with Playwright+stealth.
 
 ### PriceCheckService.js (V1)
 - Purpose: Original Playwright-based eBay price check — persistent browser with stealth plugin

@@ -1,5 +1,5 @@
 # SNAPSHOT_SCRAPERS.md
-Generated 2026-04-01
+Generated 2026-04-05
 
 ## Scraper Overview Table
 
@@ -118,8 +118,11 @@ Generated 2026-04-01
 ### run-yard-market-sniper.js (Yard Sniper)
 - **Location:** `service/scripts/run-yard-market-sniper.js`
 - **Trigger:** Manual via `run-yard-market-sniper.bat` after LKQ scrape
-- **Pipeline:** active yard_vehicles (7d) -> match to inventory via Auto+AIC+Item join -> extractPartNumbers + sanitizePartNumberForSearch + deduplicatePNQueue from partIntelligence.js -> filter against fresh cache -> scrape via PriceCheckServiceV2 (quoted exact PN match).
-- **Filters:** shouldExclude() from OpportunityService (skips complete engines/transmissions/body panels), price >= $50, stripSuffix for Chrysler/Ford revision codes.
+- **Scraper:** Playwright + stealth (replaced dead PriceCheckServiceV2 cheerio scraper which is blocked by eBay captcha)
+- **Yards:** NC pull yards only — LKQ Raleigh, LKQ Durham, LKQ Greensboro (filtered from all 7)
+- **Vehicle filter:** Newest vehicles only (first_seen >= 24 hours, configurable via `--hours=N` CLI flag)
+- **Pipeline:** active yard_vehicles → match to inventory via Auto+AIC+Item join → extractPartNumbers + sanitizePartNumberForSearch + deduplicatePNQueue from partIntelligence.js → filter against fresh cache → scrape via Playwright stealth (quoted exact PN match).
+- **CLI flags:** `--dry-run` (default, preview only), `--execute` (scrape + write), `--limit=N` (default 50), `--hours=N` (lookback, default 24)
 - **Pacing:** 2-3s between scrapes, default 50 PNs/run, sorted by price descending.
 - **Output:** Upserts market_demand_cache with `source=yard_sniper`, writes PriceSnapshot.
 
@@ -131,3 +134,4 @@ Generated 2026-04-01
 4. **PriceCheckCronRunner** batch size increased from 15 to 35/week. Priority queue: never-checked listings first, then stalest, both sorted by currentPrice DESC.
 5. **LKQ scraper** is the only yard scraper that runs from the **yards.js route handler** (on-demand via UI). All other yards scrape via FlywayScrapeRunner daily cron or local scripts.
 6. **market_demand_cache** is the pricing source of truth (see priceResolver.js). Three feeders: Market Drip (primary, source=market_drip), Yard Sniper (source=yard_sniper), PriceCheckService (source=weekly cron).
+7. **PriceCheckServiceV2 (cheerio) is blocked** on Railway by eBay's "Pardon Our Interruption" captcha page. HTTP 200 but 13K chars of captcha HTML, zero results. Yard sniper replaced with Playwright+stealth. Market drip uses Playwright primary with V2 as fallback (works locally but not on Railway).

@@ -1,5 +1,5 @@
 # SNAPSHOT_FRONTEND.md
-Generated 2026-04-04
+Generated 2026-04-05
 
 ## Shared Components
 
@@ -20,14 +20,29 @@ Generated 2026-04-04
 ### attack-list.html (Daily Feed)
 - **URL:** `/admin/pull`, `/puller`
 - **Nav key:** `feed`
-- **Features:** Vehicle scoring with color-coded score badges (green/yellow/orange), expandable vehicle rows with parts breakdown, pull buttons to claim parts, yard scrape controls, VIN photo decode, manual vehicle add, scout alert claim inline
-- **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claim` (POST), `/part-location/:partType/:make/:model/:year`, `/part-location/confirm` (POST), `/part-location/flag-wrong` (POST), `/yards/scrape/lkq` (POST), `/yards/scrape/status`, `/yards/scrape/:yardId` (POST), `/scout-alerts/claim` (POST), `/attack-list/manual` (POST), `/vin/decode-photo` (POST), `/vin/scan` (POST)
+- **Features:** Vehicle scoring with color-coded score badges (green/yellow/orange), expandable vehicle rows with parts breakdown, yard scrape controls, VIN photo decode, manual vehicle add, scout alert claim inline, manual set list paste
+- **Cache sync:** Loads `GET /cache/claimed-keys` on init. Stores `claimedPNs` (normalizedPN→cacheId) and `claimedItemIds` (itemId→cacheId) maps. `normalizePN()` mirrors backend suffix stripping (Ford/Toyota/Honda/Chrysler). `getCachedId(part)` checks PN first, falls back to itemId. Cached parts show green checkmark button + greyed row (opacity 0.55). Checkmark click unclaims via `POST /cache/:id/return`.
+- **Part badges (6-tier):**
+  - ELITE ($500+): pulsing gold (#FFD700) with soft glow animation
+  - PREMIUM ($350-499): pulsing purple (#C39BD3) with soft glow animation
+  - HIGH ($250-349): static blue (#3498DB)
+  - SOLID ($150-249): static green (#2ECC40)
+  - BASE ($100-149): static yellow (#F1C40F)
+  - LOW (<$100): static red (#FF4136)
+  - EST (estimate): maps to LOW/red style
+- **Price floors:** Below-floor parts collapsed in greyed section (opacity 0.4), excluded from vehicle score
+- **Skip/Note buttons:** Removed. Only Pull/Checkmark button remains per part row.
+- **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claimed-keys`, `/cache/claim` (POST), `/cache/:id/return` (POST), `/part-location/:partType/:make/:model/:year`, `/part-location/confirm` (POST), `/part-location/flag-wrong` (POST), `/yards/scrape/lkq` (POST), `/yards/scrape/status`, `/yards/scrape/:yardId` (POST), `/scout-alerts/claim` (POST), `/attack-list/manual` (POST), `/vin/decode-photo` (POST), `/vin/scan` (POST)
 
 ### scout-alerts.html (Scout Alerts)
 - **URL:** `/admin/scout-alerts`
 - **Nav key:** `alerts`
-- **Features:** Parts matching want lists at yards, claim to cache, unclaim
-- **API:** `/cache/claim` (POST), `/scout-alerts/claim` (POST), `/scout-alerts/refresh` (POST)
+- **Features:** Parts matching want lists at yards, claim/unclaim with cache sync, yard tabs, time filter pills, hide-pulled toggle, summary cards (MARK/QUARRY/STREAM/OVERSTOCK/JUST SOLD/YARDS), pagination
+- **Cache sync:** Loads `GET /cache/claimed-keys` on init. Stores `claimedPNs`, `claimedItemIds`, `claimedAlertIds` maps. `extractPN(title)` pulls OEM PNs from alert titles for cross-tool matching. `getAlertCacheId(alert)` checks: (1) alertId in claimedAlertIds, (2) extracted PN in claimedPNs. Claimed state = cache match OR `a.claimed` field (fallback).
+- **Claim flow:** `claimAlert()` → POST `/cache/claim` with source=scout_alert. Optimistic UI (immediate checkmark swap). On success, updates claimedAlertIds + claimedPNs maps.
+- **Unclaim flow:** `unclaimAlert()` → parallel POST `/cache/:id/return` + POST `/scout-alerts/claim` (unclaim). Removes from both maps. Optimistic UI with revert on failure.
+- **Cross-tool:** Pulling from Daily Feed automatically shows as claimed on Scout Alerts via shared PN matching.
+- **API:** `/cache/claimed-keys`, `/scout-alerts/list`, `/cache/claim` (POST), `/cache/:id/return` (POST), `/scout-alerts/claim` (POST), `/scout-alerts/refresh` (POST)
 
 ### cache.html (The Cache)
 - **URL:** `/admin/the-cache`
@@ -84,7 +99,10 @@ Generated 2026-04-04
 ### restock.html (The Quarry)
 - **URL:** `/admin/restock`
 - **Nav key:** `quarry`
-- **Features:** Restock report with configurable day range, found items tracking
+- **Features:** Restock report with configurable day range (7d/30d/60d/90d pills), found items tracking, hide-found toggle
+- **Tier system:** TIER_CONFIG keys are `critical`, `low`, `watch` (mapped to display labels RESTOCK NOW, STRONG BUY, CONSIDER)
+- **Summary cards:** `d.summary.critical`, `d.summary.low`, `d.summary.watch`, `d.summary.salesAnalyzed`, `d.summary.activeListings`
+- **Item fields:** `score`, `urgency`, `timesSold`, `inStock`, `avgPrice`, `revenue`, `basePn`, `yearRange`, `make`, `model`, `partType`, `sampleTitle`
 - **API:** `/restock/report`, `/restock/found-items`
 
 ### phoenix.html (The Phoenix)

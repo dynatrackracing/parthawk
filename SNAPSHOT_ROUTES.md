@@ -1,4 +1,4 @@
-Generated 2026-04-01
+Generated 2026-04-05
 
 # PartHawk Route Map
 
@@ -27,7 +27,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/cogs` | cogs.js | POST `/gate` `/session`, GET `/yard-profile/:yardId` `/yards` `/check-stock` |
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
-| `/restock` | restockReport.js | GET `/report` `/found-items` |
+| `/restock` | restockReport.js | GET `/report` `/found-items`, POST `/quarry-sync` |
 | `/restock-want-list` | restock-want-list.js | GET `/items` `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions`, POST `/pull` `/find-in-yard` `/add` `/delete` + watchlist/overstock CRUD |
 | `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
@@ -38,7 +38,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/stale-inventory` | stale-inventory.js | POST `/run` `/returns` `/revise-price` `/end-item` `/relist-item` `/bulk-end`, GET `/actions` `/returns/pending` `/candidates` `/restock/flags` |
 | `/competitors` | competitors.js | POST `/scan` `/auto-scrape` `/mark` `/mark/graduate` `/seed-defaults`, GET `/alerts` `/gap-intel` `/emerging` `/sellers` `/marks` `/:sellerId/best-sellers` + CRUD |
 | `/autolumen` | autolumen.js | POST `/import/listings` `/import/sales` `/import/transactions`, GET `/stats` |
-| `/cache` | cache.js | GET `/active` `/history` `/stats` `/check-stock`, POST `/claim` `/:id/return` `/:id/resolve` `/resolve`, DELETE `/:id` |
+| `/cache` | cache.js | GET `/active` `/history` `/stats` `/check-stock` `/claimed-keys`, POST `/claim` `/:id/return` `/:id/resolve` `/resolve`, DELETE `/:id` |
 | `/trim-intelligence` | trim-intelligence.js | GET `/:year/:make/:model/:trim` |
 | `/ebay-messaging` | ebay-messaging.js | GET `/status` `/history` `/templates`, POST `/poll` `/process` `/test-send` |
 | `/private` | private.js | GET `/ebay-challenger-api` `/cache/flush` `/cache/stats`, POST `/ebay-challenger-api` |
@@ -110,12 +110,13 @@ Static: `/admin` serves `service/public/` (10m cache, images 24h).
 
 ## Section 4: Key Endpoint Details
 
-### /cache (Phase 7 Part 1 -- The Cache)
+### /cache (The Cache)
 Parts staging system -- tracks parts claimed from yards before listing.
 - `GET /cache/active` -- active claims in the field. Filter: `?source=&claimedBy=&sortBy=`
 - `GET /cache/history` -- resolved entries. `?days=30&limit=100`
 - `GET /cache/stats` -- claim/resolution dashboard stats
-- `POST /cache/claim` -- claim a part from yard
+- `GET /cache/claimed-keys` -- **lightweight sync for puller tools.** Returns `{ claimedPNs: {normalizedPN: cacheId}, claimedItemIds: {itemId: cacheId}, claimedAlertIds: {alertId: cacheId} }`. Used by Daily Feed and Scout Alerts on page load.
+- `POST /cache/claim` -- claim a part from yard. Accepts `itemId` field for no-PN parts. Backend deduplicates by normalized PN or itemId.
 - `POST /cache/:id/return` -- mark part returned
 - `POST /cache/:id/resolve` -- resolve single claim
 - `POST /cache/resolve` -- bulk auto-resolve from listings
@@ -131,9 +132,9 @@ Parts staging system -- tracks parts claimed from yards before listing.
 
 ### /vin (VIN decode + scan)
 - `POST /vin/decode-photo` -- Claude Vision API decodes VIN from base64 JPEG
-- `POST /vin/scan` -- decode VIN via NHTSA + cache
+- `POST /vin/scan` -- decode VIN via LocalVinDecoder + cache
 - `GET /vin/history` -- decoded VIN history
-- `GET /vin/test-local/:vin` -- **diagnostic**: decode single VIN locally, returns raw NHTSA data
+- `GET /vin/test-local/:vin` -- **diagnostic**: decode single VIN locally
 - **Admin page:** `/admin/vin` serves vin-scanner.html
 
 ### /attack-list (Yard pull planning)
