@@ -144,20 +144,17 @@ class EbayMessagingService {
     // 4. Send via appropriate API
     let result;
     if (template.api_target === 'post_order' && entry.return_id) {
-      // Phase 3 — Post-Order API for return messages (NOT IMPLEMENTED YET)
-      this.log.info({ returnId: entry.return_id }, 'Post-Order API not yet implemented, skipping');
-      await this._markQueueStatus(entry.id, 'failed');
-      await this._logMessage(entry, renderedSubject, renderedBody, 'skipped', null, 'NOT_IMPLEMENTED', 'Post-Order API phase 3');
-      return;
+      // Post-Order API: send message into return thread
+      result = await this._sendPostOrderMessage(entry.return_id, renderedBody);
+    } else {
+      // Trading API: AddMemberMessageAAQToPartner
+      result = await this.sellerApi.sendMessageToPartner({
+        itemId: entry.item_id,
+        buyerUserId: entry.buyer_user_id,
+        subject: renderedSubject || 'Message from DynaTrack',
+        body: renderedBody,
+      });
     }
-
-    // Trading API: AddMemberMessageAAQToPartner
-    result = await this.sellerApi.sendMessageToPartner({
-      itemId: entry.item_id,
-      buyerUserId: entry.buyer_user_id,
-      subject: renderedSubject || 'Message from DynaTrack',
-      body: renderedBody,
-    });
 
     // 5. Log the result
     if (result.success) {
@@ -293,6 +290,278 @@ class EbayMessagingService {
         });
     } catch (err) {
       this.log.error({ err, orderId: entry.order_id }, 'Failed to log message');
+    }
+  }
+
+  // --- PHASE 2: POST-DELIVERY QUEUE ---
+
+  /**
+   * Queue a post_delivery message for a delivered order.
+   * 4-hour delay so buyer has time to open the package.
+   */
+  async queuePostDelivery(order, ebayStore = 'dynatrack') {
+    const primaryItem = order.lineItems?.[0];
+    if (!primaryItem?.itemId) return null;
+
+    const scheduledAt = new Date(Date.now() + 4 * 60 * 60 * 1000); // 4 hour delay
+
+    try {
+      const result = await database('ebay_message_queue')
+        .insert({
+          id: database.raw('gen_random_uuid()'),
+          order_id: order.orderId,
+          item_id: primaryItem.itemId,
+          buyer_user_id: order.buyerUsername,
+          template_key: 'post_delivery',
+          scheduled_at: scheduledAt,
+          status: 'pending',
+          ebay_store: ebayStore,
+          created_at: new Date(),
+        })
+        .onConflict(['order_id', 'template_key'])
+        .ignore()
+        .returning('id');
+
+      if (result?.length > 0) {
+        this.log.info({ orderId: order.orderId, scheduledAt }, 'Queued post_delivery message');
+        return result[0].id;
+      }
+      return null;
+    } catch (err) {
+      this.log.error({ err, orderId: order.orderId }, 'Failed to queue post_delivery');
+      return null;
+    }
+  }
+
+  /**
+   * Poll for delivered orders and queue post_delivery messages.
+   * Uses GetOrders with Completed status as delivery proxy.
+   * Called by cron every 30 minutes.
+   */
+  async pollDeliveryStatus() {
+    const startTime = Date.now();
+    let checked = 0, queued = 0;
+
+    try {
+      // Get orders that had post_purchase sent but no post_delivery yet
+      const sentPurchases = await database('ebay_messages')
+        .where('template_key', 'post_purchase')
+        .where('status', 'sent')
+        .whereNotNull('order_id')
+        .select('order_id', 'item_id', 'buyer_user_id', 'ebay_store');
+
+      if (sentPurchases.length === 0) {
+        this.log.info('No orders pending delivery check');
+        return { checked: 0, queued: 0, elapsed: Date.now() - startTime };
+      }
+
+      // Filter out orders that already have post_delivery queued/sent
+      const alreadyDelivered = await database('ebay_message_queue')
+        .where('template_key', 'post_delivery')
+        .whereIn('order_id', sentPurchases.map(o => o.order_id))
+        .select('order_id');
+      const alreadySent = await database('ebay_messages')
+        .where('template_key', 'post_delivery')
+        .whereIn('order_id', sentPurchases.map(o => o.order_id))
+        .select('order_id');
+
+      const doneSet = new Set([
+        ...alreadyDelivered.map(r => r.order_id),
+        ...alreadySent.map(r => r.order_id),
+      ]);
+
+      const toCheck = sentPurchases.filter(o => !doneSet.has(o.order_id));
+      this.log.info({ total: sentPurchases.length, alreadyDone: doneSet.size, toCheck: toCheck.length }, 'Delivery status check');
+
+      if (toCheck.length === 0) {
+        return { checked: 0, queued: 0, elapsed: Date.now() - startTime };
+      }
+
+      // Poll eBay for recent orders — check if status is Completed (delivered)
+      const orders = await this.sellerApi.getOrders({ daysBack: 14 });
+      const orderMap = new Map();
+      for (const o of orders) {
+        if (o.orderId) orderMap.set(o.orderId, o);
+      }
+
+      for (const pending of toCheck) {
+        checked++;
+        const order = orderMap.get(pending.order_id);
+        if (!order) continue;
+
+        // eBay sets orderStatus to 'Completed' after delivery confirmation
+        if (order.orderStatus === 'Completed' && order.shippedTime) {
+          // Verify it's been at least 2 days since shipping (safety margin)
+          const shippedAt = new Date(order.shippedTime);
+          const daysSinceShipped = (Date.now() - shippedAt.getTime()) / 86400000;
+          if (daysSinceShipped < 2) continue;
+
+          const queueResult = await this.queuePostDelivery({
+            orderId: pending.order_id,
+            buyerUsername: pending.buyer_user_id,
+            lineItems: [{ itemId: pending.item_id }],
+          }, pending.ebay_store || 'dynatrack');
+          if (queueResult) queued++;
+        }
+      }
+    } catch (err) {
+      this.log.error({ err }, 'Delivery status polling failed');
+    }
+
+    const elapsed = Date.now() - startTime;
+    this.log.info({ checked, queued, elapsed }, 'Delivery polling complete');
+    return { checked, queued, elapsed };
+  }
+
+  // --- PHASE 3: RETURN OPENED QUEUE ---
+
+  /**
+   * Queue a return_opened message for a new return request.
+   * 5-minute delay, stores return_id for Post-Order API routing.
+   */
+  async queueReturnOpened({ orderId, itemId, buyerUsername, returnId, ebayStore = 'dynatrack' }) {
+    const scheduledAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min delay
+
+    try {
+      const result = await database('ebay_message_queue')
+        .insert({
+          id: database.raw('gen_random_uuid()'),
+          order_id: orderId,
+          item_id: itemId,
+          buyer_user_id: buyerUsername,
+          template_key: 'return_opened',
+          scheduled_at: scheduledAt,
+          status: 'pending',
+          return_id: returnId,
+          ebay_store: ebayStore,
+          created_at: new Date(),
+        })
+        .onConflict(['order_id', 'template_key'])
+        .ignore()
+        .returning('id');
+
+      if (result?.length > 0) {
+        this.log.info({ orderId, returnId, scheduledAt }, 'Queued return_opened message');
+        return result[0].id;
+      }
+      return null;
+    } catch (err) {
+      this.log.error({ err, orderId, returnId }, 'Failed to queue return_opened');
+      return null;
+    }
+  }
+
+  /**
+   * Poll eBay Post-Order API for new returns and queue return_opened messages.
+   * Requires EBAY_OAUTH_TOKEN env var. Called by cron every 15 minutes.
+   */
+  async pollReturns() {
+    const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+    if (!oauthToken) {
+      this.log.debug('EBAY_OAUTH_TOKEN not set — return polling disabled');
+      return { checked: 0, queued: 0, skipped: true };
+    }
+
+    const startTime = Date.now();
+    let checked = 0, queued = 0;
+
+    try {
+      const axios = require('axios');
+      // Search for returns created in the last 24 hours
+      const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const toDate = new Date().toISOString();
+
+      const response = await axios.get('https://api.ebay.com/post-order/v2/return/search', {
+        params: {
+          creation_date_range_from: fromDate,
+          creation_date_range_to: toDate,
+          limit: 50,
+          offset: 0,
+        },
+        headers: {
+          'Authorization': `Bearer ${oauthToken}`,
+          'Content-Type': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+        timeout: 15000,
+      });
+
+      const returns = response.data?.members || response.data?.returns || [];
+      this.log.info({ returnCount: returns.length }, 'Polled returns');
+
+      for (const ret of returns) {
+        checked++;
+        const returnId = ret.returnId || ret.id;
+        const orderId = ret.orderId;
+        if (!returnId || !orderId) continue;
+
+        // Check if already queued/sent
+        const exists = await database('ebay_message_queue')
+          .where('order_id', orderId)
+          .where('template_key', 'return_opened')
+          .first();
+        if (exists) continue;
+
+        const existsMsg = await database('ebay_messages')
+          .where('order_id', orderId)
+          .where('template_key', 'return_opened')
+          .first();
+        if (existsMsg) continue;
+
+        const result = await this.queueReturnOpened({
+          orderId,
+          itemId: ret.itemId || ret.lineItems?.[0]?.itemId || null,
+          buyerUsername: ret.buyerLoginName || ret.buyer?.username || null,
+          returnId: String(returnId),
+          ebayStore: 'dynatrack',
+        });
+        if (result) queued++;
+      }
+    } catch (err) {
+      if (err.response?.status === 401) {
+        this.log.warn('EBAY_OAUTH_TOKEN expired — return polling skipped');
+      } else {
+        this.log.error({ err: err.message }, 'Return polling failed');
+      }
+    }
+
+    const elapsed = Date.now() - startTime;
+    this.log.info({ checked, queued, elapsed }, 'Return polling complete');
+    return { checked, queued, elapsed };
+  }
+
+  /**
+   * Send a message into an eBay return thread via Post-Order API.
+   * Requires EBAY_OAUTH_TOKEN.
+   */
+  async _sendPostOrderMessage(returnId, messageBody) {
+    const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+    if (!oauthToken) {
+      return { success: false, errorCode: 'NO_OAUTH', errorMessage: 'EBAY_OAUTH_TOKEN not configured' };
+    }
+
+    try {
+      const axios = require('axios');
+      await axios.post(
+        `https://api.ebay.com/post-order/v2/return/${returnId}/send_message`,
+        { message: { content: messageBody } },
+        {
+          headers: {
+            'Authorization': `Bearer ${oauthToken}`,
+            'Content-Type': 'application/json',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+          timeout: 15000,
+        }
+      );
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        errorCode: String(err.response?.status || 'UNKNOWN'),
+        errorMessage: err.response?.data?.message || err.message,
+        rawResponse: JSON.stringify(err.response?.data || {}).substring(0, 500),
+      };
     }
   }
 

@@ -1024,6 +1024,24 @@ async function start() {
       }
     });
 
+    // Phase 2: Poll for delivered orders every 30 minutes
+    const deliveryPollJob = schedule.scheduleJob('*/30 * * * *', async function () {
+      try {
+        await messagingService.pollDeliveryStatus();
+      } catch (err) {
+        log.error({ err }, 'Cron: Delivery status polling failed');
+      }
+    });
+
+    // Phase 3: Poll for new returns every 15 minutes (requires EBAY_OAUTH_TOKEN)
+    const returnPollJob = schedule.scheduleJob('7,22,37,52 * * * *', async function () {
+      try {
+        await messagingService.pollReturns();
+      } catch (err) {
+        log.error({ err }, 'Cron: Return polling failed');
+      }
+    });
+
     // Load Auto table models into partMatcher cache, then regenerate scout alerts
     try {
       const { loadModelsFromDB } = require('./utils/partMatcher');
