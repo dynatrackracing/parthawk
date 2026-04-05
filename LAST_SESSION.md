@@ -79,3 +79,10 @@
 - FIXED: buildStockIndex() deduplicates per listing via Set — qty added once per unique PN
 - Backfill: 9,490 rows updated across YourListing (1,835), YourSale (7,398), SoldItem (257)
 - Result: Ford ECM 7L3A12A650 stock = 5 (was 241). Each Ford model now has distinct base PN.
+
+## 19:30 — Stock match type flag (verify PN)
+- buildStockIndex() now tracks full raw PNs per base key alongside count
+- resolveStock() determines exact vs base match type per part lookup
+- Parts with stockMatchType='base' show "X in stock ⚠ verify PN" in orange
+- Exact matches show clean "X in stock" as before
+- Chrysler/Toyota PNs = exact (unique per part). Ford base PNs may include suffix variants.

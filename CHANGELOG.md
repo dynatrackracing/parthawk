@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Stock Match Type Flag (verify PN) — 2026-04-05
+- buildStockIndex tracks full raw PNs per base key for exact vs base match detection
+- Parts with base-only PN match show "X in stock ⚠ verify PN" in orange
+- Exact PN matches show clean stock count as before
+
+---
+
 ## Ford partNumberBase Fix + Stock Index Dedup — 2026-04-05
 - Ford PNs now keep vehicle prefix (7L3A12A650 not 12A650) — fixes 241→5 stock inflation
 - Stock index deduplicates per listing via Set — prevents triple-counting
