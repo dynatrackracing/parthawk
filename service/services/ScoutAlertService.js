@@ -116,9 +116,9 @@ async function _generateAlertsInner() {
     .where('yard_vehicle.active', true)
     .where('yard.enabled', true)
     .where(function() {
-      // Core yards: not in flyway_trip_yard at all
-      this.whereNotIn('yard.id', database('flyway_trip_yard').select('yard_id'))
-        // OR yards on an active trip
+      // Core/local yards always generate alerts
+      this.where('yard.is_core', true)
+        // OR yards on an active Flyway trip
         .orWhereIn('yard.id',
           database('flyway_trip_yard')
             .join('flyway_trip', 'flyway_trip.id', 'flyway_trip_yard.trip_id')

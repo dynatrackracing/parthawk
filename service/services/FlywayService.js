@@ -335,13 +335,8 @@ class FlywayService {
    * These must NEVER have their vehicles deactivated.
    */
   static async getCoreYardIds() {
-    // These match the LOCATIONS array in scrape-local.js (4 NC + 3 FL LKQ yards)
-    const coreNames = [
-      'LKQ Raleigh', 'LKQ Durham', 'LKQ Greensboro', 'LKQ East NC',
-      'LKQ Tampa', 'LKQ Largo', 'LKQ Clearwater',
-    ];
     const coreYards = await database('yard')
-      .whereIn('name', coreNames)
+      .where('is_core', true)
       .select('id');
     return coreYards.map(y => y.id);
   }
