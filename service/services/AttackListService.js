@@ -221,6 +221,38 @@ const MAKE_ALSO_CHECK = {
   'Dodge': ['Ram'],
 };
 
+// Compound model → base model(s) for fuzzy matching.
+// Returns array of model names to try (in order).
+// NEVER collapse protected pairs (Cherokee≠Grand Cherokee, Transit≠Transit Connect, Caravan≠Grand Caravan).
+const COMPOUND_MODEL_MAP = {
+  'f-250 super duty': ['f-250 super duty', 'f-250', 'f250'],
+  'f-350 super duty': ['f-350 super duty', 'f-350', 'f350'],
+  'f-450 super duty': ['f-450 super duty', 'f-450'],
+  'f-550 super duty': ['f-550 super duty', 'f-550'],
+  'e-350 super duty': ['e-350 super duty', 'e-350', 'e350'],
+  'explorer sport trac': ['explorer sport trac', 'explorer'],
+  'explorer sport': ['explorer sport', 'explorer'],
+  'grand cherokee l': ['grand cherokee l', 'grand cherokee'],
+  'wrangler unlimited': ['wrangler unlimited', 'wrangler'],
+  'f250 super duty': ['f250 super duty', 'f-250', 'f250'],
+  'f350 super duty': ['f350 super duty', 'f-350', 'f350'],
+};
+
+// Get all model variants to try for a given vehicle model
+function getModelVariants(model) {
+  if (!model) return [model];
+  const lower = model.toLowerCase().replace(/[-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const mapped = COMPOUND_MODEL_MAP[lower];
+  if (mapped) return mapped;
+  // Also try dash/no-dash variants for F-series
+  const noDash = lower.replace(/-/g, '');
+  const withDash = lower.replace(/^(f)(\d)/i, '$1-$2');
+  const variants = [lower];
+  if (noDash !== lower) variants.push(noDash);
+  if (withDash !== lower && withDash !== noDash) variants.push(withDash);
+  return variants;
+}
+
 /**
  * Normalize a make name to canonical Auto-table form. Case-insensitive.
  */
@@ -713,38 +745,48 @@ class AttackListService {
     const allMakes = [make, ...alsoCheck];
 
     // Collect candidate items from ±1 year in inventory index
+    // Try all model variants (e.g. "F-250 Super Duty" → also try "F-250", "F250")
     const candidates = [];
+    const modelVariants = getModelVariants(model);
     for (const m of allMakes) {
       for (let y = year - 1; y <= year + 1; y++) {
-        const key = `${m.toLowerCase()}|${model.toLowerCase()}|${y}`;
-        const match = inventoryIndex[key];
-        if (match) {
-          for (const item of match.items) {
-            if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
+        for (const mv of modelVariants) {
+          const key = `${m.toLowerCase()}|${mv}|${y}`;
+          const match = inventoryIndex[key];
+          if (match) {
+            for (const item of match.items) {
+              if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
+            }
           }
         }
       }
     }
 
-    // Word-boundary model match with ±1 year if no exact hits
-    // "Grand Cherokee" must NOT match "Cherokee" — require exact word boundary
-    // TODO: migrate to partIntelligence.modelMatches() for consistency
+    // Bidirectional fuzzy model match with ±1 year if no exact hits
     if (candidates.length === 0) {
-      const modelNorm = model.toLowerCase().replace(/[-]/g, ' ').trim();
-      const modelRe = new RegExp('\\b' + modelNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-      for (const [key, entry] of Object.entries(inventoryIndex)) {
-        const [iMake, iModel, iYear] = key.split('|');
-        const iYearNum = parseInt(iYear);
-        if (iYearNum < year - 1 || iYearNum > year + 1) continue;
-        if (!allMakes.map(m => m.toLowerCase()).includes(iMake)) continue;
-        const iModelNorm = iModel.replace(/[-]/g, ' ').trim();
-        // One-directional: exact match OR vehicle model appears in inventory model
-        // Cherokee (inventory) must NOT match Grand Cherokee (vehicle)
-        if (modelNorm === iModelNorm || modelRe.test(iModelNorm)) {
-          for (const item of entry.items) {
-            if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
+      const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const makesLower = allMakes.map(m => m.toLowerCase());
+      for (const mv of modelVariants) {
+        const mvNorm = mv.replace(/[-]/g, ' ').trim();
+        const mvRe = new RegExp('\\b' + esc(mvNorm) + '\\b', 'i');
+        for (const [key, entry] of Object.entries(inventoryIndex)) {
+          const [iMake, iModel, iYear] = key.split('|');
+          const iYearNum = parseInt(iYear);
+          if (iYearNum < year - 1 || iYearNum > year + 1) continue;
+          if (!makesLower.includes(iMake)) continue;
+          const iModelNorm = iModel.replace(/[-]/g, ' ').trim();
+          // Direction 1: vehicle model regex against inventory model
+          const dir1 = mvRe.test(iModelNorm);
+          // Direction 2: inventory model regex against vehicle model
+          const iRe = new RegExp('\\b' + esc(iModelNorm) + '\\b', 'i');
+          const dir2 = iRe.test(mvNorm);
+          if (dir1 || dir2) {
+            for (const item of entry.items) {
+              if (!candidates.some(p => p.itemId === item.itemId)) candidates.push(item);
+            }
           }
         }
+        if (candidates.length > 0) break; // stop trying variants once we find matches
       }
     }
 
@@ -814,18 +856,24 @@ class AttackListService {
     const allMakes = [make, ...alsoCheck].filter(Boolean);
 
     // Collect all candidate salesIndex entries by make+model (exact + partial model)
+    // Try all model variants for compound models (F-250 Super Duty → also try F-250)
     const candidateKeys = new Set();
+    const salesModelVariants = getModelVariants(model);
     for (const m of allMakes) {
-      const exactKey = `${m.toLowerCase()}|${modelLower}`;
-      if (salesIndex[exactKey]) candidateKeys.add(exactKey);
-      // One-directional model match: vehicle model must appear in sale model.
-      // "Grand Cherokee" (vehicle) matches "Grand Cherokee" (sale) — yes.
-      // "Cherokee" (sale) must NOT match "Grand Cherokee" (vehicle) — removed reverse check.
+      for (const mv of salesModelVariants) {
+        const exactKey = `${m.toLowerCase()}|${mv}`;
+        if (salesIndex[exactKey]) candidateKeys.add(exactKey);
+      }
+      // Bidirectional fuzzy: check each sales model against each vehicle model variant
       for (const sKey of Object.keys(salesIndex)) {
         if (!sKey.startsWith(m.toLowerCase() + '|')) continue;
         const sModel = sKey.split('|')[1];
-        if (sModel && piModelMatches(sModel, model)) {
-          candidateKeys.add(sKey);
+        if (!sModel) continue;
+        for (const mv of salesModelVariants) {
+          if (piModelMatches(sModel, mv) || piModelMatches(mv, sModel)) {
+            candidateKeys.add(sKey);
+            break;
+          }
         }
       }
     }
@@ -899,19 +947,36 @@ class AttackListService {
     // Recency-weighted avg across all matched sales
     salesDemand.avgPrice = weightedAvgPrice(allMatchedSales.map(s => ({ price: s.price, soldDate: s.soldDate })));
 
-    // Current stock from YourListing — match by make+model, not just make
+    // Current stock from YourListing — match by make+model using model variants
     let stock = 0;
+    const stockModelVariants = getModelVariants(model);
+    const seenStockKeys = new Set();
     for (const m of allMakes) {
-      const stockKey = `${m.toLowerCase()}|${modelLower}`;
-      stock += stockIndex[stockKey] || 0;
-      // Also check word-boundary model matches (F-150 = F150, NOT Cherokee = Grand Cherokee)
-      const stockModelRe = new RegExp('\\b' + modelLower.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-      for (const [sk, sv] of Object.entries(stockIndex)) {
-        if (!sk.startsWith(m.toLowerCase() + '|')) continue;
-        const sModel = sk.split('|')[1];
-        if (sModel !== modelLower && stockModelRe.test(sModel.replace(/[-]/g, ' '))) {
-          stock += sv;
+      // Exact keys for all model variants
+      for (const mv of stockModelVariants) {
+        const stockKey = `${m.toLowerCase()}|${mv}`;
+        if (stockIndex[stockKey] && !seenStockKeys.has(stockKey)) {
+          stock += stockIndex[stockKey];
+          seenStockKeys.add(stockKey);
         }
+      }
+      // Bidirectional fuzzy for edge cases
+      const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      for (const mv of stockModelVariants) {
+        const mvNorm = mv.replace(/[-]/g, ' ').trim();
+        const mvRe = new RegExp('\\b' + esc(mvNorm) + '\\b', 'i');
+        for (const [sk, sv] of Object.entries(stockIndex)) {
+          if (seenStockKeys.has(sk)) continue;
+          if (!sk.startsWith(m.toLowerCase() + '|')) continue;
+          const sModel = sk.split('|')[1];
+          const sModelNorm = (sModel || '').replace(/[-]/g, ' ').trim();
+          const iRe = new RegExp('\\b' + esc(sModelNorm) + '\\b', 'i');
+          if (mvRe.test(sModelNorm) || iRe.test(mvNorm)) {
+            stock += sv;
+            seenStockKeys.add(sk);
+          }
+        }
+        if (stock > 0) break;
       }
     }
 
