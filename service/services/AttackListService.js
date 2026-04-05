@@ -1458,6 +1458,7 @@ class AttackListService {
       engine: formatEngineDisplay(vehicle.engine),
       engine_type: vehicle.engine_type || null,
       drivetrain: vehicle.drivetrain || null,
+      decoded_drivetrain: vehicle.decoded_drivetrain || null,
       trim_level: vehicle.trim_level || null,
       body_style: vehicle.body_style || null,
       stock_number: vehicle.stock_number || null,

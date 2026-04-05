@@ -48,6 +48,7 @@ class VinDecodeService {
         engineType: result.engineType,
         drivetrain: result.drivetrain,
         bodyStyle: result.bodyStyle,
+        transHint: result.transHint || null,
       };
     } catch (err) {
       this.log.warn({ err: err.message, vin }, 'LocalVinDecoder failed');
@@ -141,10 +142,13 @@ class VinDecodeService {
         try {
           const updates = { vin_decoded: true, updatedAt: new Date() };
           if (result.engine) updates.engine = result.engine.substring(0, 50);
+          if (result.engine) updates.decoded_engine = result.engine.substring(0, 50);
           if (result.engineType) updates.engine_type = result.engineType.substring(0, 20);
           if (result.drivetrain) updates.drivetrain = result.drivetrain.substring(0, 20);
+          if (result.drivetrain) updates.decoded_drivetrain = result.drivetrain.substring(0, 100);
           if (result.trim) updates.trim_level = result.trim.substring(0, 100);
           if (result.bodyStyle) updates.body_style = result.bodyStyle.substring(0, 50);
+          if (result.transHint) updates.decoded_transmission = result.transHint.substring(0, 100);
           await database('yard_vehicle').where('id', v.id).update(updates);
           decoded++;
         } catch (e) {

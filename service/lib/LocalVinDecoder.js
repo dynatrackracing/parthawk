@@ -338,6 +338,7 @@ async function decode(vin) {
       engine: engine,
       drivetrain: drivetrain,
       body_style: bodyStyle,
+      transmission_style: transHint || null,
       raw_nhtsa: JSON.stringify({ corgi: corgiResult.components, engineCode: engineCode, source: source }),
       decoded_at: new Date(),
       createdAt: new Date(),
