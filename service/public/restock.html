@@ -55,9 +55,9 @@
 <div id="content"><div class="loading"><div class="spinner"></div>Generating report...</div></div>
 <script>
 const TIER_CONFIG = {
-  green:  { icon: '🟢', label: 'RESTOCK NOW',   badge: 'b-green',  header: 'sh-green' },
-  yellow: { icon: '🟡', label: 'STRONG BUY',    badge: 'b-yellow', header: 'sh-yellow' },
-  orange: { icon: '🟠', label: 'CONSIDER',      badge: 'b-orange', header: 'sh-orange' },
+  critical: { icon: '🟢', label: 'RESTOCK NOW',   badge: 'b-green',  header: 'sh-green' },
+  low:      { icon: '🟡', label: 'STRONG BUY',    badge: 'b-yellow', header: 'sh-yellow' },
+  watch:    { icon: '🟠', label: 'CONSIDER',       badge: 'b-orange', header: 'sh-orange' },
 };
 
 let currentDays = 30;
@@ -99,9 +99,9 @@ async function load() {
     document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || 0) + ' sales analyzed' + listingsNote + ')';
 
     let summaryHtml =
-      `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.green}</div></div>` +
-      `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.yellow}</div></div>` +
-      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.orange}</div></div>`;
+      `<div class="stat"><div class="stat-label">Restock Now</div><div class="stat-value sg">${d.summary.critical}</div></div>` +
+      `<div class="stat"><div class="stat-label">Strong Buy</div><div class="stat-value sy">${d.summary.low}</div></div>` +
+      `<div class="stat"><div class="stat-label">Consider</div><div class="stat-value so">${d.summary.watch}</div></div>`;
     if (foundCount > 0) summaryHtml += `<div class="stat"><div class="stat-label">Found</div><div class="stat-value" style="color:#22c55e">${foundCount}</div></div>`;
     summaryHtml +=
       `<div class="stat"><div class="stat-label">Sales</div><div class="stat-value">${d.summary.salesAnalyzed || 0}</div></div>` +
@@ -112,7 +112,7 @@ async function load() {
     if (foundCount > 0) {
       html += `<div style="display:flex;justify-content:flex-end;padding:4px 8px;font-size:11px"><label style="color:#6B7280;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="hideFoundCb" onchange="toggleHideFound()" ${hideFound ? 'checked' : ''} style="accent-color:#22c55e"> Hide found</label></div>`;
     }
-    for (const tier of ['green', 'yellow', 'orange']) {
+    for (const tier of ['critical', 'low', 'watch']) {
       const items = d.tiers[tier] || [];
       if (items.length === 0) continue;
       const cfg = TIER_CONFIG[tier];
@@ -144,7 +144,7 @@ function renderSection(tier, cfg, items) {
   let h = `<div class="section">
     <div class="section-header ${cfg.header}">
       <span>${cfg.icon} ${cfg.label} (${visibleItems.length})</span>
-      <span style="font-size:9px;color:#6B7280">Score ${tier === 'green' ? '75+' : tier === 'yellow' ? '60-74' : '40-59'}</span>
+      <span style="font-size:9px;color:#6B7280">Score ${tier === 'critical' ? '75+' : tier === 'low' ? '60-74' : '40-59'}</span>
     </div>
     <table><tr>
       <th>Score</th><th>Action</th><th>Vehicle</th><th>Part</th><th>Part #</th>
@@ -166,12 +166,12 @@ function renderSection(tier, cfg, items) {
 
     h += `<tr${found ? ' style="opacity:0.5"' : ''}>
       <td><span class="badge ${cfg.badge}">${i.score}</span></td>
-      <td style="font-size:10px;font-weight:600">${found ? 'INCOMING' : i.action}</td>
+      <td style="font-size:10px;font-weight:600">${found ? 'INCOMING' : i.urgency}</td>
       <td style="font-weight:600">${vehicle || i.make}</td>
       <td style="font-weight:600">${i.partType}</td>
       <td class="mono" style="max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${pn}">${pn}</td>
-      <td style="font-weight:600">${i.sold7d}</td>
-      <td>${i.activeStock}</td>
+      <td style="font-weight:600">${i.timesSold}</td>
+      <td>${i.inStock}</td>
       <td>$${i.avgPrice}</td>
       <td>$${Math.round(i.revenue).toLocaleString()}</td>
     </tr>`;
