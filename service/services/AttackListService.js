@@ -672,7 +672,9 @@ class AttackListService {
         }
 
         // Index by part number — dedup: each listing contributes qty ONCE per unique PN
+        // Also track full raw PNs per base key for exact vs base match detection
         const pnsForListing = new Set();
+        const fullPNsForListing = new Set(); // raw full PNs before base normalization
 
         if (listing.partNumberBase && listing.partNumberBase.length >= 5) {
           pnsForListing.add(listing.partNumberBase.toUpperCase());
@@ -680,14 +682,18 @@ class AttackListService {
         if (listing.sku) {
           const base = normalizePartNumber(listing.sku);
           if (base && base.length >= 5) pnsForListing.add(base.toUpperCase());
+          fullPNsForListing.add(listing.sku.toUpperCase().replace(/[\s.\-]/g, ''));
         }
         const pns = piExtractPNs(title);
         for (const pn of pns) {
           if (pn.base && pn.base.length >= 5) pnsForListing.add(pn.base.toUpperCase());
+          fullPNsForListing.add(pn.normalized);
         }
 
         for (const pn of pnsForListing) {
-          byPartNumber[pn] = (byPartNumber[pn] || 0) + qty;
+          if (!byPartNumber[pn]) byPartNumber[pn] = { total: 0, fullPNs: new Set() };
+          byPartNumber[pn].total += qty;
+          for (const fpn of fullPNsForListing) byPartNumber[pn].fullPNs.add(fpn);
         }
       }
     } catch (err) {
@@ -913,6 +919,23 @@ class AttackListService {
     const avgPrice = salesDemand.avgPrice > 0 ? salesDemand.avgPrice
       : (partCount > 0 ? matchedParts.reduce((sum, p) => sum + p.price, 0) / partCount : 0);
 
+    // Helper: resolve stock count + match type from byPartNumber index
+    function resolveStock(pn, stockPNs) {
+      if (!pn || !stockPNs) return { count: 0, matchType: 'none' };
+      const entry = stockPNs[pn.toUpperCase()];
+      if (!entry) return { count: 0, matchType: 'none' };
+      const total = typeof entry === 'number' ? entry : entry.total;
+      if (!total) return { count: 0, matchType: 'none' };
+      // Check if the lookup PN itself appears as a full PN in the index (exact match)
+      // or if it only matches via base normalization
+      const pnUp = pn.toUpperCase();
+      if (typeof entry === 'object' && entry.fullPNs) {
+        const isExact = entry.fullPNs.has(pnUp);
+        return { count: total, matchType: isExact ? 'exact' : 'base' };
+      }
+      return { count: total, matchType: 'exact' };
+    }
+
     // === BUILD PARTS LIST FIRST (needed for scoring) ===
     const parts = [];
     const seenTypes = new Set();
@@ -927,6 +950,7 @@ class AttackListService {
       // Try exact PN first, fall back to base ONLY if exact returns 0
       // Never sum both — base includes exact, so summing double counts
       let ptStock = 0;
+      let ptStockMatch = 'none';
       const exactPNs = [];
       const basePNs = [];
       for (const t of (ptData.titles || [])) {
@@ -939,12 +963,14 @@ class AttackListService {
       if (stockPartNumbers) {
         // Try exact normalized PNs first
         for (const pn of exactPNs) {
-          if (stockPartNumbers[pn]) { ptStock = stockPartNumbers[pn]; break; }
+          const r = resolveStock(pn, stockPartNumbers);
+          if (r.count > 0) { ptStock = r.count; ptStockMatch = r.matchType; break; }
         }
         // Only fall back to base if exact found nothing
         if (ptStock === 0) {
           for (const pn of basePNs) {
-            if (stockPartNumbers[pn]) { ptStock = stockPartNumbers[pn]; break; }
+            const r = resolveStock(pn, stockPartNumbers);
+            if (r.count > 0) { ptStock = r.count; ptStockMatch = r.matchType === 'exact' ? 'base' : r.matchType; break; }
           }
         }
       }
@@ -961,6 +987,7 @@ class AttackListService {
         itemId: null, title: ptData.titles?.[0] || `${make} ${model} ${partType}`,
         category: null, partNumber: null, partType,
         price: ptWeightedAvg, priceSource: 'sold', in_stock: ptStock,
+        stockMatchType: ptStockMatch,
         sold_90d: ptData.count, verdict, lastSoldDate: lastSold,
         reason: `Sold ${ptData.count}x @ $${ptWeightedAvg} avg (recency-weighted)`,
         deadWarning: null,
@@ -1018,12 +1045,17 @@ class AttackListService {
       } else {
         // New entry
         let ptStock = 0;
-        if (basePn && stockPartNumbers) ptStock = stockPartNumbers[basePn] || 0;
+        let ptStockMatch = 'none';
+        if (basePn && stockPartNumbers) {
+          const r = resolveStock(basePn, stockPartNumbers);
+          ptStock = r.count;
+          ptStockMatch = r.matchType;
+        }
         mergedByBase[key] = {
           itemId: p.itemId, title: p.title, category: p.category,
           partNumber: p.partNumber, partType: p.partType,
           price: Math.round(p.price), priceSource: p.priceSource || 'estimate',
-          in_stock: ptStock, sold_90d: 0,
+          in_stock: ptStock, stockMatchType: ptStockMatch, sold_90d: 0,
           verdict: 'SKIP', seller: p.seller || null,
           reason: 'Competitor listed, check YourSale for demand',
           isRebuild: false, deadWarning: null,

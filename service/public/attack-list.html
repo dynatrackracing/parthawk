@@ -859,7 +859,7 @@
           <div class="pd-verdict ${vc}">${noPrice ? 'NO DATA' : badgeVerdict + ' ' + pricePrefix + price + ' ' + freshness}</div>
         </div>
         <div class="pd-stats">
-          <span>${inStock} in stock</span>
+          <span>${inStock} in stock${p.stockMatchType === 'base' ? ' <span style="color:#FF8C00;font-size:9px" title="Stock matched by base PN — verify exact part number">⚠ verify PN</span>' : ''}</span>
           <span>${sold90d} sold/90d</span>
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
           ${isRef ? '<span style="color:#6B7280;font-size:9px" title="Reference price from listing data — not current market">ref</span>' : ''}
