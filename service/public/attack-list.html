@@ -79,7 +79,7 @@
   .v-score.purple { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
   .v-score.blue { background: #1a2a3d; color: #3498DB; }
   .v-score.green { background: #0a2e0a; color: #2ECC40; }
-  .v-score.yellow { background: #3d3200; color: #F1C40F; }
+  .v-score.yellow { background: #3d2200; color: #FF8C00; }
   .v-score.red { background: #3d0a0a; color: #FF4136; }
   .v-score.gray { background: #1f2937; color: #6B7280; }
   .v-info { flex: 1; min-width: 0; }
@@ -94,7 +94,7 @@
   .chip-purple { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
   .chip-blue { background: #1a2a3d; color: #3498DB; }
   .chip-green { background: #0a2e0a; color: #2ECC40; }
-  .chip-yellow { background: #3d3200; color: #F1C40F; }
+  .chip-yellow { background: #3d2200; color: #FF8C00; }
   .chip-orange { background: #7c2d12; color: #f97316; }
   .chip-red { background: #3d0a0a; color: #FF4136; }
   .chip-gray { background: #1f2937; color: #6B7280; }
@@ -139,8 +139,9 @@
   .verdict-premium { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
   .verdict-high { background: #1a2a3d; color: #3498DB; }
   .verdict-solid { background: #0a2e0a; color: #2ECC40; }
-  .verdict-base { background: #3d3200; color: #F1C40F; }
+  .verdict-base { background: #3d2200; color: #FF8C00; }
   .verdict-low { background: #3d0a0a; color: #FF4136; }
+  .verdict-nodata { background: #1f2937; color: #6B7280; }
   @keyframes pulse-gold { 0%,100% { background: #3d2e00; color: #FFD700; box-shadow: 0 0 4px rgba(255,215,0,0.3); } 50% { background: #4a3800; color: #FFF0A0; box-shadow: 0 0 8px rgba(255,215,0,0.5); } }
   @keyframes pulse-purple { 0%,100% { background: #2d1a3e; color: #C39BD3; box-shadow: 0 0 4px rgba(155,89,182,0.3); } 50% { background: #3a2250; color: #D7BDE2; box-shadow: 0 0 8px rgba(155,89,182,0.5); } }
   .pd-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
@@ -825,12 +826,13 @@
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
       // OUR sold price is primary when we have recent sales; market data fills gaps
       const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
-      const isEst = p.priceSource === 'estimate';
+      const isRef = p.priceSource === 'item_reference';
+      const noPrice = p.priceSource === 'none' || (!p.price && !p.marketMedian);
       const displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
-      const badgeVerdict = isEst ? 'EST' : displayPrice >= 500 ? 'ELITE' : displayPrice >= 350 ? 'PREMIUM' : displayPrice >= 250 ? 'HIGH' : displayPrice >= 150 ? 'SOLID' : displayPrice >= 100 ? 'BASE' : 'LOW';
-      const vc = badgeVerdict === 'EST' ? 'verdict-low' : 'verdict-' + badgeVerdict.toLowerCase();
+      const badgeVerdict = noPrice ? 'NO DATA' : displayPrice >= 500 ? 'ELITE' : displayPrice >= 350 ? 'PREMIUM' : displayPrice >= 250 ? 'HIGH' : displayPrice >= 150 ? 'SOLID' : displayPrice >= 100 ? 'BASE' : 'LOW';
+      const vc = noPrice ? 'verdict-nodata' : 'verdict-' + badgeVerdict.toLowerCase();
       const price = displayPrice;
-      const pricePrefix = isEst ? '~$' : '$';
+      const pricePrefix = noPrice ? '' : (isRef ? 'REF $' : '$');
       const inStock = p.in_stock != null ? p.in_stock : 0;
       const sold90d = p.sold_90d != null ? p.sold_90d : 0;
       // Price freshness indicator
@@ -853,13 +855,13 @@
       html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
           <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${p.isMarked && !p.alertMatch ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:4px" title="On your restock watch list">MARKED</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
-          <div class="pd-verdict ${vc}">${badgeVerdict} ${pricePrefix}${price} ${freshness}</div>
+          <div class="pd-verdict ${vc}">${noPrice ? 'NO DATA' : badgeVerdict + ' ' + pricePrefix + price + ' ' + freshness}</div>
         </div>
         <div class="pd-stats">
           <span>${inStock} in stock</span>
           <span>${sold90d} sold/90d</span>
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
-          ${isEst ? '<span style="color:#6B7280;font-size:9px" title="Conservative estimate — no market data available">est</span>' : ''}
+          ${isRef ? '<span style="color:#6B7280;font-size:9px" title="Reference price from listing data — not current market">ref</span>' : ''}
         </div>
         ${p.alertMatch && p.alertMatch.value ? `<div style="font-size:10px;color:#6B7280;margin-top:2px">Alert value: $${p.alertMatch.value}</div>` : ''}
         <div class="pd-reason">${p.reason || ''}${p.trimMultiplier !== undefined && p.trimMultiplier < 1.0 ? (p.trimMultiplier === 0 ? ' <span style="color:#ef4444;font-weight:600">· Not expected on this trim</span>' : ' <span style="color:#f59e0b;font-weight:600">· ⚠️ Verify on vehicle</span>') : ''}</div>
