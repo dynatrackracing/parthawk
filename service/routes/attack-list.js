@@ -65,7 +65,7 @@ router.get('/', async (req, res) => {
       for (const yard of results) {
         for (const vehicle of (yard.vehicles || [])) {
           // Keep only chip-display data: part type + price for each part
-          vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
+          vehicle.part_chips = (vehicle.parts || []).filter(p => !p.belowFloor).slice(0, 4).map(p => ({
             partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
             isMarked: p.isMarked || false,
           }));

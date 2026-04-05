@@ -1251,7 +1251,7 @@ class AttackListService {
       } : null,
       score, color_code: color, vehicle_verdict,
       est_value: totalValue,
-      max_part_value: filteredParts.length > 0 ? Math.max(...filteredParts.map(p => p.price || 0)) : 0,
+      max_part_value: filteredParts.filter(p => !p.belowFloor).length > 0 ? Math.max(...filteredParts.filter(p => !p.belowFloor).map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,

@@ -75,10 +75,12 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 800;
   }
-  .v-score.green { background: #064e3b; color: #22c55e; }
-  .v-score.yellow { background: #713f12; color: #eab308; }
-  .v-score.orange { background: #7c2d12; color: #f97316; }
-  .v-score.red { background: #7f1d1d; color: #ef4444; }
+  .v-score.gold { background: #3d2e00; color: #FFD700; animation: pulse-gold 2s ease-in-out infinite; }
+  .v-score.purple { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
+  .v-score.blue { background: #1a2a3d; color: #3498DB; }
+  .v-score.green { background: #0a2e0a; color: #2ECC40; }
+  .v-score.yellow { background: #3d3200; color: #F1C40F; }
+  .v-score.red { background: #3d0a0a; color: #FF4136; }
   .v-score.gray { background: #1f2937; color: #6B7280; }
   .v-info { flex: 1; min-width: 0; }
   .v-title { font-size: 14px; font-weight: 600; }
@@ -88,10 +90,13 @@
     font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
     letter-spacing: 0.03em; text-transform: uppercase;
   }
-  .chip-green { background: #064e3b; color: #22c55e; }
-  .chip-yellow { background: #713f12; color: #eab308; }
+  .chip-gold { background: #3d2e00; color: #FFD700; animation: pulse-gold 2s ease-in-out infinite; }
+  .chip-purple { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
+  .chip-blue { background: #1a2a3d; color: #3498DB; }
+  .chip-green { background: #0a2e0a; color: #2ECC40; }
+  .chip-yellow { background: #3d3200; color: #F1C40F; }
   .chip-orange { background: #7c2d12; color: #f97316; }
-  .chip-red { background: #7f1d1d; color: #ef4444; }
+  .chip-red { background: #3d0a0a; color: #FF4136; }
   .chip-gray { background: #1f2937; color: #6B7280; }
   .chip-age { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
   .age-today { background: #064e3b; color: #22c55e; }
@@ -347,6 +352,16 @@
         claimedItemIds = data.claimedItemIds || {};
       }
     } catch (e) { /* non-fatal */ }
+  }
+
+  // 6-tier value color mapping — shared by chips, score badge, and part verdicts
+  function tierColor(price) {
+    if (price >= 500) return 'gold';
+    if (price >= 350) return 'purple';
+    if (price >= 250) return 'blue';
+    if (price >= 150) return 'green';
+    if (price >= 100) return 'yellow';
+    return 'red';
   }
 
   // Parse date-only strings as local time, timestamps normally
@@ -654,7 +669,7 @@
   }
 
   function renderVehicle(v) {
-    const sc = v.color_code;
+    const sc = (v.max_part_value || 0) > 0 ? tierColor(v.max_part_value) : (v.color_code || 'gray');
     // Use part_chips (slim mode) or parts (full/manual mode) for chip display
     const chipSource = v.part_chips || (v.parts || []).slice(0, 4).map(p => ({ partType: p.partType || p.category, price: p.price }));
     const chipTypes = new Set();
@@ -665,7 +680,7 @@
       return true;
     }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 4).map(p => {
       const price = p.price || 0;
-      const cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
+      const cc = price > 0 ? 'chip-' + tierColor(price) : 'chip-gray';
       const markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
       return `<span class="chip ${cc}">${markIcon}${p.partType || '?'}</span>`;
     }).join('');
@@ -1476,7 +1491,7 @@
       parts.forEach(function(p) {
         var price = p.avg || p.mp || 0; tot += price;
         var vd = price >= 500 ? 'ELITE' : price >= 350 ? 'PREMIUM' : price >= 250 ? 'HIGH' : price >= 150 ? 'SOLID' : price >= 100 ? 'BASE' : 'LOW';
-        var cls = vd === 'ELITE' ? 'chip-green' : vd === 'PREMIUM' ? 'chip-green' : vd === 'HIGH' ? 'chip-green' : vd === 'SOLID' ? 'chip-yellow' : vd === 'BASE' ? 'chip-orange' : 'chip-red';
+        var cls = 'chip-' + tierColor(price);
         var badge = '';
         if (p.stk === 0 && p.sold >= 2) badge = '<span class="chip chip-green" style="font-size:9px">PULL THIS</span> ';
         else if (p.stk === 0 && p.sold >= 1) badge = '<span class="chip chip-yellow" style="font-size:9px">NEED</span> ';
