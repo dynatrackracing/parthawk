@@ -5,7 +5,7 @@ Generated 2026-04-05
 
 ### AttackListService.js
 - Purpose: Scores yard vehicles by pull value — matches yard vehicles against Auto+Item inventory, YourSale history, and YourListing stock
-- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `scoreVehicle()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`, `getModelVariants()`
+- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `buildPlatformIndex()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`, `scoreManualVehicles()`, `getModelVariants()`, `loadValidationCache()`
 - Clean Pipe: `buildStockIndex` + `buildSalesIndex` read `extractedMake`/`extractedModel`/`partNumberBase` columns first, title-parsing fallback only when null
 - Scoring upgrades:
   - Stock penalty scaling: 1 in stock=-5%, 2=-15%, 3=-30%, 4=-50%, 5+=-70%
@@ -14,18 +14,19 @@ Generated 2026-04-05
   - Mark boost: parts matching `the_mark` get +15 score bonus
 - Price resolution: market_demand_cache first, Item.price fallback (REF prefix), no price if neither (NO DATA badge). CONSERVATIVE_SELL_ESTIMATES removed.
 - Part filtering: PN-specific parts require exact year; generational parts get +/-1 tolerance; engine/drivetrain/fuel validated
-- **Price floors:** `PART_PRICE_FLOORS` constant — ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/ECU=$100. Parts below floor flagged `belowFloor:true`, excluded from vehicle `totalValue`. Mechanical parts (mirrors, visors, console lids) have no floor.
-- **Model matching:** `COMPOUND_MODEL_MAP` maps compound models to base variants (F-250 Super Duty → [F-250, F250], Explorer Sport Trac → [Explorer]). `getModelVariants()` generates all variants to try. Bidirectional fuzzy matching in `findMatchedParts()`, sales index, and stock index — tests both directions with word-boundary regex. Protected pairs: Grand Cherokee, Transit Connect, Grand Caravan never collapse.
-- **Stock index:** `buildStockIndex()` stores `{ total, fullPNs: Set }` per base key. Per-listing Set dedup prevents triple-counting. `resolveStock()` returns matchType (exact vs base) — base matches shown as "⚠ verify PN" on frontend.
-- **Part exclusion:** `isExcludedPart()` filters complete engines/transmissions/body panels. Allows all modules, trim, glass, lighting, steering, differentials.
-- **Trim/engine/trans mismatch filter:** `extractPartSpecifics(title)` detects performance trims (ST/RS/SS/SRT/Raptor/AMG/etc.), forced induction (EcoBoost/Turbo/TSI), transmission type (MT/AT/DCT/CVT), diesel. Compares against vehicle VIN data. Mismatched parts flagged `specMismatch:true`, excluded from `totalValue`, shown collapsed with orange reason text. Context-aware regex: ST avoids STEERING/START/STOCK, GT only paired with specific makes, MT only near transmission context.
+- **Price floors:** `PART_PRICE_FLOORS` constant — ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/HVAC/AIRBAG/NAV/CAMERA=$100. Parts below floor flagged `belowFloor:true`, excluded from vehicle `totalValue`. Mechanical parts (mirrors, visors, console lids) have no floor.
+- **Model matching:** `COMPOUND_MODEL_MAP` maps compound models to base variants (F-250 Super Duty → [F-250, F250], Explorer Sport Trac → [Explorer], Grand Cherokee L → [Grand Cherokee], Wrangler Unlimited → [Wrangler]). `getModelVariants()` generates all variants to try, also auto-generates dash/no-dash variants for F-series. Bidirectional fuzzy matching in `findMatchedParts()`, sales index, and stock index — tests both directions with word-boundary regex. Protected pairs: Grand Cherokee, Transit Connect, Grand Caravan never collapse.
+- **Stock index:** `buildStockIndex()` stores `{ total, fullPNs: Set }` per base key. Per-listing Set dedup prevents triple-counting — each listing contributes qty ONCE per unique PN via `pnsForListing` Set. `resolveStock()` returns matchType (exact vs base) — base matches shown as "⚠ verify PN" on frontend.
+- **Part exclusion:** `isExcludedPart()` filters complete engines/transmissions/body panels. Also excludes engine internals (pistons, crankshaft, oil pan, timing chain, flywheel, etc.). Allows all modules, trim, glass, lighting, steering, differentials.
+- **Trim/engine/trans mismatch filter:** `extractPartSpecifics(title)` detects performance trims (ST/RS/SS/SRT/Si/TRD/Nismo/Raptor/AMG/Shelby/Trail Boss/ZR2/S-Line/R-Line/GT/Type R/Type S), forced induction (EcoBoost/Twin Turbo/Turbocharged/Supercharged/TFSI/TSI/bare Turbo/displacement+T pattern like "2.0T"), transmission type (manual/automatic including MT/DCT/CVT/PowerShift context), diesel (Diesel/TDI/Duramax/Cummins/Power Stroke/EcoDiesel). Compares against vehicle VIN data (`decoded_trim`, `decoded_engine`, `decoded_transmission`, `diesel` fields). Mismatched parts flagged `specMismatch:true`, excluded from `totalValue`, shown collapsed with orange reason text. Context-aware regex: ST avoids STEERING/START/STOCK/STABILIT/STANDARD/STRUT/STRAP/STATOR, GT only paired with specific makes (Mustang/Focus/Golf/GTO/Pontiac), MT only near transmission context (TRANS/CLUTCH/SHIFT/GEAR), TSI avoids TRANSMIS, CVT avoids BOOT.
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
-- Key methods: `claim()`, `returnToAlerts()`, `deleteClaim()`, `manualResolve()`, `resolveFromListings()`, `getActiveClaims()`, `getClaimedKeys()`, `getHistory()`, `getStats()`, `checkCacheStock()`
+- Key methods: `claim()`, `updateEntry()`, `returnToAlerts()`, `deleteClaim()`, `manualResolve()`, `resolveFromListings()`, `getActiveClaims()`, `getClaimedKeys()`, `getHistory()`, `getStats()`, `checkCacheStock()`
 - Sources: daily_feed, scout_alert, hawk_eye, flyway, manual
 - Statuses: claimed -> listed / returned / deleted
 - **claim():** Accepts `itemId` field (for parts without PNs like sunroof glass, mirrors). Stores `item_id` on cache entry. Normalizes `partNumber` via `normalizePartNumber()` before storing. Dedup logic: if PN exists → match by normalized PN; if no PN but itemId → match by itemId; if both empty → allow (manual entries).
+- **updateEntry():** Partial update of editable fields on a cache entry. Accepts `partNumber`, `partDescription`, `partType`, `make`, `model`, `year`, `notes`. Re-normalizes `partNumber` via `normalizePartNumber()` on save.
 - **getClaimedKeys():** Returns three maps for puller tool sync: `claimedPNs` (normalizedPN → cacheId), `claimedItemIds` (itemId string → cacheId for no-PN parts), `claimedAlertIds` (scout alert id → cacheId). Used by Daily Feed and Scout Alerts pages.
 - Auto-resolve: `resolveFromListings()` matches cache entries against YourListing by PN or make+model+partType (listing must be created AFTER claim). Runs after every sync (4x/day)
 
@@ -117,13 +118,15 @@ Generated 2026-04-05
 ### PostScrapeService.js
 - Purpose: Universal post-scrape enrichment — runs after ANY yard scraper completes
 - Key methods: `enrichYard(yardId)`
-- Pipeline: (1) Batch VIN decode via `LocalVinDecoder.decodeBatchLocal()` (50/call, offline), (2) Trim tier matching (TrimTierService + trim_catalog + static config), (3) Scout alerts (non-blocking)
+- Pipeline: (1) Batch VIN decode via `LocalVinDecoder.decodeBatchLocal()` (50/call, offline) — writes `decoded_trim`, `decoded_engine`, `decoded_drivetrain`, `decoded_transmission`, `transmission_speeds`, `diesel` to yard_vehicle, (2) Trim tier matching (TrimTierService + trim_catalog + static config) — also sets `audio_brand`, `expected_parts`, `cult`, (3) Scout alerts (non-blocking)
+- Step 2 runs twice: first on VIN-decoded vehicles, then on non-VIN vehicles using yard-scraped trim/engine fields
 - Uses LocalVinDecoder — NOT NHTSA API
 
 ### VinDecodeService.js
 - Purpose: Single-VIN and batch decode with caching
 - Key methods: `decode(vin)`, `decodeAllUndecoded()`
 - Delegates to LocalVinDecoder (offline corgi + VDS enrichment) — no external API calls
+- **decodeAllUndecoded():** Batch decodes up to 200 undecoded yard_vehicle VINs. Writes both legacy columns (`engine`, `drivetrain`, `trim_level`) AND decoded columns (`decoded_engine`, `decoded_drivetrain`, `decoded_transmission`, `engine_type`, `body_style`). `decoded_transmission` populated from `transHint` field of LocalVinDecoder.
 
 ### TrimTierService.js
 - Purpose: Trim tier lookup — 3-tier cascade: trim_tier_reference (curated), trim_catalog (eBay Taxonomy), static config fallback

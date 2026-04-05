@@ -123,3 +123,35 @@
 - AttackListService.scoreVehicle() return now includes decoded_drivetrain (was missing — broke 4WD/AWD badges)
 - Backfill script processes 3,243 vehicles missing decoded_transmission, fills from vin_cache or re-decodes
 - Impact: 4WD/AWD badges will show on ~6,946 vehicles (was ~3,390 from scraper only)
+
+## 21:00 — VinDecodeService Write Gap Fixed
+- VinDecodeService now writes decoded_engine, decoded_drivetrain, decoded_transmission to yard_vehicle
+- vin_cache schema: added transmission_style, transmission_speeds columns
+- LocalVinDecoder stores transHint in vin_cache on write
+- AttackListService scoreVehicle returns decoded_drivetrain to frontend
+- Backfill on Railway: 885 drivetrains filled, 6,223 VINs re-decoded
+- TRANSMISSION STILL BROKEN: corgi returns null transHint for ALL vehicles. 3,243 (28%) have no decoded_transmission. The 132 confirmed manuals + 156 CHECK_MT all came from old NHTSA API before Phase 9.
+
+## OPEN — Transmission Detection in Local VIN Decoder
+- corgi (@cardog/corgi) does not return transmission style or speeds
+- The VDS engine_codes table has a transmission_hint column but it's empty for all entries
+- Need to solve this inside the local decoder, not by falling back to NHTSA
+- Options to investigate: seed transmission_hint in engine_codes from NHTSA Part 565 PDFs, EPA FuelEconomy.gov bulk data (has transmission type per engine config), or build a separate VDS transmission lookup table
+- 3,243 vehicles need transmission data. 156 CHECK_MT could potentially be resolved.
+- This is the #1 intelligence gap remaining in the VIN decoder.
+
+## SESSION SUMMARY — 2026-04-05
+Deploys this session (13 total):
+1. Global part value colors + exclusion filter (dh-parts.js/css)
+2. Price resolution fix (removed CONSERVATIVE_SELL_ESTIMATES, BASE tier yellow→orange)
+3. Scout Alerts flyway trip filter
+4. Scout Alerts confidence matching overhaul (part-type sensitivity)
+5. Scout Alerts is_core yard flag (4 LKQ NC yards only)
+6. Cache + Scour Stream inline edit (PATCH endpoints)
+7. Ford partNumberBase fix (keeps vehicle prefix) + stock index dedup
+8. Stock match type flag (verify PN warning)
+9. Model matching bidirectional fuzzy + compound normalize
+10. Clean Pipe gaps (20+ models, 11 part types, dual-make titles, 7,769 row backfill)
+11. Attack list trim/engine/trans mismatch filtering
+12. Year range PN cleanup
+13. VinDecodeService write gap + decoded_drivetrain in attack list response

@@ -5,16 +5,15 @@ Generated 2026-04-05
 
 ### partIntelligence.js
 **Purpose:** Unified matching engine for DarkHawk. Single source for PN extraction, stock counting, model matching, year parsing. Used by DAILY FEED, HAWK EYE, THE QUARRY, SCOUR STREAM, SCOUT ALERTS. Replaces partNumberExtractor.js and partMatcher.extractPartNumbers().
-**Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `computeBase`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
+**Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
 **Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`).
 **Key behavior:**
-- `extractPartNumbers(text)` — Ford 3-segment dash patterns + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets.
-- `computeBase(raw)` — Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs. This is the canonical base PN used for `partNumberBase` column.
+- `extractPartNumbers(text)` — Ford 3-segment dash patterns + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/` check after isSkipWord).
+- `computeBase(raw)` — Internal (not exported). Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs. This is the canonical base PN used for `partNumberBase` column.
 - `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` from `extractPartNumbers` for partNumberBase.
 - `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Normalizes, rejects junk (JUNK_WORDS set, VINs, years, pure-alpha), strips Ford ECU suffixes (12A650, 14A067). Returns null for unsearchable PNs. **Intentionally aggressive — for search queries, NOT for storage.**
 - `deduplicatePNQueue(entries)` — Phase E1. Sanitizes, dedupes by base, keeps highest-price entry per PN.
 - `detectPartType(title)` — Keyword detection for 40+ part types. Original: ECM, BCM, TCM, ABS, TIPM, AMP, CLUSTER, RADIO, THROTTLE, STEERING, REGULATOR, MIRROR, SUNROOF, FUEL_MODULE, CAMERA, HVAC, HEADLIGHT, TAILLIGHT, BLIND_SPOT, PARK_SENSOR, AIR_RIDE, CLOCK_SPRING, LOCK, IGNITION, LIFTGATE, ALTERNATOR, STARTER, BLOWER, NAV, VISOR. Added: ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT_MODULE, DOOR_MODULE, WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE, LANE_ASSIST, ADAPTIVE_CRUISE.
-- `extractPartNumbers()` rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/` check after isSkipWord).
 - `MAKE_NORMALIZE` — Map of lowercase make strings to title-case canonical names (matches corgi VIN decoder output). ~50 entries.
 - `MODEL_PATTERNS` — Ordered array of ~220 model strings. Multi-word models listed first for greedy matching. Includes vans (Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Metris), tonnage variants (Express 2500, Savana 3500, etc.), and compound models (Explorer Sport Trac).
 - `stripRevisionSuffix(pn)` — Strips trailing revision suffix. Chrysler 56044691AA → 56044691, GM A12345678AA → A12345678, Ford dashless patterns.
@@ -44,7 +43,7 @@ Generated 2026-04-05
 **Exports:** `decode`, `decodeBatchLocal`, `getDecoder`, `close`
 **Dependencies:** `./logger`, `../database/database`, `@cardog/corgi`
 **Key behavior:**
-- `decode(vin)` — 6-step pipeline: (1) check vin_cache table, (2) corgi offline decode (<15ms), (3) VDS trim enrichment via vin_decoder.vds_trim_lookup, (4) engine code enrichment via vin_decoder.engine_codes, (5) write to vin_cache, (6) return standardized result with year/make/model/trim/engine/drivetrain/bodyStyle/engineType/source.
+- `decode(vin)` — 6-step pipeline: (1) check vin_cache table, (2) corgi offline decode (<15ms), (3) VDS trim enrichment via vin_decoder.vds_trim_lookup, (4) engine code enrichment via vin_decoder.engine_codes, (5) write to vin_cache (includes `transmission_style` column from transHint), (6) return standardized result with vin/year/make/model/trim/engine/engineCode/engineType/displacement/cylinders/fuelType/forcedInduction/drivetrain/bodyStyle/transHint/source/cached/ms. Note: corgi returns null transHint for all vehicles currently (engine_codes.transmission_hint column is unpopulated), so `transmission_style` in vin_cache is always null for now.
 - `decodeBatchLocal(vins)` — Sequential decode loop. Returns array shaped like NHTSA batch response for backward compat (VIN, Make, Model, ModelYear, Trim, DisplacementL, etc.).
 - `cleanDecodedTrim(raw)` — Filters junk trims (NFA, std, cab types, drivetrain strings, chassis codes). Strips parenthetical content, engine specs, leather/nav suffixes. Returns null if <2 or >30 chars.
 - Singleton: `getDecoder()` caches one corgi instance for app lifetime.
