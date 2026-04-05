@@ -4,26 +4,29 @@
 /**
  * YARD MARKET SNIPER
  *
- * Fills market_demand_cache for parts matched to new yard vehicles.
- * Searches by PART NUMBER ONLY — no keyword fallback.
- * Uses PriceCheckServiceV2 (cheerio) to scrape eBay sold listings.
+ * Prices parts off NEWLY ARRIVED yard vehicles so the attack list is current.
+ * NC pull yards only (Raleigh, Durham, Greensboro).
+ * Playwright+stealth for eBay scraping (axios/cheerio is blocked).
  *
  * Pipeline:
- *   1. Get active yard vehicles (last 7 days of last_seen)
- *   2. Match each to inventory parts via Auto+AIC+Item
- *   3. Extract part numbers from matched Item titles
- *   4. Filter to PNs not already in market_demand_cache (or stale >7d)
- *   5. Scrape eBay sold comps for each PN (quoted exact match)
- *   6. Store results in market_demand_cache
+ *   1. Get vehicles added since last run (default 24h, --hours to override)
+ *   2. Filter to NC pull yards only
+ *   3. Match to inventory parts via Auto+AIC+Item
+ *   4. Extract + sanitize + dedup part numbers
+ *   5. Filter to PNs not already in market_demand_cache (<7d)
+ *   6. Scrape eBay sold comps via Playwright stealth
+ *   7. Store in market_demand_cache + PriceSnapshot
  *
  * Flags:
  *   --dry-run   DEFAULT. Preview only, no scraping or writing.
  *   --execute   Actually scrape and write.
  *   --limit=N   Cap PNs per run. Default 50.
+ *   --hours=N   Lookback window. Default 24.
  *
  * Usage:
  *   node service/scripts/run-yard-market-sniper.js --dry-run
  *   node service/scripts/run-yard-market-sniper.js --execute --limit=50
+ *   node service/scripts/run-yard-market-sniper.js --execute --hours=48
  */
 
 const path = require('path');
@@ -39,102 +42,206 @@ const knex = require('knex')({
 });
 
 const { extractPartNumbers, sanitizePartNumberForSearch, deduplicatePNQueue } = require('../utils/partIntelligence');
-// Reuse the same exclude filter from OpportunityService — single source of truth
-// This skips complete engines, complete transmissions, and body panels
-// Everything else (modules, sensors, pumps, etc.) passes through
 const { shouldExclude } = require('../services/OpportunityService');
 
 // CLI flags
 const EXECUTE = process.argv.includes('--execute');
 const DRY_RUN = !EXECUTE;
 const LIMIT = parseInt((process.argv.find(a => a.startsWith('--limit=')) || '').split('=')[1] || '50', 10);
+const HOURS = parseInt((process.argv.find(a => a.startsWith('--hours=')) || '').split('=')[1] || '24', 10);
+
+// NC pull yards — the yards we actually drive to
+const PULL_YARD_NAMES = ['LKQ Raleigh', 'LKQ Durham', 'LKQ Greensboro'];
+
+// Comp quality filter (same as market drip)
+const JUNK_COMP_RE = /\b(AS[\s-]?IS|FOR\s+PARTS|UNTESTED|NOT\s+WORKING|PARTS\s+ONLY|CORE\s+(ONLY|CHARGE|RETURN)|NEEDS\s+PROGRAMMING|MAY\s+NEED|INOP(ERABLE)?|BROKEN|DAMAGED|SALVAGE|JUNK|SCRAP)\b/i;
+
+function filterComps(items) {
+  const kept = [], filtered = [];
+  for (const item of items) {
+    if (JUNK_COMP_RE.test(item.title || '')) filtered.push(item);
+    else kept.push(item);
+  }
+  return { kept, filteredCount: filtered.length };
+}
 
 // PN normalization: strip revision suffix for cache key
 function stripSuffix(pn) {
   if (!pn) return pn;
-  // Chrysler/Mopar: 56044691AA → 56044691
   const chrysler = pn.match(/^(\d{7,})[A-Z]{2}$/i);
   if (chrysler) return chrysler[1];
-  // Ford: CT43-2C405-AB → CT43-2C405
   const ford = pn.match(/^(.+)-([A-Z]{2})$/i);
   if (ford && ford[1].includes('-')) return ford[1];
   return pn;
 }
 
-async function scrapePN(pn) {
-  // Use PriceCheckServiceV2 scrapeSoldComps directly with quoted PN
-  const { scrapeSoldComps, calculateMetrics } = require('../services/PriceCheckServiceV2');
-  // Quoted exact match
-  const query = `"${pn}"`;
-  let items = await scrapeSoldComps(query);
+// ── Playwright stealth ──────────────────────────────────────
+let _browser = null;
+let _page = null;
 
-  // Retry once if 0 results (eBay throttle)
-  if (items.length === 0) {
-    await new Promise(r => setTimeout(r, 3000));
-    items = await scrapeSoldComps(query);
+async function initBrowser() {
+  try {
+    const { chromium } = require('playwright-extra');
+    const stealth = require('puppeteer-extra-plugin-stealth');
+    chromium.use(stealth());
+    _browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const ctx = await _browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 720 },
+    });
+    _page = await ctx.newPage();
+    return true;
+  } catch (e) {
+    console.error('  Playwright init failed:', e.message);
+    return false;
   }
+}
 
-  if (items.length === 0) return null;
+async function closeBrowser() {
+  if (_browser) { try { await _browser.close(); } catch (e) {} _browser = null; _page = null; }
+}
 
-  const metrics = calculateMetrics(items, 0);
+async function scrapeSoldComps(query) {
+  if (!_page) return [];
+  const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&_sacat=6030&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=60';
+  try {
+    await _page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await _page.waitForTimeout(2500);
+    await _page.evaluate(function() { window.scrollTo(0, document.body.scrollHeight); });
+    await _page.waitForTimeout(1000);
+
+    return await _page.evaluate(function() {
+      var results = [];
+      var seen = {};
+      document.querySelectorAll('ul.srp-results > li').forEach(function(el) {
+        try {
+          var innerText = el.innerText || '';
+          if (innerText.includes('Shop on eBay') || innerText.includes('Results matching fewer words')) return;
+          var title = '';
+          var ct = el.querySelector('.s-card__title');
+          var it = el.querySelector('.s-item__title');
+          title = (ct ? ct.textContent : it ? it.textContent : '').trim().replace(/Opens in a new window or tab$/i, '').trim();
+          if (!title) return;
+          var cp = el.querySelector('.s-card__price');
+          var ip = el.querySelector('.s-item__price');
+          var pt = (cp ? cp.textContent : ip ? ip.textContent : '').trim();
+          var pm = pt.match(/\$([\d,]+\.?\d*)/);
+          if (!pm) return;
+          var price = parseFloat(pm[1].replace(',', ''));
+          if (isNaN(price) || price <= 0) return;
+          var key = title.substring(0, 50) + price;
+          if (seen[key]) return;
+          seen[key] = true;
+          results.push({ title: title, price: price });
+        } catch (e) {}
+      });
+      return results;
+    });
+  } catch (e) { return []; }
+}
+
+function calcMetrics(items) {
+  // Filter own store sales
+  const external = items.filter(i => {
+    const t = (i.title || '').toLowerCase();
+    return !t.includes('dynatrack') && !t.includes('autolumen');
+  });
+  // Filter junk comps
+  const { kept, filteredCount } = filterComps(external);
+  if (kept.length === 0) return { count: 0, filteredCount };
+
+  const prices = kept.map(i => i.price).sort((a, b) => a - b);
+  const n = prices.length;
+  const median = n % 2 === 0 ? (prices[n / 2 - 1] + prices[n / 2]) / 2 : prices[Math.floor(n / 2)];
   return {
-    count: metrics.count,
-    avg: metrics.avg,
-    median: metrics.median,
-    min: metrics.min,
-    max: metrics.max,
-    salesPerWeek: metrics.salesPerWeek,
+    count: n,
+    filteredCount,
+    median: Math.round(median * 100) / 100,
+    avg: Math.round(prices.reduce((a, b) => a + b, 0) / n * 100) / 100,
+    min: prices[0],
+    max: prices[n - 1],
+    salesPerWeek: Math.round((n / 90) * 7 * 100) / 100,
   };
 }
 
+// ── Main ────────────────────────────────────────────────────
+
 async function main() {
+  const cutoff = new Date(Date.now() - HOURS * 60 * 60 * 1000);
+  const cutoffStr = cutoff.toISOString().replace('T', ' ').substring(0, 19);
+
   console.log('═══════════════════════════════════════════════════');
   console.log('  YARD MARKET SNIPER');
-  console.log(`  Mode: ${DRY_RUN ? 'DRY RUN' : '🔴 EXECUTE'} | Limit: ${LIMIT}`);
+  console.log(`  Mode: ${DRY_RUN ? 'DRY RUN' : '🔴 EXECUTE'} | Limit: ${LIMIT} | Lookback: ${HOURS}h`);
+  console.log(`  Since: ${cutoffStr}`);
+  console.log(`  Pull yards: ${PULL_YARD_NAMES.join(', ')}`);
   console.log('═══════════════════════════════════════════════════\n');
 
-  // 1. Get recent yard vehicles (last_seen within 7 days)
-  console.log('1. Finding recent yard vehicles...');
-  const vehicles = await knex('yard_vehicle')
+  // 1. Get pull yard IDs
+  const yards = await knex('yard').whereIn('name', PULL_YARD_NAMES).select('id', 'name');
+  if (yards.length === 0) {
+    console.log('ERROR: No pull yards found in DB. Looking for:', PULL_YARD_NAMES.join(', '));
+    await knex.destroy();
+    return;
+  }
+  const yardIds = yards.map(y => y.id);
+  console.log(`1. Pull yards: ${yards.map(y => y.name).join(', ')}\n`);
+
+  // 2. Get new vehicles in pull yards since cutoff
+  const allNew = await knex('yard_vehicle')
     .where('active', true)
-    .where('last_seen', '>=', knex.raw("NOW() - INTERVAL '7 days'"))
-    .select('year', 'make', 'model');
+    .where('first_seen', '>=', cutoff)
+    .select('year', 'make', 'model', 'yard_id');
 
-  console.log(`   ${vehicles.length} active vehicles (last 7 days)\n`);
+  const pullNew = allNew.filter(v => yardIds.includes(v.yard_id));
 
-  // 2. Get unique year|make|model combos
+  console.log(`2. New vehicles since ${cutoffStr}:`);
+  console.log(`   ${allNew.length} total across all yards → ${pullNew.length} in pull yards\n`);
+
+  if (pullNew.length === 0) {
+    console.log(`   No new vehicles in pull yards since ${cutoffStr}. Nothing to snipe.`);
+    await knex.destroy();
+    return;
+  }
+
+  // 3. Get unique year|make|model combos
   const ymmSet = new Set();
-  for (const v of vehicles) {
+  for (const v of pullNew) {
     if (v.year && v.make && v.model) {
       ymmSet.add(`${v.year}|${v.make.toUpperCase()}|${v.model.toUpperCase()}`);
     }
   }
   console.log(`   ${ymmSet.size} unique year/make/model combos\n`);
 
-  // 3. Match to inventory parts via single batch query (Auto+AIC+Item)
-  console.log('2. Matching to inventory parts (batch query)...');
-  const matchedPNs = new Map(); // base PN → { raw, titles[], price }
+  // 4. Match to inventory parts via Auto+AIC+Item
+  console.log('3. Matching to inventory parts (batch query)...');
+  const matchedPNs = new Map();
 
-  // Build a single query that joins yard vehicles to inventory
-  const items = await knex.raw(`
-    SELECT DISTINCT ON (i.id) i.title, i.price, i."partNumberBase", i."manufacturerPartNumber"
-    FROM "Auto" a
-    JOIN "AutoItemCompatibility" aic ON a.id = aic."autoId"
-    JOIN "Item" i ON i.id = aic."itemId"
-    WHERE i.price > 0
-    AND EXISTS (
-      SELECT 1 FROM yard_vehicle yv
-      WHERE yv.active = true
-      AND yv.last_seen >= NOW() - INTERVAL '7 days'
-      AND CAST(yv.year AS INTEGER) = a.year
-      AND UPPER(yv.make) = UPPER(a.make)
-      AND UPPER(yv.model) = UPPER(a.model)
-    )
-  `);
+  let items;
+  if (ymmSet.size > 0) {
+    // Use the same approach as the old sniper — EXISTS subquery against yard_vehicle
+    items = await knex.raw(`
+      SELECT DISTINCT ON (i.id) i.title, i.price, i."partNumberBase", i."manufacturerPartNumber"
+      FROM "Auto" a
+      JOIN "AutoItemCompatibility" aic ON a.id = aic."autoId"
+      JOIN "Item" i ON i.id = aic."itemId"
+      WHERE i.price > 0
+      AND EXISTS (
+        SELECT 1 FROM yard_vehicle yv
+        WHERE yv.active = true
+        AND yv.first_seen >= ?
+        AND yv.yard_id = ANY(?)
+        AND CAST(yv.year AS INTEGER) = a.year
+        AND UPPER(yv.make) = UPPER(a.make)
+        AND UPPER(yv.model) = UPPER(a.model)
+      )
+    `, [cutoff, yardIds]);
+  } else {
+    items = { rows: [] };
+  }
 
   let skippedExcluded = 0;
   for (const item of items.rows) {
-    // Same filter as OpportunityService — skip engines, transmissions, body panels
     if (shouldExclude(item.title)) { skippedExcluded++; continue; }
 
     const pns = extractPartNumbers(item.title || '');
@@ -152,24 +259,20 @@ async function main() {
     }
   }
 
-  console.log(`   ${items.rows.length} inventory items → ${skippedExcluded} excluded (engines/trans/panels) → ${matchedPNs.size} unique part numbers\n`);
+  console.log(`   ${items.rows.length} inventory items → ${skippedExcluded} excluded → ${matchedPNs.size} unique PNs\n`);
 
-  // 4. Sanitize and deduplicate PNs, then filter against cache
-  console.log('3. Sanitizing and deduplicating PNs...');
+  // 5. Sanitize, deduplicate, filter cache
+  console.log('4. Sanitizing and filtering...');
 
-  // Build raw queue from matchedPNs
   const rawQueue = [];
   for (const [base, data] of matchedPNs) {
     if (data.price < 50) continue;
     rawQueue.push({ base, raw: data.raw, price: data.price, sampleTitle: data.titles[0] || base });
   }
 
-  // Sanitize + deduplicate (strips junk, Ford ECU suffixes, dash variants)
   const cleanQueue = deduplicatePNQueue(rawQueue);
-  const junkRemoved = rawQueue.length - cleanQueue.length;
-  console.log(`   ${rawQueue.length} raw PNs → ${cleanQueue.length} after sanitize+dedup (${junkRemoved} junk/dupes removed)`);
+  console.log(`   ${rawQueue.length} raw PNs → ${cleanQueue.length} after sanitize+dedup`);
 
-  // Check against cache
   const staleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const freshCache = await knex('market_demand_cache')
     .where('last_updated', '>=', staleCutoff)
@@ -177,18 +280,14 @@ async function main() {
   const freshSet = new Set(freshCache.map(r => r.part_number_base));
 
   const toScrape = cleanQueue.filter(entry => !freshSet.has(entry.base));
-
-  // Sort by price descending (highest value first)
   toScrape.sort((a, b) => b.price - a.price);
 
-  // Apply limit
   const queue = toScrape.slice(0, LIMIT);
 
-  console.log(`   ${toScrape.length} PNs need scraping (${toScrape.length - queue.length} beyond limit)`);
-  console.log(`   Queue: ${queue.length} PNs (limit=${LIMIT})\n`);
+  console.log(`   ${toScrape.length} need scraping → ${queue.length} this run (limit=${LIMIT})\n`);
 
-  // 5. Show queue preview
-  console.log('4. Queue preview (top entries):');
+  // 6. Queue preview
+  console.log('5. Queue:');
   queue.slice(0, 15).forEach((entry, i) => {
     console.log(`   ${String(i + 1).padStart(3)}. ${entry.base.padEnd(18)} $${String(Math.round(entry.price)).padStart(4)} | ${entry.sampleTitle}`);
   });
@@ -199,14 +298,24 @@ async function main() {
     console.log('═══════════════════════════════════════════════════');
     console.log('  DRY RUN COMPLETE — no scraping or writing done');
     console.log(`  Would scrape ${queue.length} part numbers`);
-    console.log(`  Run with --execute to actually scrape`);
+    console.log('  Run with --execute to actually scrape');
     console.log('═══════════════════════════════════════════════════\n');
     await knex.destroy();
     return;
   }
 
-  // 6. Scrape and cache
-  console.log('5. Scraping eBay sold comps...\n');
+  // 7. Init Playwright
+  console.log('6. Initializing Playwright...');
+  const browserOk = await initBrowser();
+  if (!browserOk) {
+    console.log('   FATAL: Playwright unavailable. Cannot scrape.');
+    await knex.destroy();
+    return;
+  }
+  console.log('   Playwright: OK\n');
+
+  // 8. Scrape and cache
+  console.log('7. Scraping eBay sold comps...\n');
   let scraped = 0, cached = 0, noResults = 0, errors = 0;
 
   for (let i = 0; i < queue.length; i++) {
@@ -214,13 +323,21 @@ async function main() {
     process.stdout.write(`   [${i + 1}/${queue.length}] ${entry.base.padEnd(18)}`);
 
     try {
-      const result = await scrapePN(entry.raw);
+      const query = `"${entry.raw}"`;
+      let items = await scrapeSoldComps(query);
 
-      if (!result || result.count === 0) {
+      // Retry once if 0 results
+      if (items.length === 0) {
+        await new Promise(r => setTimeout(r, 3000));
+        items = await scrapeSoldComps(query);
+      }
+
+      const metrics = calcMetrics(items);
+
+      if (!metrics || metrics.count === 0) {
         noResults++;
-        console.log('  0 results');
+        console.log('no comps');
       } else {
-        // Write to cache
         await knex.raw(`
           INSERT INTO market_demand_cache
             (id, part_number_base, key_type, ebay_avg_price, ebay_sold_90d,
@@ -237,53 +354,55 @@ async function main() {
             sales_per_week = EXCLUDED.sales_per_week,
             source = 'yard_sniper',
             last_updated = NOW()
-        `, [entry.base, result.median, result.count, result.median, result.min, result.max, result.salesPerWeek]);
+        `, [entry.base, metrics.median, metrics.count, metrics.median, metrics.min, metrics.max, metrics.salesPerWeek]);
 
-        // Snapshot for price history
         try {
           await knex('PriceSnapshot').insert({
             id: knex.raw('gen_random_uuid()'),
             part_number_base: entry.base,
-            soldCount: result.count,
-            soldPriceAvg: result.avg,
-            soldPriceMedian: result.median,
-            ebay_median_price: result.median,
-            ebay_min_price: result.min,
-            ebay_max_price: result.max,
+            soldCount: metrics.count,
+            soldPriceAvg: metrics.avg,
+            soldPriceMedian: metrics.median,
+            ebay_median_price: metrics.median,
+            ebay_min_price: metrics.min,
+            ebay_max_price: metrics.max,
             source: 'yard_sniper',
             snapshot_date: new Date(),
           });
         } catch (snapErr) { /* snapshot is supplementary */ }
 
         cached++;
-        console.log(`  ${result.count} sold, $${result.median} med`);
+        console.log(`${metrics.count} kept, ${metrics.filteredCount} filtered, $${metrics.median} med`);
       }
       scraped++;
     } catch (err) {
       errors++;
-      console.log(`  ERROR: ${err.message.substring(0, 50)}`);
+      console.log(`ERROR: ${err.message.substring(0, 50)}`);
     }
 
-    // Rate limit: 2-3s between scrapes
-    await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
+    // 2-3s delay between scrapes
+    if (i < queue.length - 1) await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
   }
 
-  // 7. Summary
+  await closeBrowser();
+
+  // 9. Summary
+  const cacheTotal = await knex('market_demand_cache').count('* as count').first();
+
   console.log('\n═══════════════════════════════════════════════════');
   console.log('  SNIPER COMPLETE');
   console.log(`  Scraped:    ${scraped}`);
   console.log(`  Cached:     ${cached}`);
   console.log(`  No results: ${noResults}`);
   console.log(`  Errors:     ${errors}`);
-
-  const cacheTotal = await knex('market_demand_cache').count('* as count').first();
   console.log(`  Cache total: ${cacheTotal.count}`);
   console.log('═══════════════════════════════════════════════════\n');
 
   await knex.destroy();
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('FATAL:', err.message);
+  await closeBrowser();
   process.exit(1);
 });
