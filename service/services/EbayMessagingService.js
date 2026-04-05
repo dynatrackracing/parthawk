@@ -134,6 +134,12 @@ class EbayMessagingService {
       return;
     }
 
+    // Set trigger_source for logging (delivery detection method tracked in poll logs)
+    if (!entry.trigger_source) {
+      entry.trigger_source = entry.template_key === 'post_delivery' ? 'delivery_poll'
+        : entry.template_key === 'return_opened' ? 'return_poll' : 'poll';
+    }
+
     // 2. Build template variables from order data
     const variables = await this._buildTemplateVariables(entry);
 
@@ -273,7 +279,7 @@ class EbayMessagingService {
           api_response: rawResponse || null,
           retry_count: retryCount,
           ebay_store: entry.ebay_store,
-          trigger_source: 'poll',
+          trigger_source: entry.trigger_source || 'poll',
           created_at: new Date(),
           updated_at: new Date(),
         })
@@ -335,12 +341,14 @@ class EbayMessagingService {
 
   /**
    * Poll for delivered orders and queue post_delivery messages.
-   * Uses GetOrders with Completed status as delivery proxy.
+   * Primary: eBay Fulfillment API (explicit delivery status via OAuth).
+   * Fallback: GetOrders Completed status + 2-day shipping margin (Trading API).
    * Called by cron every 30 minutes.
    */
   async pollDeliveryStatus() {
     const startTime = Date.now();
     let checked = 0, queued = 0;
+    let method = 'none';
 
     try {
       // Get orders that had post_purchase sent but no post_delivery yet
@@ -352,7 +360,7 @@ class EbayMessagingService {
 
       if (sentPurchases.length === 0) {
         this.log.info('No orders pending delivery check');
-        return { checked: 0, queued: 0, elapsed: Date.now() - startTime };
+        return { checked: 0, queued: 0, method: 'none', elapsed: Date.now() - startTime };
       }
 
       // Filter out orders that already have post_delivery queued/sent
@@ -374,34 +382,111 @@ class EbayMessagingService {
       this.log.info({ total: sentPurchases.length, alreadyDone: doneSet.size, toCheck: toCheck.length }, 'Delivery status check');
 
       if (toCheck.length === 0) {
-        return { checked: 0, queued: 0, elapsed: Date.now() - startTime };
+        return { checked: 0, queued: 0, method: 'none', elapsed: Date.now() - startTime };
       }
 
-      // Poll eBay for recent orders — check if status is Completed (delivered)
-      const orders = await this.sellerApi.getOrders({ daysBack: 14 });
-      const orderMap = new Map();
-      for (const o of orders) {
-        if (o.orderId) orderMap.set(o.orderId, o);
+      // Try Fulfillment API first (OAuth), then fall back to GetOrders (Trading API)
+      const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+      const useFulfillmentApi = !!oauthToken;
+
+      if (useFulfillmentApi) {
+        method = 'fulfillment_api';
+        this.log.info({ count: toCheck.length }, 'Checking delivery via Fulfillment API');
+        const axios = require('axios');
+
+        for (const pending of toCheck) {
+          checked++;
+          try {
+            const resp = await axios.get(
+              `https://api.ebay.com/sell/fulfillment/v1/order/${pending.order_id}/shipping_fulfillment`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${oauthToken}`,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 10000,
+              }
+            );
+
+            // Check fulfillments for explicit DELIVERED status
+            const fulfillments = resp.data?.fulfillments || [];
+            let isDelivered = false;
+            for (const f of fulfillments) {
+              // eBay Fulfillment API: shipmentTrackingNumber, shippingCarrierCode
+              // deliveredDate field or shipmentStatus === 'DELIVERED'
+              if (f.shipmentStatus === 'DELIVERED' || f.deliveredDate) {
+                isDelivered = true;
+                break;
+              }
+              // Also check tracking events if available
+              const events = f.trackingEvents || f.shipmentTracking?.events || [];
+              if (events.some(e => /delivered/i.test(e.status || e.eventDescription || ''))) {
+                isDelivered = true;
+                break;
+              }
+            }
+
+            if (isDelivered) {
+              const queueResult = await this.queuePostDelivery({
+                orderId: pending.order_id,
+                buyerUsername: pending.buyer_user_id,
+                lineItems: [{ itemId: pending.item_id }],
+                _triggerSource: 'fulfillment_api',
+              }, pending.ebay_store || 'dynatrack');
+              if (queueResult) queued++;
+            }
+          } catch (apiErr) {
+            if (apiErr.response?.status === 401) {
+              this.log.warn('Fulfillment API OAuth expired — falling back to GetOrders for remaining');
+              method = 'fallback_after_401';
+              break; // Fall through to fallback below
+            }
+            // 404 = no fulfillments yet (not shipped), skip silently
+            if (apiErr.response?.status !== 404) {
+              this.log.warn({ err: apiErr.message, orderId: pending.order_id }, 'Fulfillment API check failed');
+            }
+          }
+        }
       }
 
-      for (const pending of toCheck) {
-        checked++;
-        const order = orderMap.get(pending.order_id);
-        if (!order) continue;
+      // Fallback: GetOrders Completed status + 2-day shipping margin
+      // Runs if OAuth unavailable, or if OAuth expired mid-run
+      if (!useFulfillmentApi || method === 'fallback_after_401') {
+        if (!useFulfillmentApi) method = 'fallback';
+        this.log.info({ count: toCheck.length, reason: useFulfillmentApi ? 'oauth_expired' : 'no_oauth' }, 'Checking delivery via GetOrders fallback');
 
-        // eBay sets orderStatus to 'Completed' after delivery confirmation
-        if (order.orderStatus === 'Completed' && order.shippedTime) {
-          // Verify it's been at least 2 days since shipping (safety margin)
-          const shippedAt = new Date(order.shippedTime);
-          const daysSinceShipped = (Date.now() - shippedAt.getTime()) / 86400000;
-          if (daysSinceShipped < 2) continue;
+        const orders = await this.sellerApi.getOrders({ daysBack: 14 });
+        const orderMap = new Map();
+        for (const o of orders) {
+          if (o.orderId) orderMap.set(o.orderId, o);
+        }
 
-          const queueResult = await this.queuePostDelivery({
-            orderId: pending.order_id,
-            buyerUsername: pending.buyer_user_id,
-            lineItems: [{ itemId: pending.item_id }],
-          }, pending.ebay_store || 'dynatrack');
-          if (queueResult) queued++;
+        for (const pending of toCheck) {
+          // Skip orders already queued by Fulfillment API pass above
+          const alreadyQueued = await database('ebay_message_queue')
+            .where('order_id', pending.order_id)
+            .where('template_key', 'post_delivery')
+            .first();
+          if (alreadyQueued) continue;
+
+          checked++;
+          const order = orderMap.get(pending.order_id);
+          if (!order) continue;
+
+          // eBay sets orderStatus to 'Completed' after delivery confirmation
+          if (order.orderStatus === 'Completed' && order.shippedTime) {
+            const shippedAt = new Date(order.shippedTime);
+            const daysSinceShipped = (Date.now() - shippedAt.getTime()) / 86400000;
+            if (daysSinceShipped < 2) continue;
+
+            const queueResult = await this.queuePostDelivery({
+              orderId: pending.order_id,
+              buyerUsername: pending.buyer_user_id,
+              lineItems: [{ itemId: pending.item_id }],
+              _triggerSource: 'fallback',
+            }, pending.ebay_store || 'dynatrack');
+            if (queueResult) queued++;
+          }
         }
       }
     } catch (err) {
@@ -409,8 +494,8 @@ class EbayMessagingService {
     }
 
     const elapsed = Date.now() - startTime;
-    this.log.info({ checked, queued, elapsed }, 'Delivery polling complete');
-    return { checked, queued, elapsed };
+    this.log.info({ checked, queued, method, elapsed }, 'Delivery polling complete');
+    return { checked, queued, method, elapsed };
   }
 
   // --- PHASE 3: RETURN OPENED QUEUE ---
