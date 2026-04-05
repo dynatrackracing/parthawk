@@ -786,7 +786,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -1140,6 +1140,19 @@ class AttackListService {
       }
     }
 
+    // === INTEL SOURCE BADGES: tag parts with intel origins ===
+    for (const p of filteredParts) {
+      const sources = [];
+      if (p.isMarked) sources.push('mark');
+      const pnUpper = (p.partNumber || p.partNumberBase || '').toUpperCase();
+      if (pnUpper && intelIndex.wantPNs.has(pnUpper)) sources.push('restock');
+      if (pnUpper && intelIndex.flagPNs.has(pnUpper)) sources.push('flag');
+      // 'sold' = this part type was sold for this make/model in the sales window
+      const pt = (p.partType || '').toUpperCase();
+      if (pt && salesDemand.partTypes[pt] && salesDemand.partTypes[pt].count > 0) sources.push('sold');
+      p.intelSources = sources.length > 0 ? sources : null;
+    }
+
     // === PRICE FLOOR CHECK: flag parts below category floor ===
     for (const p of filteredParts) {
       const pt = (p.partType || '').toUpperCase();
@@ -1363,6 +1376,25 @@ class AttackListService {
       }
     } catch (e) { /* the_mark may not exist */ }
 
+    // Build intel index for source badges (want list + restock flags)
+    const intelIndex = { wantPNs: new Set(), wantPartTypes: new Set(), flagPNs: new Set() };
+    try {
+      const wants = await database('restock_want_list').where('active', true).select('title');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const w of wants) {
+        const pns = eiPNs(w.title || '');
+        for (const pn of pns) intelIndex.wantPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+    try {
+      const flags = await database('restock_flag').where('acknowledged', false).select('title');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const f of flags) {
+        const pns = eiPNs(f.title || '');
+        for (const pn of pns) intelIndex.flagPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+
     // 7-day retention: show vehicles last seen within 7 days
     const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const activeOnly = options.activeOnly === true;
@@ -1406,7 +1438,7 @@ class AttackListService {
       for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex)
       );
       // Sort: active first, then highest single part value, then total value
       scored.sort((a, b) => {
