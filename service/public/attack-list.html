@@ -763,9 +763,12 @@
       return pB - pA;
     });
 
-    // Pullable parts
-    for (const p of parts) {
-      if (!p) continue;
+    // Split parts: above floor first, below floor in collapsed section
+    const aboveFloor = parts.filter(p => p && !p.belowFloor);
+    const belowFloor = parts.filter(p => p && p.belowFloor);
+
+    // Pullable parts (above floor)
+    for (const p of aboveFloor) {
       const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
       // OUR sold price is primary when we have recent sales; market data fills gaps
       const hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
@@ -829,6 +832,23 @@
           <button onclick="saveNote('${v.id}','${pid}')" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Save</button>
         </div>
       </div>`;
+    }
+
+    // Below-floor parts — collapsed, greyed out
+    if (belowFloor.length > 0) {
+      const bfId = 'bf-' + v.id;
+      html += `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);">
+        <div onclick="var el=document.getElementById('${bfId}');el.style.display=el.style.display==='none'?'':'none';this.querySelector('span').textContent=el.style.display==='none'?'▸':'▾'" style="font-size:10px;font-weight:700;color:#6B7280;cursor:pointer;padding:4px 0;user-select:none"><span>▸</span> ${belowFloor.length} part${belowFloor.length > 1 ? 's' : ''} below price floor</div>
+        <div id="${bfId}" style="display:none">`;
+      for (const p of belowFloor) {
+        const pid = p.itemId || ('s' + Math.random().toString(36).slice(2, 8));
+        const displayPrice = (p.sold_90d || 0) > 0 && p.price > 0 ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price || 0));
+        html += `<div style="opacity:0.4;padding:6px 0;display:flex;justify-content:space-between;align-items:center;font-size:11px;border-bottom:1px solid var(--border)">
+          <span style="color:#6B7280">${p.partType ? '[' + p.partType + '] ' : ''}${(p.title || 'Part').substring(0, 50)}</span>
+          <span style="color:#6B7280;font-weight:600;white-space:nowrap">$${displayPrice} <span style="font-size:9px;font-weight:400">(floor $${p.priceFloor})</span></span>
+        </div>`;
+      }
+      html += `</div></div>`;
     }
 
     // Rebuild reference — grouped by part type, one line each

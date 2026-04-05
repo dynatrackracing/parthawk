@@ -233,6 +233,17 @@ function normalizeMake(make) {
 }
 
 /**
+ * Part category price floors — electronic parts below these thresholds aren't worth pulling
+ * after COGS, fees, and labor. Parts not listed have NO floor (mechanical/low-COGS items).
+ */
+const PART_PRICE_FLOORS = {
+  'ABS': 150, 'ECU': 100, 'ECM': 100, 'TCM': 100, 'BCM': 100,
+  'TIPM': 100, 'CLUSTER': 100, 'RADIO': 100, 'THROTTLE': 100,
+  'AMP': 100, 'AMPLIFIER': 100, 'HVAC': 100, 'AIRBAG': 100,
+  'NAV': 100, 'CAMERA': 100,
+};
+
+/**
  * Detect part type from an item title/category for chip display.
  */
 function detectPartType(title) {
@@ -1130,8 +1141,21 @@ class AttackListService {
       }
     }
 
-    // === TOTAL VALUE: sum of all FILTERED part prices (trim-adjusted) ===
-    const totalValue = filteredParts.reduce((sum, p) => sum + (p.price || 0), 0);
+    // === PRICE FLOOR CHECK: flag parts below category floor ===
+    for (const p of filteredParts) {
+      const pt = (p.partType || '').toUpperCase();
+      const floor = PART_PRICE_FLOORS[pt];
+      if (floor && (p.price || 0) < floor) {
+        p.belowFloor = true;
+        p.priceFloor = floor;
+      } else {
+        p.belowFloor = false;
+        p.priceFloor = floor || null;
+      }
+    }
+
+    // === TOTAL VALUE: sum of parts ABOVE their price floor ===
+    const totalValue = filteredParts.filter(p => !p.belowFloor).reduce((sum, p) => sum + (p.price || 0), 0);
 
     // Market data enrichment happens in getAttackList() after scoring (async context)
 
