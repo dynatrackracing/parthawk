@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Bidirectional Model Matching + Compound Models — 2026-04-05
+- COMPOUND_MODEL_MAP: F-250 Super Duty→F-250, Explorer Sport Trac→Explorer, etc.
+- getModelVariants() tries compound, base, and dash/no-dash variants
+- Bidirectional fuzzy in findMatchedParts, sales index, stock index
+- Protected: Grand Cherokee, Transit Connect, Grand Caravan never collapse
+
+---
+
 ## Stock Match Type Flag (verify PN) — 2026-04-05
 - buildStockIndex tracks full raw PNs per base key for exact vs base match detection
 - Parts with base-only PN match show "X in stock ⚠ verify PN" in orange

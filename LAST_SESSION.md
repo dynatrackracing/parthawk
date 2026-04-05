@@ -86,3 +86,11 @@
 - Parts with stockMatchType='base' show "X in stock ⚠ verify PN" in orange
 - Exact matches show clean "X in stock" as before
 - Chrysler/Toyota PNs = exact (unique per part). Ford base PNs may include suffix variants.
+
+## 20:00 — Model matching bidirectional + compound normalize
+- DIAGNOSED: "Explorer Sport Trac" → Auto table has "Explorer" only. "F-250 Super Duty" → Auto has "F-250" only.
+- findMatchedParts fuzzy match was one-directional: vehicle regex tested against inventory, not vice versa
+- Added COMPOUND_MODEL_MAP: maps compound models to base variants ("F-250 Super Duty" → ["F-250 Super Duty","F-250","F250"])
+- Added getModelVariants(): returns ordered list of model names to try, plus dash/no-dash variants
+- Bidirectional fuzzy in 3 places: findMatchedParts, sales index lookup, stock index lookup
+- Protected pairs maintained: Grand Cherokee, Transit Connect, Grand Caravan never collapse
