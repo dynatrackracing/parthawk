@@ -72,9 +72,10 @@
 - restock-list.html: tap title or notes to edit inline on WANT LIST tab
 - scout-alerts.html: STREAM alert titles tap-to-edit, saves to both want list and alert source_title
 
-## PENDING — Ford partNumberBase Over-Stripped + Stock Index Triple-Count
-- DIAGNOSED but NOT YET FIXED
-- extractStructuredFields() strips Ford PNs to generic position codes (7L3A-12A650-GJH → 12A650)
-- All Ford ECMs share partNumberBase '12A650' — stock shows 241 instead of 4
-- buildStockIndex() triple-counts same listing via partNumberBase + SKU + title extraction
-- Fix ready: align extractPartNumbers().base with normalizePartNumber() output, dedup stock index per listing
+## 19:00 — Ford partNumberBase Fix + Stock Index Dedup
+- FIXED: extractPartNumbers() Ford regex patterns now capture full 3-segment PNs (7L3A-12A650-GJH)
+- FIXED: computeBase() uses normalizePartNumber() from partMatcher.js for canonical base (keeps Ford prefix)
+- FIXED: normalizePartNumber FORD_SUFFIX regex handles 3-char suffixes (GJH, not just BD)
+- FIXED: buildStockIndex() deduplicates per listing via Set — qty added once per unique PN
+- Backfill: 9,490 rows updated across YourListing (1,835), YourSale (7,398), SoldItem (257)
+- Result: Ford ECM 7L3A12A650 stock = 5 (was 241). Each Ford model now has distinct base PN.

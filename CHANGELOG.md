@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Ford partNumberBase Fix + Stock Index Dedup — 2026-04-05
+- Ford PNs now keep vehicle prefix (7L3A12A650 not 12A650) — fixes 241→5 stock inflation
+- Stock index deduplicates per listing via Set — prevents triple-counting
+- normalizePartNumber handles 3-char Ford suffixes (GJH)
+- Backfill: 9,490 rows updated across 3 tables
+
+---
+
 ## Cache + Scour Stream Inline Edit — 2026-04-05
 - PATCH /cache/:id, PATCH /restock-want-list/:id, PATCH /restock-want-list/by-title
 - cache.html, restock-list.html, scout-alerts.html: tap-to-edit inline with green flash save
