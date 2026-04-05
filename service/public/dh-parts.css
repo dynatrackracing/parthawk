@@ -1,0 +1,26 @@
+/* DarkHawk Part Value Tiers — shared across all field pages */
+
+/* 6-tier badge system */
+.tier-elite { background: #3d2e00; color: #FFD700; animation: pulse-gold 2s ease-in-out infinite; }
+.tier-premium { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
+.tier-high { background: #1a2a3d; color: #3498DB; }
+.tier-solid { background: #0a2e0a; color: #2ECC40; }
+.tier-base { background: #3d2200; color: #FF8C00; }
+.tier-low { background: #3d0a0a; color: #FF4136; }
+.tier-nodata { background: #1f2937; color: #6B7280; }
+
+/* Pulse animations */
+@keyframes pulse-gold {
+  0%,100% { background: #3d2e00; color: #FFD700; box-shadow: 0 0 4px rgba(255,215,0,0.3); }
+  50% { background: #4a3800; color: #FFF0A0; box-shadow: 0 0 8px rgba(255,215,0,0.5); }
+}
+@keyframes pulse-purple {
+  0%,100% { background: #2d1a3e; color: #C39BD3; box-shadow: 0 0 4px rgba(155,89,182,0.3); }
+  50% { background: #3a2250; color: #D7BDE2; box-shadow: 0 0 8px rgba(155,89,182,0.5); }
+}
+
+/* Part badge base */
+.part-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px;
+  border-radius: 4px; white-space: nowrap; display: inline-block;
+}

@@ -19,21 +19,27 @@ let _stockIndexCacheTime = 0;
 const INDEX_CACHE_TTL = 10 * 60 * 1000;
 
 function isExcludedPart(title) {
-  const t = title.toUpperCase();
-  const excluded = [
-    /\bENGINE ASSEMBLY\b/, /\bMOTOR ASSEMBLY\b/, /\bLONG BLOCK\b/, /\bSHORT BLOCK\b/,
-    /\bCOMPLETE ENGINE\b/, /\bCRATE ENGINE\b/, /\bREMAN ENGINE\b/,
-    /\bTRANSMISSION ASSEMBLY\b/, /\bTRANSAXLE ASSEMBLY\b/, /\bCOMPLETE TRANSMISSION\b/,
-    /\bREMAN TRANSMISSION\b/,
-    /\bPISTON\b/, /\bCRANKSHAFT\b/, /\bCONNECTING ROD\b/, /\bHEAD GASKET\b/,
-    /\bOIL PAN\b/, /\bTIMING CHAIN\b/, /\bTIMING BELT\b/, /\bENGINE BLOCK\b/,
-    /\bCYLINDER HEAD\b/, /\bROCKER ARM\b/, /\bLIFTER\b/, /\bPUSHROD\b/,
-    /\bOIL PUMP\b/, /\bFLYWHEEL\b/, /\bFLEXPLATE\b/,
-    /\bFENDER\b/, /\bBUMPER COVER\b/, /\bHOOD PANEL\b/, /\bDOOR SHELL\b/,
-    /\bQUARTER PANEL\b/, /\bROCKER PANEL\b/, /\bBED SIDE\b/, /\bTRUCK BED\b/,
-    /\bTRANSFER CASE\b/, /\bXFER CASE\b/, /\bSTEERING RACK\b/, /\bSTEERING GEAR\b/
-  ];
-  return excluded.some(rx => rx.test(t));
+  const t = (title || '').toUpperCase();
+  // Complete engines & internals
+  if (/\b(ENGINE|MOTOR) ASSEMBLY\b/.test(t)) return true;
+  if (/\b(LONG|SHORT) BLOCK\b/.test(t)) return true;
+  if (/\b(COMPLETE|CRATE|REMAN) ENGINE\b/.test(t)) return true;
+  if (/\bENGINE BLOCK\b/.test(t)) return true;
+  if (/\bCYLINDER HEAD\b/.test(t)) return true;
+  if (/\b(PISTON|CRANKSHAFT|CONNECTING ROD|HEAD GASKET)\b/.test(t)) return true;
+  if (/\b(OIL PAN|TIMING CHAIN|TIMING BELT|ROCKER ARM|LIFTER|PUSHROD)\b/.test(t)) return true;
+  if (/\b(OIL PUMP|FLYWHEEL|FLEXPLATE)\b/.test(t)) return true;
+  // Complete transmissions (NOT modules — TCM is sellable)
+  if (/\b(TRANSMISSION|TRANSAXLE) ASSEMBLY\b/.test(t)) return true;
+  if (/\b(COMPLETE|REMAN) TRANSMISSION\b/.test(t)) return true;
+  // Body panels
+  if (/\bFENDER\b/.test(t)) return true;
+  if (/\bBUMPER (COVER|ASSEMBLY)\b/.test(t)) return true;
+  if (/\bHOOD PANEL\b/.test(t)) return true;
+  if (/\bDOOR SHELL\b/.test(t)) return true;
+  if (/\b(QUARTER|ROCKER) PANEL\b/.test(t)) return true;
+  if (/\b(BED SIDE|TRUCK BED|TRUNK LID|ROOF PANEL)\b/.test(t)) return true;
+  return false;
 }
 
 // Part types that require EXACT year matching (no ±1 tolerance)

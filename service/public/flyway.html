@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
 <title>DarkHawk - THE FLYWAY</title>
+<link rel="stylesheet" href="/admin/dh-parts.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -176,7 +177,7 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
 </head>
 <body>
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('flyway')</script>
+<script src="/admin/dh-nav.js?v=3"></script><script src="/admin/dh-parts.js?v=1"></script><script>dhNav('flyway')</script>
 
 <header>
   <div class="header-left">
@@ -770,7 +771,7 @@ function renderVehicleCard(v) {
     return true;
   }).sort(function(a, b) { return (b.price || 0) - (a.price || 0); }).slice(0, 4).forEach(function(p) {
     var price = p.price || 0;
-    var cc = price >= 250 ? 'chip-green' : price >= 150 ? 'chip-yellow' : price >= 100 ? 'chip-orange' : price > 0 ? 'chip-red' : 'chip-gray';
+    var cc = price > 0 ? getPartTier(price).cssClass : 'chip-gray';
     var markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
     chips += '<span class="chip ' + cc + '">' + markIcon + esc(p.partType || '?') + '</span> ';
   });
@@ -851,11 +852,13 @@ function renderExpandedParts(vehicleId, data) {
 
   parts.forEach(function(p) {
     var hasOurSales = (p.sold_90d || 0) > 0 && p.price > 0;
-    var isEst = p.priceSource === 'estimate';
+    var isRef = p.priceSource === 'item_reference';
+    var noPrice = p.priceSource === 'none' || (!p.price && !p.marketMedian);
     var displayPrice = hasOurSales ? p.price : (p.marketMedian > 0 ? p.marketMedian : (p.price != null ? p.price : 0));
-    var badgeVerdict = isEst && !hasOurSales && !p.marketMedian ? 'EST' : displayPrice >= 250 ? 'GREAT' : displayPrice >= 150 ? 'GOOD' : displayPrice >= 100 ? 'FAIR' : 'POOR';
-    var vc = badgeVerdict === 'EST' ? 'chip-gray' : badgeVerdict === 'GREAT' ? 'chip-green' : badgeVerdict === 'GOOD' ? 'chip-cyan' : badgeVerdict === 'FAIR' ? 'chip-yellow' : 'chip-gray';
-    var pricePrefix = isEst && !hasOurSales && !p.marketMedian ? '~$' : '$';
+    var tier = displayPrice > 0 ? getPartTier(displayPrice) : null;
+    var badgeVerdict = noPrice ? 'NO DATA' : tier.label;
+    var vc = noPrice ? 'tier-nodata' : tier.cssClass;
+    var pricePrefix = noPrice ? '' : (isRef ? 'REF $' : '$');
 
     var freshness = '';
     if (hasOurSales) {

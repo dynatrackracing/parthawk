@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a">
 <title>DarkHawk - NEST PROTECTOR</title>
+<link rel="stylesheet" href="/admin/dh-parts.css">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{--bg:#0a0a0a;--s:#141414;--s2:#1a1a1a;--b:#2a2a2a;--r:#DC2626;--rd:#7f1d1d;--y:#eab308;--yd:#713f12;--g:#22c55e;--gd:#064e3b;--t:#F0F0F0;--tm:#d1d5db;--tf:#6b7280}
@@ -96,7 +97,7 @@
 <body>
 
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js?v=2"></script><script>dhNav('gate')</script>
+<script src="/admin/dh-nav.js?v=2"></script><script src="/admin/dh-parts.js?v=1"></script><script>dhNav('gate')</script>
 
 <div class="c">
   <div class="section-header">CHECK STOCK</div>
@@ -370,7 +371,7 @@ function checkStock() {
           h += '<div class="stock-item">';
           h += '<div class="si-title">' + esc(item.title) + storeBadge + '</div>';
           h += '<div class="si-meta">';
-          if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
+          if (item.currentPrice) h += renderPriceBadge(item.currentPrice);
           h += '<span>Qty: ' + item.quantity + '</span>';
           h += '<a href="https://www.ebay.com/itm/' + esc(item.ebayItemId) + '" target="_blank" style="color:var(--tf);text-decoration:none">#' + esc(item.ebayItemId) + '</a>';
           h += '</div></div>';
@@ -388,7 +389,7 @@ function checkStock() {
           h += '<div class="stock-item">';
           h += '<div class="si-title">' + esc(item.title) + storeBadge + '</div>';
           h += '<div class="si-meta">';
-          if (item.currentPrice) h += '<span style="color:var(--g);font-weight:700">$' + item.currentPrice.toFixed(2) + '</span>';
+          if (item.currentPrice) h += renderPriceBadge(item.currentPrice);
           h += '<span>Qty: ' + item.quantity + '</span>';
           h += '</div>';
           if (item.variantNote) h += '<div style="font-size:10px;color:var(--y);margin-top:2px">' + esc(item.variantNote) + '</div>';

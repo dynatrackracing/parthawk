@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a">
 <title>DarkHawk — HAWK EYE</title>
+<link rel="stylesheet" href="/admin/dh-parts.css">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
@@ -38,7 +39,7 @@ td{padding:6px;border-bottom:1px solid #1f1f1f}
 </head>
 <body>
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js?v=2"></script><script>dhNav('vin')</script>
+<script src="/admin/dh-nav.js?v=2"></script><script src="/admin/dh-parts.js?v=1"></script><script>dhNav('vin')</script>
 <div class="container">
   <div class="card">
     <div class="card-title">Enter or Scan VIN</div>
@@ -143,8 +144,8 @@ function doScan(src){
   .finally(function(){btn.disabled=false;btn.textContent='Decode';});
 }
 
-function vd(v){return v>=250?'GREAT':v>=150?'GOOD':v>=100?'FAIR':'POOR'}
-function vc(v){return v==='GREAT'?'b-gr':v==='GOOD'?'b-yl':v==='FAIR'?'b-or':'b-rd'}
+function vd(price){return getPartTier(price).label}
+function vc(label){var m={'ELITE':500,'PREMIUM':350,'HIGH':250,'SOLID':150,'BASE':100,'LOW':0};return getPartTier(m[label]||0).cssClass}
 function pc(v){return v>=250?'pg':v>=150?'py':v>=100?'po':'pr'}
 function ta(ds){if(!ds)return'-';var m=Math.floor((Date.now()-new Date(ds).getTime())/60000);if(m<1)return'now';if(m<60)return m+'m';var h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d'}
 
@@ -284,7 +285,7 @@ async function runInstantResearch(){
       if(r.totalEstimatedValue)h+='<div style="font-size:12px;font-weight:700;color:#22c55e">Est. $'+Math.round(r.totalEstimatedValue)+'</div>';
       h+='</div>';
       r.parts.forEach(function(p){
-        var bc=p.badge==='GREAT'?'b-gr':p.badge==='GOOD'?'b-yl':p.badge==='FAIR'?'b-or':'b-rd';
+        var bc=getPartTier(p.referencePrice||p.yourDemand&&p.yourDemand.avgPrice||0).cssClass;
         var bestPrice=p.market&&p.market.source==='cache'?p.market.avgPrice:p.yourDemand&&p.yourDemand.avgPrice>0?p.yourDemand.avgPrice:p.referencePrice||0;
         var yrLabel=p.yearRange?(p.yearRange.min===p.yearRange.max?p.yearRange.min:p.yearRange.min+'-'+p.yearRange.max):'';
         h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
@@ -345,7 +346,7 @@ async function runStandaloneResearch(){
       h+='<div style="margin-top:10px">';
       if(r.totalValue)h+='<div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap"><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Total Value</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalValue+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Est. Profit</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalProfit+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Parts to Pull</div><div style="font-size:18px;font-weight:800;color:#dc2626">'+(r.pullCount||0)+'</div></div></div>';
       r.parts.forEach(function(p){
-        var bc=p.badge==='GREAT'?'b-gr':p.badge==='GOOD'?'b-yl':p.badge==='FAIR'?'b-or':'b-rd';
+        var bc=getPartTier(p.referencePrice||p.yourDemand&&p.yourDemand.avgPrice||0).cssClass;
         h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px">';
         h+='<div style="font-size:16px;flex-shrink:0">'+(p.verdictIcon||'')+'</div>';
         h+='<div style="flex:1"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span class="b '+bc+'">'+p.badge+' $'+p.avgPrice+'</span><span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span></div>';

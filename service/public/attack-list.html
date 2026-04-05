@@ -10,6 +10,7 @@
 <link rel="manifest" href="/admin/manifest.json">
 <link rel="apple-touch-icon" href="/admin/icon-192.png">
 <title>DarkHawk — DAILY FEED</title>
+<link rel="stylesheet" href="/admin/dh-parts.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -219,7 +220,7 @@
 <body>
 
 <div id="dh-nav"></div>
-<script src="/admin/dh-nav.js?v=2"></script><script>dhNav('feed')</script>
+<script src="/admin/dh-nav.js?v=2"></script><script src="/admin/dh-parts.js?v=1"></script><script>dhNav('feed')</script>
 <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;">
   <p id="headerSub" style="font-size:11px;color:#6b7280;">Loading...</p>
   <div class="header-actions">
@@ -355,7 +356,7 @@
     } catch (e) { /* non-fatal */ }
   }
 
-  // 6-tier value color mapping — shared by chips, score badge, and part verdicts
+  // Delegate to shared dh-parts.js — returns color key for CSS class names
   function tierColor(price) {
     if (price >= 500) return 'gold';
     if (price >= 350) return 'purple';
