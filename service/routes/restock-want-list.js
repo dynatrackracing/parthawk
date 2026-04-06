@@ -119,6 +119,18 @@ router.get('/debug/:id', async (req, res) => {
   res.json({ wantTitle: item.title, extractedPNs: pns, parsed, listings, sales });
 });
 
+// Lightweight: just titles + part numbers, no stock check
+router.get('/titles', async (req, res) => {
+  try {
+    const items = await database('restock_want_list')
+      .select('id', 'title', 'part_number', 'make', 'model')
+      .where('active', true);
+    res.json({ success: true, items, total: items.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Get active want list items with stock counts and sale data
 // ?manual_only=true to exclude auto-generated entries
 router.get('/items', async (req, res) => {

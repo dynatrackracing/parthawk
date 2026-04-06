@@ -83,7 +83,7 @@ async function loadMarks() {
   try {
     var [markResp, wlResp] = await Promise.all([
       fetch('/competitors/marks').then(function(r){return r.json()}),
-      fetch('/restock-want-list/items').then(function(r){return r.json()}).catch(function(){return{items:[]}})
+      fetch('/restock-want-list/titles').then(function(r){return r.json()}).catch(function(){return{items:[]}})
     ]);
 
     _marks = markResp.marks || [];
