@@ -1,53 +1,83 @@
 # SNAPSHOT_LIBS.md
-Generated 2026-04-05
+Generated 2026-04-06
 
 ## service/utils/
 
 ### partIntelligence.js
-**Purpose:** Unified matching engine for DarkHawk. Single source for PN extraction, stock counting, model matching, year parsing. Used by DAILY FEED, HAWK EYE, THE QUARRY, SCOUR STREAM, SCOUT ALERTS. Replaces partNumberExtractor.js and partMatcher.extractPartNumbers().
+**Purpose:** Unified matching engine for DarkHawk. Single source for PN extraction, stock counting, model matching, year parsing. Used by DAILY FEED, HAWK EYE, THE QUARRY, SCOUR STREAM, SCOUT ALERTS.
 **Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
 **Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`).
 **Key behavior:**
-- `extractPartNumbers(text)` — Ford 3-segment dash patterns + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/` check after isSkipWord).
-- `computeBase(raw)` — Internal (not exported). Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs. This is the canonical base PN used for `partNumberBase` column.
-- `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` from `extractPartNumbers` for partNumberBase.
-- `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Normalizes, rejects junk (JUNK_WORDS set, VINs, years, pure-alpha), strips Ford ECU suffixes (12A650, 14A067). Returns null for unsearchable PNs. **Intentionally aggressive — for search queries, NOT for storage.**
+- `extractPartNumbers(text)` — Ford 3-segment dash patterns (`/\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}-[A-Z]{1,3}\b/`) + dashless Ford + 2-segment Ford + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/`).
+- `computeBase(raw)` — Internal (not exported). Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs.
+- `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` for partNumberBase.
+- `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Intentionally aggressive — for search queries, NOT for storage. Strips Ford ECU suffixes (12A650, 14A067).
 - `deduplicatePNQueue(entries)` — Phase E1. Sanitizes, dedupes by base, keeps highest-price entry per PN.
-- `detectPartType(title)` — Keyword detection for 40+ part types. Original: ECM, BCM, TCM, ABS, TIPM, AMP, CLUSTER, RADIO, THROTTLE, STEERING, REGULATOR, MIRROR, SUNROOF, FUEL_MODULE, CAMERA, HVAC, HEADLIGHT, TAILLIGHT, BLIND_SPOT, PARK_SENSOR, AIR_RIDE, CLOCK_SPRING, LOCK, IGNITION, LIFTGATE, ALTERNATOR, STARTER, BLOWER, NAV, VISOR. Added: ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT_MODULE, DOOR_MODULE, WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE, LANE_ASSIST, ADAPTIVE_CRUISE.
-- `MAKE_NORMALIZE` — Map of lowercase make strings to title-case canonical names (matches corgi VIN decoder output). ~50 entries.
-- `MODEL_PATTERNS` — Ordered array of ~220 model strings. Multi-word models listed first for greedy matching. Includes vans (Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Metris), tonnage variants (Express 2500, Savana 3500, etc.), and compound models (Explorer Sport Trac).
-- `stripRevisionSuffix(pn)` — Strips trailing revision suffix. Chrysler 56044691AA → 56044691, GM A12345678AA → A12345678, Ford dashless patterns.
+- `detectPartType(title)` — Keyword detection for 40+ part types: TCM, BCM, ECM, ABS, TIPM, AMP, CLUSTER, RADIO, THROTTLE, STEERING, REGULATOR, MIRROR, SUNROOF, FUEL_MODULE, CAMERA, HVAC, HEADLIGHT, TAILLIGHT, BLIND_SPOT, PARK_SENSOR, AIR_RIDE, CLOCK_SPRING, LOCK, IGNITION, LIFTGATE, ALTERNATOR, STARTER, BLOWER, NAV, VISOR, ROLLOVER_SENSOR, YAW_SENSOR, OCCUPANT_SENSOR, SEAT_MODULE, DOOR_MODULE, WIPER_MODULE, BLEND_DOOR, TRAILER_MODULE, LANE_ASSIST, ADAPTIVE_CRUISE.
+- `MAKE_NORMALIZE` — Map of ~50 lowercase make strings to title-case canonical names (matches corgi VIN decoder output). Includes aliases: chevy→Chevrolet, vw→Volkswagen, merc→Mercury.
+- `MODEL_PATTERNS` — Ordered array of ~220 model strings. Multi-word models first (Grand Cherokee, Transit Connect, Explorer Sport Trac). Includes vans (Express, Savana, Econoline, Transit, Sprinter, Astro, Safari, NV200, ProMaster, Metris), tonnage variants (Express 2500/3500, Savana 1500/2500/3500, Sprinter 2500/3500), trucks with tonnage (Silverado 1500/2500/3500, F-150/F-250/F-350), Lexus/Infiniti/Acura/BMW model numbers.
+- `stripRevisionSuffix(pn)` — Strips trailing revision suffix from dashless PNs. Chrysler 56044691AA → 56044691, GM A12345678AA → A12345678.
+- `modelMatches(partModel, vehicleModel)` — Prefix-based model comparison with normalization. Returns true if shorter model is prefix of longer model and extra words are digits.
+- `extractMake(titleLower)` — Multi-word makes first (land rover, mercedes-benz), then word-boundary single-word. Returns title-case from MAKE_NORMALIZE.
+- `extractModel(title, make)` — Searches full title for MODEL_PATTERNS matches (word-boundary). Returns first match.
 
 ### partMatcher.js
-**Purpose:** Shared part number recognition and matching. Still used for `normalizePartNumber()` by CacheService, priceResolver, and other services.
-**Exports:** `extractPartNumbers`, `normalizePartNumber`, `loadModelsFromDB`, `getModels`, `MAKES`, `MAKE_ALIASES`, `MODEL_IMPLIES_MAKE`, `MODELS`, `PART_PHRASES`, plus parsing helpers.
+**Purpose:** Shared part number recognition and matching. Canonical source for `normalizePartNumber()`.
+**Exports:** `extractPartNumbers`, `extractYearsFromTitle`, `normalizePartNumber`, `parseTitle`, `findSimilarPartNumbers`, `matchPartToListings`, `matchPartToSales`, `matchPartToYardVehicles`, `loadModelsFromDB`, `MAKES`, `MODELS`, `PART_PHRASES`
 **Dependencies:** `../database/database`, `../lib/logger`
 **Key behavior:**
+- `normalizePartNumber(pn)` — Canonical OEM revision suffix stripper. Ford dash-style with 1-3 char suffix (AL3T-15604-BD → AL3T-15604, 7L3A-12A650-GJH → 7L3A-12A650), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **Used by CacheService for dedup, computeBase() in partIntelligence.js, and frontend normalizePN() for matching.**
 - `extractPartNumbers(title)` — OEM-specific regex patterns (chrysler, ford, honda, toyota, nissan, gm, bosch, bmw). Returns `{raw, base, format}`. Deduplicates by base, keeps longer raw match.
-- `normalizePartNumber(pn)` — Strips OEM revision suffixes. Ford dash-style with 1-3 char suffix (AL3T-15604-BD → AL3T-15604, 7L3A-12A650-GJH → 7L3A-12A650), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **This is the canonical normalizer used by CacheService for dedup, by computeBase() in partIntelligence.js, and by the frontend normalizePN() for matching.**
+- `parseTitle(title)` — Extracts year range, make, models from any eBay/listing title. Used by ScoutAlertService for want-list matching.
 - `loadModelsFromDB()` — Loads Auto table models into cache organized by make. Sorted longest-first. Falls back to FALLBACK_MODELS (~120 entries).
-- `MODEL_IMPLIES_MAKE` — Reverse lookup: model name -> make (e.g. "charger" -> "dodge"). ~100 entries.
 
 ### partNumberExtractor.js
 **Purpose:** DEPRECATED. Original OEM part number extractor. Kept for backward compatibility; use partIntelligence.js.
 **Exports:** `extractPartNumbers`, `stripRevisionSuffix`
 **Dependencies:** None (pure logic).
-**Key behavior:** 13 regex patterns for multi-OEM extraction. `isCommonWord` filter rejects years and common abbreviations.
 
 ---
 
 ## service/lib/
 
 ### LocalVinDecoder.js
-**Purpose:** Offline VIN decoding via @cardog/corgi + Postgres VDS enrichment. Replaces all NHTSA API calls. Singleton pattern.
+**Purpose:** Offline VIN decoding via @cardog/corgi + VDS enrichment + vPIC fallback + EPA transmission. Replaces all NHTSA API calls. Singleton pattern.
 **Exports:** `decode`, `decodeBatchLocal`, `getDecoder`, `close`
 **Dependencies:** `./logger`, `../database/database`, `@cardog/corgi`
-**Key behavior:**
-- `decode(vin)` — 6-step pipeline: (1) check vin_cache table, (2) corgi offline decode (<15ms), (3) VDS trim enrichment via vin_decoder.vds_trim_lookup, (4) engine code enrichment via vin_decoder.engine_codes, (5) write to vin_cache (includes `transmission_style` column from transHint), (6) return standardized result with vin/year/make/model/trim/engine/engineCode/engineType/displacement/cylinders/fuelType/forcedInduction/drivetrain/bodyStyle/transHint/source/cached/ms. Note: corgi returns null transHint for all vehicles currently (engine_codes.transmission_hint column is unpopulated), so `transmission_style` in vin_cache is always null for now.
-- `decodeBatchLocal(vins)` — Sequential decode loop. Returns array shaped like NHTSA batch response for backward compat (VIN, Make, Model, ModelYear, Trim, DisplacementL, etc.).
-- `cleanDecodedTrim(raw)` — Filters junk trims (NFA, std, cab types, drivetrain strings, chassis codes). Strips parenthetical content, engine specs, leather/nav suffixes. Returns null if <2 or >30 chars.
+
+**Decode pipeline (6 steps):**
+
+1. **Step 1: vin_cache check** — SELECT from `vin_cache` by VIN. If cached, return immediately with trim, engine, drivetrain, transmission_style, trans_speeds, trans_sub_type, trans_source. Source: `vin_cache`.
+
+2. **Step 2: Corgi offline decode** (<15ms, zero network) — `@cardog/corgi` SQLite-based VIN pattern matching. Returns year, make, model, series, bodyStyle, driveType, fuelType, engine displacement/cylinders. Series processed: tonnage patterns (1500, 3/4 ton) folded into model; non-tonnage run through `cleanDecodedTrim()` and used as trim. Engine fallback: if corgi has no engine data, checks old vin_cache for NHTSA-era engine strings.
+
+3. **Step 3: VDS trim enrichment** — `identifyManufacturer(vin)` → `resolveTrimFromVDS(mfr.id, vin, year, model)`. Uses `vin_decoder.vds_trim_lookup` table. Only seeded for 3 manufacturers (GM=41 entries, Chrysler=26, Honda=20). If VDS has a match AND trim is still null, sets trim. Source: `+vds_trim`.
+
+4. **Step 3.5: vPIC trim+transmission fallback** — `vpicTrimFallback(vin)` queries `vpic.spvindecode(vin)` stored procedure. Parses key-value rows for Trim, Series, Transmission Style, Transmission Speeds. Only fills trim if still null after VDS. Trim cleaned via `cleanDecodedTrim()`. Also fills transHint if still null. Source: `+vpic_trim`, `+vpic_series`, `+vpic_trans`. **This is the main trim source for non-VDS makes (Toyota, Nissan, BMW, Mercedes, Hyundai, Kia, Lexus, etc.).**
+
+5. **Step 4: Engine code enrichment** — `resolveEngineCode(mfr.id, mfr.name, vin, year, model)`. Uses `vin_decoder.engine_codes` table. Returns displacement, cylinders, fuelType, forcedInduction, transHint. Honda exception: position 8 = trim not engine. Source: `+engine_code`.
+
+6. **Step 4.5: EPA transmission resolution** — `resolveTransmission(year, make, model, displacement, cylinders, trim)`. Queries `vin_decoder.epa_transmission` table (36,035 EPA FuelEconomy.gov records). Runs if transHint is null OR came from vPIC (EPA CHECK_MT logic is smarter than vPIC's raw data). **3-tier resolution:**
+   - **Tier 1 (epa_definitive):** Only one trans type in EPA data → use it (e.g., "4-speed Automatic" or "5-speed Manual")
+   - **Tier 2 (epa_check_mt):** Both Manual and Automatic offered → check CHECK_MT model list (22 models: Corvette, Camaro, Mustang, Challenger, WRX, BRZ, FR-S, 350Z, 370Z, MX-5, Miata, Genesis Coupe, Veloster, GTI, GTO, Solstice, Sky, Lancer, FJ Cruiser, Tacoma, Frontier, Ranger, Wrangler) → mark as CHECK_MT. Also checks PERFORMANCE_TRIMS override (`/\b(ST|Si|Type R|Type S|SRT|SS|RS|Nismo|TRD|Sport|S\b|R-Line|GT(?:\s|$)|Turbo)\b/i`).
+   - **Tier 3 (epa_default_auto):** Both offered, not a CHECK_MT model → default to Automatic with speeds.
+   - Model matching via `epaModelMatches()`: normalization, containment, GM tonnage aliases (K15→1500), suffix stripping.
+   - Source: `+epa`.
+
+7. **Step 5: Write to vin_cache** — INSERT with all resolved fields (trim, engine, drivetrain, transmission_style, transmission_speeds, trans_sub_type, trans_source). ON CONFLICT IGNORE.
+
+8. **Step 6: Return result** — Standardized object with vin, year, make, model, trim, engine, engineCode, engineType, displacement, cylinders, fuelType, forcedInduction, drivetrain, bodyStyle, transHint, transSpeeds, transSubType, transSource, source, cached, ms.
+
+**Priority order for trim:** VDS (GM/Chrysler/Honda) > corgi series > vPIC Trim > vPIC Series > null
+**Priority order for transmission:** engine_codes.transHint > vPIC transmissionStyle > EPA resolution > null (EPA overrides vPIC)
+
+**Other functions:**
+- `cleanDecodedTrim(raw)` — Filters junk (NFA, std, cab types, drivetrain strings, chassis codes, Middle-level/High-level Korean strings). Strips parenthetical content, engine specs, leather/nav suffixes. Returns null if <2 or >30 chars.
+- `decodeBatchLocal(vins)` — Sequential decode loop. Returns array shaped like NHTSA batch response for backward compat (VIN, Make, Model, ModelYear, Trim, DisplacementL, DriveType, TransmissionStyle, TransmissionSpeeds, etc.).
+- `parseDrivetrain(driveType)` — Normalizes to 4WD/AWD/FWD/RWD.
+- `parseEngineType(fuelType)` — Returns Gas/Diesel/Hybrid/Electric/Flex Fuel.
+- `formatEngineString(disp, cyl, corgiEngine)` — Returns "3.6L V6" format.
 - Singleton: `getDecoder()` caches one corgi instance for app lifetime.
-- Honda exception: position 8 = trim not engine, so engine code lookup skipped for Honda.
 
 ### priceResolver.js
 **Purpose:** Resolve best available price for a part number from tiered sources.
@@ -56,7 +86,6 @@ Generated 2026-04-05
 **Key behavior:**
 - `resolvePricesBatch(partNumbers, options)` — Normalizes keys (strip spaces/dashes/dots, uppercase). Priority: market_demand_cache (fresh/aging/stale) > Item.price (frozen reference). Freshness tiers: fresh <=30d, aging 30-60d, stale 60-90d, expired >90d (treated as missing).
 - Returns Map of `{price, source, freshness, details}`. Details include median, min, max, soldCount for cache hits.
-- PriceCheck data is NOT queried directly in batch mode; it feeds into market_demand_cache via Phase 1c.
 
 ### FlywayScrapeRunner.js
 **Purpose:** Cron runner for non-LKQ Flyway yard scraping + post-scrape enrichment.
@@ -65,48 +94,6 @@ Generated 2026-04-05
 **Key behavior:**
 - `work()` — (1) auto-complete expired Flyway trips, (2) cleanup expired trip vehicles, (3) get active non-LKQ yards, deduplicate, (4) scrape each with 5min timeout and 3s inter-yard delay, (5) delegates post-scrape to `PostScrapeService.enrichYard(yardId)` for VIN decode + trim tier + scout alerts.
 - `scrapeYard(yard)` — Routes to chain-specific scraper by method/chain field. Skips Foss on Sundays (PriceCheck Playwright conflict). Skips Carolina PNP on Railway (datacenter IPs blocked).
-
-### MarketDemandCronRunner.js
-**Purpose:** DISABLED in production. Nightly job to update market_demand_cache for all Item partNumberBase values via eBay Finding API.
-**Exports:** `MarketDemandCronRunner` (class)
-**Dependencies:** `./logger`, `../database/database`, `./partNumberUtils`, `axios`, `xml2js`
-**Key behavior:**
-- `work()` — Queries distinct partNumberBase from Item table. Skips if cache <24h old. Calls `queryEbaySold(pn)` then `upsertCache()`. 100ms rate limit between calls.
-- `upsertCache()` — Key normalization: `rawPartNumberBase.replace(/[\s\-\.]/g, '').toUpperCase()`. Computes seasonal_weight (30d estimate vs 90d) and market_score (sold/active ratio).
-- `queryEbaySold(pn)` — Uses eBay Finding API XML (findCompletedItems + findItemsByKeywords). Returns `{soldCount, avgPrice, activeListings}`.
-
-### CompetitorDripRunner.js
-**Purpose:** Randomized micro-scrape runner for competitor eBay sellers. Replaces old Sunday "blast all sellers" approach.
-**Exports:** Singleton instance of `CompetitorDripRunner`
-**Dependencies:** `./logger`, `../database/database`, `../managers/SoldItemsManager`
-**Key behavior:**
-- `runDrip()` — Called 4x daily (6am, noon, 6pm, midnight UTC). Random 0-45min startup delay. Picks least-recently-scraped enabled seller from SoldItemSeller. Skips if all sellers scraped <6h ago. Scrapes 1-2 random pages via SoldItemsManager.scrapeCompetitor(). Updates lastScrapedAt and itemsScraped. Closes Playwright browser after each run.
-
-### PriceCheckCronRunner.js
-**Purpose:** Weekly batch price checker for active YourListing items.
-**Exports:** `PriceCheckCronRunner` (class)
-**Dependencies:** `./logger`, `../services/PriceCheckService`, `../models/PriceCheck`, `../models/YourListing`, `async-lock`, `uuid`
-**Key behavior:**
-- `work({batchSize=35})` — Uses async-lock to prevent concurrent runs. Delegates to `doWork()`.
-- `getListingsNeedingPriceCheck(limit)` — SQL: active listings with quantityAvailable > 0, not omitted, no PriceCheck in 7 days. Prioritized by never-checked first, then stalest, then highest price.
-- 3-6s random delay between checks; 5s after errors. Calls `PriceCheckService.checkPrice()` per listing.
-- Scheduled Sunday 2am (weekly cycle so each listing checked once/week).
-
-### CronWorkRunner.js
-**Purpose:** Primary eBay seller item processing cron. Imports new items from competitors, then processes unprocessed items.
-**Exports:** `CronWorkRunner` (class)
-**Dependencies:** `./logger`, `../managers/SellerItemManager`, `../models/Item`, `../managers/ItemDetailsManager`, `async-lock`, `uuid`, `../models/Cron`, `../middleware/CacheManager`, `../managers/CompetitorManager`
-**Key behavior:**
-- `work()` — Async-locked. If unprocessed Items exist, skips import and processes them. Otherwise imports from all competitors via SellerItemManager, then processes via ItemDetailsManager. Logs metrics to Cron table. Flushes item caches post-run.
-
-### async-handler.js
-**Purpose:** Express route error wrapper. Catches thrown errors and rejected promises, forwards to next(err).
-**Exports:** `asyncHandler`
-**Dependencies:** `@hapi/joi`
-
-### constants.js
-**Purpose:** Shared constants. Provides `dataDir` (path to service/data/) and `makes` (40 supported automotive makes).
-**Exports:** `dataDir`, `makes`
 
 ### logger.js
 **Purpose:** Bunyan logger singleton. Writes to service/lib/logs/dynatrack.log at debug level.
@@ -122,8 +109,5 @@ Generated 2026-04-05
 **Exports:** `getPlatformMatches`, `getExpandedSalesQuery`, `applyPlatformBonus`, `normalizeMake`, `normalizeModel`, `MAKE_ALIASES`, `MODEL_ALIASES`
 **Dependencies:** `../database/database` (via platform_vehicle, platform_group, platform_shared_part tables)
 **Key behavior:**
-- `getPlatformMatches(db, make, model, year)` — SQL join across platform_vehicle/platform_group/platform_shared_part. Returns sibling vehicles with shared part_types.
-- `getExpandedSalesQuery(db, make, model, year)` — Builds ILIKE conditions for YourSale title matching across original vehicle + all platform siblings with make/model aliases.
+- `getPlatformMatches(db, make, model, year)` — SQL join across platform tables. Returns sibling vehicles with shared part_types.
 - `applyPlatformBonus(baseScore, platformMatches, salesData)` — Up to 20% score boost based on sibling sales volume.
-- `MAKE_ALIASES` — Uppercase make -> array of display variants (e.g., 'RAM' -> ['Ram', 'Dodge']).
-- `MODEL_ALIASES` — Model -> array of name variants (e.g., 'Town & Country' -> ['Town & Country', 'Town and Country', 'T&C']).
