@@ -385,8 +385,10 @@ class EbayMessagingService {
         return { checked: 0, queued: 0, method: 'none', elapsed: Date.now() - startTime };
       }
 
-      // Try Fulfillment API first (OAuth), then fall back to GetOrders (Trading API)
-      const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+      // Fulfillment API requires a valid OAuth 2.0 Bearer token.
+      // EBAY_OAUTH_TOKEN is currently expired, so skip straight to GetOrders fallback.
+      // When a fresh OAuth token is available, re-enable by setting EBAY_FULFILLMENT_TOKEN.
+      const oauthToken = process.env.EBAY_FULFILLMENT_TOKEN;
       const useFulfillmentApi = !!oauthToken;
 
       if (useFulfillmentApi) {
@@ -541,9 +543,11 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN env var. Called by cron every 15 minutes.
    */
   async pollReturns() {
-    const oauthToken = process.env.EBAY_OAUTH_TOKEN || process.env.TRADING_API_TOKEN;
+    // Post-Order API requires TOKEN scheme (not Bearer OAuth).
+    // TRADING_API_TOKEN is the active eBay User Auth Token.
+    const oauthToken = process.env.TRADING_API_TOKEN;
     if (!oauthToken) {
-      this.log.debug('No eBay auth token set — return polling disabled');
+      this.log.debug('TRADING_API_TOKEN not set — return polling disabled');
       return { checked: 0, queued: 0, skipped: true };
     }
 
@@ -604,7 +608,7 @@ class EbayMessagingService {
       }
     } catch (err) {
       if (err.response?.status === 401) {
-        this.log.warn('EBAY_OAUTH_TOKEN expired — return polling skipped');
+        this.log.warn('TRADING_API_TOKEN rejected (401) — return polling skipped');
       } else {
         this.log.error({ err: err.message }, 'Return polling failed');
       }
@@ -620,9 +624,10 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN.
    */
   async _sendPostOrderMessage(returnId, messageBody) {
-    const oauthToken = process.env.EBAY_OAUTH_TOKEN || process.env.TRADING_API_TOKEN;
+    // Post-Order API requires TOKEN scheme with TRADING_API_TOKEN
+    const oauthToken = process.env.TRADING_API_TOKEN;
     if (!oauthToken) {
-      return { success: false, errorCode: 'NO_OAUTH', errorMessage: 'No eBay auth token configured' };
+      return { success: false, errorCode: 'NO_TOKEN', errorMessage: 'TRADING_API_TOKEN not configured' };
     }
 
     try {
