@@ -350,3 +350,12 @@ Deploys this session (13 total):
 - markByIdx()/hideByIdx() wrappers call existing markItem()/hideIntel()
 - Mark button: gold ★. Hide button: red ✕ with dim border.
 - Files: hunters-perch.html
+
+## Market Drip Priority Queue Restructure — 2026-04-06
+- isExcludedPart() filter: engines/transmissions/body panels/airbags removed from queue
+- $100 price floor: sub-$100 parts skipped (was 36% of cache = wasted cycles)
+- 10-tier priority queue: $500+ PN → $500+ KW → $350+ PN → ... → $100+ KW
+- Within each tier: never-checked first, then oldest cache first
+- Keyword search path for no-PN parts: smart-query-builder + relevance-scorer (min 3 relevant results)
+- Keyword cache: key_type='keyword', cache_key = partType|make|model|years
+- CLAUDE_RULES.md rule 29 updated to reflect keyword search path

@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Market Drip Priority Queue Restructure — 2026-04-06
+- isExcludedPart() filter removes engines/transmissions/body panels/airbags from queue
+- $100 price floor skips sub-$100 parts (~36% of queue was wasted)
+- 10-tier priority: price descending ($500+→$100+), PN-first within each tier
+- Keyword search for no-PN parts: smart-query-builder + relevance-scorer (min 3 relevant results)
+- Files: run-importapart-drip.js, CLAUDE_RULES.md
+
+---
+
 ## Fix Hunters Perch Mark + Hide Buttons — 2026-04-06
 - JSON.stringify(sellers) in onclick attributes broke HTML parsing (unescaped double quotes)
 - Replaced with data-attribute lookup: window._intelData stores item data, buttons reference by index

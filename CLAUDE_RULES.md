@@ -84,7 +84,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 ## SCRAPING RULES
 
-29. **All market data scraping: search by part number only.** No keyword fallback, no title matching. Parts without OEM part number are skipped entirely.
+29. **Market data scraping priority:** Part number search first. Parts with OEM PN always searched by PN. Parts WITHOUT PN searched by keyword (smart-query-builder: part type + make + model + year) with relevance-scorer filter — minimum 3 relevant results required or data is discarded. Make AND model must both be present for keyword search. Parts under $100 and excluded parts (engines, transmissions, body panels, airbags) are skipped entirely.
 
 30. **LKQ scraper runs locally only** (CloudFlare blocks Railway). Run via `run-scrape.bat`, Windows Task Scheduler 5am daily.
 
