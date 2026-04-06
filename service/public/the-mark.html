@@ -146,15 +146,20 @@ async function loadMarks() {
 async function hideMark(markId, pnOrTitle, btn) {
   btn.disabled = true;
   try {
-    // Add to hidden_parts
-    await fetch('/hidden/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNumberBase: pnOrTitle.substring(0, 40), source: 'mark' }) });
-    // Delete the mark
-    await fetch('/competitors/mark/' + markId, { method: 'DELETE' });
+    // Add to hidden_parts — must succeed before we delete the mark
+    var hideResp = await fetch('/hidden/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNumberBase: pnOrTitle.substring(0, 40), source: 'mark' }) }).then(function(r){ return r.json(); });
+    if (!hideResp.success) {
+      showToast('Failed to hide: ' + (hideResp.error || 'unknown error'));
+      btn.disabled = false;
+      return;
+    }
+    // Hidden insert succeeded — now delete the mark
+    await fetch('/competitors/mark/' + markId, { method: 'DELETE' }).then(function(r){ return r.json(); }).catch(function(e){ console.error('Mark delete failed:', e); });
     var el = btn.closest('.mark-card');
     if (el) { el.style.background = '#3d0a0a'; el.style.opacity = '0'; setTimeout(function(){ el.remove(); }, 400); }
     showToast('Part hidden — will not appear on any intel page');
     setTimeout(loadMarks, 500);
-  } catch (e) { btn.disabled = false; }
+  } catch (e) { btn.disabled = false; console.error('hideMark error:', e); }
 }
 
 async function deleteMark(id, btn) {

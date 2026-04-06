@@ -134,16 +134,17 @@ router.get('/gap-intel', async (req, res) => {
     }
 
     // Build match sets from our data (PNs + partType|make|model keys)
-    const yourSales = await database('YourSale').select('title').limit(25000);
-    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
+    // Use Clean Pipe partNumberBase column when available, fall back to title extraction
+    const yourSales = await database('YourSale').select('title', 'partNumberBase').limit(25000);
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title', 'partNumberBase').limit(10000);
     const yourItems = await database('Item').whereRaw("LOWER(seller) LIKE '%dynatrack%'").select('title').limit(5000);
 
-    const allOurTitles = [
-      ...yourSales.map(s => s.title),
-      ...yourListings.map(l => l.title),
-      ...yourItems.map(i => i.title),
-    ].filter(Boolean);
-    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurTitles);
+    const allOurRows = [
+      ...yourSales.map(s => ({ title: s.title, partNumberBase: s.partNumberBase })),
+      ...yourListings.map(l => ({ title: l.title, partNumberBase: l.partNumberBase })),
+      ...yourItems.map(i => ({ title: i.title, partNumberBase: null })),
+    ];
+    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurRows);
 
     let dismissedTitles = new Set();
     try {
@@ -425,24 +426,40 @@ function buildTitleKey(title) {
 }
 
 /**
- * Build PN and title-key sets from an array of title strings.
+ * Build PN and title-key sets from an array of row objects {title, partNumberBase}.
+ * Uses Clean Pipe partNumberBase when available, falls back to title extraction.
  * Returns { pnSet: Set<string>, keySet: Set<string> }
  */
-function buildMatchSets(titles) {
+function buildMatchSets(rows) {
   var pnSet = new Set();
   var keySet = new Set();
-  for (var title of titles) {
-    if (!title) continue;
-    // Extract part number
-    var pn = extractPartNumber(title);
+  for (var row of rows) {
+    if (!row) continue;
+    var title = typeof row === 'string' ? row : row.title;
+    var storedPN = typeof row === 'string' ? null : row.partNumberBase;
+
+    // Use Clean Pipe partNumberBase if available, else extract from title
+    var pn = null;
+    if (storedPN && storedPN.length >= 4) {
+      pn = storedPN.toUpperCase().replace(/[-\s]/g, '');
+      pnSet.add(pn);
+    }
+    if (!pn && title) {
+      var extracted = extractPartNumber(title);
+      if (extracted) {
+        pn = extracted.replace(/[-\s]/g, '');
+        pnSet.add(pn);
+      }
+    }
     if (pn) {
-      var pnBase = pn.replace(/[-\s]/g, '').replace(/[A-Z]{1,2}$/, '');
+      var pnBase = pn.replace(/[A-Z]{1,2}$/, '');
       if (pnBase.length >= 5) pnSet.add(pnBase);
-      pnSet.add(pn.replace(/[-\s]/g, ''));
     }
     // Extract title key
-    var key = buildTitleKey(title);
-    if (key) keySet.add(key);
+    if (title) {
+      var key = buildTitleKey(title);
+      if (key) keySet.add(key);
+    }
   }
   return { pnSet, keySet };
 }
@@ -474,19 +491,23 @@ function extractPartNumber(title) {
   if (!title) return null;
 
   // Common OEM part number patterns (alphanumeric with dashes/spaces, 6+ chars)
+  // Use global flag so we can iterate ALL matches per pattern (not just the first)
   const patterns = [
-    /\b([A-Z]{1,4}\d{1,4}[-\s]?\d{2,5}[-\s]?[A-Z0-9]{1,5})\b/i,    // CT43-2C405-AB, 8T0 035 223AN
-    /\b(\d{4,6}[-]?[A-Z0-9]{2,6}[-]?[A-Z0-9]{0,4})\b/i,             // 39132-26BL0, 68059524AI
-    /\b([A-Z]{2,4}\d{3,6}[A-Z]?\d{0,2})\b/i,                         // BBM466A20, MR578042
-    /\b(\d{2,3}[-]\d{4,5}[-]\d{3,5}[-]?[A-Z]{0,2})\b/,               // 84010-48180, 99211-F1000
+    /\b([A-Z]{1,4}\d{1,4}[-\s]?\d{2,5}[-\s]?[A-Z0-9]{1,5})\b/gi,    // CT43-2C405-AB, 8T0 035 223AN
+    /\b(\d{4,6}[-]?[A-Z0-9]{2,6}[-]?[A-Z0-9]{0,4})\b/gi,             // 39132-26BL0, 68059524AI
+    /\b([A-Z]{2,4}\d{3,6}[A-Z]?\d{0,2})\b/gi,                         // BBM466A20, MR578042
+    /\b(\d{2,3}[-]\d{4,5}[-]\d{3,5}[-]?[A-Z]{0,2})\b/g,               // 84010-48180, 99211-F1000
   ];
 
   for (const pattern of patterns) {
-    const match = title.match(pattern);
-    if (match && match[1] && match[1].length >= 6) {
-      // Filter out obvious non-part-numbers (years, mileage)
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(title)) !== null) {
+      if (!match[1] || match[1].length < 6) continue;
+      // Filter out obvious non-part-numbers (years, year ranges, mileage)
       const candidate = match[1].replace(/\s+/g, '-');
-      if (/^(19|20)\d{2}$/.test(candidate)) continue; // skip years
+      if (/^(19|20)?\d{2}-(19|20)?\d{2}$/.test(candidate)) continue; // skip year ranges (2007-2011, 07-11)
+      if (/^(19|20)\d{2}$/.test(candidate)) continue; // skip single years
       if (/^\d{1,3},?\d{3}$/.test(candidate)) continue; // skip mileage
       return candidate.toUpperCase();
     }
