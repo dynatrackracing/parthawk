@@ -724,9 +724,9 @@
 
     // LINE 1 — rarity badge (inline after engine)
     let rarityInline = '';
-    if (v.rarityTier && v.rarityTier !== 'NORMAL') {
+    if (v.rarityTier === 'UNCOMMON' || v.rarityTier === 'RARE' || v.rarityTier === 'LEGENDARY') {
       const rtColor = v.rarityColor || '#666';
-      const rtText = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' || v.rarityTier === 'SATURATED' ? '#000' : '#fff';
+      const rtText = v.rarityTier === 'LEGENDARY' ? '#000' : '#fff';
       const rtPulse = v.rarityPulses ? 'animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite;' : '';
       const rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
       rarityInline = ` <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>`;
@@ -737,7 +737,7 @@
 
     // LINE 3 — location + freshness
     const daysOld = getDaysFromNewest(v, _currentNewestDate);
-    const newBadge = daysOld === 0 ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:#06b6d4;color:#000">NEW</span>' : '';
+    const newBadge = daysOld === 0 ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:#4CAF50;color:#000">NEW</span>' : '';
     const metaParts = [];
     if (v.row_number) metaParts.push('Row ' + v.row_number);
     if (v.color) metaParts.push(v.color);
