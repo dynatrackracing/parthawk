@@ -562,24 +562,44 @@ function detectPartType(title) {
  */
 router.get('/overstock/scan-duplicates', async (req, res) => {
   try {
+    // Scope to overstock watch list items only — find duplicates WITHIN the curated list
     const dupes = await database.raw(`
-      SELECT "partNumberBase", "extractedMake", "extractedModel",
+      SELECT ogi.part_number_base as "partNumberBase",
+        og.name as group_name,
         COUNT(*) as cnt,
-        array_agg("ebayItemId") as item_ids,
-        array_agg(title) as titles,
-        array_agg("currentPrice"::text) as prices,
-        array_agg("startTime"::text) as dates
-      FROM "YourListing"
-      WHERE "listingStatus" = 'Active'
-        AND "partNumberBase" IS NOT NULL AND "partNumberBase" != ''
-      GROUP BY "partNumberBase", "extractedMake", "extractedModel"
+        array_agg(DISTINCT og.name) as group_names,
+        array_agg(ogi.ebay_item_id) as item_ids,
+        array_agg(ogi.title) as titles,
+        array_agg(ogi.current_price::text) as prices
+      FROM overstock_group_item ogi
+      JOIN overstock_group og ON og.id = ogi.group_id
+      WHERE ogi.part_number_base IS NOT NULL AND ogi.part_number_base != ''
+        AND ogi.is_active = true
+      GROUP BY ogi.part_number_base
       HAVING COUNT(*) > 1
       ORDER BY COUNT(*) DESC
       LIMIT 50
     `);
     res.json({ success: true, duplicates: dupes.rows, total: dupes.rows.length });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    // If overstock tables don't have part_number_base, fall back to title grouping
+    try {
+      const dupes2 = await database.raw(`
+        SELECT ogi.title, COUNT(*) as cnt,
+          array_agg(DISTINCT og.name) as group_names,
+          array_agg(ogi.ebay_item_id) as item_ids
+        FROM overstock_group_item ogi
+        JOIN overstock_group og ON og.id = ogi.group_id
+        WHERE ogi.is_active = true
+        GROUP BY ogi.title
+        HAVING COUNT(*) > 1
+        ORDER BY COUNT(*) DESC
+        LIMIT 50
+      `);
+      res.json({ success: true, duplicates: dupes2.rows, total: dupes2.rows.length });
+    } catch (err2) {
+      res.status(500).json({ success: false, error: err2.message });
+    }
   }
 });
 

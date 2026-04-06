@@ -86,7 +86,6 @@ nav a.active{color:#DC2626;font-weight:700}
 </div>
 
 <div class="container" id="wantlistView">
-  <div id="justSold"></div>
   <div class="card">
     <div style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Add to Want List</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -495,58 +494,7 @@ function scanHighQty() {
     .finally(function() { btn.disabled = false; btn.textContent = 'Scan High-Qty New'; });
 }
 
-function loadJustSold() {
-  fetch('/restock-want-list/just-sold')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success || !d.items || d.items.length === 0) {
-        document.getElementById('justSold').innerHTML = '';
-        return;
-      }
-      var totalSales = d.items.reduce(function(n, s) { return n + s.sales.length; }, 0);
-      var h = '<div class="card" style="border-color:#16a34a;border-width:2px">';
-      h += '<div style="font-size:11px;font-weight:800;color:#22c55e;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">JUST SOLD — RESTOCK NOW (' + totalSales + ' sale' + (totalSales > 1 ? 's' : '') + ')</div>';
-      d.items.forEach(function(s, idx) {
-        h += '<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
-        h += '<div style="font-size:13px;font-weight:600">' + esc(s.wantTitle) + '</div>';
-        // Show grouped sales: "3x sold — $500 / $200 / $399"
-        var prices = s.sales.map(function(sl) { return '$' + sl.price; }).join(' / ');
-        var soldLabel = s.sales.length > 1
-          ? s.sales.length + 'x sold ' + s.sales[0].soldAgo
-          : 'sold ' + s.sales[0].soldAgo;
-        h += '<div style="font-size:11px;margin-top:2px"><span style="color:#22c55e;font-weight:700">' + prices + '</span> <span style="color:#9CA3AF">' + soldLabel + '</span></div>';
-        // Collapsible details: matched sale titles + yard locations
-        var hasYards = s.yardMatches && s.yardMatches.length > 0;
-        var hasSaleTitles = s.matchedSaleTitles && s.matchedSaleTitles.length > 0;
-        if (hasYards || hasSaleTitles) {
-          var label = hasYards ? s.yardMatches.length + ' yard' + (s.yardMatches.length > 1 ? 's' : '') + ' nearby' : 'View details';
-          h += '<details style="margin-top:4px"><summary style="font-size:10px;color:#22c55e;cursor:pointer;user-select:none">' + label + ' &#9654;</summary>';
-          h += '<div style="margin-top:4px;padding:4px 8px;background:#0a0a0a;border-radius:4px;border:1px solid #2a2a2a">';
-          if (hasYards) {
-            s.yardMatches.forEach(function(v) {
-              h += '<div style="font-size:10px;color:#d1d5db;padding:2px 0"><span style="font-weight:600">' + esc(v.desc) + '</span> — <span style="color:#22c55e">' + esc(v.yard) + '</span> Row ' + esc(v.row) + '</div>';
-            });
-          }
-          if (hasSaleTitles) {
-            h += '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #2a2a2a;font-size:9px;color:#6B7280">Matched sales:</div>';
-            s.matchedSaleTitles.forEach(function(t) {
-              h += '<div style="font-size:9px;color:#9CA3AF;padding:1px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t) + '</div>';
-            });
-          }
-          h += '</div></details>';
-        } else {
-          h += '<div style="font-size:10px;color:#6B7280;margin-top:2px">No matching vehicles in yards right now</div>';
-        }
-        h += '</div>';
-      });
-      h += '</div>';
-      document.getElementById('justSold').innerHTML = h;
-    })
-    .catch(function() { /* ignore */ });
-}
-
 load();
-loadJustSold();
 
 // ── OVERSTOCK (group-based) ──────────────────────────────────
 function loadOverstock() {
@@ -601,80 +549,30 @@ function renderOverstock() {
     document.getElementById('overstockList').innerHTML = '<div class="empty">No overstock groups tracked yet.<br><span style="font-size:11px">Paste eBay item numbers above to start monitoring, or use "Find High-Quantity Listings" to auto-detect.</span></div>';
     return;
   }
-  var h = '';
-  overstockItems.forEach(function(group) {
+  var h = '<div style="border:1px solid #2a2a2a;border-radius:8px;overflow:hidden">';
+  overstockItems.forEach(function(group, idx) {
     var stock = group.live_stock != null ? group.live_stock : group.current_stock;
-    var qtyColor = '#22C55E';
-    if (stock <= group.restock_target) qtyColor = '#EF4444';
-    else if (stock === group.restock_target + 1) qtyColor = '#EAB308';
+    var qtyColor = stock <= group.restock_target ? '#EF4444' : stock === group.restock_target + 1 ? '#EAB308' : '#22C55E';
+    var statusColor = group.status === 'triggered' ? '#EF4444' : group.status === 'acknowledged' ? '#6B7280' : '#3498DB';
+    var statusLabel = group.status === 'triggered' ? 'RESTOCK' : group.status === 'acknowledged' ? 'ACK' : 'WATCH';
 
-    var statusBadge = '';
-    var cardClass = 'overstock-card';
+    h += '<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid #1f1f1f;font-size:11px' + (group.status === 'triggered' ? ';background:#1a0a0a' : '') + '">';
+    // Status dot
+    h += '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + statusColor + ';color:#fff;flex-shrink:0">' + statusLabel + '</span>';
+    // Name
+    h += '<span style="font-weight:600;color:#F0F0F0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(group.name) + '</span>';
+    // Stock
+    h += '<span style="font-weight:700;color:' + qtyColor + ';flex-shrink:0">' + stock + '/' + group.initial_stock + '</span>';
+    // Target
+    h += '<span style="color:#6B7280;flex-shrink:0;font-size:10px" onclick="editRestockTarget(' + group.id + ',' + group.restock_target + ',' + stock + ')" style="cursor:pointer" title="Restock at ' + group.restock_target + '">@' + group.restock_target + '</span>';
+    // Actions
     if (group.status === 'triggered') {
-      statusBadge = '<div class="status-badge" style="background:#EF4444;color:#fff">RESTOCK NOW</div>';
-      cardClass += ' overstock-triggered';
-    } else if (group.status === 'acknowledged') {
-      statusBadge = '<div class="status-badge" style="background:#374151;color:#9CA3AF">ACKNOWLEDGED</div>';
-    } else {
-      statusBadge = '<div class="status-badge" style="background:#6B7280;color:#fff">WATCHING</div>';
+      h += '<button onclick="ackOverstock(' + group.id + ')" style="font-size:9px;padding:2px 6px;border:1px solid #EF4444;border-radius:4px;background:transparent;color:#EF4444;cursor:pointer;flex-shrink:0">Ack</button>';
     }
-
-    var timeStr = '';
-    if (group.status === 'triggered' && group.triggered_at) timeStr = 'Triggered ' + relTime(group.triggered_at);
-    else if (group.status === 'acknowledged' && group.acknowledged_at) timeStr = 'Acknowledged ' + relTime(group.acknowledged_at);
-    else timeStr = 'Tracking for ' + relTime(group.created_at);
-
-    var typeLabel = group.group_type === 'single'
-      ? 'SINGLE (qty ' + group.initial_stock + ')'
-      : 'GROUP (' + (group.items ? group.items.length : group.initial_stock) + ' listings)';
-
-    h += '<div class="' + cardClass + '">';
-    h += statusBadge;
-    h += '<div style="font-size:14px;font-weight:700;color:#F0F0F0;padding-right:90px">' + esc(group.name) + '</div>';
-    h += '<div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">';
-    if (group.part_type) h += '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:#1a1a1a;color:#9CA3AF;font-weight:700;border:1px solid #333">' + esc(group.part_type) + '</span>';
-    h += '<span style="font-size:10px;color:#6B7280">' + typeLabel + '</span>';
-    h += '</div>';
-
-    // Expandable item list
-    if (group.items && group.items.length > 0) {
-      h += '<details style="margin-top:6px"><summary style="font-size:10px;color:#6B7280;cursor:pointer;user-select:none">' + group.items.length + ' item' + (group.items.length > 1 ? 's' : '') + ' &#9654;</summary>';
-      h += '<div style="margin-top:4px;padding:4px 8px;background:#0a0a0a;border-radius:4px;border:1px solid #2a2a2a">';
-      group.items.forEach(function(item) {
-        var style = item.is_active ? 'color:#d1d5db' : 'color:#6B7280;text-decoration:line-through;opacity:0.5';
-        h += '<div style="font-size:10px;padding:3px 0;' + style + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">';
-        h += '<a href="https://www.ebay.com/itm/' + esc(item.ebay_item_id) + '" target="_blank" style="color:inherit;text-decoration:none">#' + esc(item.ebay_item_id) + '</a> ';
-        h += esc(item.title || '');
-        if (item.current_price) h += ' <span style="color:#22c55e">$' + parseFloat(item.current_price).toFixed(0) + '</span>';
-        if (!item.is_active) h += ' <span style="color:#EF4444;font-size:8px;font-weight:700">SOLD</span>';
-        h += '</div>';
-      });
-      h += '</div></details>';
-    }
-
-    h += '<div style="margin-top:8px;font-size:13px;font-weight:700;color:' + qtyColor + '">Stock: ' + stock + ' / ' + group.initial_stock + '</div>';
-    h += '<div style="font-size:11px;color:#9CA3AF;margin-top:2px" id="restock-target-row-' + group.id + '">Restock at: <span onclick="editRestockTarget(' + group.id + ',' + group.restock_target + ',' + stock + ')" style="cursor:pointer;border-bottom:1px dashed #6B7280" title="Click to edit">' + group.restock_target + '</span>';
-    if (group.restock_target === 0) h += ' <span style="color:#6B7280;font-size:9px;font-weight:700">SLOW MOVER</span>';
-    h += '</div>';
-    h += '<div style="font-size:10px;color:#6B7280;margin-top:4px">' + timeStr + '</div>';
-    if (group.notes) h += '<div style="font-size:10px;color:#9CA3AF;margin-top:3px;font-style:italic">' + esc(group.notes) + '</div>';
-
-    h += '<div class="actions-row">';
-    if (group.status === 'triggered') {
-      h += '<button class="btn-ack" onclick="ackOverstock(' + group.id + ')">Acknowledge</button>';
-      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + group.id + ')">Re-watch</button>';
-    } else if (group.status === 'acknowledged') {
-      h += '<button class="btn-rewatch" onclick="rewatchOverstock(' + group.id + ')">Re-watch</button>';
-      h += '<button class="btn-del" onclick="deleteOverstock(' + group.id + ')">Delete</button>';
-    } else {
-      h += '<button class="btn-rewatch" onclick="showAddItems(' + group.id + ')" style="border-color:#6B7280;color:#9CA3AF">Add Items</button>';
-      h += '<button class="btn-del" onclick="deleteOverstock(' + group.id + ')">Delete</button>';
-    }
-    h += '</div>';
-    h += '<div id="overstock-add-' + group.id + '" style="display:none;margin-top:8px"><input type="text" class="add-input" style="font-size:12px;padding:8px" placeholder="Paste item numbers (comma or space separated)" id="overstock-add-input-' + group.id + '"><button class="btn-add" style="margin-top:4px;font-size:11px;padding:6px 12px" onclick="addItemsToGroup(' + group.id + ')">Add to Group</button></div>';
-    h += '<div id="overstock-err-' + group.id + '" class="overstock-error" style="display:none"></div>';
+    h += '<button onclick="deleteOverstock(' + group.id + ')" style="font-size:9px;padding:2px 6px;border:1px solid #333;border-radius:4px;background:transparent;color:#6B7280;cursor:pointer;flex-shrink:0">×</button>';
     h += '</div>';
   });
+  h += '</div>';
   document.getElementById('overstockList').innerHTML = h;
 }
 
