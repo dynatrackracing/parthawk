@@ -1102,7 +1102,7 @@ async function start() {
       }
     });
 
-    // Phase 3: Poll for new returns every 15 minutes (requires EBAY_OAUTH_TOKEN)
+    // Phase 3: Poll for new returns (uses EBAY_OAUTH_TOKEN or TRADING_API_TOKEN)
     const returnPollJob = schedule.scheduleJob('7,22,37,52 * * * *', async function () {
       try {
         await messagingService.pollReturns();

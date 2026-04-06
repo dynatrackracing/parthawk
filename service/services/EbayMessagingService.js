@@ -541,9 +541,9 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN env var. Called by cron every 15 minutes.
    */
   async pollReturns() {
-    const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+    const oauthToken = process.env.EBAY_OAUTH_TOKEN || process.env.TRADING_API_TOKEN;
     if (!oauthToken) {
-      this.log.debug('EBAY_OAUTH_TOKEN not set — return polling disabled');
+      this.log.debug('No eBay auth token set — return polling disabled');
       return { checked: 0, queued: 0, skipped: true };
     }
 
@@ -564,7 +564,7 @@ class EbayMessagingService {
           offset: 0,
         },
         headers: {
-          'Authorization': `Bearer ${oauthToken}`,
+          'Authorization': `TOKEN ${oauthToken}`,
           'Content-Type': 'application/json',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
@@ -620,9 +620,9 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN.
    */
   async _sendPostOrderMessage(returnId, messageBody) {
-    const oauthToken = process.env.EBAY_OAUTH_TOKEN;
+    const oauthToken = process.env.EBAY_OAUTH_TOKEN || process.env.TRADING_API_TOKEN;
     if (!oauthToken) {
-      return { success: false, errorCode: 'NO_OAUTH', errorMessage: 'EBAY_OAUTH_TOKEN not configured' };
+      return { success: false, errorCode: 'NO_OAUTH', errorMessage: 'No eBay auth token configured' };
     }
 
     try {
@@ -632,7 +632,7 @@ class EbayMessagingService {
         { message: { content: messageBody } },
         {
           headers: {
-            'Authorization': `Bearer ${oauthToken}`,
+            'Authorization': `TOKEN ${oauthToken}`,
             'Content-Type': 'application/json',
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
           },
