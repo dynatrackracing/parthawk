@@ -455,11 +455,11 @@ class AttackListService {
     const scored = vehicles.map(v =>
       this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs)
     );
-    // Sort: highest single part value first, then total value as tiebreaker
+    // Sort: highest total extractable value first, max single part tiebreaker
     scored.sort((a, b) => {
-      const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
-      if (maxDiff !== 0) return maxDiff;
-      return b.est_value - a.est_value;
+      const valDiff = (b.est_value || 0) - (a.est_value || 0);
+      if (valDiff !== 0) return valDiff;
+      return (b.max_part_value || 0) - (a.max_part_value || 0);
     });
 
     // Enrich with cached market data (async context — safe to await here)
@@ -902,7 +902,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, rarityMap = {}) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -1333,7 +1333,13 @@ class AttackListService {
       }
     }
 
-    filteredParts.sort((a, b) => (b.sold_90d || 0) - (a.sold_90d || 0));
+    // Sort parts: highest price first, then NOVEL before RESTOCK before STOCKED at equal price
+    const noveltyOrder = { NOVEL: 0, RESTOCK: 1, STOCKED: 2 };
+    filteredParts.sort((a, b) => {
+      const priceDiff = (b.price || 0) - (a.price || 0);
+      if (priceDiff !== 0) return priceDiff;
+      return (noveltyOrder[a.noveltyTier] || 2) - (noveltyOrder[b.noveltyTier] || 2);
+    });
 
     // === TRIM INTELLIGENCE: adjust trim-dependent part scores ===
     const vehicleTrim = cleanNHTSATrim(vehicle.decoded_trim) || cleanNHTSATrim(vehicle.trim_level) || vehicle.trim || null;
@@ -1383,8 +1389,24 @@ class AttackListService {
       }
     }
 
-    // === TOTAL VALUE: sum of parts ABOVE their price floor AND not mismatched ===
-    const totalValue = filteredParts.filter(p => !p.belowFloor && !p.specMismatch).reduce((sum, p) => sum + (p.price || 0), 0);
+    // === PART NOVELTY — boost scoring value for parts we've never had or need to restock ===
+    for (const p of filteredParts) {
+      const stock = p.in_stock || 0;
+      const sold = p.sold_90d || 0;
+      if (stock === 0 && sold === 0) {
+        p.noveltyTier = 'NOVEL';
+        p._scoringValue = Math.round((p.price || 0) * 1.20);
+      } else if (stock === 0 && sold > 0) {
+        p.noveltyTier = 'RESTOCK';
+        p._scoringValue = Math.round((p.price || 0) * 1.10);
+      } else {
+        p.noveltyTier = 'STOCKED';
+        p._scoringValue = p.price || 0;
+      }
+    }
+
+    // === TOTAL VALUE: sum of novelty-boosted scoring values for eligible parts ===
+    const totalValue = filteredParts.filter(p => !p.belowFloor && !p.specMismatch).reduce((sum, p) => sum + (p._scoringValue || p.price || 0), 0);
 
     // Market data enrichment happens in getAttackList() after scoring (async context)
 
@@ -1450,6 +1472,20 @@ class AttackListService {
       score = Math.round(score * (1 + attributeBoost / 100));
     }
 
+    // === VEHICLE RARITY — rare vehicles in yards get boosted ===
+    const rarityKey = `${make}|${model}`.toLowerCase();
+    const rarityAppearances = rarityMap[rarityKey] || 0;
+    let rarityTag = 'NORMAL', rarityBoost = 0;
+    if (rarityAppearances <= 1) { rarityTag = 'RARE'; rarityBoost = 25; }
+    else if (rarityAppearances <= 4) { rarityTag = 'UNCOMMON'; rarityBoost = 10; }
+    else if (rarityAppearances <= 15) { rarityTag = 'NORMAL'; rarityBoost = 0; }
+    else if (rarityAppearances <= 50) { rarityTag = 'COMMON'; rarityBoost = -5; }
+    else { rarityTag = 'SATURATED'; rarityBoost = -10; }
+
+    if (rarityBoost !== 0) {
+      score = Math.round(score * (1 + rarityBoost / 100));
+    }
+
     score = Math.max(0, Math.min(100, score));
 
     // Color based on TOTAL ESTIMATED VALUE, not score number
@@ -1501,6 +1537,7 @@ class AttackListService {
       score, color_code: color, vehicle_verdict,
       attributeBoost: attributeBoost > 0 ? attributeBoost : null,
       boostReasons: boostReasons.length > 0 ? boostReasons : null,
+      rarityTag, rarityAppearances, rarityBoost: rarityBoost !== 0 ? rarityBoost : null,
       est_value: totalValue,
       max_part_value: filteredParts.filter(p => !p.belowFloor).length > 0 ? Math.max(...filteredParts.filter(p => !p.belowFloor).map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,
@@ -1580,9 +1617,9 @@ class AttackListService {
     );
 
     scored.sort((a, b) => {
-      const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
-      if (maxDiff !== 0) return maxDiff;
-      return b.est_value - a.est_value;
+      const valDiff = (b.est_value || 0) - (a.est_value || 0);
+      if (valDiff !== 0) return valDiff;
+      return (b.max_part_value || 0) - (a.max_part_value || 0);
     });
 
     return scored;
@@ -1604,6 +1641,21 @@ class AttackListService {
     const salesIndex = await this.buildSalesIndex(cutoff);
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
+
+    // Build rarity index — count appearances of each make+model across all active vehicles
+    const rarityMap = {};
+    try {
+      const rarityRows = await database('yard_vehicle')
+        .select('make', 'model')
+        .count('* as appearances')
+        .where('active', true)
+        .whereNotNull('make')
+        .whereNotNull('model')
+        .groupBy('make', 'model');
+      for (const row of rarityRows) {
+        rarityMap[`${row.make}|${row.model}`.toLowerCase()] = parseInt(row.appearances);
+      }
+    } catch (e) { /* non-fatal */ }
 
     // Build mark index from the_mark for score boosting
     let markIndex = { byPN: new Map(), byTitle: new Set() };
@@ -1677,14 +1729,14 @@ class AttackListService {
       for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, rarityMap)
       );
-      // Sort: active first, then highest single part value, then total value
+      // Sort: active first, then highest total value, then max single part tiebreaker
       scored.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-        const maxDiff = (b.max_part_value || 0) - (a.max_part_value || 0);
-        if (maxDiff !== 0) return maxDiff;
-        return b.est_value - a.est_value;
+        const valDiff = (b.est_value || 0) - (a.est_value || 0);
+        if (valDiff !== 0) return valDiff;
+        return (b.max_part_value || 0) - (a.max_part_value || 0);
       });
 
       results.push({

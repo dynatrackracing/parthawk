@@ -56,6 +56,12 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 21. **Restock scoring:** Your demand max 35pts, Market demand max 35pts, Ratio max 15pts, Price max 25pts. $300+ parts with any market signal get floor score 75.
 
+21b. **Vehicle rarity scoring:** Computed from active yard_vehicle count per make+model. RARE (1 appearance) +25%, UNCOMMON (2-4) +10%, NORMAL (5-15) 0%, COMMON (16-50) -5%, SATURATED (51+) -10%. Applied multiplicatively on score after attribute boosts.
+
+21c. **Part novelty scoring:** NOVEL (zero stock AND zero sales) +20% scoring boost. RESTOCK (sold before, zero stock) +10%. STOCKED: no boost. Boosts apply to scoring value only, not display price.
+
+21d. **Attack list sort order:** Vehicles sorted by est_value DESC (total yield with all multipliers), max_part_value DESC tiebreaker. Parts within vehicles sorted by price DESC, novelty tier tiebreaker.
+
 ---
 
 ## TRIM SYSTEM RULES
