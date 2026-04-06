@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Hide Button + HIDDEN Tab on Hunters Perch — 2026-04-06
+- hideByIdx() uses structured partNumber from _intelData (was unreliable title regex)
+- HIDDEN tab: lazy-loaded list of hidden parts, unhide button, count badge
+- Backend hidden filtering already working in gap-intel + emerging
+- Files: hunters-perch.html
+
+---
+
 ## Fix Mark Persistence — Marked Items Reappearing — 2026-04-06
 - Gap-intel groups by partNumberBase but marks store normalizedTitle — key types never matched
 - Added markedPNs Set, filter checks both title AND PN keys

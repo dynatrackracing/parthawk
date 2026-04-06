@@ -367,3 +367,13 @@ Deploys this session (13 total):
 - Fix: load markedPNs Set from the_mark.partNumber, filter checks both markedTitles.has(key) AND markedPNs.has(partNumberBase)
 - Also fixed emerging section: had NO mark filter at all — added markedTitles + markedPNs
 - Files: competitors.js
+
+## 15:00 — Fix Hunters Perch Hide Button + Add HIDDEN Tab
+- hideByIdx() rewritten: uses structured partNumber from _intelData (was extracting PN from title with unreliable regex)
+- Error logging + button text revert on failure
+- Removed old hideIntel() function
+- Added two-tab system: INTEL (default) / HIDDEN (with count badge)
+- HIDDEN tab: lazy loads GET /hidden/list, shows PN + partType + source, Unhide button per item
+- Hidden count badge loaded on page init
+- Backend filtering confirmed working: loadHiddenSet() + isHidden() in gap-intel + emerging
+- Files: hunters-perch.html
