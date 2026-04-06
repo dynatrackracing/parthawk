@@ -722,18 +722,18 @@
     }
     const line2 = attrBadges.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${attrBadges.join('')}</div>` : '';
 
-    // LINE 1 — rarity badge
-    let rarityHtml = '';
+    // LINE 1 — rarity badge (inline after engine)
+    let rarityInline = '';
     if (v.rarityTier && v.rarityTier !== 'NORMAL') {
       const rtColor = v.rarityColor || '#666';
       const rtText = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' ? '#000' : '#fff';
       const rtPulse = v.rarityPulses ? 'animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite;' : '';
       const rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
-      rarityHtml = `<div style="text-align:right;flex-shrink:0">
-        <span class="chip" style="font-size:9px;font-weight:700;padding:2px 7px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>
-        <div style="font-size:9px;color:#6B7280;margin-top:1px">${v.rarityReason || ('~' + (v.rarityAvgDays || '?') + 'd · ' + (v.rarityTotalSeen || 0) + ' seen')}</div>
-      </div>`;
+      rarityInline = ` <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>`;
     }
+
+    // LINE 1 — total value (right-aligned)
+    const valColor = (v.est_value || 0) >= 800 ? '#2ECC40' : (v.est_value || 0) >= 500 ? '#F1C40F' : (v.est_value || 0) >= 250 ? '#FF8C00' : '#FF4136';
 
     // LINE 3 — location + freshness
     const daysOld = getDaysFromNewest(v, _currentNewestDate);
@@ -746,13 +746,13 @@
 
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
-        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${v.score}${v.attributeBoost ? '<span style="font-size:8px;color:#06b6d4;display:block;margin-top:1px">\u2191' + v.attributeBoost + '%</span>' : ''}</div>
+        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${v.score}</div>
         <div class="v-info" style="flex:1;min-width:0">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
             <div style="min-width:0">
-              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}</div>
+              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}${rarityInline}</div>
             </div>
-            ${rarityHtml}
+            ${v.est_value > 0 ? `<div style="font-size:14px;font-weight:700;color:${valColor};flex-shrink:0">$${v.est_value}</div>` : ''}
           </div>
           ${line2}
           ${renderAlertBadges(v)}
