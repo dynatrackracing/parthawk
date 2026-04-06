@@ -54,9 +54,33 @@ class OverstockCheckService {
         }
       }
 
+      const previousStock = group.current_stock || 0;
       await database('overstock_group')
         .where('id', group.id)
         .update({ current_stock: currentStock, updated_at: new Date() });
+
+      // Auto-transition: overstock → want list when stock hits 0
+      if (currentStock === 0 && previousStock > 0) {
+        try {
+          // Check if want list entry already exists
+          const existing = await database('restock_want_list')
+            .where('title', group.name)
+            .where('active', true)
+            .first();
+          if (!existing) {
+            await database('restock_want_list').insert({
+              title: group.name,
+              notes: '[overstock_auto] Stock hit 0 — auto-added from overstock watch',
+              active: true,
+              auto_generated: true,
+              created_at: new Date(),
+            });
+            log.info('Overstock → want list: stock hit 0 for %s', group.name);
+          }
+        } catch (e) {
+          log.warn('Overstock → want list failed for %s: %s', group.name, e.message);
+        }
+      }
 
       if (currentStock <= group.restock_target) {
         await database('overstock_group')

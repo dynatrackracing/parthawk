@@ -11,44 +11,53 @@ const { extractPartNumbers, parseYearRange: piParseYearRange } = require('../uti
  * TIER 2: Year + Model + Part phrase (vehicle-specific)
  * TIER 3: Keyword fallback (flagged as unreliable)
  */
-async function countStockedForEntry(knex, title) {
-  // TIER 1: Part number match
-  const partNumbers = extractPartNumbers(title);
-  const realPNs = partNumbers.filter(pn => pn.normalized.length >= 6);
+async function countStockedForEntry(knex, title, entryPartNumber, entryMake, entryModel) {
+  const { normalizePartNumber } = require('../lib/partNumberUtils');
 
-  if (realPNs.length > 0) {
-    let q = knex('YourListing').where('listingStatus', 'Active');
-    q = q.where(function() {
-      for (const pn of realPNs) {
-        this.orWhere('title', 'ilike', `%${pn.normalized}%`);
-        if (pn.base !== pn.normalized) this.orWhere('title', 'ilike', `%${pn.base}%`);
-        // Also match with original formatting (dashes etc)
-        const rawUp = pn.raw.toUpperCase();
-        if (rawUp !== pn.normalized) this.orWhere('title', 'ilike', `%${rawUp}%`);
-      }
-    });
-    const listings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(20);
-    const totalStock = listings.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
-    return {
-      stock: totalStock,
-      listingCount: listings.length,
-      matchedTitles: listings.map(l => l.title),
-      method: 'PART_NUMBER',
-      debug: `PN: ${realPNs[0].raw} (${listings.length} listing${listings.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
-    };
+  // TIER 1: partNumberBase column match (Clean Pipe — accurate, no title ILIKE)
+  // Use entry's stored part_number if available, otherwise extract from title
+  let lookupPN = entryPartNumber ? normalizePartNumber(entryPartNumber) : null;
+  if (!lookupPN) {
+    const partNumbers = extractPartNumbers(title);
+    const realPNs = partNumbers.filter(pn => pn.base && pn.base.length >= 8); // require 8+ chars to avoid model names
+    if (realPNs.length > 0) lookupPN = realPNs[0].base;
   }
 
-  // TIER 2: Year + Model + Part phrase (vehicle-specific via Auto table)
+  if (lookupPN) {
+    let q = knex('YourListing').where('listingStatus', 'Active')
+      .where('partNumberBase', lookupPN);
+    // Scope by make/model if available
+    if (entryMake) q = q.whereRaw('LOWER("extractedMake") = ?', [entryMake.toLowerCase()]);
+    if (entryModel) q = q.whereRaw('LOWER("extractedModel") = ?', [entryModel.toLowerCase()]);
+
+    const listings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(20);
+    if (listings.length > 0) {
+      const totalStock = listings.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
+      return {
+        stock: totalStock,
+        listingCount: listings.length,
+        matchedTitles: listings.map(l => l.title),
+        method: 'PART_NUMBER',
+        debug: `PN: ${lookupPN} (${listings.length} listing${listings.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
+      };
+    }
+  }
+
+  // TIER 2: Make + Model + part phrase (vehicle-specific, Clean Pipe columns)
   await loadModelsFromDB();
   const parsed = parseTitle(title);
-  if (parsed && parsed.models.length > 0 && parsed.partPhrase) {
+  const make = entryMake || (parsed ? parsed.make : null);
+  const model = entryModel || (parsed && parsed.models.length > 0 ? parsed.models[0] : null);
+
+  if (make && model && parsed && parsed.partPhrase) {
     let q = knex('YourListing').where('listingStatus', 'Active');
+    q = q.whereRaw('LOWER("extractedMake") = ?', [make.toLowerCase()]);
     q = q.where(function() {
-      for (const model of parsed.models) this.orWhere('title', 'ilike', `%${model}%`);
+      this.whereRaw('LOWER("extractedModel") = ?', [model.toLowerCase()])
+        .orWhere('title', 'ilike', `%${model}%`);
     });
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
     const allListings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(50);
-    // Year filter
     const filtered = parsed.yearStart && parsed.yearEnd
       ? allListings.filter(l => {
           const ly = extractYearsFromListingTitle(l.title);
@@ -57,37 +66,28 @@ async function countStockedForEntry(knex, title) {
         })
       : allListings;
     const totalStock = filtered.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
-    const yearLabel = parsed.yearStart ? (parsed.yearStart === parsed.yearEnd ? String(parsed.yearStart) : parsed.yearStart + '-' + parsed.yearEnd) : null;
-    const debug = [yearLabel, parsed.models.join('/'), '"' + parsed.partPhrase + '"'].filter(Boolean).join(' + ');
     return {
       stock: totalStock,
       listingCount: filtered.length,
       matchedTitles: filtered.slice(0, 10).map(l => l.title),
       method: 'VEHICLE_MATCH',
-      debug: `${debug} (${filtered.length} listing${filtered.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
+      debug: `${make} ${model} "${parsed.partPhrase}" (${filtered.length} listing${filtered.length !== 1 ? 's' : ''}, ${totalStock} in stock)`
     };
   }
 
-  // TIER 3: Keyword fallback — flag as unreliable
-  if (parsed && parsed.make && parsed.partPhrase) {
+  // TIER 3: Make + keyword fallback
+  if (make && parsed && parsed.partPhrase) {
     let q = knex('YourListing').where('listingStatus', 'Active');
-    q = q.andWhere('title', 'ilike', `%${parsed.make}%`);
+    q = q.whereRaw('LOWER("extractedMake") = ?', [make.toLowerCase()]);
     q = q.andWhere('title', 'ilike', `%${parsed.partPhrase}%`);
     const allListings = await q.select('title', knex.raw('COALESCE("quantityAvailable"::int, 1) as qty')).limit(50);
-    const filtered = parsed.yearStart && parsed.yearEnd
-      ? allListings.filter(l => {
-          const ly = extractYearsFromListingTitle(l.title);
-          if (!ly) return true;
-          return ly.start <= parsed.yearEnd && ly.end >= parsed.yearStart;
-        })
-      : allListings;
-    const totalStock = filtered.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
+    const totalStock = allListings.reduce((sum, l) => sum + (parseInt(l.qty) || 1), 0);
     return {
       stock: totalStock,
-      listingCount: filtered.length,
-      matchedTitles: filtered.slice(0, 10).map(l => l.title),
+      listingCount: allListings.length,
+      matchedTitles: allListings.slice(0, 10).map(l => l.title),
       method: 'KEYWORD',
-      debug: `${parsed.make} + "${parsed.partPhrase}" (${filtered.length} listing${filtered.length !== 1 ? 's' : ''}, ${totalStock} in stock, keyword)`
+      debug: `${make} "${parsed.partPhrase}" (${allListings.length} listing${allListings.length !== 1 ? 's' : ''}, ${totalStock} in stock, keyword)`
     };
   }
 
@@ -112,7 +112,7 @@ router.get('/debug/:id', async (req, res) => {
   if (!item) return res.status(404).json({ error: 'Not found' });
 
   const pns = extractPartNumbers(item.title);
-  const listings = await countStockedForEntry(database, item.title);
+  const listings = await countStockedForEntry(database, item.title, item.part_number, item.make, item.model);
   const sales = await matchPartToSales(item.title);
   const parsed = parseTitle(item.title);
 
@@ -132,7 +132,7 @@ router.get('/items', async (req, res) => {
   const knex = database;
   const results = [];
   for (const item of items) {
-    const listings = await countStockedForEntry(knex, item.title);
+    const listings = await countStockedForEntry(knex, item.title, item.part_number, item.make, item.model);
     const sales = await matchPartToSales(item.title);
 
     results.push({
