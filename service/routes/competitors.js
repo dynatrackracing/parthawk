@@ -247,26 +247,22 @@ router.get('/gap-intel', async (req, res) => {
 
 /**
  * GET /competitors/emerging
- * Detect NEW (first-ever appearance) and ACCELERATING parts from competitor data.
- * Query: days (default 90), limit (default 40)
+ * Hot parts: sold 3+ times in 60 days by 2+ distinct sellers.
+ * These are validated market signals — multiple competitors agree the part sells.
+ * Query: limit (default 50), seller (optional filter)
  */
 router.get('/emerging', async (req, res) => {
-  const days = parseInt(req.query.days) || 90;
-  const limit = parseInt(req.query.limit) || 40;
+  const days = 60;
+  const limit = parseInt(req.query.limit) || 50;
   const sellerFilter = req.query.seller || null;
 
   try {
-    const now = new Date();
-    const cutoff = new Date(now - days * 24 * 60 * 60 * 1000);
-    const midpoint = new Date(now - (days / 2) * 24 * 60 * 60 * 1000);
-    const recentWindow = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-    // Exclude rebuild sellers — their data is reference intel, not competitive
+    // Exclude rebuild sellers
     const rebuildSellers = await database('SoldItemSeller').where('type', 'rebuild').select('name');
     const rebuildNames = rebuildSellers.map(s => s.name);
 
     let emergingQuery = database('SoldItem')
-      .where('soldDate', '>=', cutoff)
+      .where('soldDate', '>=', database.raw(`NOW() - INTERVAL '${days} days'`))
       .where('soldPrice', '>=', 100)
       .whereNot('seller', 'dynatrack')
       .whereNot('seller', 'dynatrackracing');
@@ -274,7 +270,6 @@ router.get('/emerging', async (req, res) => {
     if (rebuildNames.length > 0) {
       emergingQuery = emergingQuery.whereNotIn('seller', rebuildNames);
     }
-
     if (sellerFilter) {
       emergingQuery = emergingQuery.where('seller', sellerFilter);
     }
@@ -284,35 +279,37 @@ router.get('/emerging', async (req, res) => {
       .limit(5000)
       .select('title', 'soldPrice', 'soldDate', 'seller', 'ebayItemId', 'partNumberBase', 'partType');
 
+    // Group by partNumberBase or normalized title
     const groups = {};
     for (const item of items) {
       const key = item.partNumberBase || normalizeTitle(item.title);
       if (!key || key.length < 3) continue;
       if (!groups[key]) {
-        groups[key] = { title: item.title, sellers: new Set(), firstSeen: new Date(item.soldDate), recentCount: 0, olderCount: 0, totalCount: 0, prices: [], ebayItemId: item.ebayItemId, _partNumberBase: item.partNumberBase || null, _partType: item.partType || null };
+        groups[key] = { title: item.title, sellers: new Set(), totalCount: 0, prices: [], lastSold: null, ebayItemId: item.ebayItemId, _partNumberBase: item.partNumberBase || null, _partType: item.partType || null };
       }
       const g = groups[key];
       g.sellers.add(item.seller);
       g.totalCount++;
       g.prices.push(parseFloat(item.soldPrice) || 0);
-      const soldDate = new Date(item.soldDate);
-      if (soldDate < g.firstSeen) g.firstSeen = soldDate;
-      if (soldDate >= midpoint) { g.recentCount++; } else { g.olderCount++; }
+      if (!g.lastSold || new Date(item.soldDate) > new Date(g.lastSold)) g.lastSold = item.soldDate;
     }
 
-    const olderItems = await database('SoldItem').where('soldDate', '<', cutoff).select('title').limit(10000);
-    const previouslySeenTitles = new Set(olderItems.map(function(i) { return normalizeTitle(i.title); }).filter(Boolean));
+    // Build match sets from our data (Clean Pipe partNumberBase + title fallback)
+    const yourSales = await database('YourSale').select('title', 'partNumberBase').limit(25000);
+    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title', 'partNumberBase').limit(10000);
+    const yourItems = await database('Item').whereRaw("LOWER(seller) LIKE '%dynatrack%'").select('title').limit(5000);
 
-    // Build match sets from our data
-    const yourSales = await database('YourSale').select('title').limit(25000);
-    const yourListings = await database('YourListing').where('listingStatus', 'Active').select('title').limit(10000);
-    const allOurTitles = [...yourSales.map(s => s.title), ...yourListings.map(l => l.title)].filter(Boolean);
-    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurTitles);
+    const allOurRows = [
+      ...yourSales.map(s => ({ title: s.title, partNumberBase: s.partNumberBase })),
+      ...yourListings.map(l => ({ title: l.title, partNumberBase: l.partNumberBase })),
+      ...yourItems.map(i => ({ title: i.title, partNumberBase: null })),
+    ];
+    const { pnSet: yourPNs, keySet: yourKeys } = buildMatchSets(allOurRows);
 
     let dismissedTitles = new Set();
     try {
       const dismissed = await database('dismissed_intel').select('normalizedTitle');
-      dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
+      dismissedTitles = new Set(dismissed.map(d => d.normalizedTitle));
     } catch (e) { /* table may not exist yet */ }
 
     // Load marks + hidden for filtering
@@ -323,53 +320,45 @@ router.get('/emerging', async (req, res) => {
       for (const m of marks) { if (m.partNumber) emMarkedPNs.add(m.partNumber.toUpperCase()); }
     } catch (e) {}
 
+    // Filter to hot parts: 3+ sales AND 2+ sellers
     const emerging = [];
     for (const [key, group] of Object.entries(groups)) {
+      if (group.totalCount < 3 || group.sellers.size < 2) continue;
       if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
       if (emMarkedTitles.has(key)) continue;
       if (group._partNumberBase && emMarkedPNs.has(group._partNumberBase.toUpperCase())) continue;
 
-      const sorted = group.prices.sort(function(a, b) { return a - b; });
-      const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+      const sorted = group.prices.sort((a, b) => a - b);
+      const median = sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+        : sorted[Math.floor(sorted.length / 2)];
       const partNumber = group._partNumberBase || extractPartNumber(group.title);
-
-      let signal = null;
-      let signalStrength = 0;
-
-      if (group.firstSeen >= recentWindow && group.totalCount <= 5 && !previouslySeenTitles.has(key)) {
-        signal = 'NEW';
-        const rarityScore = Math.max(0, 100 - (group.totalCount - 1) * 20);
-        const priceWeight = Math.min(100, (median / 400) * 100);
-        const pnBonus = partNumber ? 20 : 0;
-        signalStrength = Math.min(100, rarityScore * 0.45 + priceWeight * 0.35 + pnBonus);
-      } else if (group.recentCount >= 4 && group.olderCount > 0 && group.recentCount >= group.olderCount * 3) {
-        signal = 'ACCEL';
-        const acceleration = group.recentCount / Math.max(1, group.olderCount);
-        signalStrength = Math.min(100, (acceleration / 6) * 40 + (median / 400) * 30 + (group.recentCount / 20) * 20 + (partNumber ? 10 : 0));
-      }
-
-      if (!signal) continue;
+      const avgPrice = Math.round(group.prices.reduce((a, b) => a + b, 0) / group.totalCount);
 
       emerging.push({
-        title: group.title, partNumber, partType: group._partType || extractPartType(group.title), signal, signalStrength: Math.round(signalStrength),
-        sellers: Array.from(group.sellers), totalCount: group.totalCount, recentCount: group.recentCount,
-        olderCount: group.olderCount, medianPrice: Math.round(median),
-        totalRevenue: Math.round(group.prices.reduce(function(a, b) { return a + b; }, 0)),
-        firstSeen: group.firstSeen.toISOString(), ebayItemId: group.ebayItemId,
+        title: group.title,
+        partNumber,
+        partType: group._partType || extractPartType(group.title),
+        sellers: Array.from(group.sellers),
+        sellerCount: group.sellers.size,
+        totalCount: group.totalCount,
+        medianPrice: Math.round(median),
+        avgPrice,
+        totalRevenue: Math.round(group.prices.reduce((a, b) => a + b, 0)),
+        lastSold: group.lastSold,
+        ebayItemId: group.ebayItemId,
       });
     }
 
-    emerging.sort(function(a, b) {
-      if (a.signal === 'NEW' && b.signal !== 'NEW') return -1;
-      if (b.signal === 'NEW' && a.signal !== 'NEW') return 1;
-      return b.signalStrength - a.signalStrength;
-    });
+    // Sort: most sellers first, then most sales, then highest avg price
+    emerging.sort((a, b) => b.sellerCount - a.sellerCount || b.totalCount - a.totalCount || b.avgPrice - a.avgPrice);
 
     // Filter hidden parts
     const hiddenSet2 = await loadHiddenSet();
-    const visibleEmerging = emerging.filter(e => !isHidden(hiddenSet2, e.partNumber || e.partNumberBase, e.make, e.model));
-    res.json({ success: true, days, totalEmerging: visibleEmerging.length, newCount: visibleEmerging.filter(function(e) { return e.signal === 'NEW'; }).length, accelCount: visibleEmerging.filter(function(e) { return e.signal === 'ACCEL'; }).length, emerging: visibleEmerging.slice(0, limit) });
+    const visibleEmerging = emerging.filter(e => !isHidden(hiddenSet2, e.partNumber, e.make, e.model));
+
+    res.json({ success: true, days, totalEmerging: visibleEmerging.length, emerging: visibleEmerging.slice(0, limit) });
   } catch (err) {
     log.error({ err }, 'Emerging parts error');
     res.status(500).json({ success: false, error: err.message });

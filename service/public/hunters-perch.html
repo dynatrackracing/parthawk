@@ -69,8 +69,8 @@ nav a.active{color:#DC2626;font-weight:700}
   <div class="card" id="emergingCard" style="border-color:#f59e0b;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div>
-        <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.06em">EMERGING - New & Accelerating Parts</div>
-        <div style="font-size:11px;color:#6B7280;margin-top:2px">Parts appearing for the first time or gaining momentum</div>
+        <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.06em">EMERGING - Hot Parts</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px">Sold 3+ times in 60 days by 2+ sellers — hot right now</div>
       </div>
     </div>
     <div id="emergingLoading" style="text-align:center;padding:16px"><div class="spinner"></div></div>
@@ -138,31 +138,31 @@ function loadEmerging() {
   var loading = document.getElementById('emergingLoading');
   loading.style.display = 'block';
   results.style.display = 'none';
-  fetch('/competitors/emerging?days=90&limit=30' + (currentSellerFilter ? '&seller=' + encodeURIComponent(currentSellerFilter) : ''))
+  fetch('/competitors/emerging?limit=50' + (currentSellerFilter ? '&seller=' + encodeURIComponent(currentSellerFilter) : ''))
     .then(function(r) { return r.json(); })
     .then(function(d) {
       loading.style.display = 'none';
       results.style.display = 'block';
       if (!d.success || !d.emerging || d.emerging.length === 0) {
-        results.innerHTML = '<div class="empty">No emerging parts detected yet. Run a scrape to populate competitor data.</div>';
+        results.innerHTML = '<div class="empty">No hot parts detected — need 3+ sales by 2+ sellers in 60 days.</div>';
         return;
       }
-      var h = '<div style="padding:6px 0;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a;margin-bottom:6px">' + d.newCount + ' new on scene · ' + d.accelCount + ' accelerating</div>';
+      var h = '<div style="padding:6px 0;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a;margin-bottom:6px">' + d.totalEmerging + ' hot parts (60-day window)</div>';
       d.emerging.forEach(function(item, idx) {
-        var signalBadge = item.signal === 'NEW' ? '<span class="badge" style="background:#1e3a5f;color:#3b82f6">NEW</span> ' : '<span class="badge" style="background:#422006;color:#f59e0b">ACCEL ' + item.recentCount + 'x</span> ';
+        var sellerBadge = '<span class="badge" style="background:#422006;color:#f59e0b">' + item.sellerCount + ' SELLERS</span> ';
         var pn = item.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partNumber) + '</span>' : '';
         var ptBadge = item.partType ? '<span style="font-size:9px;font-weight:700;color:#a78bfa;background:#2e1065;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partType) + '</span>' : '';
         var sellerList = item.sellers.slice(0, 3).join(', ');
         var searchUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent((item.title || '').substring(0, 60)) + '&_sacat=6030&LH_Sold=1&LH_Complete=1';
         h += '<div class="item-row" style="align-items:center">';
-        h += '<div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:800;color:#f59e0b;background:#422006;border-radius:6px;padding:4px 6px">' + item.signalStrength + '</div></div>';
-        h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + signalBadge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(item.title || '') + '</a></div>';
+        h += '<div style="min-width:36px;text-align:center"><div style="font-size:16px;font-weight:800;color:#f59e0b;background:#422006;border-radius:6px;padding:4px 6px">' + item.totalCount + 'x</div></div>';
+        h += '<div style="flex:1;min-width:0;padding-left:8px"><div class="item-title">' + sellerBadge + '<a href="' + searchUrl + '" target="_blank" rel="noopener" style="color:#F0F0F0;text-decoration:none">' + esc(item.title || '') + '</a></div>';
         h += '<div class="item-meta">' + ptBadge + pn + item.totalCount + 'x sold by ' + esc(sellerList) + ' · $' + item.medianPrice + ' median · $' + item.totalRevenue.toLocaleString() + ' rev</div></div>';
         h += '<div style="text-align:right"><div class="item-price">$' + item.medianPrice + '<div style="font-size:9px;color:#6B7280;font-weight:400">median</div></div>';
         h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#22c55e;border-color:#22c55e" data-mark-idx="e' + idx + '" onclick="markByIdx(\'e' + idx + '\',this)">★ Mark</button>';
         h += '<button class="btn-sm" style="font-size:9px;padding:2px 6px;margin-top:3px;color:#dc2626;border-color:#7f1d1d" data-mark-idx="e' + idx + '" onclick="hideByIdx(\'e' + idx + '\',this)">✕ Hide</button></div>';
         window._intelData = window._intelData || {};
-        window._intelData['e' + idx] = { title: item.title, partNumber: item.partNumber, partType: item.partType, medianPrice: item.medianPrice, sellers: item.sellers, score: item.signalStrength, signal: 'emerging' };
+        window._intelData['e' + idx] = { title: item.title, partNumber: item.partNumber, partType: item.partType, medianPrice: item.medianPrice, sellers: item.sellers, score: item.totalCount, signal: 'emerging' };
         h += '</div>';
       });
       results.innerHTML = h;
