@@ -58,6 +58,15 @@ input:focus,textarea:focus{border-color:var(--r)}
   <!-- Marks list -->
   <div class="section-title" style="padding:0 0 4px">ACTIVE MARKS (<span id="markCount">0</span>)</div>
   <div id="marksList"></div>
+
+  <!-- Hidden Parts section -->
+  <div style="margin-top:16px;border-top:1px solid #2a2a2a;padding-top:12px">
+    <div onclick="toggleHidden()" style="font-size:11px;font-weight:700;color:#6B7280;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center">
+      <span><span id="hiddenArrow">▸</span> HIDDEN PARTS (<span id="hiddenCount">0</span>)</span>
+      <span style="font-size:9px;color:#4B5563">tap to expand</span>
+    </div>
+    <div id="hiddenList" style="display:none;margin-top:8px"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -124,6 +133,7 @@ async function loadMarks() {
         h += '<button class="btn btn-purple" onclick="pushToWantList(\'' + m.id + '\',\'' + esc(m.originalTitle).replace(/'/g,"\\'") + '\',this)">Send to want list</button>';
       }
       h += '<button class="btn" onclick="deleteMark(\'' + m.id + '\',this)">Remove</button>';
+      h += '<button class="btn" style="color:#dc2626;border-color:#7f1d1d" onclick="hideMark(\'' + m.id + '\',\'' + esc(m.partNumber || m.originalTitle || '').replace(/'/g,"\\'") + '\',this)">✕ Hide</button>';
       if (m.notes) h += '<span style="font-size:10px;color:#6B7280;margin-left:auto">' + esc(m.notes) + '</span>';
       h += '</div></div>';
     });
@@ -131,6 +141,20 @@ async function loadMarks() {
   } catch (err) {
     document.getElementById('marksList').innerHTML = '<div class="empty">Error loading marks: ' + esc(err.message) + '</div>';
   }
+}
+
+async function hideMark(markId, pnOrTitle, btn) {
+  btn.disabled = true;
+  try {
+    // Add to hidden_parts
+    await fetch('/hidden/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNumberBase: pnOrTitle.substring(0, 40), source: 'mark' }) });
+    // Delete the mark
+    await fetch('/competitors/mark/' + markId, { method: 'DELETE' });
+    var el = btn.closest('.mark-card');
+    if (el) { el.style.background = '#3d0a0a'; el.style.opacity = '0'; setTimeout(function(){ el.remove(); }, 400); }
+    showToast('Part hidden — will not appear on any intel page');
+    setTimeout(loadMarks, 500);
+  } catch (e) { btn.disabled = false; }
 }
 
 async function deleteMark(id, btn) {
@@ -187,7 +211,51 @@ async function addToWantList() {
   }
 }
 
+// Hidden parts
+var hiddenOpen = false;
+function toggleHidden() {
+  hiddenOpen = !hiddenOpen;
+  document.getElementById('hiddenList').style.display = hiddenOpen ? 'block' : 'none';
+  document.getElementById('hiddenArrow').textContent = hiddenOpen ? '▾' : '▸';
+  if (hiddenOpen) loadHidden();
+}
+
+async function loadHidden() {
+  try {
+    var resp = await fetch('/hidden/list');
+    var d = await resp.json();
+    document.getElementById('hiddenCount').textContent = d.total || 0;
+    if (!d.items || d.items.length === 0) {
+      document.getElementById('hiddenList').innerHTML = '<div style="font-size:11px;color:#6B7280;padding:8px 0">No hidden parts</div>';
+      return;
+    }
+    var h = '';
+    d.items.forEach(function(item) {
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1f1f1f;font-size:11px">';
+      h += '<span style="color:#9CA3AF"><span style="font-family:monospace;color:#F0F0F0;font-weight:600">' + esc(item.part_number_base) + '</span>';
+      if (item.make) h += ' ' + esc(item.make);
+      if (item.model) h += ' ' + esc(item.model);
+      h += ' <span style="color:#6B7280">(' + esc(item.source) + ')</span></span>';
+      h += '<button style="font-size:9px;padding:2px 8px;border:1px solid #333;border-radius:4px;background:transparent;color:#22c55e;cursor:pointer" onclick="unhide(\'' + item.id + '\',this)">Unhide</button>';
+      h += '</div>';
+    });
+    document.getElementById('hiddenList').innerHTML = h;
+  } catch(e) { document.getElementById('hiddenList').innerHTML = '<div style="color:#dc2626;font-size:11px">Error loading hidden parts</div>'; }
+}
+
+async function unhide(id, btn) {
+  btn.disabled = true;
+  try {
+    await fetch('/hidden/' + id, { method: 'DELETE' });
+    btn.closest('div').remove();
+    var cnt = parseInt(document.getElementById('hiddenCount').textContent) - 1;
+    document.getElementById('hiddenCount').textContent = Math.max(0, cnt);
+    showToast('Part unhidden');
+  } catch(e) { btn.disabled = false; }
+}
+
 loadMarks();
+fetch('/hidden/list').then(function(r){return r.json()}).then(function(d){document.getElementById('hiddenCount').textContent = d.total || 0}).catch(function(){});
 </script>
 </body>
 </html>

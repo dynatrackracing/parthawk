@@ -174,6 +174,7 @@ app.use('/part-location', require('./routes/part-location'));
 app.use('/vin', require('./routes/vin'));
 app.use('/stale-inventory', require('./routes/stale-inventory'));
 app.use('/competitors', require('./routes/competitors'));
+app.use('/hidden', require('./routes/hidden'));
 app.use('/autolumen', require('./routes/autolumen'));
 app.use('/cache', require('./routes/cache'));
 app.use('/trim-intelligence', require('./routes/trim-intelligence'));

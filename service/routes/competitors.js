@@ -6,6 +6,25 @@ const { database } = require('../database/database');
 const CompetitorMonitorService = require('../services/CompetitorMonitorService');
 const SoldItemsManager = require('../managers/SoldItemsManager');
 
+// Load hidden parts set for filtering intel results
+async function loadHiddenSet() {
+  try {
+    const rows = await database('hidden_parts').select('part_number_base', 'make', 'model');
+    const set = new Set();
+    for (const r of rows) set.add(`${r.part_number_base}|${(r.make || '').toUpperCase()}|${(r.model || '').toUpperCase()}`);
+    return set;
+  } catch (e) { return new Set(); }
+}
+
+function isHidden(hiddenSet, partNumberBase, make, model) {
+  if (!partNumberBase || hiddenSet.size === 0) return false;
+  const pn = partNumberBase.toUpperCase();
+  const m = (make || '').toUpperCase();
+  const md = (model || '').toUpperCase();
+  // Check exact match and make/model-agnostic match
+  return hiddenSet.has(`${pn}|${m}|${md}`) || hiddenSet.has(`${pn}||`);
+}
+
 /**
  * POST /competitors/scan
  * Run competitor price monitoring scan.
@@ -204,11 +223,15 @@ router.get('/gap-intel', async (req, res) => {
     // Sort by score descending
     gaps.sort((a, b) => b.score - a.score);
 
+    // Filter hidden parts
+    const hiddenSet = await loadHiddenSet();
+    const visibleGaps = gaps.filter(g => !isHidden(hiddenSet, g.partNumber || g.partNumberBase, g.make, g.model));
+
     res.json({
       success: true,
       days,
-      totalGaps: gaps.length,
-      gaps: gaps.slice(0, limit),
+      totalGaps: visibleGaps.length,
+      gaps: visibleGaps.slice(0, limit),
     });
   } catch (err) {
     log.error({ err }, 'Gap intel error');
@@ -327,7 +350,10 @@ router.get('/emerging', async (req, res) => {
       return b.signalStrength - a.signalStrength;
     });
 
-    res.json({ success: true, days, totalEmerging: emerging.length, newCount: emerging.filter(function(e) { return e.signal === 'NEW'; }).length, accelCount: emerging.filter(function(e) { return e.signal === 'ACCEL'; }).length, emerging: emerging.slice(0, limit) });
+    // Filter hidden parts
+    const hiddenSet2 = await loadHiddenSet();
+    const visibleEmerging = emerging.filter(e => !isHidden(hiddenSet2, e.partNumber || e.partNumberBase, e.make, e.model));
+    res.json({ success: true, days, totalEmerging: visibleEmerging.length, newCount: visibleEmerging.filter(function(e) { return e.signal === 'NEW'; }).length, accelCount: visibleEmerging.filter(function(e) { return e.signal === 'ACCEL'; }).length, emerging: visibleEmerging.slice(0, limit) });
   } catch (err) {
     log.error({ err }, 'Emerging parts error');
     res.status(500).json({ success: false, error: err.message });

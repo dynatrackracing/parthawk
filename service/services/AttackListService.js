@@ -1831,6 +1831,23 @@ class AttackListService {
       }
     } catch (e) { /* table may not exist */ }
 
+    // Load hidden parts — parts blacklisted from all intel
+    const hiddenPNs = new Set();
+    try {
+      const hiddenRows = await database('hidden_parts').select('part_number_base');
+      for (const h of hiddenRows) {
+        if (h.part_number_base) hiddenPNs.add(h.part_number_base.toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+    // Remove hidden PNs from all intel sets
+    for (const pn of hiddenPNs) {
+      intelIndex.wantPNs.delete(pn);
+      intelIndex.quarryPNs.delete(pn);
+      intelIndex.streamPNs.delete(pn);
+      intelIndex.flagPNs.delete(pn);
+      markIndex.byPN.delete(pn);
+    }
+
     // 7-day retention: show vehicles last seen within 7 days
     const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const activeOnly = options.activeOnly === true;
