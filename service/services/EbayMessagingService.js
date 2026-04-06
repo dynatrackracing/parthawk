@@ -3,6 +3,7 @@
 const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const SellerAPI = require('../ebay/SellerAPI');
+const oauthManager = require('../ebay/EbayOAuthManager');
 
 class EbayMessagingService {
   constructor() {
@@ -385,10 +386,9 @@ class EbayMessagingService {
         return { checked: 0, queued: 0, method: 'none', elapsed: Date.now() - startTime };
       }
 
-      // Fulfillment API requires a valid OAuth 2.0 Bearer token.
-      // EBAY_OAUTH_TOKEN is currently expired, so skip straight to GetOrders fallback.
-      // When a fresh OAuth token is available, re-enable by setting EBAY_FULFILLMENT_TOKEN.
-      const oauthToken = process.env.EBAY_FULFILLMENT_TOKEN;
+      // Fulfillment API requires OAuth 2.0 Bearer token (auto-refreshed via EbayOAuthManager).
+      // Falls back to GetOrders (Trading API) if OAuth is not configured.
+      const oauthToken = await oauthManager.getToken();
       const useFulfillmentApi = !!oauthToken;
 
       if (useFulfillmentApi) {
@@ -439,7 +439,8 @@ class EbayMessagingService {
             }
           } catch (apiErr) {
             if (apiErr.response?.status === 401) {
-              this.log.warn('Fulfillment API OAuth expired — falling back to GetOrders for remaining');
+              this.log.warn('Fulfillment API 401 — token may have been revoked, falling back to GetOrders');
+              oauthManager._accessToken = null; // Force re-refresh on next call
               method = 'fallback_after_401';
               break; // Fall through to fallback below
             }
@@ -543,11 +544,14 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN env var. Called by cron every 15 minutes.
    */
   async pollReturns() {
-    // Post-Order API requires TOKEN scheme (not Bearer OAuth).
-    // TRADING_API_TOKEN is the active eBay User Auth Token.
-    const oauthToken = process.env.TRADING_API_TOKEN;
-    if (!oauthToken) {
-      this.log.debug('TRADING_API_TOKEN not set — return polling disabled');
+    // Post-Order API: prefer OAuth token (Bearer), fall back to TRADING_API_TOKEN (TOKEN scheme)
+    const freshOAuth = await oauthManager.getToken();
+    const legacyToken = process.env.TRADING_API_TOKEN;
+    const token = freshOAuth || legacyToken;
+    const authScheme = freshOAuth ? 'Bearer' : 'TOKEN';
+
+    if (!token) {
+      this.log.debug('No eBay auth token available — return polling disabled');
       return { checked: 0, queued: 0, skipped: true };
     }
 
@@ -568,7 +572,7 @@ class EbayMessagingService {
           offset: 0,
         },
         headers: {
-          'Authorization': `TOKEN ${oauthToken}`,
+          'Authorization': `${authScheme} ${token}`,
           'Content-Type': 'application/json',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
@@ -608,7 +612,7 @@ class EbayMessagingService {
       }
     } catch (err) {
       if (err.response?.status === 401) {
-        this.log.warn('TRADING_API_TOKEN rejected (401) — return polling skipped');
+        this.log.warn({ authScheme }, 'Return poll auth rejected (401)');
       } else {
         this.log.error({ err: err.message }, 'Return polling failed');
       }
@@ -624,10 +628,14 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN.
    */
   async _sendPostOrderMessage(returnId, messageBody) {
-    // Post-Order API requires TOKEN scheme with TRADING_API_TOKEN
-    const oauthToken = process.env.TRADING_API_TOKEN;
-    if (!oauthToken) {
-      return { success: false, errorCode: 'NO_TOKEN', errorMessage: 'TRADING_API_TOKEN not configured' };
+    // Post-Order API: prefer OAuth (Bearer), fall back to TRADING_API_TOKEN (TOKEN scheme)
+    const freshOAuth = await oauthManager.getToken();
+    const legacyToken = process.env.TRADING_API_TOKEN;
+    const token = freshOAuth || legacyToken;
+    const authScheme = freshOAuth ? 'Bearer' : 'TOKEN';
+
+    if (!token) {
+      return { success: false, errorCode: 'NO_TOKEN', errorMessage: 'No eBay auth token configured' };
     }
 
     try {
@@ -637,7 +645,7 @@ class EbayMessagingService {
         { message: { content: messageBody } },
         {
           headers: {
-            'Authorization': `TOKEN ${oauthToken}`,
+            'Authorization': `${authScheme} ${token}`,
             'Content-Type': 'application/json',
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
           },

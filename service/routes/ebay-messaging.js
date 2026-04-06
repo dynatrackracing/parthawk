@@ -103,4 +103,45 @@ router.post('/test-send', async (req, res) => {
   }
 });
 
+/**
+ * GET /ebay-messaging/health/oauth
+ * Check OAuth token manager status. Attempts a refresh if needed.
+ */
+router.get('/health/oauth', async (req, res) => {
+  try {
+    const oauthManager = require('../ebay/EbayOAuthManager');
+    const status = oauthManager.getStatus();
+
+    // If configured, try a health check (will refresh if expired)
+    if (status.configured) {
+      const check = await oauthManager.healthCheck();
+      return res.json({
+        success: check.success,
+        configured: true,
+        hasToken: !!check.expiresIn,
+        expiresIn: check.expiresIn ? `${Math.round(check.expiresIn / 60)} minutes` : null,
+        expiresAt: check.expiresAt || null,
+        error: check.error || null,
+        fallback: 'TRADING_API_TOKEN is ' + (process.env.TRADING_API_TOKEN ? 'available' : 'NOT SET'),
+      });
+    }
+
+    // Not configured — report what's missing
+    res.json({
+      success: false,
+      configured: false,
+      error: 'OAuth not configured — using TRADING_API_TOKEN fallback',
+      missing: [
+        !process.env.EBAY_CLIENT_ID && 'EBAY_CLIENT_ID',
+        !process.env.EBAY_CLIENT_SECRET && 'EBAY_CLIENT_SECRET',
+        !process.env.EBAY_REFRESH_TOKEN && 'EBAY_REFRESH_TOKEN',
+      ].filter(Boolean),
+      fallback: 'TRADING_API_TOKEN is ' + (process.env.TRADING_API_TOKEN ? 'available' : 'NOT SET'),
+    });
+  } catch (err) {
+    log.error({ err }, 'OAuth health check failed');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

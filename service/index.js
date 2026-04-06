@@ -1102,7 +1102,7 @@ async function start() {
       }
     });
 
-    // Phase 3: Poll for new returns (uses EBAY_OAUTH_TOKEN or TRADING_API_TOKEN)
+    // Phase 3: Poll for new returns (OAuth preferred, TRADING_API_TOKEN fallback)
     const returnPollJob = schedule.scheduleJob('7,22,37,52 * * * *', async function () {
       try {
         await messagingService.pollReturns();
@@ -1110,6 +1110,23 @@ async function start() {
         log.error({ err }, 'Cron: Return polling failed');
       }
     });
+
+    // OAuth startup health check — verify token refresh works
+    try {
+      const oauthManager = require('./ebay/EbayOAuthManager');
+      if (oauthManager.isConfigured()) {
+        const check = await oauthManager.healthCheck();
+        if (check.success) {
+          log.info({ expiresIn: `${Math.round(check.expiresIn / 60)}m` }, 'OAuth token refresh OK');
+        } else {
+          log.warn({ error: check.error }, 'OAuth token refresh FAILED — will use TRADING_API_TOKEN fallback');
+        }
+      } else {
+        log.info('OAuth not configured (EBAY_CLIENT_ID/SECRET/REFRESH_TOKEN) — using TRADING_API_TOKEN for Post-Order API');
+      }
+    } catch (e) {
+      log.warn({ err: e.message }, 'OAuth startup check failed');
+    }
 
     // Load Auto table models into partMatcher cache, then regenerate scout alerts
     try {
