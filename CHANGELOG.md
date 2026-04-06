@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Hunters Perch Mark + Hide Buttons — 2026-04-06
+- JSON.stringify(sellers) in onclick attributes broke HTML parsing (unescaped double quotes)
+- Replaced with data-attribute lookup: window._intelData stores item data, buttons reference by index
+- Both Mark (★ gold) and Hide (✕ red) now functional on all gap-intel + emerging cards
+- Files: hunters-perch.html
+
+---
+
 ## Mark + Hidden System Repair — 2026-04-06
 - hidden_parts table: global part blacklist with PN+make+model+source
 - /hidden routes (add/delete/list/keys) for CRUD

@@ -342,3 +342,11 @@ Deploys this session (13 total):
 - Hidden parts management section on The Mark page (collapsible, unhide button)
 - AttackListService: loads hidden_parts, removes hidden PNs from all intel sets
 - Files: migration, hidden.js (route), competitors.js, index.js, AttackListService.js, hunters-perch.html, the-mark.html
+
+## 13:00 — Fix Hunters Perch Mark + Hide Buttons
+- Root cause: JSON.stringify(item.sellers) embedded ["seller1","seller2"] with unescaped double quotes inside onclick="..." attributes
+- HTML parser corrupted by unescaped quotes — both Mark AND Hide buttons non-functional on every card
+- Fix: data-attribute lookup pattern (window._intelData stores item data, buttons reference by index key)
+- markByIdx()/hideByIdx() wrappers call existing markItem()/hideIntel()
+- Mark button: gold ★. Hide button: red ✕ with dim border.
+- Files: hunters-perch.html
