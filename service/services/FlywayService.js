@@ -151,6 +151,38 @@ class FlywayService {
       }
     } catch (e) { /* the_mark may not exist */ }
 
+    // Build intel index — same as Daily Feed (MARK, QUARRY, STREAM, OVERSTOCK badges)
+    const intelIndex = { wantPNs: new Set(), wantPartTypes: new Set(), flagPNs: new Set() };
+    try {
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      const wants = await database('restock_want_list').where('active', true).select('title');
+      for (const w of wants) {
+        const pns = eiPNs(w.title || '');
+        for (const pn of pns) intelIndex.wantPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* non-fatal */ }
+    try {
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      const flags = await database('restock_flag').where('acknowledged', false).select('title');
+      for (const f of flags) {
+        const pns = eiPNs(f.title || '');
+        for (const pn of pns) intelIndex.flagPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* non-fatal */ }
+
+    // Load vehicle frequency for rarity scoring
+    const frequencyMap = {};
+    try {
+      const freqRows = await database('vehicle_frequency').select('make', 'model', 'gen_start', 'gen_end', 'avg_days_between', 'total_seen');
+      for (const row of freqRows) {
+        if (row.gen_start && row.gen_end) {
+          frequencyMap[`${row.make}|${row.model}|${row.gen_start}|${row.gen_end}`.toLowerCase()] = row;
+        }
+        const mmKey = `${row.make}|${row.model}`.toLowerCase();
+        if (!frequencyMap[mmKey]) frequencyMap[mmKey] = row;
+      }
+    } catch (e) { /* non-fatal */ }
+
     // Score floor tiered by trip distance
     const maxDistance = Math.max(...trip.yards.map(y => parseFloat(y.distance_from_base) || 0), 0);
     const SCORE_FLOOR = maxDistance >= 150 ? 1000 : 600;
@@ -161,7 +193,7 @@ class FlywayService {
     for (const vehicle of vehicles) {
       try {
         const result = attackService.scoreVehicle(
-          vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex
+          vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap
         );
 
         const daysInYard = this.calculateDaysInYard(vehicle.date_added);
@@ -201,15 +233,24 @@ class FlywayService {
         return new Date(b.date_added || 0) - new Date(a.date_added || 0);
       });
 
+      // Road trip filter: LEGENDARY + RARE + MARK only
+      const isRoadTrip = trip.trip_type === 'road_trip';
+      const filteredForTrip = isRoadTrip
+        ? yardVehicles.filter(v =>
+            v.rarityTier === 'LEGENDARY' || v.rarityTier === 'RARE' ||
+            (v.intel_match_count && v.intel_match_count > 0 && v.parts && v.parts.some(p => p.intelSource === 'mark'))
+          )
+        : yardVehicles;
+
       // Pass 1: Top vehicles above score floor
-      const top = yardVehicles
+      const top = filteredForTrip
         .filter(v => (v.est_value || 0) >= SCORE_FLOOR)
         .slice(0, MAX_PER_YARD);
       const topIds = new Set(top.map(v => v._vehicleId));
 
       // Pass 2: Guaranteed vehicles (rare finds) not already in top list
       const guaranteed = [];
-      for (const v of yardVehicles) {
+      for (const v of filteredForTrip) {
         if (topIds.has(v._vehicleId)) continue;
         if ((v.est_value || 0) <= 0) continue;
         const reason = this.getGuaranteedReason(v);
@@ -228,9 +269,10 @@ class FlywayService {
 
       // Slim mode: strip parts, create part_chips — same as Daily Feed route
       for (const vehicle of combined) {
-        vehicle.part_chips = (vehicle.parts || []).slice(0, 4).map(p => ({
+        vehicle.part_chips = (vehicle.parts || []).filter(p => !p.belowFloor).slice(0, 6).map(p => ({
           partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
-          isMarked: p.isMarked || false,
+          isMarked: p.isMarked || false, noveltyTier: p.noveltyTier || 'STOCKED',
+          intelSource: p.intelSource || null,
         }));
         delete vehicle.parts;
         delete vehicle.rebuild_parts;
