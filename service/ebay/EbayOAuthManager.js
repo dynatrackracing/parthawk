@@ -22,12 +22,11 @@ const axios = require('axios').default;
 
 const TOKEN_ENDPOINT = 'https://api.ebay.com/identity/v1/oauth2/token';
 
-// Scopes needed for Fulfillment + Post-Order APIs
+// Scopes granted during consent flow (must match exactly)
 const SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
-  'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
 ].join(' ');
 
 class EbayOAuthManager {
