@@ -731,7 +731,7 @@
       const rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
       rarityHtml = `<div style="text-align:right;flex-shrink:0">
         <span class="chip" style="font-size:9px;font-weight:700;padding:2px 7px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>
-        <div style="font-size:9px;color:#6B7280;margin-top:1px">~${v.rarityAvgDays || '?'}d · ${v.rarityTotalSeen || 0} seen</div>
+        <div style="font-size:9px;color:#6B7280;margin-top:1px">${v.rarityReason || ('~' + (v.rarityAvgDays || '?') + 'd · ' + (v.rarityTotalSeen || 0) + ' seen')}</div>
       </div>`;
     }
 

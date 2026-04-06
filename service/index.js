@@ -920,29 +920,65 @@ async function start() {
     });
 
     // Vehicle frequency update — 6:30 AM UTC, after Flyway scrape at 6:00 AM
+    // Generation-aware: groups by make+model+generation range from trim_tier_reference
     const vehicleFrequencyJob = schedule.scheduleJob('30 6 * * *', async function () {
-      log.info('Vehicle frequency cron: updating rarity data');
+      log.info('Vehicle frequency cron: updating rarity data (generation-aware)');
       try {
         const newArrivals = await database('yard_vehicle')
           .where('first_seen', '>=', database.raw("NOW() - INTERVAL '24 hours'"))
-          .whereNotNull('make').whereNotNull('model')
-          .select('make', 'model')
+          .whereNotNull('make').whereNotNull('model').whereNotNull('year')
+          .select('make', 'model', 'year')
           .count('* as cnt')
-          .groupBy('make', 'model');
-        let updated = 0;
-        for (const row of newArrivals) {
-          await database.raw(`
-            INSERT INTO vehicle_frequency (make, model, total_seen, first_tracked_at, last_seen_at, avg_days_between, updated_at)
-            VALUES (?, ?, ?, NOW(), NOW(), NULL, NOW())
-            ON CONFLICT (make, model) DO UPDATE SET
-              total_seen = vehicle_frequency.total_seen + ?,
-              last_seen_at = NOW(),
-              avg_days_between = EXTRACT(EPOCH FROM (NOW() - vehicle_frequency.first_tracked_at)) / 86400 / NULLIF(vehicle_frequency.total_seen + ? - 1, 0),
-              updated_at = NOW()
-          `, [row.make, row.model, parseInt(row.cnt), parseInt(row.cnt), parseInt(row.cnt)]);
-          updated++;
+          .groupBy('make', 'model', 'year');
+
+        // Build generation cache from trim_tier_reference
+        const genRows = await database('trim_tier_reference')
+          .select('make', 'model', 'gen_start', 'gen_end')
+          .groupBy('make', 'model', 'gen_start', 'gen_end');
+        const genLookup = {};
+        for (const g of genRows) {
+          const key = `${g.make}|${g.model}`.toLowerCase();
+          if (!genLookup[key]) genLookup[key] = [];
+          genLookup[key].push({ gen_start: g.gen_start, gen_end: g.gen_end });
         }
-        log.info({ updated }, 'Vehicle frequency cron complete');
+
+        function getGen(make, model, year) {
+          const gens = genLookup[`${make}|${model}`.toLowerCase()] || [];
+          const y = parseInt(year);
+          for (const g of gens) {
+            if (y >= g.gen_start && y <= g.gen_end) return g;
+          }
+          const ds = Math.floor(y / 10) * 10;
+          return { gen_start: ds, gen_end: ds + 9 };
+        }
+
+        // Aggregate by make+model+generation
+        const genGroups = {};
+        for (const row of newArrivals) {
+          const gen = getGen(row.make, row.model, row.year);
+          const key = `${row.make}|${row.model}|${gen.gen_start}|${gen.gen_end}`;
+          if (!genGroups[key]) genGroups[key] = { make: row.make, model: row.model, gen_start: gen.gen_start, gen_end: gen.gen_end, cnt: 0 };
+          genGroups[key].cnt += parseInt(row.cnt);
+        }
+
+        let updated = 0;
+        for (const g of Object.values(genGroups)) {
+          try {
+            await database.raw(`
+              INSERT INTO vehicle_frequency (make, model, gen_start, gen_end, total_seen, first_tracked_at, last_seen_at, avg_days_between, updated_at)
+              VALUES (?, ?, ?, ?, ?, NOW(), NOW(), NULL, NOW())
+              ON CONFLICT (make, model) DO UPDATE SET
+                gen_start = COALESCE(EXCLUDED.gen_start, vehicle_frequency.gen_start),
+                gen_end = COALESCE(EXCLUDED.gen_end, vehicle_frequency.gen_end),
+                total_seen = vehicle_frequency.total_seen + ?,
+                last_seen_at = NOW(),
+                avg_days_between = EXTRACT(EPOCH FROM (NOW() - vehicle_frequency.first_tracked_at)) / 86400 / NULLIF(vehicle_frequency.total_seen + ? - 1, 0),
+                updated_at = NOW()
+            `, [g.make, g.model, g.gen_start, g.gen_end, g.cnt, g.cnt, g.cnt]);
+            updated++;
+          } catch (e) { /* upsert conflict — non-fatal */ }
+        }
+        log.info({ updated, arrivals: newArrivals.length }, 'Vehicle frequency cron complete');
       } catch (err) {
         log.error({ err: err.message }, 'Vehicle frequency cron failed');
       }

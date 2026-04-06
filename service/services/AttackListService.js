@@ -1474,26 +1474,77 @@ class AttackListService {
       score = Math.round(score * (1 + attributeBoost / 100));
     }
 
-    // === VEHICLE RARITY — from persistent vehicle_frequency table ===
-    const freqKey = `${make}|${model}`.toLowerCase();
-    const freqData = frequencyMap[freqKey];
+    // === VEHICLE RARITY — generation-aware frequency + trim-driven overrides ===
+    // Try generation-specific key first, fall back to make|model
+    const vYear = parseInt(vehicle.year) || 0;
+    let freqData = null;
+    // Look for generation-specific match via trim_tier_reference gen ranges
+    for (const [fk, fv] of Object.entries(frequencyMap)) {
+      if (!fv.gen_start || !fv.gen_end) continue;
+      if (fk.startsWith(`${make}|${model}`.toLowerCase() + '|') &&
+          vYear >= fv.gen_start && vYear <= fv.gen_end) {
+        freqData = fv;
+        break;
+      }
+    }
+    if (!freqData) freqData = frequencyMap[`${make}|${model}`.toLowerCase()];
+
     const avgDays = freqData ? parseFloat(freqData.avg_days_between) : null;
     const totalSeen = freqData ? parseInt(freqData.total_seen) : 0;
+
+    // Frequency-based rarity tier
     let rarityTier = 'NORMAL', rarityBoost = 0, rarityColor = '#2ECC40', rarityPulses = false;
+    let rarityReason = '';
     if (totalSeen <= 1 || avgDays === null) {
       rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
+      rarityReason = totalSeen <= 1 ? '1 sighting' : 'No frequency data';
     } else if (avgDays >= 180) {
       rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
+      rarityReason = `~${Math.round(avgDays)}d avg`;
     } else if (avgDays >= 90) {
       rarityTier = 'RARE'; rarityBoost = 20; rarityColor = '#C39BD3'; rarityPulses = true;
+      rarityReason = `~${Math.round(avgDays)}d avg`;
     } else if (avgDays >= 45) {
       rarityTier = 'UNCOMMON'; rarityBoost = 10; rarityColor = '#3498DB';
+      rarityReason = `~${Math.round(avgDays)}d avg`;
     } else if (avgDays >= 15) {
       rarityTier = 'NORMAL'; rarityBoost = 0; rarityColor = '#2ECC40';
+      rarityReason = `~${Math.round(avgDays)}d avg`;
     } else if (avgDays >= 7) {
       rarityTier = 'COMMON'; rarityBoost = -5; rarityColor = '#FF8C00';
+      rarityReason = `~${Math.round(avgDays)}d avg`;
     } else {
       rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = '#FF4136';
+      rarityReason = `~${(avgDays || 0).toFixed(1)}d avg`;
+    }
+
+    // Trim-driven rarity FLOOR — overrides only RAISE, never lower
+    const RARITY_RANK = { LEGENDARY: 6, RARE: 5, UNCOMMON: 4, NORMAL: 3, COMMON: 2, SATURATED: 1 };
+    const currentRank = RARITY_RANK[rarityTier] || 3;
+
+    let trimFloorTier = null, trimFloorBoost = 0, trimFloorReason = '';
+    if (vTrimTier === 'PERFORMANCE') {
+      trimFloorTier = 'LEGENDARY'; trimFloorBoost = 30; trimFloorReason = 'PERFORMANCE trim';
+    } else if (vTrimTier === 'PREMIUM') {
+      trimFloorTier = 'RARE'; trimFloorBoost = 20; trimFloorReason = 'PREMIUM trim';
+    }
+    if (!trimFloorTier && is4wd && isManual) {
+      trimFloorTier = 'RARE'; trimFloorBoost = 20; trimFloorReason = '4WD+MT';
+    }
+    if (!trimFloorTier && vehicle.diesel) {
+      trimFloorTier = 'RARE'; trimFloorBoost = 20; trimFloorReason = 'DIESEL';
+    }
+
+    // Apply floor: use whichever tier is HIGHER
+    if (trimFloorTier) {
+      const floorRank = RARITY_RANK[trimFloorTier] || 3;
+      if (floorRank > currentRank) {
+        rarityTier = trimFloorTier;
+        rarityBoost = trimFloorBoost;
+        rarityReason = trimFloorReason;
+        rarityColor = trimFloorTier === 'LEGENDARY' ? '#FFD700' : '#C39BD3';
+        rarityPulses = trimFloorTier === 'LEGENDARY' || trimFloorTier === 'RARE';
+      }
     }
 
     if (rarityBoost !== 0) {
@@ -1551,7 +1602,7 @@ class AttackListService {
       score, color_code: color, vehicle_verdict,
       attributeBoost: attributeBoost > 0 ? attributeBoost : null,
       boostReasons: boostReasons.length > 0 ? boostReasons : null,
-      rarityTier, rarityColor, rarityPulses,
+      rarityTier, rarityColor, rarityPulses, rarityReason,
       rarityAvgDays: avgDays != null ? Math.round(avgDays * 10) / 10 : null,
       rarityTotalSeen: totalSeen,
       rarityBoost: rarityBoost !== 0 ? rarityBoost : null,
@@ -1659,12 +1710,18 @@ class AttackListService {
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
 
-    // Load persistent vehicle frequency data for rarity scoring
+    // Load persistent vehicle frequency data for rarity scoring (generation-aware)
     const frequencyMap = {};
     try {
-      const freqRows = await database('vehicle_frequency').select('make', 'model', 'avg_days_between', 'total_seen');
+      const freqRows = await database('vehicle_frequency').select('make', 'model', 'gen_start', 'gen_end', 'avg_days_between', 'total_seen');
       for (const row of freqRows) {
-        frequencyMap[`${row.make}|${row.model}`.toLowerCase()] = row;
+        // Key by make|model|gen_start|gen_end for generation-specific lookup
+        if (row.gen_start && row.gen_end) {
+          frequencyMap[`${row.make}|${row.model}|${row.gen_start}|${row.gen_end}`.toLowerCase()] = row;
+        }
+        // Also keep make|model fallback for vehicles without generation data
+        const mmKey = `${row.make}|${row.model}`.toLowerCase();
+        if (!frequencyMap[mmKey]) frequencyMap[mmKey] = row;
       }
     } catch (e) { /* table may not exist yet */ }
 
