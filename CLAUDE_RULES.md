@@ -56,7 +56,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 21. **Restock scoring:** Your demand max 35pts, Market demand max 35pts, Ratio max 15pts, Price max 25pts. $300+ parts with any market signal get floor score 75.
 
-21b. **Vehicle rarity scoring:** Computed from active yard_vehicle count per make+model. RARE (1 appearance) +25%, UNCOMMON (2-4) +10%, NORMAL (5-15) 0%, COMMON (16-50) -5%, SATURATED (51+) -10%. Applied multiplicatively on score after attribute boosts.
+21b. **Vehicle rarity scoring:** `vehicle_frequency` table tracks lifetime make+model appearance rates. `avg_days_between` determines tier: LEGENDARY (1 sighting or 7+d) pulsing gold +30%. RARE (3-6.9d) pulsing purple +20%. UNCOMMON (1-2.9d) blue +10%. NORMAL (0.3-0.9d) green 0%. COMMON (<0.3d) orange -5%. SATURATED (very frequent) red -15%. Cron updates daily at 6:30 AM UTC after scrape.
 
 21c. **Part novelty scoring:** NOVEL (zero stock AND zero sales) +20% scoring boost. RESTOCK (sold before, zero stock) +10%. STOCKED: no boost. Boosts apply to scoring value only, not display price.
 

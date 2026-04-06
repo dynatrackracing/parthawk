@@ -919,6 +919,35 @@ async function start() {
       }
     });
 
+    // Vehicle frequency update — 6:30 AM UTC, after Flyway scrape at 6:00 AM
+    const vehicleFrequencyJob = schedule.scheduleJob('30 6 * * *', async function () {
+      log.info('Vehicle frequency cron: updating rarity data');
+      try {
+        const newArrivals = await database('yard_vehicle')
+          .where('first_seen', '>=', database.raw("NOW() - INTERVAL '24 hours'"))
+          .whereNotNull('make').whereNotNull('model')
+          .select('make', 'model')
+          .count('* as cnt')
+          .groupBy('make', 'model');
+        let updated = 0;
+        for (const row of newArrivals) {
+          await database.raw(`
+            INSERT INTO vehicle_frequency (make, model, total_seen, first_tracked_at, last_seen_at, avg_days_between, updated_at)
+            VALUES (?, ?, ?, NOW(), NOW(), NULL, NOW())
+            ON CONFLICT (make, model) DO UPDATE SET
+              total_seen = vehicle_frequency.total_seen + ?,
+              last_seen_at = NOW(),
+              avg_days_between = EXTRACT(EPOCH FROM (NOW() - vehicle_frequency.first_tracked_at)) / 86400 / NULLIF(vehicle_frequency.total_seen + ? - 1, 0),
+              updated_at = NOW()
+          `, [row.make, row.model, parseInt(row.cnt), parseInt(row.cnt), parseInt(row.cnt)]);
+          updated++;
+        }
+        log.info({ updated }, 'Vehicle frequency cron complete');
+      } catch (err) {
+        log.error({ err: err.message }, 'Vehicle frequency cron failed');
+      }
+    });
+
     // VIN decode — runs after each local scrape to decode new vehicles + assign trim tiers
     // 3:00 AM UTC = after 2:00 AM local scrape
     // 8:40 AM UTC = after 8:30 AM local scrape

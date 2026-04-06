@@ -902,7 +902,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, rarityMap = {}) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, frequencyMap = {}) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -1472,15 +1472,25 @@ class AttackListService {
       score = Math.round(score * (1 + attributeBoost / 100));
     }
 
-    // === VEHICLE RARITY — rare vehicles in yards get boosted ===
-    const rarityKey = `${make}|${model}`.toLowerCase();
-    const rarityAppearances = rarityMap[rarityKey] || 0;
-    let rarityTag = 'NORMAL', rarityBoost = 0;
-    if (rarityAppearances <= 1) { rarityTag = 'RARE'; rarityBoost = 25; }
-    else if (rarityAppearances <= 4) { rarityTag = 'UNCOMMON'; rarityBoost = 10; }
-    else if (rarityAppearances <= 15) { rarityTag = 'NORMAL'; rarityBoost = 0; }
-    else if (rarityAppearances <= 50) { rarityTag = 'COMMON'; rarityBoost = -5; }
-    else { rarityTag = 'SATURATED'; rarityBoost = -10; }
+    // === VEHICLE RARITY — from persistent vehicle_frequency table ===
+    const freqKey = `${make}|${model}`.toLowerCase();
+    const freqData = frequencyMap[freqKey];
+    const avgDays = freqData ? parseFloat(freqData.avg_days_between) : null;
+    const totalSeen = freqData ? parseInt(freqData.total_seen) : 0;
+    let rarityTier = 'NORMAL', rarityBoost = 0, rarityColor = '#2ECC40', rarityPulses = false;
+    if (totalSeen <= 1 || avgDays === null) {
+      rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
+    } else if (avgDays >= 7) {
+      rarityTier = 'RARE'; rarityBoost = 20; rarityColor = '#C39BD3'; rarityPulses = true;
+    } else if (avgDays >= 3) {
+      rarityTier = 'UNCOMMON'; rarityBoost = 10; rarityColor = '#3498DB';
+    } else if (avgDays >= 1) {
+      rarityTier = 'NORMAL'; rarityBoost = 0; rarityColor = '#2ECC40';
+    } else if (avgDays >= 0.3) {
+      rarityTier = 'COMMON'; rarityBoost = -5; rarityColor = '#FF8C00';
+    } else {
+      rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = '#FF4136';
+    }
 
     if (rarityBoost !== 0) {
       score = Math.round(score * (1 + rarityBoost / 100));
@@ -1537,7 +1547,10 @@ class AttackListService {
       score, color_code: color, vehicle_verdict,
       attributeBoost: attributeBoost > 0 ? attributeBoost : null,
       boostReasons: boostReasons.length > 0 ? boostReasons : null,
-      rarityTag, rarityAppearances, rarityBoost: rarityBoost !== 0 ? rarityBoost : null,
+      rarityTier, rarityColor, rarityPulses,
+      rarityAvgDays: avgDays != null ? Math.round(avgDays * 10) / 10 : null,
+      rarityTotalSeen: totalSeen,
+      rarityBoost: rarityBoost !== 0 ? rarityBoost : null,
       est_value: totalValue,
       max_part_value: filteredParts.filter(p => !p.belowFloor).length > 0 ? Math.max(...filteredParts.filter(p => !p.belowFloor).map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,
@@ -1642,20 +1655,14 @@ class AttackListService {
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
 
-    // Build rarity index — count appearances of each make+model across all active vehicles
-    const rarityMap = {};
+    // Load persistent vehicle frequency data for rarity scoring
+    const frequencyMap = {};
     try {
-      const rarityRows = await database('yard_vehicle')
-        .select('make', 'model')
-        .count('* as appearances')
-        .where('active', true)
-        .whereNotNull('make')
-        .whereNotNull('model')
-        .groupBy('make', 'model');
-      for (const row of rarityRows) {
-        rarityMap[`${row.make}|${row.model}`.toLowerCase()] = parseInt(row.appearances);
+      const freqRows = await database('vehicle_frequency').select('make', 'model', 'avg_days_between', 'total_seen');
+      for (const row of freqRows) {
+        frequencyMap[`${row.make}|${row.model}`.toLowerCase()] = row;
       }
-    } catch (e) { /* non-fatal */ }
+    } catch (e) { /* table may not exist yet */ }
 
     // Build mark index from the_mark for score boosting
     let markIndex = { byPN: new Map(), byTitle: new Set() };
@@ -1729,7 +1736,7 @@ class AttackListService {
       for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, rarityMap)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap)
       );
       // Sort: active first, then highest total value, then max single part tiebreaker
       scored.sort((a, b) => {
