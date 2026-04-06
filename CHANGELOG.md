@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Revenue-Optimized Scoring: Rarity + Novelty + Sort — 2026-04-06
+- Vehicle rarity from active yard_vehicle count (RARE/UNCOMMON/NORMAL/COMMON/SATURATED)
+- Part novelty tiers (NOVEL/RESTOCK/STOCKED) with scoring boosts
+- Vehicle sort: est_value DESC (total yield wins over single-part chasers)
+- Part sort: price DESC (grab the money first)
+- Frontend badges: RARE/UNCOMMON on vehicles, NEW/RESTOCK on parts
+- Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md
+
+---
+
 ## Airbag Exclusion + Vehicle Attribute Boosts + ECM Visibility — 2026-04-06
 - Airbags/SRS added to isExcludedPart() backend+frontend, removed from PART_PRICE_FLOORS
 - Vehicle scoring boosts: PERFORMANCE +20%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%

@@ -196,3 +196,12 @@ Deploys this session (13 total):
 - AIRBAG removed from PART_PRICE_FLOORS
 - CLAUDE_RULES rules 19+20 updated
 - Files: AttackListService.js, dh-parts.js, attack-list.html, CLAUDE_RULES.md
+
+## 02:00 — Revenue-Optimized Scoring: Rarity + Novelty + Sort Overhaul
+- Vehicle rarity index: active yard_vehicle count per make+model, 5 tiers (RARE +25% through SATURATED -10%)
+- Distribution: 698 distinct combos, median 3 appearances. Top: Altima 311, F-150 308, Camry 242
+- Part novelty: NOVEL (zero stock+sales) +20%, RESTOCK (sold before, zero stock) +10%, STOCKED no boost (scoring value only, not display price)
+- Sort overhaul: vehicles by est_value DESC (was max_part_value DESC), parts by price DESC (was sold_90d DESC)
+- Frontend: red RARE badge, yellow UNCOMMON badge on vehicles. Cyan NEW badge, green RESTOCK badge on parts.
+- CLAUDE_RULES rules 21b, 21c, 21d added
+- Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md
