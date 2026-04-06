@@ -359,6 +359,41 @@ function parseEngineType(fuelType) {
 }
 
 /**
+ * vPIC trim+transmission fallback — calls vpic.spVinDecode() stored procedure.
+ * Returns { trim, series, transmissionStyle, transmissionSpeeds } or null.
+ */
+async function vpicTrimFallback(vin) {
+  try {
+    var result = await database.raw("SELECT variable, value FROM vpic.spvindecode(?) WHERE value IS NOT NULL AND value != '' AND value != 'Not Applicable'", [vin]);
+    if (!result || !result.rows || result.rows.length === 0) return null;
+
+    var data = {};
+    for (var i = 0; i < result.rows.length; i++) {
+      var row = result.rows[i];
+      if (row.variable && row.value) data[row.variable] = row.value.trim();
+    }
+
+    var trim = data['Trim'] || data['Trim2'] || null;
+    var series = data['Series'] || data['Series2'] || null;
+    var transStyle = data['Transmission Style'] || null;
+    var transSpeeds = data['Transmission Speeds'] || null;
+
+    if (!trim && !series && !transStyle) return null;
+
+    return {
+      trim: trim,
+      series: series,
+      transmissionStyle: transStyle,
+      transmissionSpeeds: transSpeeds,
+    };
+  } catch (e) {
+    // vpic schema may not exist — completely non-fatal
+    log.debug({ err: e.message }, 'vpicTrimFallback: vpic schema not available');
+    return null;
+  }
+}
+
+/**
  * Main decode function. Returns standardized result.
  */
 async function decode(vin) {
@@ -466,6 +501,35 @@ async function decode(vin) {
     source += '+corgi_trim';
   }
 
+  // Step 3.5: vPIC trim+transmission fallback (replaces old NHTSA API for non-VDS makes)
+  if (!trim || !transHint) {
+    try {
+      var vpic = await vpicTrimFallback(vin);
+      if (vpic) {
+        if (!trim && vpic.trim) {
+          var cleanVpicTrim = cleanDecodedTrim(vpic.trim);
+          if (cleanVpicTrim) {
+            trim = cleanVpicTrim;
+            source += '+vpic_trim';
+          }
+        }
+        if (!trim && vpic.series) {
+          var cleanSeries = cleanDecodedTrim(vpic.series);
+          if (cleanSeries) {
+            trim = cleanSeries;
+            source += '+vpic_series';
+          }
+        }
+        if (!transHint && vpic.transmissionStyle) {
+          transHint = vpic.transmissionStyle;
+          source += '+vpic_trans';
+        }
+      }
+    } catch (err) {
+      log.debug({ err: err.message, vin: vin }, 'vpicTrimFallback failed (non-fatal)');
+    }
+  }
+
   // Step 4: Engine code enrichment
   if (mfr) {
     var eng = await resolveEngineCode(mfr.id, mfr.name, vin, year, model);
@@ -488,7 +552,9 @@ async function decode(vin) {
   var transSource = null;
 
   // Step 4.5: EPA transmission resolution
-  if (!transHint) {
+  // Run if no transHint yet, OR if transHint came from vPIC (EPA CHECK_MT logic is smarter)
+  var isVpicTrans = transHint && source.includes('+vpic_trans');
+  if (!transHint || isVpicTrans) {
     try {
       var epaResult = await resolveTransmission(year, make, model, displacement, cylinders, trim);
       if (epaResult) {

@@ -12,3 +12,4 @@ scrape-local-old.js.js
 scrape-log.txt
 .claude/
 service/data/*.csv
+vPICList_lite_2026_03.sql
