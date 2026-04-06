@@ -39,6 +39,10 @@ function isExcludedPart(title) {
   if (/\bDOOR SHELL\b/.test(t)) return true;
   if (/\b(QUARTER|ROCKER) PANEL\b/.test(t)) return true;
   if (/\b(BED SIDE|TRUCK BED|TRUNK LID|ROOF PANEL)\b/.test(t)) return true;
+  // Airbags/SRS — not sellable (clock springs ARE sellable, don't catch here)
+  if (/\b(AIRBAG|AIR\s*BAG)\b/.test(t)) return true;
+  if (/\bSRS\s*(MODULE|SENSOR|UNIT)\b/.test(t)) return true;
+  if (/\bSUPPLEMENTAL\s*RESTRAINT\b/.test(t)) return true;
   return false;
 }
 
@@ -329,7 +333,7 @@ function normalizeMake(make) {
 const PART_PRICE_FLOORS = {
   'ABS': 150, 'ECU': 100, 'ECM': 100, 'TCM': 100, 'BCM': 100,
   'TIPM': 100, 'CLUSTER': 100, 'RADIO': 100, 'THROTTLE': 100,
-  'AMP': 100, 'AMPLIFIER': 100, 'HVAC': 100, 'AIRBAG': 100,
+  'AMP': 100, 'AMPLIFIER': 100, 'HVAC': 100,
   'NAV': 100, 'CAMERA': 100,
 };
 
@@ -554,7 +558,7 @@ class AttackListService {
             isRebuild,
           });
           entry.count++;
-          if (!isRebuild) {
+          if (!isRebuild || (row.title && /\b(ECM|ECU|PCM|ENGINE\s*CONTROL)\b/i.test(row.title))) {
             entry.totalValue += effectivePrice;
             entry.avgPrice = entry.count > 0 ? entry.totalValue / entry.count : 0;
           }
@@ -1127,8 +1131,8 @@ class AttackListService {
       if (isExcludedPart(p.title || '')) continue;
       const basePn = p.partNumber ? normalizePartNumber(p.partNumber) : null;
 
-      if (p.isRebuild) {
-        // Group rebuild parts by partType+seller
+      if (p.isRebuild && p.partType !== 'ECM') {
+        // Group rebuild parts by partType+seller (ECM/ECU/PCM from pro-rebuild treated as normal)
         const rbKey = `_rb_${p.partType}_${p.seller || 'pro-rebuild'}`;
         if (mergedByBase[rbKey]) {
           const rb = mergedByBase[rbKey];
@@ -1422,9 +1426,28 @@ class AttackListService {
     }
 
     // === COGS YARD FACTOR — cheaper yards get slight boost ===
-    // Applied via _yardCostFactor set by getAllYardsAttackList before scoring
     if (vehicle._yardCostFactor) {
       score = Math.round(score * (1 + vehicle._yardCostFactor));
+    }
+
+    // === VEHICLE ATTRIBUTE BOOSTS — desirable configs score higher ===
+    let attributeBoost = 0;
+    const boostReasons = [];
+    const vTrimTier = (vehicle.trim_tier || '').toUpperCase();
+    const vDrive = (vehicle.decoded_drivetrain || vehicle.drivetrain || '').toUpperCase();
+    const vTrans = (vehicle.decoded_transmission || '').toUpperCase();
+    const is4wd = /4WD|4X4|AWD/.test(vDrive);
+    const isManual = /MANUAL|STANDARD/.test(vTrans) || vTrans === 'CHECK_MT';
+
+    if (vTrimTier === 'PERFORMANCE') { attributeBoost += 20; boostReasons.push('PERFORMANCE'); }
+    else if (vTrimTier === 'PREMIUM') { attributeBoost += 10; boostReasons.push('PREMIUM'); }
+    if (vehicle.diesel) { attributeBoost += 15; boostReasons.push('DIESEL'); }
+    if (is4wd && isManual) { attributeBoost += 12; boostReasons.push('4WD+MT'); }
+    else if (isManual) { attributeBoost += 8; boostReasons.push('MANUAL'); }
+    else if (is4wd) { attributeBoost += 5; boostReasons.push('4WD'); }
+
+    if (attributeBoost > 0) {
+      score = Math.round(score * (1 + attributeBoost / 100));
     }
 
     score = Math.max(0, Math.min(100, score));
@@ -1476,6 +1499,8 @@ class AttackListService {
         decodedTrim: cleanNHTSATrim(vehicle.decoded_trim) || cleanNHTSATrim(vehicle.trim_level),
       } : null,
       score, color_code: color, vehicle_verdict,
+      attributeBoost: attributeBoost > 0 ? attributeBoost : null,
+      boostReasons: boostReasons.length > 0 ? boostReasons : null,
       est_value: totalValue,
       max_part_value: filteredParts.filter(p => !p.belowFloor).length > 0 ? Math.max(...filteredParts.filter(p => !p.belowFloor).map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,

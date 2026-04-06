@@ -87,5 +87,10 @@ function isExcludedPart(title) {
   if (/\bTRUNK LID\b/.test(t)) return true;
   if (/\bROOF PANEL\b/.test(t)) return true;
 
+  // --- AIRBAGS / SRS (clock springs ARE sellable — not caught here) ---
+  if (/\b(AIRBAG|AIR\s*BAG)\b/.test(t)) return true;
+  if (/\bSRS\s*(MODULE|SENSOR|UNIT)\b/.test(t)) return true;
+  if (/\bSUPPLEMENTAL\s*RESTRAINT\b/.test(t)) return true;
+
   return false;
 }

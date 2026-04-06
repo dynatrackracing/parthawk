@@ -50,9 +50,9 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 18. **Price source display:** `sold` and `market` sources display normally. `estimate` source displays as grey `~$XXX EST`.
 
-19. **Excluded from attack list:** engines, transmissions, internal engine components, body panels, transfer cases. Steering IS sellable (racks, EPS modules, steering wheels). Sunroof glass IS sellable. Do not exclude these.
+19. **Excluded from attack list:** engines, transmissions, internal engine components, body panels, airbags/SRS modules. Steering IS sellable (racks, EPS modules, steering wheels). Sunroof glass IS sellable. Clock springs ARE sellable — do not exclude. Do not exclude these.
 
-20. **Pro-rebuild parts shown as grey reference only,** never scored.
+20. **Pro-rebuild parts shown as grey reference only, never scored — EXCEPT ECM/ECU/PCM which display as normal scored parts on the attack list.**
 
 21. **Restock scoring:** Your demand max 35pts, Market demand max 35pts, Ratio max 15pts, Price max 25pts. $300+ parts with any market signal get floor score 75.
 
