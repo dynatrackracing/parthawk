@@ -44,7 +44,11 @@ nav a.active{color:#DC2626;font-weight:700}
 <body>
 <div id="dh-nav"></div>
 <script src="/admin/dh-nav.js?v=2"></script><script>dhNav('perch')</script>
-<div class="container">
+<div style="display:flex;background:#141414;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none">
+  <div class="stream-tab" style="padding:10px 16px;font-size:12px;font-weight:600;color:#F0F0F0;cursor:pointer;border-bottom:2px solid #dc2626;white-space:nowrap" id="tab-intel" onclick="switchPerchTab('intel')">INTEL</div>
+  <div class="stream-tab" style="padding:10px 16px;font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap" id="tab-hidden" onclick="switchPerchTab('hidden')">HIDDEN (<span id="hiddenCount">0</span>)</div>
+</div>
+<div class="container" id="intelView">
   <div id="scrapeAlerts" style="display:none"></div>
   <div class="card" id="gapCard" style="border-color:#dc2626;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -83,6 +87,13 @@ nav a.active{color:#DC2626;font-weight:700}
   </div>
   <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div></div>
   <div id="sellers"></div>
+</div>
+<div class="container" id="hiddenView" style="display:none">
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">HIDDEN PARTS</div>
+    <div id="hiddenLoading" style="text-align:center;padding:16px"><div class="spinner"></div></div>
+    <div id="hiddenList"></div>
+  </div>
 </div>
 <script>
 var sellersData = [];
@@ -402,8 +413,34 @@ function markByIdx(idx, btn) {
 
 function hideByIdx(idx, btn) {
   var d = (window._intelData || {})[idx];
-  if (!d) return;
-  hideIntel(d.title, btn);
+  if (!d) { console.error('hideByIdx: no data for', idx); return; }
+  // Use the structured partNumber from intel data if available
+  var pn = d.partNumber || null;
+  if (!pn) {
+    var m = (d.title || '').match(/[A-Z0-9]{5,}/i);
+    pn = m ? m[0].toUpperCase() : (d.title || '').substring(0, 40);
+  }
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/hidden/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      partNumberBase: pn,
+      partType: d.partType || null,
+      make: null,
+      model: null,
+      source: 'perch',
+      sourceDetail: { title: d.title }
+    }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+      if (resp.success) {
+        var row = btn.closest('.item-row');
+        if (row) { row.style.transition = 'opacity 0.3s, background 0.3s'; row.style.background = '#3d0a0a'; row.style.opacity = '0'; setTimeout(function() { row.remove(); }, 400); }
+      } else { btn.disabled = false; btn.textContent = '✕ Hide'; }
+    })
+    .catch(function(err) { console.error('Hide failed:', err); btn.disabled = false; btn.textContent = '✕ Hide'; });
 }
 
 function markItem(title, partNumber, partType, medianPrice, sourceSignal, sellers, score, btn) {
@@ -460,29 +497,74 @@ function dismissIntel(title, btn) {
     .catch(function() { btn.disabled = false; btn.textContent = '✕'; });
 }
 
-function hideIntel(title, btn) {
-  btn.disabled = true;
-  btn.textContent = '...';
-  // Extract PN from title if possible
-  var pnMatch = title.match(/[A-Z0-9]{5,}/);
-  fetch('/hidden/add', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ partNumberBase: pnMatch ? pnMatch[0] : title.substring(0, 40), source: 'perch', sourceDetail: { title: title } }),
-  })
+// hideIntel removed — hideByIdx handles hide directly with structured data
+
+// Tab switching
+var currentPerchTab = 'intel';
+function switchPerchTab(tab) {
+  currentPerchTab = tab;
+  document.getElementById('tab-intel').style.color = tab === 'intel' ? '#F0F0F0' : '#6B7280';
+  document.getElementById('tab-intel').style.borderBottomColor = tab === 'intel' ? '#dc2626' : 'transparent';
+  document.getElementById('tab-hidden').style.color = tab === 'hidden' ? '#F0F0F0' : '#6B7280';
+  document.getElementById('tab-hidden').style.borderBottomColor = tab === 'hidden' ? '#dc2626' : 'transparent';
+  document.getElementById('intelView').style.display = tab === 'intel' ? 'block' : 'none';
+  document.getElementById('hiddenView').style.display = tab === 'hidden' ? 'block' : 'none';
+  if (tab === 'hidden') loadHiddenParts();
+}
+
+function loadHiddenParts() {
+  document.getElementById('hiddenLoading').style.display = 'block';
+  fetch('/hidden/list')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('hiddenLoading').style.display = 'none';
+      document.getElementById('hiddenCount').textContent = d.total || 0;
+      if (!d.items || d.items.length === 0) {
+        document.getElementById('hiddenList').innerHTML = '<div class="empty">No hidden parts</div>';
+        return;
+      }
+      var h = '';
+      d.items.forEach(function(item) {
+        h += '<div class="item-row" style="align-items:center" id="hidden-' + item.id + '">';
+        h += '<div style="flex:1;min-width:0">';
+        h += '<div style="font-size:13px;font-weight:600;font-family:monospace;color:#F0F0F0">' + esc(item.part_number_base) + '</div>';
+        h += '<div style="font-size:10px;color:#6B7280">';
+        if (item.part_type) h += '<span>' + esc(item.part_type) + '</span> · ';
+        if (item.make) h += esc(item.make) + ' ';
+        if (item.model) h += esc(item.model) + ' · ';
+        h += '<span>' + esc(item.source) + '</span>';
+        h += '</div></div>';
+        h += '<button class="btn-sm" style="color:#22c55e;border-color:#064e3b" onclick="unhidePart(\'' + item.id + '\',this)">Unhide</button>';
+        h += '</div>';
+      });
+      document.getElementById('hiddenList').innerHTML = h;
+    })
+    .catch(function(err) {
+      document.getElementById('hiddenLoading').style.display = 'none';
+      document.getElementById('hiddenList').innerHTML = '<div class="empty" style="color:#dc2626">Error: ' + err.message + '</div>';
+    });
+}
+
+function unhidePart(id, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/hidden/' + id, { method: 'DELETE' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.success) {
-        var row = btn.closest('.item-row');
-        if (row) { row.style.transition = 'opacity 0.3s, background 0.3s'; row.style.background = '#3d0a0a'; row.style.opacity = '0'; setTimeout(function() { row.remove(); }, 400); }
-      } else { btn.disabled = false; btn.textContent = '✕'; }
+        var el = document.getElementById('hidden-' + id);
+        if (el) { el.style.opacity = '0'; setTimeout(function() { el.remove(); }, 300); }
+        var cnt = parseInt(document.getElementById('hiddenCount').textContent) - 1;
+        document.getElementById('hiddenCount').textContent = Math.max(0, cnt);
+      } else { btn.disabled = false; btn.textContent = 'Unhide'; }
     })
-    .catch(function() { btn.disabled = false; btn.textContent = '✕'; });
+    .catch(function() { btn.disabled = false; btn.textContent = 'Unhide'; });
 }
 
 load();
 loadGapIntel();
 loadEmerging();
+// Load hidden count on init
+fetch('/hidden/list').then(function(r){return r.json()}).then(function(d){document.getElementById('hiddenCount').textContent = d.total || 0}).catch(function(){});
 </script>
 </body>
 </html>
