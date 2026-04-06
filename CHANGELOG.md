@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Intel Sources Wired into Attack List — 2026-04-06
+- Enhanced intel index: quarryPNs, streamPNs, overstockPNs separated (was single wantPNs set)
+- Per-source vehicle score boosts: MARK +15%, QUARRY +10%, STREAM +5% (multiplicative, stacking)
+- Part chips: ★gold MARK, ★green QUARRY, ★blue STREAM, ✕red OVERSTOCK
+- Expanded view: matching intel badges with source labels
+- intel_match_count on vehicle response, ★N indicator on collapsed cards
+- Files: AttackListService.js, attack-list.html
+
+---
+
 ## Fix Overstock Stock Counting + Overstock→Want List Auto-Transition — 2026-04-06
 - countStockedForEntry(): Clean Pipe partNumberBase+make+model (was title ILIKE with false PN matches)
 - 4Runner BCM: 13→0, Ranger Fuse Box: 21→correct count

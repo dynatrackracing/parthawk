@@ -95,6 +95,7 @@
   .chip-purple { background: #2d1a3e; color: #C39BD3; animation: pulse-purple 2s ease-in-out infinite; }
   .chip-blue { background: #1a2a3d; color: #3498DB; }
   .chip-green { background: #0a2e0a; color: #2ECC40; }
+  .chip-gold { background: #3d2e0a; color: #FFD700; }
   .chip-yellow { background: #3d2200; color: #FF8C00; }
   .chip-orange { background: #7c2d12; color: #f97316; }
   .chip-red { background: #3d0a0a; color: #FF4136; }
@@ -681,18 +682,44 @@
 
   function renderVehicle(v) {
     // Part chips — use slim part_chips or full parts
-    const chipSource = v.part_chips || (v.parts || []).slice(0, 6).map(p => ({ partType: p.partType || p.category, price: p.price, noveltyTier: p.noveltyTier }));
+    const chipSource = v.part_chips || (v.parts || []).slice(0, 6).map(p => ({ partType: p.partType || p.category, price: p.price, noveltyTier: p.noveltyTier, intelSources: p.intelSources, overstockWarning: p.overstockWarning }));
     const chipTypes = new Set();
     const chips = chipSource.filter(p => {
       const t = p.partType || '?';
       if (chipTypes.has(t)) return false;
       chipTypes.add(t);
       return true;
-    }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 5).map(p => {
+    }).sort((a, b) => {
+      // Overstock to end, then by price desc
+      if (a.overstockWarning && !b.overstockWarning) return 1;
+      if (!a.overstockWarning && b.overstockWarning) return -1;
+      return (b.price || 0) - (a.price || 0);
+    }).slice(0, 6).map(p => {
       const price = p.price || 0;
-      const cc = price > 0 ? 'chip-' + tierColor(price) : 'chip-gray';
-      const dot = p.noveltyTier === 'NOVEL' ? '<span style="color:#06b6d4">● </span>' : p.noveltyTier === 'RESTOCK' ? '<span style="color:#2ECC40">● </span>' : '';
-      return `<span class="chip ${cc}">${dot}${p.partType || '?'}</span>`;
+      const sources = p.intelSources || [];
+      const isOver = sources.includes('overstock');
+      const isMark = sources.includes('mark');
+      const isQuarry = sources.includes('quarry');
+      const isStream = sources.includes('stream') || sources.includes('restock');
+      let cc, star = '';
+      if (isOver) {
+        cc = 'chip-red';
+        star = '<span style="color:#ef4444">✕</span>';
+      } else if (isMark) {
+        cc = 'chip-gold';
+        star = '<span style="color:#FFD700">★</span>';
+      } else if (isQuarry) {
+        cc = 'chip-' + tierColor(price);
+        star = '<span style="color:#22c55e">★</span>';
+      } else if (isStream) {
+        cc = 'chip-' + tierColor(price);
+        star = '<span style="color:#3b82f6">★</span>';
+      } else {
+        cc = price > 0 ? 'chip-' + tierColor(price) : 'chip-gray';
+        const dot = p.noveltyTier === 'NOVEL' ? '<span style="color:#06b6d4">● </span>' : p.noveltyTier === 'RESTOCK' ? '<span style="color:#2ECC40">● </span>' : '';
+        star = dot;
+      }
+      return `<span class="chip ${cc}">${star}${p.partType || '?'}</span>`;
     }).join('');
 
     const rowClass = vehicleRowClass(v);
@@ -757,7 +784,7 @@
           ${line2}
           ${renderAlertBadges(v)}
           ${line3}
-          <div class="v-chips" style="margin-top:4px">${chips || '<span class="chip chip-gray">No data</span>'}</div>
+          <div class="v-chips" style="margin-top:4px">${chips || '<span class="chip chip-gray">No data</span>'}${v.intel_match_count > 0 ? ` <span style="font-size:8px;font-weight:700;color:#FFD700;margin-left:2px" title="${v.intel_match_count} intel-backed parts">★${v.intel_match_count}</span>` : ''}</div>
         </div>
       </div>
       <div class="v-expanded" id="vexp-${v.id}">
@@ -903,7 +930,7 @@
       const isCached = !!getCachedId(p);
       html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
-          <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${(p.intelSources || []).map(s => s === 'mark' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#E74C3C;color:#fff;margin-right:3px">\uD83C\uDFAF MARK</span>' : s === 'restock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#3498DB;color:#fff;margin-right:3px">\uD83D\uDD04 RESTOCK</span>' : s === 'sold' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#27AE60;color:#fff;margin-right:3px">\uD83D\uDCCA SOLD</span>' : s === 'flag' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#F39C12;color:#fff;margin-right:3px">\u26A1 FLAG</span>' : '').join('')}${p.noveltyTier === 'NOVEL' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>' : p.noveltyTier === 'RESTOCK' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
+          <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 PERCH' : '\u26A0 OVER'}</span>` : ''}${(p.intelSources || []).map(s => s === 'mark' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">★ MARK</span>' : s === 'quarry' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#064e3b;color:#22c55e;margin-right:3px">★ RESTOCK</span>' : s === 'stream' || s === 'restock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">★ WANT</span>' : s === 'overstock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">✕ OVER</span>' : s === 'sold' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#27AE60;color:#fff;margin-right:3px">SOLD</span>' : s === 'flag' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#F39C12;color:#fff;margin-right:3px">⚡ FLAG</span>' : '').join('')}${p.noveltyTier === 'NOVEL' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>' : p.noveltyTier === 'RESTOCK' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
           <div class="pd-verdict ${vc}">${noPrice ? 'NO DATA' : badgeVerdict + ' ' + pricePrefix + price + ' ' + freshness}</div>
         </div>
         <div class="pd-stats">

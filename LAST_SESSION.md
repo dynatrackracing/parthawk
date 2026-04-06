@@ -296,3 +296,14 @@ Deploys this session (13 total):
   Scout Alerts picks up new want list entries on next refresh
   Lifecycle: OVERSTOCK → stock=0 → WANT LIST (auto) → SCOUT ALERTS → CACHE → eBay
 - Files: restock-want-list.js, OverstockCheckService.js
+
+## Intel Sources Wired into Attack List — 2026-04-06
+- Enhanced intel index: quarryPNs (auto_generated want list), streamPNs (manual want list), overstockPNs (from overstock_group_item), markPNs (existing), flagPNs (existing)
+- Uses part_number column from restock_want_list when available (more reliable than title extraction)
+- Per-source vehicle score boosts (multiplicative, stacking): MARK +15%, QUARRY +10%, STREAM +5%
+- Overstock parts tagged with overstockWarning=true, sorted to end of chip list
+- intel_match_count added to vehicle response
+- Frontend chips: ★ gold star for MARK, ★ green star for QUARRY, ★ blue star for STREAM, ✕ red for OVERSTOCK
+- Expanded view badges: gold ★ MARK, green ★ RESTOCK, blue ★ WANT, red ✕ OVER, green SOLD, orange ⚡ FLAG
+- ★N indicator on collapsed card shows intel-backed part count
+- chip-gold CSS class added

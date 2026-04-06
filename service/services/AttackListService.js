@@ -1353,25 +1353,46 @@ class AttackListService {
       }
     }
 
-    // === MARK BOOST: parts matching the_mark get +15 bonus ===
+    // === INTEL SOURCE TAGGING: mark, quarry, stream, overstock, sold, flag ===
+    // Priority: mark > quarry > stream. Overstock is independent (warning).
     for (const p of filteredParts) {
       const pnUpper = (p.partNumber || '').toUpperCase();
       const pnBase = (p.partNumberBase || pnUpper).toUpperCase();
+      const sources = [];
+
+      // MARK (priority 1)
       if ((pnBase && markIndex.byPN.has(pnBase)) || (pnUpper && markIndex.byPN.has(pnUpper))) {
         p.isMarked = true;
+        sources.push('mark');
       }
-    }
 
-    // === INTEL SOURCE BADGES: tag parts with intel origins ===
-    for (const p of filteredParts) {
-      const sources = [];
-      if (p.isMarked) sources.push('mark');
-      const pnUpper = (p.partNumber || p.partNumberBase || '').toUpperCase();
-      if (pnUpper && intelIndex.wantPNs.has(pnUpper)) sources.push('restock');
-      if (pnUpper && intelIndex.flagPNs.has(pnUpper)) sources.push('flag');
-      // 'sold' = this part type was sold for this make/model in the sales window
+      // QUARRY / STREAM (priority 2/3) — from intelIndex
+      if (pnBase || pnUpper) {
+        const key = pnBase || pnUpper;
+        if (intelIndex.quarryPNs && intelIndex.quarryPNs.has(key)) {
+          if (!p.isMarked) sources.push('quarry');
+        } else if (intelIndex.streamPNs && intelIndex.streamPNs.has(key)) {
+          if (!p.isMarked) sources.push('stream');
+        } else if (intelIndex.wantPNs && intelIndex.wantPNs.has(key)) {
+          // Legacy fallback
+          if (!p.isMarked) sources.push('restock');
+        }
+      }
+
+      // OVERSTOCK (independent warning — always show if matched)
+      if ((pnBase && intelIndex.overstockPNs && intelIndex.overstockPNs.has(pnBase)) ||
+          (pnUpper && intelIndex.overstockPNs && intelIndex.overstockPNs.has(pnUpper))) {
+        p.overstockWarning = true;
+        sources.push('overstock');
+      }
+
+      // FLAG
+      if (pnUpper && intelIndex.flagPNs && intelIndex.flagPNs.has(pnUpper)) sources.push('flag');
+
+      // SOLD = this part type was sold for this make/model in the sales window
       const pt = (p.partType || '').toUpperCase();
       if (pt && salesDemand.partTypes[pt] && salesDemand.partTypes[pt].count > 0) sources.push('sold');
+
       p.intelSources = sources.length > 0 ? sources : null;
     }
 
@@ -1428,8 +1449,14 @@ class AttackListService {
     score += Math.min(15, (filteredParts.length - 1) * 3);
     // Bonus: any part sold 2+ times in 90d
     if (filteredParts.some(p => (p.sold_90d || 0) >= 2)) score += 5;
-    // Bonus: any part on The Mark want list
-    if (filteredParts.some(p => p.isMarked)) score += 15;
+    // Bonus: intel-backed parts boost vehicle score
+    const intelMatchCount = filteredParts.filter(p => p.intelSources && p.intelSources.some(s => s === 'mark' || s === 'quarry' || s === 'stream' || s === 'restock')).length;
+    for (const p of filteredParts) {
+      if (!p.intelSources) continue;
+      if (p.intelSources.includes('mark')) score = Math.round(score * 1.15);
+      else if (p.intelSources.includes('quarry')) score = Math.round(score * 1.10);
+      else if (p.intelSources.includes('stream') || p.intelSources.includes('restock')) score = Math.round(score * 1.05);
+    }
 
     // === STOCK PENALTY SCALING — more stock = harder suppression ===
     // Max in_stock across all parts on this vehicle
@@ -1629,6 +1656,7 @@ class AttackListService {
       est_value: totalValue,
       max_part_value: filteredParts.filter(p => !p.belowFloor).length > 0 ? Math.max(...filteredParts.filter(p => !p.belowFloor).map(p => p.price || 0)) : 0,
       matched_parts: filteredParts.length,
+      intel_match_count: intelMatchCount,
       avg_part_price: Math.round(salesDemand.avgPrice || avgPrice),
       sales_count: salesDemand.count,
       platform_siblings: platformSiblingNames.length > 0 ? platformSiblingNames : null,
@@ -1755,14 +1783,30 @@ class AttackListService {
       }
     } catch (e) { /* the_mark may not exist */ }
 
-    // Build intel index for source badges (want list + restock flags)
-    const intelIndex = { wantPNs: new Set(), wantPartTypes: new Set(), flagPNs: new Set() };
+    // Build intel index for source badges (quarry, stream, overstock, flags)
+    const intelIndex = { wantPNs: new Set(), quarryPNs: new Set(), streamPNs: new Set(), overstockPNs: new Set(), flagPNs: new Set() };
     try {
-      const wants = await database('restock_want_list').where('active', true).select('title');
+      const wants = await database('restock_want_list').where('active', true).select('title', 'part_number', 'auto_generated');
       const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      const { normalizePartNumber } = require('../lib/partNumberUtils');
       for (const w of wants) {
-        const pns = eiPNs(w.title || '');
-        for (const pn of pns) intelIndex.wantPNs.add((pn.base || pn.normalized || '').toUpperCase());
+        const pns = [];
+        // Use part_number column if available (more reliable)
+        if (w.part_number) {
+          const norm = normalizePartNumber(w.part_number);
+          if (norm) pns.push(norm.toUpperCase());
+        }
+        // Also extract from title as fallback
+        const extracted = eiPNs(w.title || '');
+        for (const pn of extracted) {
+          const key = (pn.base || pn.normalized || '').toUpperCase();
+          if (key) pns.push(key);
+        }
+        const targetSet = w.auto_generated ? intelIndex.quarryPNs : intelIndex.streamPNs;
+        for (const pn of pns) {
+          targetSet.add(pn);
+          intelIndex.wantPNs.add(pn); // Legacy compat
+        }
       }
     } catch (e) { /* table may not exist */ }
     try {
@@ -1771,6 +1815,19 @@ class AttackListService {
       for (const f of flags) {
         const pns = eiPNs(f.title || '');
         for (const pn of pns) intelIndex.flagPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+    // Overstock PNs — parts we have too many of
+    try {
+      const overItems = await database('overstock_group_item')
+        .join('overstock_group', 'overstock_group.id', 'overstock_group_item.group_id')
+        .where('overstock_group.status', 'active')
+        .where('overstock_group_item.is_active', true)
+        .select('overstock_group_item.title');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const o of overItems) {
+        const pns = eiPNs(o.title || '');
+        for (const pn of pns) intelIndex.overstockPNs.add((pn.base || pn.normalized || '').toUpperCase());
       }
     } catch (e) { /* table may not exist */ }
 
