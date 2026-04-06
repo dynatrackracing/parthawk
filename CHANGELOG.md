@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix hidden_parts INSERT — Broken Knex onConflict — 2026-04-06
+- POST /hidden/add threw 500 on every call — Knex `.onConflict(raw(...))` wrapped expression in double parens, producing invalid SQL
+- Zero rows were ever inserted into hidden_parts table
+- Replaced with raw INSERT ... ON CONFLICT DO NOTHING RETURNING id
+- Duplicate detection now returns `alreadyHidden: true` instead of silent failure
+- Files: hidden.js
+
+---
+
 ## Fix Hide Button + HIDDEN Tab on Hunters Perch — 2026-04-06
 - hideByIdx() uses structured partNumber from _intelData (was unreliable title regex)
 - HIDDEN tab: lazy-loaded list of hidden parts, unhide button, count badge

@@ -1,6 +1,15 @@
-# LAST SESSION — 2026-04-05
+# LAST SESSION — 2026-04-06
 
-## Edit Part Numbers on Cache & Scour Stream Want List
+## Fix hidden_parts INSERT — Broken Knex onConflict
+- POST /hidden/add threw 500 on every call due to Knex `.onConflict(raw(...))` double-paren SQL bug
+- Replaced with raw INSERT ... ON CONFLICT DO NOTHING — inserts now succeed, duplicates return `alreadyHidden: true`
+- Files: service/routes/hidden.js
+
+## Diagnosed (not yet fixed)
+- **BUG 1 — Gap-intel showing parts we've sold**: `extractPartNumber()` matches year ranges like `2007-2011` before the real PN `44510-30270`. Also, gap-intel only reads `title` from YourSale — ignores the clean `partNumberBase` column.
+- **BUG 2 — Hide on The Mark doesn't persist**: `hideMark()` fires `/hidden/add` but doesn't check the response. Mark is deleted from the_mark, but the hidden insert failed (now fixed above), so the part reappears on Hunters Perch.
+
+## Previous — Edit Part Numbers on Cache & Scour Stream Want List
 - Added PATCH /cache/:id — update partNumber (re-normalized), partDescription, partType, make, model, year, notes on cache entries
 - Added PATCH /restock-want-list/:id — update title, notes on want list entries
 - Added PATCH /restock-want-list/by-title — update want list entry by title match (used by scout-alerts inline edit), also updates scout_alerts.source_title
