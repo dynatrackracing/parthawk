@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Overstock Stock Counting + Overstock→Want List Auto-Transition — 2026-04-06
+- countStockedForEntry(): Clean Pipe partNumberBase+make+model (was title ILIKE with false PN matches)
+- 4Runner BCM: 13→0, Ranger Fuse Box: 21→correct count
+- OverstockCheckService: auto-creates want list entry when stock drops to 0
+- Lifecycle: OVERSTOCK→stock=0→WANT LIST (auto)→SCOUT ALERTS→CACHE→eBay
+- Files: restock-want-list.js, OverstockCheckService.js
+
+---
+
 ## QUARRY: Remove 200 Cap, High-Value CRITICAL Upgrade, Timeframe Sort, Pagination — 2026-04-06
 - Removed items.slice(0, 200) hard cap — returns all qualifying items with pagination
 - High-value zero-stock parts auto-upgrade to CRITICAL (avgPrice≥$200+sold≥1, or totalRevenue≥$500)

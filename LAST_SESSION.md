@@ -285,3 +285,14 @@ Deploys this session (13 total):
 - Summary counts now reflect ALL items, not just current page
 - Frontend labels confirmed correct: CRITICAL=RESTOCK NOW, LOW=STRONG BUY, WATCH=CONSIDER
 - quarrySync() also uses updated getUrgency with totalRevenue param
+
+## 09:00 — Fix Overstock Stock Counting + Overstock→Want List Auto-Transition
+- countStockedForEntry() rewritten: uses partNumberBase column (not title ILIKE), scoped by make/model
+  Before: 4Runner BCM=13 (caught all 4Runner listings via model name as PN), Ranger Fuse Box=21 (bare 14B476 cross-model)
+  After: 4Runner BCM=0 (correct), Ranger Fuse Box=only Ranger matches
+- Requires 8+ char PNs to avoid model names (4RUNNER, TRANSIT) being treated as part numbers
+- Uses entry stored part_number/make/model from Scour Stream upgrade
+- OverstockCheckService auto-transition: when stock drops from >0 to 0, auto-creates want list entry
+  Scout Alerts picks up new want list entries on next refresh
+  Lifecycle: OVERSTOCK → stock=0 → WANT LIST (auto) → SCOUT ALERTS → CACHE → eBay
+- Files: restock-want-list.js, OverstockCheckService.js
