@@ -172,3 +172,14 @@ Deploys this session (13 total):
 - Backfill script: service/scripts/backfill-epa-transmission.js — deletes vin_cache with null trans, re-decodes yard_vehicles
 - CLAUDE_RULES.md rule 27 updated with full CHECK_MT model list + performance trim override
 - Run order: (1) deploy, (2) import EPA CSV, (3) run backfill
+
+## 23:30 — vPIC Database Restore + Trim Fallback (Phase 10b)
+- Restored NHTSA vPIC standalone PostgreSQL database to vpic schema (1.6M Pattern rows, spvindecode stored procedure)
+- Added vpicTrimFallback() to LocalVinDecoder — step 3.5 in decode pipeline (after VDS, before EPA)
+- Fills trim for all makes that VDS does not cover (Nissan, Toyota, Lexus, BMW, Mercedes, Hyundai/Kia, etc.)
+- EPA step 4.5 updated: also runs when transHint came from vPIC so CHECK_MT logic still wins
+- Backfill: 2,152 vehicles got trim, 10 got transmission (0 errors)
+- Top resolved: Chevrolet 435, Toyota 322, Nissan 299, Dodge 153, BMW 126, Hyundai 124, GMC 120, Ford 107
+- Before: Nissan 1.1%, BMW 10.6%, Toyota 29.8%. After: Nissan 30.8%, BMW 81.5%, Toyota 75.8%, Chevrolet 95.9%, GMC 100%
+- vPIC SQL file in .gitignore (not committed). DB size: ~1.4GB after restore.
+- restore-vpic.js: streaming SQL loader with COPY FROM stdin + dollar-quoting support

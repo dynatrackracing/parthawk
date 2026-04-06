@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Phase 10b: vPIC Trim+Transmission Fallback — 2026-04-06
+- Restored NHTSA vPIC standalone PostgreSQL database to vpic schema (1.6M patterns)
+- LocalVinDecoder step 3.5: vpicTrimFallback() — fills trim+transmission from vPIC pattern matching
+- Fixes trim regression from Phase 9: Nissan 1.1%→30.8%, BMW 10.6%→81.5%, Toyota 29.8%→75.8%, Chevy 58.2%→95.9%, GMC 50.4%→100%
+- Backfill: 2,152 vehicles got trim (0 errors)
+
+---
+
 ## Phase 10: EPA Transmission Resolver — 2026-04-05
 - vin_decoder.epa_transmission table: 36,035 EPA FuelEconomy.gov records (year/make/model/trans_type/speeds)
 - resolveTransmission() 3-tier: epa_definitive (single type), epa_check_mt (22 models), epa_default_auto (both offered, default auto)

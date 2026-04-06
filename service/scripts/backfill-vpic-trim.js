@@ -76,7 +76,7 @@ async function run() {
 
   // Verify vPIC is available
   try {
-    var test = await database.raw("SELECT count(*) as cnt FROM vpic.\"Pattern\"");
+    var test = await database.raw("SELECT count(*) as cnt FROM vpic.pattern");
     console.log('vPIC Pattern table:', test.rows[0].cnt, 'rows\n');
   } catch (e) {
     console.error('ERROR: vpic schema not found. Run the vPIC SQL restore first.');
