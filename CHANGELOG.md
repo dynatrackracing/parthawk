@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Airbag Exclusion + Vehicle Attribute Boosts + ECM Visibility — 2026-04-06
+- Airbags/SRS added to isExcludedPart() backend+frontend, removed from PART_PRICE_FLOORS
+- Vehicle scoring boosts: PERFORMANCE +20%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%
+- Pro-rebuild ECM/ECU/PCM display as normal scored parts (1,298 items, bypass rebuild grouping)
+- CLAUDE_RULES rules 19+20 updated
+- Files: AttackListService.js, dh-parts.js, attack-list.html, CLAUDE_RULES.md
+
+---
+
 ## Phase 10b: vPIC Trim+Transmission Fallback — 2026-04-06
 - Restored NHTSA vPIC standalone PostgreSQL database to vpic schema (1.6M patterns)
 - LocalVinDecoder step 3.5: vpicTrimFallback() — fills trim+transmission from vPIC pattern matching

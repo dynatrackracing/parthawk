@@ -183,3 +183,16 @@ Deploys this session (13 total):
 - Before: Nissan 1.1%, BMW 10.6%, Toyota 29.8%. After: Nissan 30.8%, BMW 81.5%, Toyota 75.8%, Chevrolet 95.9%, GMC 100%
 - vPIC SQL file in .gitignore (not committed). DB size: ~1.4GB after restore.
 - restore-vpic.js: streaming SQL loader with COPY FROM stdin + dollar-quoting support
+
+## 01:00 — Airbag Exclusion + Vehicle Attribute Boosts + Pro-Rebuild ECM Visibility
+- Airbags/SRS excluded from attack list + scout alerts (clock springs still sellable)
+- Scoring audit: vehicles sort by max_part_value DESC then est_value DESC. Parts sort by sold_90d DESC.
+- No existing attribute boosts found — fresh implementation
+- Vehicle attribute boosts: PERFORMANCE +20%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%
+- Applied as multiplier on score after stock/fresh/COGS. attributeBoost + boostReasons passed to frontend.
+- Frontend: cyan "↑XX%" below score badge
+- ECM visibility confirmed: isExcludedPart() does NOT catch ECM/ECU/PCM titles (engine exclusion requires ASSEMBLY/BLOCK/COMPLETE — not CONTROL/MODULE)
+- Pro-rebuild ECM fix: 1,298 pro-rebuild ECM items now bypass rebuild grouping, display as normal scored parts with full pricing
+- AIRBAG removed from PART_PRICE_FLOORS
+- CLAUDE_RULES rules 19+20 updated
+- Files: AttackListService.js, dh-parts.js, attack-list.html, CLAUDE_RULES.md
