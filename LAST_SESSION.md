@@ -215,3 +215,13 @@ Deploys this session (13 total):
 - Frontend: rarity badges with tier colors + pulsing for LEGENDARY/RARE, tooltip shows avg days + total seen
 - CLAUDE_RULES rule 21b updated with persistent rarity system
 - Files: migration, backfill script, AttackListService.js, attack-list.html, index.js, CLAUDE_RULES.md
+
+## 04:00 — Backend: Rarity Thresholds + Score Uncap + Vehicle Limit Removed
+- Rarity thresholds corrected to long-term values: LEGENDARY 180+d, RARE 90+d, UNCOMMON 45+d, NORMAL 15+d, COMMON 7+d, SATURATED <7d
+- Most vehicles show LEGENDARY with 19d of data — correct, will self-calibrate as daily scrapes accumulate
+- Score uncapped: Math.min(100, score) removed. Boosted vehicles can score 127, 145, etc.
+- Vehicle limits removed: getAttackList .limit(200) gone, getAllYardsAttackList .limit(500) gone
+- Frontend VEHICLE_CAPS raised: all=5000 (was 500), other filters proportionally raised
+- Part noveltyBoost field exposed in response (20/10/0) alongside existing noveltyTier
+- ALL filter already correct (pillDays=999, groups by age, no date restriction)
+- Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md

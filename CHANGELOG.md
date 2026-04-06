@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Rarity Thresholds + Score Uncap + Vehicle Limit Removed — 2026-04-06
+- Rarity: long-term thresholds (LEGENDARY 180+d through SATURATED <7d)
+- Score uncapped — can exceed 100 with attribute/rarity/novelty boosts
+- Vehicle limits removed (was 200/500 backend, 500 frontend cap → unlimited)
+- Part noveltyBoost exposed in response
+- Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md
+
+---
+
 ## Persistent Vehicle Rarity + Sort Overhaul — 2026-04-06
 - vehicle_frequency table with lifetime avg_days_between tracking (1,057 rows backfilled)
 - 6-tier rarity: LEGENDARY/RARE/UNCOMMON/NORMAL/COMMON/SATURATED with pulsing gold/purple badges
