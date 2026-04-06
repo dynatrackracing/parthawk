@@ -28,7 +28,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
 | `/restock` | restockReport.js | GET `/report` (paginated: page/pageSize, timeframe sort, CRITICAL upgrade) `/found-items`, POST `/quarry-sync` |
-| `/restock-want-list` | restock-want-list.js | GET `/items` `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
+| `/restock-want-list` | restock-want-list.js | GET `/items` `/titles` (lightweight, no stock check) `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
 | `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
 | `/api/fitment` | fitment.js | GET `/lookup` `/stats` |
@@ -36,7 +36,8 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/part-location` | part-location.js | GET `/:partType/:make/:model/:year`, POST `/confirm` `/flag-wrong` |
 | `/vin` | vin.js | POST `/decode-photo` `/scan`, GET `/history` `/test-local/:vin` |
 | `/stale-inventory` | stale-inventory.js | POST `/run` `/returns` `/revise-price` `/end-item` `/relist-item` `/bulk-end`, GET `/actions` `/returns/pending` `/candidates` `/restock/flags` |
-| `/competitors` | competitors.js | POST `/scan` `/auto-scrape` `/mark` `/mark/graduate` `/seed-defaults`, GET `/alerts` `/gap-intel` `/emerging` `/sellers` `/marks` `/:sellerId/best-sellers` + CRUD |
+| `/competitors` | competitors.js | POST `/scan` `/auto-scrape` `/mark` `/mark/graduate` `/seed-defaults`, GET `/alerts` `/gap-intel` (Clean Pipe partNumberBase, year-range PN rejection) `/emerging` (3+ sales by 2+ sellers in 60d) `/sellers` `/marks` `/:sellerId/best-sellers` + CRUD |
+| `/hidden` | hidden.js | POST `/add` (raw INSERT, ON CONFLICT DO NOTHING), DELETE `/:id`, GET `/list` `/keys` |
 | `/autolumen` | autolumen.js | POST `/import/listings` `/import/sales` `/import/transactions`, GET `/stats` |
 | `/cache` | cache.js | GET `/active` `/history` `/stats` `/check-stock` `/claimed-keys`, POST `/claim` `/:id/return` `/:id/resolve` `/resolve`, DELETE `/:id` |
 | `/trim-intelligence` | trim-intelligence.js | GET `/:year/:make/:model/:trim` |
@@ -148,12 +149,18 @@ Parts staging system -- tracks parts claimed from yards before listing.
 - `POST /attack-list/manual` -- manual vehicle entry
 - **Admin page:** `/admin/pull` and `/puller` (public) both serve attack-list.html
 
+### /hidden (Global Part Blacklist)
+- `POST /hidden/add` -- hide a part globally. Body: `{ partNumberBase, partType, make, model, source, sourceDetail, hiddenBy }`. Raw INSERT with ON CONFLICT (part_number_base, COALESCE(make,''), COALESCE(model,'')) DO NOTHING. Returns `{ success, id, alreadyHidden }`.
+- `DELETE /hidden/:id` -- unhide a part
+- `GET /hidden/list` -- all hidden parts ordered by created_at desc
+- `GET /hidden/keys` -- lightweight set for backend filtering: `{ keys: ["PN|MAKE|MODEL", ...] }`
+
 ### /competitors (Phase E4 -- partNumberBase grouping)
 `gap-intel`, `emerging`, and `best-sellers` now group by partNumberBase.
 - `POST /competitors/scan` -- run competitor price monitoring
 - `GET /competitors/alerts` -- active price alerts. `?dismissed=&limit=`
-- `GET /competitors/gap-intel` -- parts they sell that we don't (partNumberBase groups)
-- `GET /competitors/emerging` -- emerging competitor parts (partNumberBase groups)
+- `GET /competitors/gap-intel` -- parts they sell that we don't (partNumberBase groups). Uses Clean Pipe partNumberBase from YourSale/YourListing (not title extraction). extractPartNumber() rejects year ranges. Filters: weAlreadySellThis, dismissed, marked (dual markedTitles + markedPNs), hidden (loadHiddenSet). 90-day window, $100+ floor.
+- `GET /competitors/emerging` -- hot parts: 3+ sales by 2+ distinct sellers in 60-day window. Same Clean Pipe + hidden/marked filters. Sort: sellerCount DESC, totalCount DESC, avgPrice DESC. Cap 50.
 - `GET /competitors/:sellerId/best-sellers` -- seller top sellers (partNumberBase groups)
 - `GET /competitors/sellers` -- list tracked sellers
 - `POST /competitors/auto-scrape` -- trigger scrape of tracked sellers

@@ -75,8 +75,12 @@ Generated 2026-04-06
 ### hunters-perch.html (Hunters Perch)
 - **URL:** `/admin/hunters-perch`
 - **Nav key:** `perch`
-- **Features:** Gap intel, emerging parts, seller tracking/scraping, Mark + Dismiss buttons
-- **API:** `/competitors/gap-intel`, `/competitors/emerging`, `/competitors/sellers`, `/competitors/:name/best-sellers`, `/competitors/:name/scrape`, `/competitors/mark`, `/competitors/dismiss`
+- **Two tabs:** INTEL (default) / HIDDEN (with count badge)
+- **INTEL tab:** Two sections: NEW INTEL (gap-intel: parts competitors sell that we don't, 90d) + EMERGING (hot parts: 3+ sales by 2+ sellers in 60d). Seller filter dropdown. Mark (★ gold) + Hide (✕ red) buttons per item using `window._intelData` lookup pattern.
+- **HIDDEN tab:** Lazy-loads GET /hidden/list. Shows PN + partType + source per item, Unhide button (DELETE /hidden/:id), hidden count badge on tab.
+- **Mark flow:** markByIdx() → POST /competitors/mark with structured data from _intelData
+- **Hide flow:** hideByIdx() → POST /hidden/add with partNumber from _intelData (structured, not title regex)
+- **API:** `/competitors/gap-intel`, `/competitors/emerging`, `/competitors/sellers`, `/competitors/:name/best-sellers`, `/competitors/:name/scrape`, `/competitors/mark`, `/hidden/add`, `/hidden/list`, `/hidden/:id` (DELETE)
 
 ### opportunities.html (Sky Watch)
 - **URL:** `/admin/opportunities`
@@ -87,8 +91,13 @@ Generated 2026-04-06
 ### the-mark.html (The Mark)
 - **URL:** `/admin/the-mark`
 - **Nav key:** `mark`
-- **Features:** Active marks with source badges (SKY/PERCH), status badges (HUNTING/IN-YARD/LISTED/SOLD), push to want list
-- **API:** `/competitors/marks`, `/restock-want-list/items`, `/competitors/mark/:id` (DELETE), `/restock-want-list/add`
+- **Search bar:** Sticky at top, 150ms debounce, client-side filter across partNumber/originalTitle/partType/source/notes. "Showing X of Y marks" count.
+- **Mark cards:** Source badges (SKY/PERCH), status badges (HUNTING/IN-YARD/LISTED/SOLD), IN WANT LIST badge, median price, part number, time ago.
+- **Buttons per card:** Find in Yard (pin-drop icon, inline yard results), Send to want list (if not already), Remove, Hide (✕ red).
+- **Find in Yard:** Hits POST /restock-want-list/find-in-yard with mark title. Shows matching yard vehicles inline (YMM/color/yard/row/set date). Toggle on/off.
+- **Hide flow:** hideMark() awaits POST /hidden/add, checks response, only deletes from the_mark on success. Reverts card on failure.
+- **Hidden parts:** Collapsible section at bottom. Lazy-loads /hidden/list, unhide per item.
+- **API:** `/competitors/marks`, `/restock-want-list/titles` (lightweight, no stock check), `/restock-want-list/find-in-yard`, `/competitors/mark/:id` (DELETE), `/restock-want-list/add`, `/hidden/add`, `/hidden/list`, `/hidden/:id` (DELETE)
 
 ### restock-list.html (Scour Stream)
 - **URL:** `/admin/restock-list`
