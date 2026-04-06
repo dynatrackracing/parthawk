@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Emerging Rewrite — Hot Parts Signal — 2026-04-06
+- Old NEW/ACCEL criteria was trivially true (1,078/1,085 items = 99.4% overlap with gap-intel)
+- New: 3+ sales by 2+ distinct sellers in 60-day window. Currently 13 genuine multi-seller validated results.
+- Applied Clean Pipe partNumberBase fix to emerging's buildMatchSets (missed in previous deploy)
+- Frontend: updated subtitle, badges, score display for new response shape
+- Files: competitors.js, hunters-perch.html
+
+---
+
 ## Four-Bug Cascade Fix — Hidden + Gap-Intel — 2026-04-06
 - **hidden_parts insert**: POST /hidden/add threw 500 on every call — Knex `.onConflict(raw)` double-paren SQL. Replaced with raw INSERT. Zero rows had ever been inserted.
 - **the-mark hideMark()**: Fire-and-forget → now awaits /hidden/add response, reverts card on failure instead of deleting mark blindly

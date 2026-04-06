@@ -1,5 +1,12 @@
 # LAST SESSION — 2026-04-06
 
+## Emerging Rewrite — Hot Parts Signal
+- Old criteria (NEW/ACCEL) was trivially true — 1,078 of 1,085 items qualified, 99.4% overlap with gap-intel
+- New criteria: 3+ sales by 2+ distinct sellers in 60 days. Currently 13 results — genuine validated signals.
+- Applied Clean Pipe partNumberBase fix to emerging's buildMatchSets (was missed in previous deploy)
+- Updated frontend: subtitle, badge, score display to match new response shape
+- Files: service/routes/competitors.js, service/public/hunters-perch.html
+
 ## Four-Bug Cascade Fix — Hidden + Gap-Intel
 All four root causes fixed and deployed:
 1. **hidden_parts insert**: Knex `.onConflict(raw)` double-paren SQL → raw INSERT. Zero rows had ever been inserted.
