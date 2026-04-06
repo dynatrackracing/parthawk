@@ -726,7 +726,7 @@
     let rarityInline = '';
     if (v.rarityTier && v.rarityTier !== 'NORMAL') {
       const rtColor = v.rarityColor || '#666';
-      const rtText = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' ? '#000' : '#fff';
+      const rtText = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' || v.rarityTier === 'SATURATED' ? '#000' : '#fff';
       const rtPulse = v.rarityPulses ? 'animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite;' : '';
       const rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
       rarityInline = ` <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>`;

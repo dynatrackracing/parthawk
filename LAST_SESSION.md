@@ -265,3 +265,14 @@ Deploys this session (13 total):
   - Single-sighting vehicles (totalSeen=1) still get LEGENDARY regardless (genuinely rare)
 - Re-backfilled: 895 rows, 0 epoch zero dates. Titan now SATURATED (avg 0.37d), Explorer SATURATED (avg 0.61d)
 - Distribution: 61% SATURATED, 35% single-sighting (will be capped to UNCOMMON by min-data guard), 2% COMMON, 1% NORMAL
+
+## 08:00 — Scour Stream Overhaul: Watchlist Removed, Want List Upgraded, Overstock Scanners
+- Watchlist tab removed entirely from frontend (backend routes left for compat)
+- Want list add form: Part Number + Description + Make + Model + Notes fields
+- POST /add accepts structured fields, builds title for backward compat, stores part_number/make/model columns
+- Migration: part_number, make, model columns added to restock_want_list
+- Want list is now default tab on page load
+- Overstock scan-duplicates: groups active YourListing by partNumberBase+make+model, shows count > 1
+- Overstock scan-high-qty: active listings with qty > 1 listed in last 30 days
+- Frontend: scan buttons + clear results, collapsible duplicate cards
+- Files: restock-list.html, restock-want-list.js (route), migration

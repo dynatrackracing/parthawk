@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scour Stream Overhaul — 2026-04-06
+- Watchlist tab removed, want list is default
+- Want list add: PN + Description + Make + Model + Notes (structured fields)
+- Migration: part_number, make, model columns on restock_want_list
+- Overstock scanners: scan-duplicates (partNumberBase groups) + scan-high-qty (qty>1, last 30d)
+- Files: restock-list.html, restock-want-list.js, migration
+
+---
+
 ## Fix: vehicle_frequency Epoch Zero Corruption — 2026-04-06
 - 174/895 rows had first_tracked_at=1970-01-01 from old LKQ scraper NULL first_seen dates
 - Backfill now uses earliest valid date (first_seen or createdAt, > 2020-01-01 guard)

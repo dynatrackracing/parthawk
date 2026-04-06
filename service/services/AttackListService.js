@@ -1522,7 +1522,7 @@ class AttackListService {
       rarityTier = 'COMMON'; rarityBoost = -5; rarityColor = '#FF8C00';
       rarityReason = `~${Math.round(avgDays)}d avg`;
     } else {
-      rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = '#FF4136';
+      rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = 'rgba(140,50,50,0.45)';
       rarityReason = `~${(avgDays || 0).toFixed(1)}d avg`;
     }
 
