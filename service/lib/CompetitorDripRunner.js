@@ -51,7 +51,7 @@ class CompetitorDripRunner {
     try {
       const result = await manager.scrapeCompetitor({
         seller: seller.name,
-        categoryId: '6030',
+        categoryId: '0',
         maxPages,
       });
 

@@ -578,7 +578,7 @@ router.post('/auto-scrape', async (req, res) => {
       try {
         const result = await manager.scrapeCompetitor({
           seller: seller.name,
-          categoryId: '6030',
+          categoryId: '0',
           maxPages: 3,
         });
 
