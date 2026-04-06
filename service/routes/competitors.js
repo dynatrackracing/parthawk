@@ -153,9 +153,13 @@ router.get('/gap-intel', async (req, res) => {
 
     // Exclude items already in the_mark (actively tracked)
     let markedTitles = new Set();
+    let markedPNs = new Set();
     try {
-      const marks = await database('the_mark').where('active', true).select('normalizedTitle');
+      const marks = await database('the_mark').where('active', true).select('normalizedTitle', 'partNumber');
       markedTitles = new Set(marks.map(function(m) { return m.normalizedTitle; }));
+      for (const m of marks) {
+        if (m.partNumber) markedPNs.add(m.partNumber.toUpperCase());
+      }
     } catch (e) { /* table may not exist yet */ }
 
     // Check yard_vehicle for local matches (moved BEFORE gap loop)
@@ -173,6 +177,7 @@ router.get('/gap-intel', async (req, res) => {
       if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
       if (markedTitles.has(key)) continue;
+      if (group._partNumberBase && markedPNs.has(group._partNumberBase.toUpperCase())) continue;
 
       // Calculate median price
       const sorted = group.prices.sort((a, b) => a - b);
@@ -309,10 +314,20 @@ router.get('/emerging', async (req, res) => {
       dismissedTitles = new Set(dismissed.map(function(d) { return d.normalizedTitle; }));
     } catch (e) { /* table may not exist yet */ }
 
+    // Load marks + hidden for filtering
+    let emMarkedTitles = new Set(), emMarkedPNs = new Set();
+    try {
+      const marks = await database('the_mark').where('active', true).select('normalizedTitle', 'partNumber');
+      emMarkedTitles = new Set(marks.map(m => m.normalizedTitle));
+      for (const m of marks) { if (m.partNumber) emMarkedPNs.add(m.partNumber.toUpperCase()); }
+    } catch (e) {}
+
     const emerging = [];
     for (const [key, group] of Object.entries(groups)) {
       if (weAlreadySellThis(group.title, yourPNs, yourKeys)) continue;
       if (dismissedTitles.has(key)) continue;
+      if (emMarkedTitles.has(key)) continue;
+      if (group._partNumberBase && emMarkedPNs.has(group._partNumberBase.toUpperCase())) continue;
 
       const sorted = group.prices.sort(function(a, b) { return a - b; });
       const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
