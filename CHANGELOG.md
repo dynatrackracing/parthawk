@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Persistent Vehicle Rarity + Sort Overhaul — 2026-04-06
+- vehicle_frequency table with lifetime avg_days_between tracking (1,057 rows backfilled)
+- 6-tier rarity: LEGENDARY/RARE/UNCOMMON/NORMAL/COMMON/SATURATED with pulsing gold/purple badges
+- Replaced ephemeral active-count rarity with persistent frequency-based scoring
+- Daily cron at 6:30 AM UTC, badge on vehicle cards with tooltip
+- Files: migration, backfill, AttackListService.js, attack-list.html, index.js, CLAUDE_RULES.md
+
+---
+
 ## Revenue-Optimized Scoring: Rarity + Novelty + Sort — 2026-04-06
 - Vehicle rarity from active yard_vehicle count (RARE/UNCOMMON/NORMAL/COMMON/SATURATED)
 - Part novelty tiers (NOVEL/RESTOCK/STOCKED) with scoring boosts

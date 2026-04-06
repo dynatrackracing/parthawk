@@ -205,3 +205,13 @@ Deploys this session (13 total):
 - Frontend: red RARE badge, yellow UNCOMMON badge on vehicles. Cyan NEW badge, green RESTOCK badge on parts.
 - CLAUDE_RULES rules 21b, 21c, 21d added
 - Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md
+
+## 03:00 — Revenue-Optimized Scoring: Persistent Rarity + Sort Overhaul
+- vehicle_frequency table: persistent make+model rarity tracking, avg_days_between metric
+- Backfill from all yard_vehicle history: 1,057 rows (315 LEGENDARY single-sighting)
+- 6-tier rarity: LEGENDARY gold pulse +30%, RARE purple pulse +20%, UNCOMMON blue +10%, NORMAL green 0%, COMMON orange -5%, SATURATED red -15%
+- Replaced ephemeral active-count rarityMap with persistent vehicle_frequency lookup
+- Daily cron at 6:30 AM UTC updates from new arrivals via UPSERT
+- Frontend: rarity badges with tier colors + pulsing for LEGENDARY/RARE, tooltip shows avg days + total seen
+- CLAUDE_RULES rule 21b updated with persistent rarity system
+- Files: migration, backfill script, AttackListService.js, attack-list.html, index.js, CLAUDE_RULES.md
