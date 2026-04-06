@@ -1,5 +1,13 @@
 # LAST SESSION — 2026-04-06
 
+## The Mark — Search Bar + Find in Yard
+- Sticky search bar at top: debounced 150ms client-side filter across partNumber, title, partType, source, notes
+- "Showing X of Y marks" count label updates in real time
+- Find-in-yard pin-drop button on each mark card — hits /restock-want-list/find-in-yard (same as Scour Stream)
+- Inline yard results: YMM, color, yard name, row, set date. Toggle on/off.
+- Separated loadMarks() from renderMarks() for search re-rendering
+- Files: service/public/the-mark.html
+
 ## Emerging Rewrite — Hot Parts Signal
 - Old criteria (NEW/ACCEL) was trivially true — 1,078 of 1,085 items qualified, 99.4% overlap with gap-intel
 - New criteria: 3+ sales by 2+ distinct sellers in 60 days. Currently 13 results — genuine validated signals.

@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## The Mark — Search Bar + Find in Yard — 2026-04-06
+- Sticky search bar: debounced 150ms client-side filter across all mark fields
+- Find-in-yard button on each mark card (same endpoint as Scour Stream)
+- Inline yard results with YMM, yard name, row, set date
+- Files: the-mark.html
+
+---
+
 ## Emerging Rewrite — Hot Parts Signal — 2026-04-06
 - Old NEW/ACCEL criteria was trivially true (1,078/1,085 items = 99.4% overlap with gap-intel)
 - New: 3+ sales by 2+ distinct sellers in 60-day window. Currently 13 genuine multi-seller validated results.
