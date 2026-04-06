@@ -709,58 +709,66 @@ function renderActiveTrip() {
   el.innerHTML = h;
 }
 
+function getScoreColor(s) {
+  if (s >= 120) return '#FFD700';
+  if (s >= 100) return '#00FF00';
+  if (s >= 80) return '#2ECC40';
+  if (s >= 60) return '#F1C40F';
+  if (s >= 40) return '#FF8C00';
+  return '#FF4136';
+}
+
 function renderVehicleCard(v) {
-  var sc = v.color_code || 'gray';
   var make = cleanModel(v.make || '', '');
   var model = cleanModel(v.model || '', v.make || '');
-  var engine = v.engine ? ' <span style="font-size:12px;color:#b0b0b0;font-weight:600">' + esc(v.engine) + '</span>' : '';
+  var engine = v.engine ? ' <span style="font-size:12px;color:#9CA3AF;font-weight:600">' + esc(v.engine) + '</span>' : '';
 
-  var trimBadge = '';
+  // Score badge color (matches attack list)
+  var scoreColor = getScoreColor(v.score || 0);
+  var scorePulse = (v.score || 0) >= 120 ? 'animation:pulse-gold 2s ease-in-out infinite;' : '';
+
+  // LINE 1 — rarity badge inline (only UNCOMMON/RARE/LEGENDARY)
+  var rarityInline = '';
+  if (v.rarityTier === 'UNCOMMON' || v.rarityTier === 'RARE' || v.rarityTier === 'LEGENDARY') {
+    var rtColor = v.rarityColor || '#666';
+    var rtText = v.rarityTier === 'LEGENDARY' ? '#000' : '#fff';
+    var rtPulse = v.rarityPulses ? 'animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite;' : '';
+    var rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
+    rarityInline = ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:' + rtColor + ';color:' + rtText + ';' + rtPulse + '">' + rtStar + v.rarityTier + '</span>';
+  }
+
+  // LINE 1 — total value right-aligned
+  var valColor = (v.est_value || 0) >= 800 ? '#2ECC40' : (v.est_value || 0) >= 500 ? '#F1C40F' : (v.est_value || 0) >= 250 ? '#FF8C00' : '#FF4136';
+
+  // LINE 2 — attribute badges
+  var attrBadges = [];
   if (v.trimBadge) {
-    var tbColor = v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b';
-    var tbText = v.trimBadge.color === 'gray' ? '#9ca3af' : '#000';
-    trimBadge = ' <span class="chip" style="font-size:9px;padding:1px 6px;background:' + tbColor + ';color:' + tbText + ';font-weight:' + (v.trimBadge.color === 'gray' ? '500' : '700') + '">' + esc(v.trimBadge.decodedTrim || v.trimBadge.label) + '</span>';
+    var tbBg = v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b';
+    var tbTx = v.trimBadge.color === 'gray' ? '#9ca3af' : '#000';
+    attrBadges.push('<span class="chip" style="font-size:9px;font-weight:' + (v.trimBadge.color === 'gray' ? '500' : '700') + ';padding:1px 6px;background:' + tbBg + ';color:' + tbTx + '">' + esc(v.trimBadge.decodedTrim || v.trimBadge.label) + '</span>');
   }
-
-  var rowNum = v.row_number ? '<span style="font-size:11px;color:var(--text-faint);float:right">Row ' + esc(v.row_number) + '</span>' : '';
-
-  // Premium flag badges
-  var badges = '';
-  var pf = v.premiumFlags || [];
-  pf.forEach(function(f) {
-    if (f === 'PERFORMANCE') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#f97316;color:#000;font-weight:700">PERFORMANCE</span> ';
-    if (f === 'PREMIUM') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#eab308;color:#000;font-weight:700">PREMIUM</span> ';
-    if (f === 'CULT') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#d946ef;color:#000;font-weight:700">CULT</span> ';
-    if (f === 'MANUAL') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#06b6d4;color:#000;font-weight:700">MANUAL</span> ';
-    if (f === 'DIESEL') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#166534;color:#22c55e;font-weight:700">DIESEL</span> ';
-    if (f === '4WD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">4WD</span> ';
-    if (f === 'AWD') badges += '<span class="chip" style="font-size:9px;padding:1px 6px;background:#16a34a;color:#000;font-weight:700">AWD</span> ';
-  });
-  if (v.isGuaranteedInclusion && v.guaranteedReason) {
-    badges += '<span class="chip" style="font-size:8px;padding:1px 5px;background:#78350f;color:#fbbf24;font-weight:600;letter-spacing:0.05em">RARE: ' + esc(v.guaranteedReason) + '</span> ';
+  if (v.cult) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>');
+  if (v.diesel) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>');
+  var dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase();
+  if (/4WD|4X4|AWD/i.test(dt)) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>');
+  if (v.decoded_transmission) {
+    if (/manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>');
+    else if (v.decoded_transmission === 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>');
   }
+  var line2 = attrBadges.length > 0 ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + attrBadges.join('') + '</div>' : '';
 
-  // Scout alert badges
-  if (v.alertBadges && v.alertBadges.length > 0) {
-    v.alertBadges.slice(0, 2).forEach(function(ab) {
-      if (ab.source === 'PERCH') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#422006;color:#f59e0b;font-weight:700">\uD83C\uDFAF MARK</span> ';
-      else if (ab.source === 'bone_pile') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#7c2d12;color:#f97316;font-weight:700">\u26A1 QUARRY</span> ';
-      else if (ab.source === 'hunters_perch') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#1e3a5f;color:#3b82f6;font-weight:700">\u26A1 PERCH</span> ';
-      else if (ab.source === 'OVERSTOCK') badges += '<span class="chip" style="font-size:9px;padding:2px 6px;background:#7f1d1d;color:#ef4444;font-weight:700">\u26A0 OVERSTOCK</span> ';
-    });
-  }
-
-  // Age badge (data-driven relative)
+  // LINE 3 — location + freshness
   var diy = v.daysInYard || 0;
-  if (diy === 0) {
-    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#064e3b;color:#22c55e;font-weight:700">NEW</span> ';
-  } else if (diy <= 3) {
-    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#713f12;color:#eab308;font-weight:700">' + diy + 'D</span> ';
-  } else if (diy <= 7) {
-    badges += '<span class="chip" style="font-size:9px;padding:1px 5px;background:#1f2937;color:#6B7280;font-weight:600">' + diy + 'D</span> ';
-  }
+  var newBadge = diy === 0 ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:#4CAF50;color:#000">NEW</span>' : '';
+  var metaParts = [];
+  if (v.row_number) metaParts.push('Row ' + v.row_number);
+  if (v.color) metaParts.push(v.color);
+  if (diy > 0) metaParts.push(diy + 'd ago');
+  var yardLabel = activeYardFilter === 'all' && v._yardName ? v._yardName.replace(/^LKQ |^Pull-A-Part /, '') : '';
+  if (yardLabel) metaParts.push(yardLabel);
+  var line3 = '<div style="font-size:11px;color:#6B7280;margin-top:3px">' + metaParts.join(' \u00b7 ') + newBadge + '</div>';
 
-  // Part type chips — names only, no dollar amounts (matches Daily Feed)
+  // LINE 4 — part chips with novelty dots (matches attack list)
   var chipSource = v.part_chips || [];
   var chipTypes = {};
   var chips = '';
@@ -769,26 +777,29 @@ function renderVehicleCard(v) {
     if (chipTypes[t]) return false;
     chipTypes[t] = true;
     return true;
-  }).sort(function(a, b) { return (b.price || 0) - (a.price || 0); }).slice(0, 4).forEach(function(p) {
+  }).sort(function(a, b) { return (b.price || 0) - (a.price || 0); }).slice(0, 5).forEach(function(p) {
     var price = p.price || 0;
     var cc = price > 0 ? getPartTier(price).cssClass : 'chip-gray';
-    var markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
-    chips += '<span class="chip ' + cc + '">' + markIcon + esc(p.partType || '?') + '</span> ';
+    var dot = p.noveltyTier === 'NOVEL' ? '<span style="color:#06b6d4">\u25cf </span>' : p.noveltyTier === 'RESTOCK' ? '<span style="color:#2ECC40">\u25cf </span>' : '';
+    chips += '<span class="chip ' + cc + '">' + dot + esc(p.partType || '?') + '</span> ';
   });
-
-  var yardLabel = activeYardFilter === 'all' && v._yardName ? '<span style="font-size:9px;color:var(--text-faint)">' + esc(v._yardName.replace(/^LKQ |^Pull-A-Part /, '')) + '</span> ' : '';
 
   var h = '<div class="vehicle-row" id="vrow-' + v.id + '">';
   h += '<div class="v-collapsed" onclick="toggleV(\'' + v.id + '\')">';
-  h += '<div class="v-score ' + sc + '">' + (v.score || 0) + '</div>';
-  h += '<div class="v-info">';
-  h += '<div class="v-title"><strong style="color:#fff">' + esc(v.year) + ' ' + esc(make) + ' ' + esc(model) + '</strong>' + engine + trimBadge + ' ' + rowNum + '</div>';
-  if (badges) h += '<div class="v-badges">' + yardLabel + badges + '</div>';
-  h += '<div class="v-chips">' + (chips || '<span class="chip chip-gray">No data</span>') + '</div>';
+  h += '<div class="v-score" style="background:' + scoreColor + '20;color:' + scoreColor + ';' + scorePulse + '">' + (v.score || 0) + '</div>';
+  h += '<div class="v-info" style="flex:1;min-width:0">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">';
+  h += '<div style="min-width:0"><div class="v-title"><strong style="color:#fff">' + esc(v.year) + ' ' + esc(make) + ' ' + esc(model) + '</strong>' + engine + rarityInline + '</div></div>';
+  if (v.est_value > 0) h += '<div style="font-size:14px;font-weight:700;color:' + valColor + ';flex-shrink:0">$' + v.est_value + '</div>';
   h += '</div>';
-  h += '<div class="v-right">';
-  if (v.est_value > 0) {
-    var allEst = chipSource.length > 0 && chipSource.every(function(p) { return p.priceSource === 'estimate'; });
+  h += line2;
+  h += line3;
+  h += '<div class="v-chips" style="margin-top:4px">' + (chips || '<span class="chip chip-gray">No data</span>') + '</div>';
+  h += '</div>';
+  h += '</div>';
+  // Keep the v-right for expanded view compatibility
+  h += '<div class="v-right" style="display:none">';
+  var allEst = chipSource.length > 0 && chipSource.every(function(p) { return p.priceSource === 'estimate'; });
     if (allEst) h += '<div class="v-value" style="color:#6B7280">~$' + v.est_value + ' <span style="font-size:9px">EST</span></div>';
     else h += '<div class="v-value">$' + v.est_value + '</div>';
   }
