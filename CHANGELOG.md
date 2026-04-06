@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Generation-Aware Rarity + Trim-Driven Badge Overrides — 2026-04-06
+- vehicle_frequency generation-aware: gen_start/gen_end from trim_tier_reference, decade fallback
+- Trim overrides: PERFORMANCE→LEGENDARY, PREMIUM→RARE, 4WD+MT→RARE, DIESEL→RARE (floor only, never lower)
+- Generation-specific frequency lookup, rarityReason field for badge detail
+- Backfill: 895 rows from 4,641 year combos. Camry split into 2012-2017 + 2018-2024.
+- Files: migration, backfill, AttackListService.js, index.js, attack-list.html, CLAUDE_RULES.md
+
+---
+
 ## Vehicle Card 4-Line Layout — 2026-04-06
 - Collapsed cards: headline (score+YMM+rarity) / attributes (trim+diesel+4WD+MT) / location (row+color+age+NEW) / parts (colored chips with novelty dots)
 - Score uncapped display (120+ = gold pulse), attribute boost as cyan ↑XX%

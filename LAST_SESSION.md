@@ -237,3 +237,18 @@ Deploys this session (13 total):
 - Part chips: 6 max (was 4), noveltyTier passed in slim part_chips response
 - Expanded view unchanged — parts load on demand, pull buttons work, cache sync works
 - Files: attack-list.html, attack-list.js (route)
+
+## 06:00 — Generation-Aware Rarity + Trim-Driven Badge Overrides
+- vehicle_frequency now generation-aware: gen_start/gen_end columns from trim_tier_reference
+- Backfill: 895 generation-aware rows (from 4,641 year combos). Camry split into 2012-2017 + 2018-2024.
+- Frequency lookup: tries generation-specific key first, falls back to make|model
+- Trim-driven rarity FLOOR overrides (raise only, never lower):
+  PERFORMANCE trim → LEGENDARY floor (+30%)
+  PREMIUM trim → RARE floor (+20%)
+  4WD+MANUAL → RARE floor (+20%)
+  DIESEL → RARE floor (+20%)
+- rarityReason field: shows "PERFORMANCE trim" or "~52d avg" or "1 sighting"
+- Daily cron updated: generation-aware grouping for new arrivals
+- Frontend: rarity badge detail text shows rarityReason
+- CLAUDE_RULES rule 21b updated with generation + override logic
+- Files: migration, backfill script, AttackListService.js, index.js, attack-list.html, CLAUDE_RULES.md
