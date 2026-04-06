@@ -137,7 +137,7 @@ function loadEmerging() {
         return;
       }
       var h = '<div style="padding:6px 0;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a;margin-bottom:6px">' + d.newCount + ' new on scene · ' + d.accelCount + ' accelerating</div>';
-      d.emerging.forEach(function(item) {
+      d.emerging.forEach(function(item, idx) {
         var signalBadge = item.signal === 'NEW' ? '<span class="badge" style="background:#1e3a5f;color:#3b82f6">NEW</span> ' : '<span class="badge" style="background:#422006;color:#f59e0b">ACCEL ' + item.recentCount + 'x</span> ';
         var pn = item.partNumber ? '<span style="font-family:monospace;font-size:11px;color:#f59e0b;background:#422006;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partNumber) + '</span>' : '';
         var ptBadge = item.partType ? '<span style="font-size:9px;font-weight:700;color:#a78bfa;background:#2e1065;padding:1px 5px;border-radius:3px;margin-right:4px">' + esc(item.partType) + '</span>' : '';
@@ -182,7 +182,7 @@ function loadGapIntel() {
 
       var h = '<div style="padding:6px 0;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a;margin-bottom:6px">' + d.totalGaps + ' parts found that we have never stocked or sold</div>';
 
-      d.gaps.forEach(function(gap) {
+      d.gaps.forEach(function(gap, idx) {
         var scoreColor = gap.score >= 70 ? '#22c55e' : gap.score >= 40 ? '#eab308' : '#6B7280';
         var scoreBg = gap.score >= 70 ? '#064e3b' : gap.score >= 40 ? '#422006' : '#1a1a1a';
         var badge = gap.soldCount >= 3 ? '<span class="badge b-hot">HOT ' + gap.soldCount + 'x</span> ' : '';
