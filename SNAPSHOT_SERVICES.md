@@ -28,9 +28,11 @@ Generated 2026-04-06
   8. Attribute boosts: PERFORMANCE +20%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%
   9. Rarity from vehicle_frequency: LEGENDARY (180+d or 1 sighting) +30%, RARE (90+d) +20%, UNCOMMON (45+d) +10%, NORMAL (15+d) 0%, COMMON (7+d) -5%, SATURATED (<7d) -15%
   10. **Score UNCAPPED** — can exceed 100 with boosts
+- **Intel index:** `buildIntelIndex()` loads 4 PN sets: quarryPNs (auto_generated want list), streamPNs (manual want list), overstockPNs (overstock_group_item), flagPNs (restock_flag). Mark targets from separate markIndex. Per-part `intelSources` array: ['mark', 'quarry', 'stream', 'restock', 'overstock', 'flag', 'sold']. Overstock parts get `overstockWarning: true`. `intel_match_count` on vehicle response.
+- **Intel scoring boosts:** MARK ×1.15 (+15%), QUARRY ×1.10 (+10%), STREAM/RESTOCK ×1.05 (+5%). Applied per matching part, multipliers compound. Overstock parts excluded from totalValue.
 - **Sort:** Vehicles by est_value DESC, max_part_value DESC tiebreaker. Parts by price DESC, noveltyTier ASC.
 - **No vehicle limit** — full yard inventory served. Frontend VEHICLE_CAPS raised to 5000.
-- **Response fields:** score (uncapped), rarityTier/Color/Pulses/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons, est_value, max_part_value, parts with noveltyTier/noveltyBoost/stockMatchType/specMismatch/mismatchReason/belowFloor
+- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons, intel_match_count, est_value, max_part_value, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
@@ -51,6 +53,7 @@ Generated 2026-04-06
 - Key methods: `getTrips()`, `createTrip()`, `getFlywayAttackList()`, `cleanupExpiredTripVehicles()`, `getCoreYardIds()`
 - getCoreYardIds() reads `is_core` flag from yard table (4 LKQ NC yards)
 - cleanupExpiredTripVehicles() deactivates vehicles 24h after trip completion, protects core yards + active trip yards
+- **getFlywayAttackList():** Builds full intelIndex + frequencyMap (same as Daily Feed). Road trip filter: only LEGENDARY + RARE + MARK vehicles. Day trip: no filter (identical to Daily Feed). Part chips: 6 max with noveltyTier + intelSource.
 
 ## Intelligence Services
 
@@ -94,7 +97,7 @@ Generated 2026-04-06
 - Purpose: Identifies stale listings needing action
 
 ### OverstockCheckService.js
-- Purpose: Monitors overstock watch groups — triggers alerts when stock thresholds exceeded
+- Purpose: Monitors overstock watch groups — triggers alerts when stock thresholds exceeded. Auto-creates want list entry when stock drops to 0 (overstock → want list lifecycle).
 
 ### StaleInventoryService.js
 - Purpose: Automated price reductions via TradingAPI. 60d=-10% through 270d=-30%

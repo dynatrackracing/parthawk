@@ -24,10 +24,10 @@ Generated 2026-04-06
 - **URL:** `/admin/pull`, `/puller`
 - **Nav key:** `feed`
 - **4-line collapsed vehicle card layout:**
-  - **Line 1 — Headline:** Score badge (inline color, pulse at 120+, ↑XX% boost) + Year Make Model + engine. Rarity badge right-aligned (LEGENDARY gold pulse ★, RARE purple pulse, UNCOMMON blue, NORMAL hidden, COMMON orange, SATURATED red) with detail text (~Xd · Y seen).
+  - **Line 1 — Headline:** Score badge (inline color, pulse at 120+) + Year Make Model + engine + rarity badge (inline after engine) + $value (right-aligned, color-coded). Rarity: only UNCOMMON (blue), RARE (purple pulse), LEGENDARY (gold pulse ★) shown. SATURATED/COMMON/NORMAL hidden.
   - **Line 2 — Attributes:** Trim/CULT/DIESEL/4WD/MANUAL/CHECK MT/CVT badges. Collapses when none apply.
-  - **Line 3 — Location:** Row · Color · Xd ago + NEW badge (cyan, for ≤0d). Gone label for inactive.
-  - **Line 4 — Parts:** Up to 6 type chips colored by price tier. Novelty dots: cyan ● = NOVEL, green ● = RESTOCK.
+  - **Line 3 — Location:** Row · Color · Xd ago + NEW badge (green #4CAF50, for ≤0d). Gone label for inactive.
+  - **Line 4 — Parts:** Up to 6 type chips colored by price tier. Novelty dots: cyan ● = NOVEL, green ● = RESTOCK. Intel chips: ★gold MARK, ★green RESTOCK, ★blue WANT, ✕red OVER. ★N indicator for intel match count.
 - **Score display:** Uncapped (can show 127, 145, etc.). Color tiers: 120+ gold, 100+ bright green, 80+ green, 60+ yellow, 40+ orange, <40 red. Gold pulses at 120+.
 - **getScoreColor(score):** Returns hex color for score badge background.
 - **VEHICLE_CAPS:** `{ newest: 50, '3d': 150, '7d': 300, '30d': 500, '60d': 1000, '90d': 2000, all: 5000 }`
@@ -64,8 +64,9 @@ Generated 2026-04-06
 ### flyway.html (The Flyway)
 - **URL:** `/admin/flyway`
 - **Nav key:** `flyway`
-- **Features:** Road trip planner with yard scoring, vehicle parts expansion, claim to cache. Chips use getPartTier() for colors.
-- **API:** `/cache/claim`, `/flyway/vehicle/:id/parts`, `/flyway/trips`, etc.
+- **Features:** Road trip planner. Vehicle cards match attack list layout (4-line: score+YMM+rarity+$value / attributes / location+NEW / part chips with novelty dots). Day trip = full feed, road trip = LEGENDARY+RARE+MARK only.
+- **Card layout:** getScoreColor() for score badge, rarity badges (UNCOMMON/RARE/LEGENDARY only), green NEW badge, novelty dots on part chips. Price right-aligned, attribute badges on Line 2.
+- **API:** `/cache/claim`, `/flyway/vehicle/:id/parts`, `/flyway/trips`, `/flyway/trips/:id/attack-list`, etc.
 
 ---
 
@@ -92,7 +93,7 @@ Generated 2026-04-06
 ### restock-list.html (Scour Stream)
 - **URL:** `/admin/restock-list`
 - **Nav key:** `scour`
-- **Features:** Watchlist + want list management, inline edit (title/notes), pull/found-in-yard actions, overstock tracking
+- **Features:** Two tabs: WANT LIST (default) + OVERSTOCK. Add form: PN + Description + Make + Model + Notes. Inline edit (title/notes), pull/found-in-yard actions. Overstock: compact row layout, scan duplicates (scoped to overstock list), scan high-qty new. Auto-transition: overstock stock=0 creates want list entry.
 - **API:** `/restock-want-list/watchlist`, `/restock-want-list/items`, `/restock-want-list/add`, `/restock-want-list/delete`, `/restock-want-list/just-sold`, etc.
 
 ### restock.html (The Quarry)

@@ -1,4 +1,4 @@
-Generated 2026-04-05
+Generated 2026-04-06
 
 # PartHawk Route Map
 
@@ -27,8 +27,8 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/cogs` | cogs.js | POST `/gate` `/session`, GET `/yard-profile/:yardId` `/yards` `/check-stock` |
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
-| `/restock` | restockReport.js | GET `/report` `/found-items`, POST `/quarry-sync` |
-| `/restock-want-list` | restock-want-list.js | GET `/items` `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions`, POST `/pull` `/find-in-yard` `/add` `/delete` + watchlist/overstock CRUD |
+| `/restock` | restockReport.js | GET `/report` (paginated: page/pageSize, timeframe sort, CRITICAL upgrade) `/found-items`, POST `/quarry-sync` |
+| `/restock-want-list` | restock-want-list.js | GET `/items` `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
 | `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
 | `/api/fitment` | fitment.js | GET `/lookup` `/stats` |

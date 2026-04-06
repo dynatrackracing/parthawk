@@ -315,3 +315,19 @@ Deploys this session (13 total):
 - Day trip: no filter, identical to Daily Feed
 - Part chips: 6 max (was 4), includes noveltyTier + intelSource, filters belowFloor
 - Files: FlywayService.js
+
+## 11:00 — Flyway Card Layout Match
+- renderVehicleCard() rewritten to match attack-list 4-line layout
+- Score badge: inline color + pulse at 120+
+- Rarity: only UNCOMMON/RARE/LEGENDARY shown, inline after engine
+- Price right-aligned on Line 1
+- Attribute badges on Line 2 (trim/4WD/manual/diesel/cult)
+- Green NEW badge, novelty dots on part chips
+- Files: flyway.html
+
+## Open items carried forward
+- The Mark table empty (Hunters Perch → Mark link broken, no marks flowing)
+- instrumentclusterstore scraper: 0 items, needs debug-scrape
+- Scout Alerts role shift: now office monitoring dashboard, not puller-facing
+- Nissan trim coverage still low (30.8%) — vPIC doesn't return Trim for many Nissan models
+- market_demand_cache needs more coverage — market drip filling ~600/day
