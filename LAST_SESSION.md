@@ -307,3 +307,11 @@ Deploys this session (13 total):
 - Expanded view badges: gold ★ MARK, green ★ RESTOCK, blue ★ WANT, red ✕ OVER, green SOLD, orange ⚡ FLAG
 - ★N indicator on collapsed card shows intel-backed part count
 - chip-gold CSS class added
+
+## 10:00 — Flyway Intel Integration: Day Trip = Full Feed, Road Trip = Elite Only
+- getFlywayAttackList() now builds full intel index (MARK/QUARRY/STREAM/OVERSTOCK) + frequencyMap
+- scoreVehicle() receives all indexes — vehicles get rarity tiers, intel chips, attribute boosts
+- Road trip filter: only LEGENDARY + RARE + MARK vehicles pass (COMMON/SATURATED filtered out)
+- Day trip: no filter, identical to Daily Feed
+- Part chips: 6 max (was 4), includes noveltyTier + intelSource, filters belowFloor
+- Files: FlywayService.js
