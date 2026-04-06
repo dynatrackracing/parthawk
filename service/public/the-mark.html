@@ -36,6 +36,18 @@ input,textarea{padding:8px 10px;border:1px solid var(--b);border-radius:6px;back
 input:focus,textarea:focus{border-color:var(--r)}
 .empty{text-align:center;color:var(--tf);padding:30px;font-size:13px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#064e3b;color:#22c55e;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:700;z-index:999;display:none}
+.find-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--b);background:var(--s2);color:#9CA3AF;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.find-btn:active{opacity:.5}
+.find-btn.has-results{color:var(--g);border-color:#064e3b}
+.yard-results{margin-top:6px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--b);font-size:11px}
+.yard-row{padding:4px 0;border-bottom:1px solid var(--s);color:var(--tm)}
+.yard-row:last-child{border-bottom:none}
+.yard-name{color:var(--g);font-weight:600}
+.yard-loc{color:#9CA3AF}
+.yard-age{color:var(--tf);font-size:10px}
+.search-wrap{position:sticky;top:0;z-index:10;background:var(--bg);padding:8px 0 4px}
+.search-count{font-size:10px;color:var(--tf);margin-top:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -55,7 +67,11 @@ input:focus,textarea:focus{border-color:var(--r)}
     <div id="wlResult" style="margin-top:6px;font-size:11px"></div>
   </div>
 
-  <!-- Marks list -->
+  <!-- Search + Marks list -->
+  <div class="search-wrap">
+    <input type="text" id="markSearch" placeholder="Search marks by part, make, model, or title..." style="font-size:12px">
+    <div class="search-count" id="searchCount"></div>
+  </div>
   <div class="section-title" style="padding:0 0 4px">ACTIVE MARKS (<span id="markCount">0</span>)</div>
   <div id="marksList"></div>
 
@@ -78,6 +94,30 @@ function showToast(msg){var t=document.getElementById('toast');t.textContent=msg
 
 var _marks = [];
 var _wantListTitles = new Set();
+var _searchTimer = null;
+
+function debounce(fn, ms) {
+  return function() {
+    var args = arguments, ctx = this;
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(function() { fn.apply(ctx, args); }, ms);
+  };
+}
+
+document.getElementById('markSearch').addEventListener('input', debounce(function(e) {
+  var q = e.target.value.toLowerCase().trim();
+  if (!q) {
+    renderMarks(_marks);
+    document.getElementById('searchCount').textContent = '';
+    return;
+  }
+  var filtered = _marks.filter(function(m) {
+    var haystack = [m.partNumber, m.originalTitle, m.normalizedTitle, m.partType, m.source, m.notes].join(' ').toLowerCase();
+    return haystack.indexOf(q) !== -1;
+  });
+  renderMarks(filtered);
+  document.getElementById('searchCount').textContent = 'Showing ' + filtered.length + ' of ' + _marks.length + ' marks';
+}, 150));
 
 async function loadMarks() {
   try {
@@ -102,45 +142,65 @@ async function loadMarks() {
     document.getElementById('stats').innerHTML =
       'Total: <b>' + _marks.length + '</b> · Hunting: <b>' + hunting + '</b> · In yard: <b style="color:#22c55e">' + inYard + '</b> · Listed: <b style="color:#22c55e">' + listed + '</b> · Sold: <b style="color:#22c55e">' + sold + '</b>';
 
-    // Render
-    var h = '';
-    if (_marks.length === 0) {
-      h = '<div class="empty">No marks yet. Use Sky Watch or Hunters Perch to mark parts, or add directly to the want list above.</div>';
+    // Re-apply current search filter
+    var q = document.getElementById('markSearch').value.toLowerCase().trim();
+    if (q) {
+      var filtered = _marks.filter(function(m) {
+        var haystack = [m.partNumber, m.originalTitle, m.normalizedTitle, m.partType, m.source, m.notes].join(' ').toLowerCase();
+        return haystack.indexOf(q) !== -1;
+      });
+      renderMarks(filtered);
+      document.getElementById('searchCount').textContent = 'Showing ' + filtered.length + ' of ' + _marks.length + ' marks';
+    } else {
+      renderMarks(_marks);
+      document.getElementById('searchCount').textContent = '';
     }
-    _marks.forEach(function(m) {
-      var srcBadge = m.source === 'SKY' ? '<span class="badge b-sky">SKY WATCH</span>' :
-                     m.source === 'PERCH' ? '<span class="badge b-perch">PERCH</span>' : '<span class="badge" style="background:#333;color:#9CA3AF">' + esc(m.source||'?') + '</span>';
-      var statusBadge = m.status === 'in-yard' ? '<span class="badge b-yard">IN YARD</span>' :
-                        m.status === 'listed' ? '<span class="badge b-listed">LISTED</span>' :
-                        m.status === 'sold' ? '<span class="badge b-sold">SOLD</span>' :
-                        '<span class="badge b-hunting">HUNTING</span>';
-
-      var wlKey = (m.originalTitle||'').substring(0,40).toLowerCase();
-      var inWantList = _wantListTitles.has(wlKey);
-
-      h += '<div class="mark-card" id="mark-' + m.id + '">';
-      h += '<div class="mark-title">' + esc(m.originalTitle) + '</div>';
-      h += '<div class="mark-meta">';
-      h += srcBadge + ' ' + statusBadge;
-      if (m.partType) h += ' <span>' + esc(m.partType) + '</span>';
-      if (m.medianPrice) h += ' <span style="color:#22c55e;font-weight:700">$' + m.medianPrice + '</span>';
-      if (m.partNumber) h += ' <span style="font-family:monospace">' + esc(m.partNumber) + '</span>';
-      h += ' <span>' + timeAgo(m.markedAt) + '</span>';
-      if (inWantList) h += ' <span class="badge b-wl">IN WANT LIST</span>';
-      h += '</div>';
-      h += '<div class="mark-actions">';
-      if (!inWantList) {
-        h += '<button class="btn btn-purple" onclick="pushToWantList(\'' + m.id + '\',\'' + esc(m.originalTitle).replace(/'/g,"\\'") + '\',this)">Send to want list</button>';
-      }
-      h += '<button class="btn" onclick="deleteMark(\'' + m.id + '\',this)">Remove</button>';
-      h += '<button class="btn" style="color:#dc2626;border-color:#7f1d1d" onclick="hideMark(\'' + m.id + '\',\'' + esc(m.partNumber || m.originalTitle || '').replace(/'/g,"\\'") + '\',this)">✕ Hide</button>';
-      if (m.notes) h += '<span style="font-size:10px;color:#6B7280;margin-left:auto">' + esc(m.notes) + '</span>';
-      h += '</div></div>';
-    });
-    document.getElementById('marksList').innerHTML = h;
   } catch (err) {
     document.getElementById('marksList').innerHTML = '<div class="empty">Error loading marks: ' + esc(err.message) + '</div>';
   }
+}
+
+function renderMarks(marks) {
+  var h = '';
+  if (marks.length === 0) {
+    h = '<div class="empty">No marks found.</div>';
+    document.getElementById('marksList').innerHTML = h;
+    return;
+  }
+  marks.forEach(function(m) {
+    var srcBadge = m.source === 'SKY' ? '<span class="badge b-sky">SKY WATCH</span>' :
+                   m.source === 'PERCH' ? '<span class="badge b-perch">PERCH</span>' : '<span class="badge" style="background:#333;color:#9CA3AF">' + esc(m.source||'?') + '</span>';
+    var statusBadge = m.status === 'in-yard' ? '<span class="badge b-yard">IN YARD</span>' :
+                      m.status === 'listed' ? '<span class="badge b-listed">LISTED</span>' :
+                      m.status === 'sold' ? '<span class="badge b-sold">SOLD</span>' :
+                      '<span class="badge b-hunting">HUNTING</span>';
+
+    var wlKey = (m.originalTitle||'').substring(0,40).toLowerCase();
+    var inWantList = _wantListTitles.has(wlKey);
+
+    h += '<div class="mark-card" id="mark-' + m.id + '">';
+    h += '<div class="mark-title">' + esc(m.originalTitle) + '</div>';
+    h += '<div class="mark-meta">';
+    h += srcBadge + ' ' + statusBadge;
+    if (m.partType) h += ' <span>' + esc(m.partType) + '</span>';
+    if (m.medianPrice) h += ' <span style="color:#22c55e;font-weight:700">$' + m.medianPrice + '</span>';
+    if (m.partNumber) h += ' <span style="font-family:monospace">' + esc(m.partNumber) + '</span>';
+    h += ' <span>' + timeAgo(m.markedAt) + '</span>';
+    if (inWantList) h += ' <span class="badge b-wl">IN WANT LIST</span>';
+    h += '</div>';
+    h += '<div class="mark-actions">';
+    h += '<button class="find-btn" onclick="findInYard(\'' + m.id + '\',this)" title="Find in yard"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></button>';
+    if (!inWantList) {
+      h += '<button class="btn btn-purple" onclick="pushToWantList(\'' + m.id + '\',\'' + esc(m.originalTitle).replace(/'/g,"\\'") + '\',this)">Send to want list</button>';
+    }
+    h += '<button class="btn" onclick="deleteMark(\'' + m.id + '\',this)">Remove</button>';
+    h += '<button class="btn" style="color:#dc2626;border-color:#7f1d1d" onclick="hideMark(\'' + m.id + '\',\'' + esc(m.partNumber || m.originalTitle || '').replace(/'/g,"\\'") + '\',this)">✕ Hide</button>';
+    if (m.notes) h += '<span style="font-size:10px;color:#6B7280;margin-left:auto">' + esc(m.notes) + '</span>';
+    h += '</div>';
+    h += '<div id="yard-' + m.id + '"></div>';
+    h += '</div>';
+  });
+  document.getElementById('marksList').innerHTML = h;
 }
 
 async function hideMark(markId, pnOrTitle, btn) {
@@ -257,6 +317,44 @@ async function unhide(id, btn) {
     document.getElementById('hiddenCount').textContent = Math.max(0, cnt);
     showToast('Part unhidden');
   } catch(e) { btn.disabled = false; }
+}
+
+function findInYard(markId, btn) {
+  var mark = null;
+  for (var i = 0; i < _marks.length; i++) { if (_marks[i].id === markId) { mark = _marks[i]; break; } }
+  if (!mark) return;
+
+  var el = document.getElementById('yard-' + markId);
+  // Toggle off if already showing
+  if (el.innerHTML) { el.innerHTML = ''; btn.classList.remove('has-results'); return; }
+
+  el.innerHTML = '<div class="yard-results"><div style="color:#6B7280;text-align:center"><div class="spinner" style="width:14px;height:14px;display:inline-block;border:2px solid #333;border-top-color:#22c55e;border-radius:50%;animation:spin .6s linear infinite"></div> Searching yards...</div></div>';
+
+  fetch('/restock-want-list/find-in-yard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: mark.originalTitle || mark.normalizedTitle }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.vehicles || d.vehicles.length === 0) {
+        el.innerHTML = '<div class="yard-results"><div style="color:#6B7280;text-align:center">No matching vehicles on current set lists</div></div>';
+        return;
+      }
+      btn.classList.add('has-results');
+      var h = '<div class="yard-results">';
+      h += '<div style="font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:4px">' + d.vehicles.length + ' vehicle' + (d.vehicles.length > 1 ? 's' : '') + ' found in yards</div>';
+      d.vehicles.forEach(function(v) {
+        h += '<div class="yard-row">';
+        h += '<span style="font-weight:600">' + esc(v.year + ' ' + v.make + ' ' + v.model) + '</span>';
+        if (v.color) h += ' <span style="color:#6B7280">(' + esc(v.color) + ')</span>';
+        h += ' — <span class="yard-name">' + esc(v.yard) + '</span>';
+        h += ' <span class="yard-loc">Row ' + esc(v.row) + '</span>';
+        h += ' <span class="yard-age">set ' + v.daysAgo + '</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+      el.innerHTML = h;
+    })
+    .catch(function(err) {
+      el.innerHTML = '<div class="yard-results" style="color:#dc2626">Error: ' + err.message + '</div>';
+    });
 }
 
 loadMarks();
