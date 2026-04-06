@@ -17,7 +17,10 @@ const { log } = require('../lib/logger');
  * No Item table dependency. No title scanning. Clean Pipe only.
  */
 
-function getUrgency(soldCount, inStock, avgPrice) {
+function getUrgency(soldCount, inStock, avgPrice, totalRevenue) {
+  // Zero stock + high value = always CRITICAL
+  if (inStock === 0 && avgPrice >= 200 && soldCount >= 1) return 'CRITICAL';
+  if (inStock === 0 && totalRevenue >= 500) return 'CRITICAL';
   if (inStock === 0 && soldCount >= 3 && avgPrice >= 100) return 'CRITICAL';
   if (inStock === 0 && soldCount >= 2) return 'CRITICAL';
   if (inStock === 0) return 'LOW';
@@ -132,7 +135,7 @@ router.get('/report', async (req, res) => {
 
       // Velocity ratio
       const velocityRatio = stock === 0 ? 999 : Math.round((timesSold / stock) * 100) / 100;
-      const urgency = getUrgency(timesSold, stock, avgPrice);
+      const urgency = getUrgency(timesSold, stock, avgPrice, totalRevenue);
 
       // === SCORING: price is king ===
       let score = 0;
@@ -159,25 +162,45 @@ router.get('/report', async (req, res) => {
       });
     }
 
-    // Sort: urgency tier (CRITICAL first), then revenue impact
+    // Sort: urgency tier (CRITICAL first), then timeframe-aware secondary sort
     const urgencyOrder = { CRITICAL: 0, LOW: 1, WATCH: 2 };
-    items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.revenue - a.revenue);
-    const top = items.slice(0, 200);
+    if (days <= 7) {
+      // Short-term: velocity matters most
+      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.timesSold - a.timesSold || b.avgPrice - a.avgPrice);
+    } else if (days <= 30) {
+      // Monthly: revenue impact
+      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.revenue - a.revenue || b.velocityRatio - a.velocityRatio);
+    } else {
+      // Long-term: sustained demand (ratio), then revenue
+      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.velocityRatio - a.velocityRatio || b.revenue - a.revenue);
+    }
 
-    // Tier assignment
+    // Pagination
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize) || 100, 10), 500);
+    const totalCount = items.length;
+    const paged = items.slice((page - 1) * pageSize, page * pageSize);
+
+    // Tier assignment (for paged items)
     const tiers = { critical: [], low: [], watch: [] };
-    for (const item of top) {
+    for (const item of paged) {
       tiers[item.urgency.toLowerCase()].push(item);
     }
+
+    // Full tier counts (across ALL items, not just current page)
+    const fullCritical = items.filter(i => i.urgency === 'CRITICAL').length;
+    const fullLow = items.filter(i => i.urgency === 'LOW').length;
+    const fullWatch = items.filter(i => i.urgency === 'WATCH').length;
 
     res.json({
       success: true, generatedAt: new Date().toISOString(), days,
       period: days === 1 ? 'Last 24 hours' : `Last ${days} days`,
       tiers,
-      items: top,
+      items: paged,
+      total: totalCount, page, pageSize, totalPages: Math.ceil(totalCount / pageSize),
       summary: {
-        critical: tiers.critical.length, low: tiers.low.length, watch: tiers.watch.length,
-        total: top.length, salesAnalyzed, activeListings: activeListingCount,
+        critical: fullCritical, low: fullLow, watch: fullWatch,
+        total: totalCount, salesAnalyzed, activeListings: activeListingCount,
       },
     });
   } catch (err) {
@@ -243,7 +266,8 @@ async function quarrySync() {
     const key = `${pn}|${make}|${model}`;
     const stock = stockByPn[key] || 0;
 
-    const urgency = getUrgency(timesSold, stock, avgPrice);
+    const totalRevenue = timesSold * avgPrice;
+    const urgency = getUrgency(timesSold, stock, avgPrice, totalRevenue);
     if (!urgency) continue;
 
     if (urgency === 'CRITICAL') criticalCount++;

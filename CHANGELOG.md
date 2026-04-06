@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## QUARRY: Remove 200 Cap, High-Value CRITICAL Upgrade, Timeframe Sort, Pagination — 2026-04-06
+- Removed items.slice(0, 200) hard cap — returns all qualifying items with pagination
+- High-value zero-stock parts auto-upgrade to CRITICAL (avgPrice≥$200+sold≥1, or totalRevenue≥$500)
+- Timeframe-aware sort: 7d=velocity, 30d=revenue, 60d/90d=ratio
+- Pagination: page/pageSize params, Prev/Next controls, full tier counts in summary
+- Files: restockReport.js, restock.html
+
+---
+
 ## Scour Stream Overhaul — 2026-04-06
 - Watchlist tab removed, want list is default
 - Want list add: PN + Description + Make + Model + Notes (structured fields)

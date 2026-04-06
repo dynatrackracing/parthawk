@@ -61,14 +61,22 @@ const TIER_CONFIG = {
 };
 
 let currentDays = 30;
+let currentPage = 1;
 let foundItems = {};
 let hideFound = false;
 
 function setPeriod(days) {
   currentDays = days;
+  currentPage = 1;
   document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pd-' + days).classList.add('active');
   load();
+}
+
+function goPage(p) {
+  currentPage = p;
+  load();
+  window.scrollTo(0, 0);
 }
 
 function toggleHideFound() {
@@ -87,7 +95,7 @@ async function load() {
   document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Generating report...</div>';
   try {
     const [reportRes, foundRes] = await Promise.all([
-      fetch('/restock/report?days=' + currentDays).then(r => r.json()),
+      fetch('/restock/report?days=' + currentDays + '&page=' + currentPage + '&pageSize=100').then(r => r.json()),
       fetch('/restock/found-items').then(r => r.json()).catch(() => ({ found: {} })),
     ]);
     const d = reportRes;
@@ -129,6 +137,15 @@ async function load() {
       }
       html += '</div>';
     }
+    // Pagination controls
+    if (d.totalPages > 1) {
+      html += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:16px 20px;">';
+      if (currentPage > 1) html += '<button class="toggle-btn" onclick="goPage(' + (currentPage - 1) + ')">← Prev</button>';
+      html += '<span style="font-size:11px;color:#6B7280">Page ' + d.page + ' of ' + d.totalPages + ' (' + d.total + ' items)</span>';
+      if (currentPage < d.totalPages) html += '<button class="toggle-btn" onclick="goPage(' + (currentPage + 1) + ')">Next →</button>';
+      html += '</div>';
+    }
+
     document.getElementById('content').innerHTML = html;
   } catch (e) {
     document.getElementById('content').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';

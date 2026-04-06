@@ -276,3 +276,12 @@ Deploys this session (13 total):
 - Overstock scan-high-qty: active listings with qty > 1 listed in last 30 days
 - Frontend: scan buttons + clear results, collapsible duplicate cards
 - Files: restock-list.html, restock-want-list.js (route), migration
+
+## QUARRY Overhaul — Remove Cap, Fix Urgency, Timeframe Sorting, Pagination — 2026-04-06
+- Removed items.slice(0, 200) hard cap — all qualifying items returned
+- Added pagination: page/pageSize query params (default page=1, pageSize=100), frontend Prev/Next controls
+- High-value zero-stock upgrade to CRITICAL: avgPrice >= $200 + sold >= 1, or totalRevenue >= $500
+- Timeframe-aware sort: 7d = velocity, 30d = revenue, 60d/90d = ratio
+- Summary counts now reflect ALL items, not just current page
+- Frontend labels confirmed correct: CRITICAL=RESTOCK NOW, LOW=STRONG BUY, WATCH=CONSIDER
+- quarrySync() also uses updated getUrgency with totalRevenue param
