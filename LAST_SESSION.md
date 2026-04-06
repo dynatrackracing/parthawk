@@ -1,13 +1,13 @@
 # LAST SESSION — 2026-04-06
 
-## Fix hidden_parts INSERT — Broken Knex onConflict
-- POST /hidden/add threw 500 on every call due to Knex `.onConflict(raw(...))` double-paren SQL bug
-- Replaced with raw INSERT ... ON CONFLICT DO NOTHING — inserts now succeed, duplicates return `alreadyHidden: true`
-- Files: service/routes/hidden.js
-
-## Diagnosed (not yet fixed)
-- **BUG 1 — Gap-intel showing parts we've sold**: `extractPartNumber()` matches year ranges like `2007-2011` before the real PN `44510-30270`. Also, gap-intel only reads `title` from YourSale — ignores the clean `partNumberBase` column.
-- **BUG 2 — Hide on The Mark doesn't persist**: `hideMark()` fires `/hidden/add` but doesn't check the response. Mark is deleted from the_mark, but the hidden insert failed (now fixed above), so the part reappears on Hunters Perch.
+## Four-Bug Cascade Fix — Hidden + Gap-Intel
+All four root causes fixed and deployed:
+1. **hidden_parts insert**: Knex `.onConflict(raw)` double-paren SQL → raw INSERT. Zero rows had ever been inserted.
+2. **the-mark hideMark()**: Fire-and-forget → awaits response, reverts on failure
+3. **extractPartNumber()**: Year ranges (`2007-2011`) matched as PNs → added rejection + global regex for multi-match iteration
+4. **gap-intel buildMatchSets()**: Re-extracted PNs from titles → uses Clean Pipe `partNumberBase` column directly
+- **Verified**: 44510-30270 (18 sales, 3 active listings) now correctly excluded from gap-intel
+- Files: service/routes/hidden.js, service/public/the-mark.html, service/routes/competitors.js
 
 ## Previous — Edit Part Numbers on Cache & Scour Stream Want List
 - Added PATCH /cache/:id — update partNumber (re-normalized), partDescription, partType, make, model, year, notes on cache entries

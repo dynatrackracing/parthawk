@@ -4,12 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
-## Fix hidden_parts INSERT — Broken Knex onConflict — 2026-04-06
-- POST /hidden/add threw 500 on every call — Knex `.onConflict(raw(...))` wrapped expression in double parens, producing invalid SQL
-- Zero rows were ever inserted into hidden_parts table
-- Replaced with raw INSERT ... ON CONFLICT DO NOTHING RETURNING id
-- Duplicate detection now returns `alreadyHidden: true` instead of silent failure
-- Files: hidden.js
+## Four-Bug Cascade Fix — Hidden + Gap-Intel — 2026-04-06
+- **hidden_parts insert**: POST /hidden/add threw 500 on every call — Knex `.onConflict(raw)` double-paren SQL. Replaced with raw INSERT. Zero rows had ever been inserted.
+- **the-mark hideMark()**: Fire-and-forget → now awaits /hidden/add response, reverts card on failure instead of deleting mark blindly
+- **extractPartNumber() year-range false positive**: Year ranges like `2007-2011` matched as PNs before the real PN. Added year-range rejection + global regex to iterate all matches per pattern.
+- **gap-intel buildMatchSets()**: Was re-extracting PNs from titles (broken for year-range titles). Now uses Clean Pipe `partNumberBase` column directly, title extraction as fallback only.
+- **Result**: 44510-30270 (18 sales) no longer appears as a false "gap". Hide button on The Mark and Hunters Perch now actually inserts into hidden_parts.
+- Files: hidden.js, the-mark.html, competitors.js
 
 ---
 
