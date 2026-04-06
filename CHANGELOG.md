@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Mark Persistence — Marked Items Reappearing — 2026-04-06
+- Gap-intel groups by partNumberBase but marks store normalizedTitle — key types never matched
+- Added markedPNs Set, filter checks both title AND PN keys
+- Emerging section had NO mark filter — added
+- Files: competitors.js
+
+---
+
 ## Market Drip Priority Queue Restructure — 2026-04-06
 - isExcludedPart() filter removes engines/transmissions/body panels/airbags from queue
 - $100 price floor skips sub-$100 parts (~36% of queue was wasted)

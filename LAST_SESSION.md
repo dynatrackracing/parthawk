@@ -359,3 +359,11 @@ Deploys this session (13 total):
 - Keyword search path for no-PN parts: smart-query-builder + relevance-scorer (min 3 relevant results)
 - Keyword cache: key_type='keyword', cache_key = partType|make|model|years
 - CLAUDE_RULES.md rule 29 updated to reflect keyword search path
+
+## 14:00 — Fix Hunters Perch Mark Persistence (Items Reappearing)
+- Mark WAS persisting (7 active marks in the_mark) — but items reappeared on reload
+- Root cause: gap-intel groups by partNumberBase ("56040348") but marks stored normalizedTitle ("REBUILT PROGRAMMED 94 LEXUS ES300")
+- Filter compared PN key against title — never matched, so marked items passed through
+- Fix: load markedPNs Set from the_mark.partNumber, filter checks both markedTitles.has(key) AND markedPNs.has(partNumberBase)
+- Also fixed emerging section: had NO mark filter at all — added markedTitles + markedPNs
+- Files: competitors.js
