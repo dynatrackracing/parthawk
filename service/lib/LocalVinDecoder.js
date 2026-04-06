@@ -122,6 +122,159 @@ async function resolveEngineCode(mfrId, mfrName, vin, year, model) {
   return null;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// EPA TRANSMISSION RESOLUTION
+// ═══════════════════════════════════════════════════════════════
+
+const CHECK_MT_MODELS = [
+  'Corvette', 'Camaro', 'Mustang', 'Challenger',
+  'WRX', 'BRZ', 'FR-S',
+  '350Z', '370Z', 'MX-5', 'Miata',
+  'Genesis Coupe', 'Veloster',
+  'GTI', 'GTO', 'Solstice', 'Sky',
+  'Lancer',
+  'FJ Cruiser',
+  'Tacoma', 'Frontier', 'Ranger', 'Wrangler',
+];
+
+const PERFORMANCE_TRIMS = /\b(ST|Si|Type R|Type S|SRT|SS|RS|Nismo|TRD|Sport|S\b|R-Line|GT(?:\s|$)|Turbo)\b/i;
+
+function normalizeForMatch(s) {
+  return (s || '').toLowerCase().replace(/[-\s]/g, '');
+}
+
+function epaModelMatches(epaModelClean, corgiModel, make) {
+  if (!epaModelClean || !corgiModel) return false;
+  var ea = normalizeForMatch(epaModelClean);
+  var ca = normalizeForMatch(corgiModel);
+  if (!ea || !ca) return false;
+
+  // Direct match
+  if (ea === ca) return true;
+
+  // Containment — either direction
+  if (ca.includes(ea) || ea.includes(ca)) return true;
+
+  // GM tonnage: K15/C15 → 1500 etc.
+  if (/chevrolet|gmc/i.test(make)) {
+    var eaStrip = ea.replace(/k15|c15|k10|c10/g, '1500')
+                    .replace(/k25|c25|k20|c20/g, '2500')
+                    .replace(/k35|c35|k30|c30/g, '3500')
+                    .replace(/pickup/g, '');
+    var caStrip = ca.replace(/pickup/g, '');
+    if (eaStrip === caStrip || caStrip.includes(eaStrip) || eaStrip.includes(caStrip)) return true;
+  }
+
+  // Strip "classic", "limited", "eco" suffixes
+  var eaBase = ea.replace(/(classic|limited|eco|hybrid|plugin)$/g, '').trim();
+  if (eaBase && (ca.includes(eaBase) || eaBase.includes(ca))) return true;
+
+  return false;
+}
+
+async function resolveTransmission(year, make, model, displacement, cylinders, trim) {
+  if (!year || !make || !model) return null;
+
+  var makeLower = make.toLowerCase();
+  var rows;
+  try {
+    var result = await database.raw(
+      'SELECT trans_type, trans_speeds, trans_sub_type, model_clean FROM vin_decoder.epa_transmission WHERE year = ? AND LOWER(make) = ?',
+      [year, makeLower]
+    );
+    rows = result.rows;
+  } catch (e) {
+    // Table may not exist or be empty
+    return null;
+  }
+
+  if (!rows || rows.length === 0) {
+    // Ram brand split: try Dodge if Ram has no results
+    if (makeLower === 'ram') {
+      try {
+        var result2 = await database.raw(
+          'SELECT trans_type, trans_speeds, trans_sub_type, model_clean FROM vin_decoder.epa_transmission WHERE year = ? AND LOWER(make) = ?',
+          [year, 'dodge']
+        );
+        rows = (result2.rows || []).filter(function(r) {
+          return epaModelMatches(r.model_clean, 'Ram ' + model, 'Dodge') || epaModelMatches(r.model_clean, model, 'Dodge');
+        });
+      } catch (e) { return null; }
+    }
+    if (!rows || rows.length === 0) return null;
+  }
+
+  // Filter to model matches
+  var matched = rows.filter(function(r) {
+    return epaModelMatches(r.model_clean, model, make);
+  });
+
+  if (matched.length === 0) return null;
+
+  // Collect unique trans types
+  var types = new Set(matched.map(function(r) { return r.trans_type; }));
+  var hasManual = types.has('Manual');
+  var hasAutomatic = types.has('Automatic');
+
+  // Helper: most common value from an array
+  function mostCommon(arr) {
+    var counts = {};
+    for (var i = 0; i < arr.length; i++) {
+      var v = arr[i] || '';
+      counts[v] = (counts[v] || 0) + 1;
+    }
+    var best = null, bestCount = 0;
+    for (var k in counts) {
+      if (counts[k] > bestCount) { best = k; bestCount = counts[k]; }
+    }
+    return best || null;
+  }
+
+  // TIER 1: EPA DEFINITIVE — only one trans type
+  if (hasAutomatic && !hasManual) {
+    var autoRows = matched.filter(function(r) { return r.trans_type === 'Automatic'; });
+    return {
+      transType: 'Automatic',
+      transSpeeds: mostCommon(autoRows.map(function(r) { return r.trans_speeds; })),
+      transSubType: mostCommon(autoRows.map(function(r) { return r.trans_sub_type; })) || null,
+      source: 'epa_definitive',
+    };
+  }
+  if (hasManual && !hasAutomatic) {
+    var manRows = matched.filter(function(r) { return r.trans_type === 'Manual'; });
+    return {
+      transType: 'Manual',
+      transSpeeds: mostCommon(manRows.map(function(r) { return r.trans_speeds; })),
+      transSubType: null,
+      source: 'epa_definitive',
+    };
+  }
+
+  // Both types exist — TIER 2: CHECK_MT models
+  var modelUpper = model.toUpperCase();
+  var isCheckMT = CHECK_MT_MODELS.some(function(m) {
+    return modelUpper.includes(m.toUpperCase());
+  });
+
+  if (isCheckMT) {
+    return { transType: 'CHECK_MT', transSpeeds: null, transSubType: null, source: 'epa_check_mt' };
+  }
+
+  // Performance trim override
+  if (trim && PERFORMANCE_TRIMS.test(trim)) {
+    return { transType: 'CHECK_MT', transSpeeds: null, transSubType: null, source: 'epa_check_mt' };
+  }
+
+  // TIER 3: DEFAULT AUTOMATIC
+  var autoRows2 = matched.filter(function(r) { return r.trans_type === 'Automatic'; });
+  return {
+    transType: 'Automatic',
+    transSpeeds: mostCommon(autoRows2.map(function(r) { return r.trans_speeds; })),
+    transSubType: mostCommon(autoRows2.map(function(r) { return r.trans_sub_type; })) || null,
+    source: 'epa_default_auto',
+  };
+}
+
 function formatEngineString(displacement, cylinders, corgiEngine) {
   var disp = displacement || (corgiEngine && corgiEngine.displacement ? parseFloat(corgiEngine.displacement) : null);
   var cyl = cylinders || (corgiEngine && corgiEngine.cylinders ? parseInt(corgiEngine.cylinders) : null);
@@ -228,6 +381,10 @@ async function decode(vin) {
         drivetrain: cached.drivetrain || null,
         bodyStyle: cached.body_style || null,
         engineType: null,
+        transHint: cached.transmission_style || null,
+        transSpeeds: cached.transmission_speeds || null,
+        transSubType: cached.trans_sub_type || null,
+        transSource: cached.trans_source || null,
         source: 'vin_cache',
         cached: true,
         ms: Date.now() - startTime,
@@ -326,6 +483,25 @@ async function decode(vin) {
   var engine = formatEngineString(displacement, cylinders, corgiEngine);
   var drivetrain = parseDrivetrain(driveType);
   var engineType = parseEngineType(fuelType);
+  var transSpeeds = null;
+  var transSubType = null;
+  var transSource = null;
+
+  // Step 4.5: EPA transmission resolution
+  if (!transHint) {
+    try {
+      var epaResult = await resolveTransmission(year, make, model, displacement, cylinders, trim);
+      if (epaResult) {
+        transHint = epaResult.transType;
+        transSpeeds = epaResult.transSpeeds || null;
+        transSubType = epaResult.transSubType || null;
+        transSource = epaResult.source;
+        source += '+epa';
+      }
+    } catch (e) {
+      log.debug({ err: e.message }, 'LocalVinDecoder: EPA transmission resolution failed (non-fatal)');
+    }
+  }
 
   // Step 5: Write to vin_cache
   try {
@@ -339,6 +515,9 @@ async function decode(vin) {
       drivetrain: drivetrain,
       body_style: bodyStyle,
       transmission_style: transHint || null,
+      transmission_speeds: transSpeeds || null,
+      trans_sub_type: transSubType || null,
+      trans_source: transSource || null,
       raw_nhtsa: JSON.stringify({ corgi: corgiResult.components, engineCode: engineCode, source: source }),
       decoded_at: new Date(),
       createdAt: new Date(),
@@ -363,6 +542,9 @@ async function decode(vin) {
     drivetrain: drivetrain,
     bodyStyle: bodyStyle,
     transHint: transHint,
+    transSpeeds: transSpeeds,
+    transSubType: transSubType,
+    transSource: transSource,
     source: source,
     cached: false,
     ms: Date.now() - startTime,
@@ -392,7 +574,7 @@ async function decodeBatchLocal(vins) {
         FuelTypePrimary: d.fuelType,
         BodyClass: d.bodyStyle,
         TransmissionStyle: d.transHint || null,
-        TransmissionSpeeds: null,
+        TransmissionSpeeds: d.transSpeeds || null,
         _engineCode: d.engineCode,
         _engineType: d.engineType,
         _forcedInduction: d.forcedInduction,

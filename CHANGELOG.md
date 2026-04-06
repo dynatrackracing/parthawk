@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Phase 10: EPA Transmission Resolver — 2026-04-05
+- vin_decoder.epa_transmission table: 36,035 EPA FuelEconomy.gov records (year/make/model/trans_type/speeds)
+- resolveTransmission() 3-tier: epa_definitive (single type), epa_check_mt (22 models), epa_default_auto (both offered, default auto)
+- 22 CHECK_MT models: Corvette, Camaro, Mustang, Challenger, WRX, BRZ, FR-S, 350Z, 370Z, MX-5, Miata, Genesis Coupe, Veloster, GTI, GTO, Solstice, Sky, Lancer, FJ Cruiser, Tacoma, Frontier, Ranger, Wrangler
+- Performance trim override: ST/Si/Type R/SRT/SS/RS/Nismo/TRD/Sport/GT → CHECK_MT
+- Wired into decode() step 4.5, vin_cache stores all EPA fields, cached path returns them
+- Files: LocalVinDecoder.js, migration, import script, backfill script, CLAUDE_RULES.md
+
+---
+
 ## VinDecodeService Write Gap + vin_cache Transmission — 2026-04-05
 - VinDecodeService writes decoded_engine/drivetrain/transmission to yard_vehicle
 - vin_cache stores transmission_style from corgi transHint

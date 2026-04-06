@@ -155,3 +155,20 @@ Deploys this session (13 total):
 11. Attack list trim/engine/trans mismatch filtering
 12. Year range PN cleanup
 13. VinDecodeService write gap + decoded_drivetrain in attack list response
+
+## 23:00 — Phase 10: EPA Transmission Resolver
+- Migration: vin_decoder.epa_transmission table (36,035 rows) + vin_cache columns (trans_sub_type, trans_source)
+- Import script: service/scripts/import-epa-transmission.js — reads CSV, bulk inserts
+- resolveTransmission() in LocalVinDecoder.js — 3-tier resolution:
+  - TIER 1 (epa_definitive): Only one trans type in EPA for year+make+model → use it
+  - TIER 2 (epa_check_mt): Both offered + model on 22-entry CHECK_MT_MODELS list → CHECK_MT
+  - TIER 3 (epa_default_auto): Both offered + not on CHECK_MT list → Automatic
+  - Performance trim override: ST/Si/Type R/SRT/SS/RS/Nismo/TRD/Sport/GT → CHECK_MT
+- Wired into decode() pipeline as step 4.5 (after engine codes, before vin_cache write)
+- vin_cache INSERT now stores transmission_style, transmission_speeds, trans_sub_type, trans_source
+- Cached path returns transHint, transSpeeds, transSubType, transSource
+- decodeBatchLocal() passes through transSpeeds
+- epaModelMatches() handles: GM tonnage codes (K15→1500), dash stripping, Ram brand split, suffix stripping (Classic/Limited/Eco)
+- Backfill script: service/scripts/backfill-epa-transmission.js — deletes vin_cache with null trans, re-decodes yard_vehicles
+- CLAUDE_RULES.md rule 27 updated with full CHECK_MT model list + performance trim override
+- Run order: (1) deploy, (2) import EPA CSV, (3) run backfill

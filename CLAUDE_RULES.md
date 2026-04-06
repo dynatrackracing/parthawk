@@ -70,7 +70,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 26. **LKQ body code stripper regex runs ONLY on Stellantis makes** (tighter pattern to avoid eating G35, G6, Q7, X5).
 
-27. **CHECK_MT:** ambiguous-era base trucks where manual was common but not certain. Silverado excluded. Tacoma CHECK_MT limited to V6 trims only.
+27. **CHECK_MT:** 22 models where manual genuinely shows up in junkyards: Corvette, Camaro, Mustang, Challenger, WRX, BRZ, FR-S, 350Z, 370Z, MX-5/Miata, Genesis Coupe, Veloster, GTI, GTO, Solstice, Sky, Lancer, FJ Cruiser, Tacoma, Frontier, Ranger, Wrangler. Performance trim override: if decoded_trim matches ST/Si/Type R/SRT/SS/RS/Nismo/TRD/Sport/GT, upgrade to CHECK_MT regardless of model. All other "both offered" models default to Automatic.
 
 28. **Trim value validation verdicts:** CONFIRMED (green), WORTH_IT (yellow), MARGINAL (grey), NO_PREMIUM (red), UNVALIDATED (dim). Non-sellable suggestions (NO_PREMIUM with negative delta) are filtered out entirely.
 
