@@ -670,47 +670,94 @@
     el.outerHTML = html;
   }
 
+  function getScoreColor(s) {
+    if (s >= 120) return '#FFD700';
+    if (s >= 100) return '#00FF00';
+    if (s >= 80) return '#2ECC40';
+    if (s >= 60) return '#F1C40F';
+    if (s >= 40) return '#FF8C00';
+    return '#FF4136';
+  }
+
   function renderVehicle(v) {
-    const sc = (v.max_part_value || 0) > 0 ? tierColor(v.max_part_value) : (v.color_code || 'gray');
-    // Use part_chips (slim mode) or parts (full/manual mode) for chip display
-    const chipSource = v.part_chips || (v.parts || []).slice(0, 4).map(p => ({ partType: p.partType || p.category, price: p.price }));
+    // Part chips — use slim part_chips or full parts
+    const chipSource = v.part_chips || (v.parts || []).slice(0, 6).map(p => ({ partType: p.partType || p.category, price: p.price, noveltyTier: p.noveltyTier }));
     const chipTypes = new Set();
     const chips = chipSource.filter(p => {
       const t = p.partType || '?';
       if (chipTypes.has(t)) return false;
       chipTypes.add(t);
       return true;
-    }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 4).map(p => {
+    }).sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 5).map(p => {
       const price = p.price || 0;
       const cc = price > 0 ? 'chip-' + tierColor(price) : 'chip-gray';
-      const markIcon = p.isMarked ? '\uD83C\uDFAF ' : '';
-      return `<span class="chip ${cc}">${markIcon}${p.partType || '?'}</span>`;
+      const dot = p.noveltyTier === 'NOVEL' ? '<span style="color:#06b6d4">● </span>' : p.noveltyTier === 'RESTOCK' ? '<span style="color:#2ECC40">● </span>' : '';
+      return `<span class="chip ${cc}">${dot}${p.partType || '?'}</span>`;
     }).join('');
 
     const rowClass = vehicleRowClass(v);
-    const aBadge = ageBadge(v);
     const goneLabel = v.is_active === false ? '<span class="chip chip-age age-old">GONE</span>' : '';
-
-    // Don't pre-render expanded parts — load on demand when tapped
     const hasPartsPreloaded = v.parts && v.parts.length > 0;
+
+    // Score badge color
+    const scoreColor = getScoreColor(v.score || 0);
+    const scorePulse = (v.score || 0) >= 120 ? 'animation:pulse-gold 2s ease-in-out infinite;' : '';
+
+    // LINE 2 — attribute badges
+    const attrBadges = [];
+    if (v.trimBadge) {
+      const tb = v.trimBadge;
+      const tbBg = tb.color === 'green' ? '#22c55e' : tb.color === 'blue' ? '#3b82f6' : tb.color === 'gray' ? '#374151' : '#f59e0b';
+      const tbTx = tb.color === 'gray' ? '#9ca3af' : '#000';
+      attrBadges.push(`<span class="chip" style="font-size:9px;font-weight:${tb.color === 'gray' ? '500' : '700'};padding:1px 6px;background:${tbBg};color:${tbTx}">${tb.decodedTrim || tb.label}</span>`);
+    }
+    if (v.cult) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>');
+    if (v.diesel) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>');
+    const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase();
+    if (/4WD|4X4|AWD/i.test(dt)) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>');
+    if (v.decoded_transmission) {
+      if (/manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>');
+      else if (v.decoded_transmission === 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>');
+      else if (/cvt/i.test(v.decoded_transmission)) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>');
+    }
+    const line2 = attrBadges.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${attrBadges.join('')}</div>` : '';
+
+    // LINE 1 — rarity badge
+    let rarityHtml = '';
+    if (v.rarityTier && v.rarityTier !== 'NORMAL') {
+      const rtColor = v.rarityColor || '#666';
+      const rtText = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' ? '#000' : '#fff';
+      const rtPulse = v.rarityPulses ? 'animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite;' : '';
+      const rtStar = v.rarityTier === 'LEGENDARY' ? '\u2605 ' : '';
+      rarityHtml = `<div style="text-align:right;flex-shrink:0">
+        <span class="chip" style="font-size:9px;font-weight:700;padding:2px 7px;background:${rtColor};color:${rtText};${rtPulse}">${rtStar}${v.rarityTier}</span>
+        <div style="font-size:9px;color:#6B7280;margin-top:1px">~${v.rarityAvgDays || '?'}d · ${v.rarityTotalSeen || 0} seen</div>
+      </div>`;
+    }
+
+    // LINE 3 — location + freshness
+    const daysOld = getDaysFromNewest(v, _currentNewestDate);
+    const newBadge = daysOld === 0 ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:#06b6d4;color:#000">NEW</span>' : '';
+    const metaParts = [];
+    if (v.row_number) metaParts.push('Row ' + v.row_number);
+    if (v.color) metaParts.push(v.color);
+    if (v.date_added || v.createdAt) metaParts.push(timeAgo(parseLocalDate(v.date_added || v.createdAt)));
+    const line3 = `<div style="font-size:11px;color:#6B7280;margin-top:3px">${metaParts.join(' · ')}${newBadge}${goneLabel}</div>`;
 
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
-        <div class="v-score ${sc}">${v.score}${v.attributeBoost ? '<span style="font-size:8px;color:#06b6d4;display:block;margin-top:1px">↑' + v.attributeBoost + '%</span>' : ''}</div>
-        <div class="v-info">
-          <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:13px;color:#b0b0b0;font-weight:600">${v.engine}</span>` : ''}${v.trimBadge ? ` <span class="chip" style="font-size:9px;font-weight:${v.trimBadge.color === 'gray' ? '500' : '700'};padding:1px 6px;background:${v.trimBadge.color === 'green' ? '#22c55e' : v.trimBadge.color === 'blue' ? '#3b82f6' : v.trimBadge.color === 'gray' ? '#374151' : '#f59e0b'};color:${v.trimBadge.color === 'gray' ? '#9ca3af' : '#000'}">${v.trimBadge.decodedTrim || v.trimBadge.label}</span>` : ''}${v.cult ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>' : ''}${v.diesel ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>' : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); if (/4WD|4X4|AWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>'; if (/FWD/i.test(dt)) return ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">FWD</span>'; return ''; })()}${v.decoded_transmission ? (/manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT' ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>' : v.decoded_transmission === 'CHECK_MT' ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>' : /cvt/i.test(v.decoded_transmission) ? ' <span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>' : '') : ''}${(() => { const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase(); const is4x4 = /4WD|4X4|AWD/i.test(dt); const isMT = v.decoded_transmission && (/manual/i.test(v.decoded_transmission) || v.decoded_transmission === 'CHECK_MT'); return is4x4 && isMT ? ' <span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">4\u00d74+MT</span>' : ''; })()} ${aBadge}${goneLabel}${v.rarityTier && v.rarityTier !== 'NORMAL' ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:' + v.rarityColor + ';color:' + (v.rarityTier === 'LEGENDARY' || v.rarityTier === 'COMMON' ? '#000' : '#fff') + (v.rarityPulses ? ';animation:pulse-' + (v.rarityTier === 'LEGENDARY' ? 'gold' : 'purple') + ' 2s ease-in-out infinite' : '') + '" title="~' + (v.rarityAvgDays || '?') + 'd between · ' + v.rarityTotalSeen + ' seen">' + v.rarityTier + '</span>' : ''}</div>
-          ${renderAlertBadges(v)}
-          <div class="v-meta">
-            ${v.row_number ? `<span>Row ${v.row_number}</span>` : ''}
-            ${v.color ? `<span style="font-weight:600">${v.color}</span>` : ''}
-            ${v.engine_type && v.engine_type !== 'Gas' ? `<span class="chip chip-age ${v.engine_type === 'Hybrid' ? 'age-recent' : 'age-today'}" style="font-size:9px;font-weight:700">${v.engine_type.toUpperCase()}</span>` : ''}
-            ${(v.date_added || v.createdAt) ? `<span>${timeAgo(parseLocalDate(v.date_added || v.createdAt))}</span>` : ''}
+        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${v.score}${v.attributeBoost ? '<span style="font-size:8px;color:#06b6d4;display:block;margin-top:1px">\u2191' + v.attributeBoost + '%</span>' : ''}</div>
+        <div class="v-info" style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="min-width:0">
+              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}</div>
+            </div>
+            ${rarityHtml}
           </div>
-          <div class="v-chips">${chips || '<span class="chip chip-gray">No data</span>'}</div>
-        </div>
-        <div class="v-right">
-          ${v.est_value > 0 ? `<div class="v-value">$${v.est_value}</div>` : ''}
-          ${v.matched_parts > 0 ? `<div class="v-parts-count">${v.matched_parts} parts</div>` : ''}
+          ${line2}
+          ${renderAlertBadges(v)}
+          ${line3}
+          <div class="v-chips" style="margin-top:4px">${chips || '<span class="chip chip-gray">No data</span>'}</div>
         </div>
       </div>
       <div class="v-expanded" id="vexp-${v.id}">
