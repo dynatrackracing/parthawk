@@ -5,18 +5,26 @@ const { database } = require('../database/database');
 
 // POST /hidden/add — hide a part globally
 router.post('/add', async (req, res) => {
-  const { partNumberBase, partType, make, model, source, sourceDetail } = req.body;
+  const { partNumberBase, partType, make, model, source, sourceDetail, hiddenBy } = req.body;
   if (!partNumberBase) return res.status(400).json({ success: false, error: 'partNumberBase required' });
   try {
-    const [row] = await database('hidden_parts').insert({
-      part_number_base: partNumberBase.trim().toUpperCase(),
-      part_type: partType || null,
-      make: make || null,
-      model: model || null,
-      source: source || 'manual',
-      source_detail: sourceDetail ? JSON.stringify(sourceDetail) : null,
-    }).onConflict(database.raw("(part_number_base, COALESCE(make,''), COALESCE(model,''))")).ignore().returning('id');
-    res.json({ success: true, id: row?.id || null });
+    const result = await database.raw(`
+      INSERT INTO hidden_parts (part_number_base, part_type, make, model, source, source_detail, hidden_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      ON CONFLICT (part_number_base, COALESCE(make, ''), COALESCE(model, ''))
+      DO NOTHING
+      RETURNING id
+    `, [
+      partNumberBase.trim().toUpperCase(),
+      partType || null,
+      make || null,
+      model || null,
+      source || 'manual',
+      sourceDetail ? JSON.stringify(sourceDetail) : null,
+      hiddenBy || 'user',
+    ]);
+    const insertedId = result.rows?.[0]?.id || null;
+    res.json({ success: true, id: insertedId, alreadyHidden: !insertedId });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
