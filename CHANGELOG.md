@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Mark + Hidden System Repair — 2026-04-06
+- hidden_parts table: global part blacklist with PN+make+model+source
+- /hidden routes (add/delete/list/keys) for CRUD
+- Hidden filtering in gap-intel + emerging backends
+- Hunters Perch: dismiss → hideIntel (red fade to /hidden/add)
+- The Mark: HIDE button (mark → hidden), hidden management section with unhide
+- AttackListService: hidden PNs removed from all intel sets (no chips on Daily Feed)
+- Files: migration, hidden.js, competitors.js, index.js, ALS, hunters-perch.html, the-mark.html
+
+---
+
 ## Flyway Intel Integration — 2026-04-06
 - Day trip = full attack list (all vehicles, all intel chips, all scoring)
 - Road trip = LEGENDARY + RARE + MARK only (COMMON/SATURATED filtered out)

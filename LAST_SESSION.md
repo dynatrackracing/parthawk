@@ -331,3 +331,14 @@ Deploys this session (13 total):
 - Scout Alerts role shift: now office monitoring dashboard, not puller-facing
 - Nissan trim coverage still low (30.8%) — vPIC doesn't return Trim for many Nissan models
 - market_demand_cache needs more coverage — market drip filling ~600/day
+
+## 12:00 — Mark + Hidden System Repair
+- Mark flow confirmed working: POST /competitors/mark correctly inserts into the_mark (table was empty because unused, not broken)
+- Created hidden_parts table (global blacklist): part_number_base + make + model + source
+- /hidden routes: POST /add, DELETE /:id, GET /list, GET /keys
+- Hidden filtering wired into gap-intel + emerging backends (competitors.js)
+- Hunters Perch: dismiss buttons → hideIntel() with red fade (sends to /hidden/add)
+- The Mark: HIDE button added (moves mark → hidden_parts, deletes from the_mark)
+- Hidden parts management section on The Mark page (collapsible, unhide button)
+- AttackListService: loads hidden_parts, removes hidden PNs from all intel sets
+- Files: migration, hidden.js (route), competitors.js, index.js, AttackListService.js, hunters-perch.html, the-mark.html
