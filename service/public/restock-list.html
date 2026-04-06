@@ -81,29 +81,23 @@ nav a.active{color:#DC2626;font-weight:700}
 <div style="padding:4px 16px;background:#0a0a0a;font-size:10px;color:#6B7280;border-bottom:1px solid #2a2a2a">SCOUR STREAM <span id="totalCount" class="count"></span></div>
 </nav>
 <div style="display:flex;background:#141414;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none">
-  <div class="stream-tab active" onclick="switchTab('watchlist')" id="tab-watchlist" style="padding:10px 16px;font-size:12px;font-weight:600;color:#F0F0F0;cursor:pointer;border-bottom:2px solid #dc2626;white-space:nowrap">WATCHLIST</div>
-  <div class="stream-tab" onclick="switchTab('wantlist')" id="tab-wantlist" style="padding:10px 16px;font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap">WANT LIST</div>
+  <div class="stream-tab active" onclick="switchTab('wantlist')" id="tab-wantlist" style="padding:10px 16px;font-size:12px;font-weight:600;color:#F0F0F0;cursor:pointer;border-bottom:2px solid #dc2626;white-space:nowrap">WANT LIST</div>
   <div class="stream-tab" onclick="switchTab('overstock')" id="tab-overstock" style="padding:10px 16px;font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap">OVERSTOCK</div>
 </div>
 
-<div class="container" id="watchlistView">
+<div class="container" id="wantlistView">
   <div id="justSold"></div>
   <div class="card">
-    <div class="add-row">
-      <input type="text" class="add-input" id="watchInput" placeholder="Add PN to watchlist (e.g. 56044691)" autocomplete="off">
-      <input type="text" class="add-input" id="watchDesc" placeholder="Description (optional)" autocomplete="off" style="flex:.8">
-      <button class="btn-add" onclick="addToWatchlist()">Add</button>
+    <div style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Add to Want List</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input type="text" class="add-input" id="addPN" placeholder="Part Number" autocomplete="off" style="flex:.6;min-width:120px">
+      <input type="text" class="add-input" id="addDesc" placeholder="Description" autocomplete="off" style="flex:1;min-width:150px">
     </div>
-  </div>
-  <div id="watchLoading" style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading watchlist...</div></div>
-  <div id="watchList"></div>
-</div>
-
-<div class="container" id="wantlistView" style="display:none">
-  <div class="card">
-    <div class="add-row">
-      <input type="text" class="add-input" id="addInput" placeholder="Add part (e.g. 2010-2015 Toyota Prius ABS Pump)" autocomplete="off">
-      <button class="btn-add" id="addBtn" onclick="addPart()">Add</button>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <input type="text" class="add-input" id="addMake" placeholder="Make (opt)" autocomplete="off" style="flex:.4;min-width:80px">
+      <input type="text" class="add-input" id="addModel" placeholder="Model (opt)" autocomplete="off" style="flex:.4;min-width:80px">
+      <input type="text" class="add-input" id="addNotes" placeholder="Notes (opt)" autocomplete="off" style="flex:.5;min-width:80px">
+      <button class="btn-add" id="addBtn" onclick="addPart()">+ Add</button>
     </div>
   </div>
   <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading want list...</div></div>
@@ -134,8 +128,13 @@ nav a.active{color:#DC2626;font-weight:700}
     <div id="overstockFormError" class="overstock-error" style="display:none"></div>
     <div id="overstockFormWarnings" style="display:none;font-size:10px;color:#EAB308;margin-top:6px"></div>
   </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn-add" onclick="scanDuplicates()" id="scanDupBtn" style="background:#1a1a1a;color:#d1d5db;border:1px solid #333;font-size:11px;padding:8px 14px;flex:1">Scan Duplicates</button>
+    <button class="btn-add" onclick="scanHighQty()" id="scanHqBtn" style="background:#1a1a1a;color:#d1d5db;border:1px solid #333;font-size:11px;padding:8px 14px;flex:1">Scan High-Qty New</button>
+    <button class="btn-add" onclick="loadSuggestions()" id="suggestBtn" style="background:#1a1a1a;color:#d1d5db;border:1px solid #333;font-size:11px;padding:8px 14px;flex:1">Suggestions</button>
+  </div>
+  <div id="scanResults" style="margin-bottom:10px"></div>
   <div id="suggestionsSection" style="margin-bottom:10px">
-    <button class="btn-add" onclick="loadSuggestions()" id="suggestBtn" style="background:#1a1a1a;color:#d1d5db;border:1px solid #333;font-size:11px;padding:8px 14px;width:100%;margin-bottom:6px">Find High-Quantity Listings</button>
     <div id="suggestionsContent"></div>
   </div>
   <div id="overstockLoading" style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading...</div></div>
@@ -145,7 +144,7 @@ nav a.active{color:#DC2626;font-weight:700}
 var allItems = [];
 var page = 1;
 var perPage = 50;
-var currentTab = 'watchlist';
+var currentTab = 'wantlist';
 
 var overstockItems = [];
 var overstockLoaded = false;
@@ -157,65 +156,15 @@ function switchTab(tab) {
   });
   var el = document.getElementById('tab-' + tab);
   el.style.color = '#F0F0F0'; el.style.borderBottomColor = '#dc2626';
-  document.getElementById('watchlistView').style.display = tab === 'watchlist' ? 'block' : 'none';
   document.getElementById('wantlistView').style.display = tab === 'wantlist' ? 'block' : 'none';
   document.getElementById('overstockView').style.display = tab === 'overstock' ? 'block' : 'none';
   if (tab === 'wantlist' && allItems.length === 0) load();
   if (tab === 'overstock') loadOverstock();
 }
 
-// ── WATCHLIST ────────────────────────────────────────────────
-function loadWatchlist() {
-  fetch('/restock-want-list/watchlist')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      document.getElementById('watchLoading').style.display = 'none';
-      if (!d.success) { document.getElementById('watchList').innerHTML = '<div class="empty">Error loading watchlist</div>'; return; }
-      document.getElementById('totalCount').textContent = '(' + d.total + ' watched)';
-      var html = '';
-      if (d.items.length === 0) {
-        html = '<div class="empty">No items on watchlist. Add part numbers above to track rinse-and-repeat parts.</div>';
-      }
-      d.items.forEach(function(item) {
-        var badge = item.stock === 0 ? '<span class="badge b-out">OUT</span>' : item.stock < item.targetStock ? '<span class="badge b-low">LOW (' + item.stock + ')</span>' : '<span class="badge b-ok">STOCKED (' + item.stock + ')</span>';
-        var market = item.marketMedian ? '$' + Math.round(item.marketMedian) + ' med' : 'no market data';
-        var sold = item.marketSold ? item.marketSold + ' sold' : '';
-        var lastSoldStr = item.lastSold ? Math.floor((Date.now() - new Date(item.lastSold).getTime()) / 86400000) + 'd ago @ $' + Math.round(item.lastSoldPrice || 0) : 'never sold';
-        var prioColor = item.priority === 'high' ? '#dc2626' : item.priority === 'low' ? '#6B7280' : '#d1d5db';
-        html += '<div class="part-row">';
-        html += '<div class="part-info">';
-        html += '<div class="part-title" style="color:' + prioColor + '">' + item.partNumberBase + (item.description ? ' - ' + item.description : '') + '</div>';
-        html += '<div class="part-meta">' + badge + ' <span>' + market + '</span> <span>' + sold + '</span> <span>Last sold: ' + lastSoldStr + '</span></div>';
-        if (item.notes) html += '<div class="part-notes">' + item.notes + '</div>';
-        html += '</div>';
-        html += '<div class="part-actions"><button class="del-btn" onclick="removeWatch(' + item.id + ')" title="Remove">x</button></div>';
-        html += '</div>';
-      });
-      document.getElementById('watchList').innerHTML = html;
-    })
-    .catch(function(err) {
-      document.getElementById('watchLoading').style.display = 'none';
-      document.getElementById('watchList').innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
-    });
-}
-
-function addToWatchlist() {
-  var pn = document.getElementById('watchInput').value.trim();
-  var desc = document.getElementById('watchDesc').value.trim();
-  if (!pn) return;
-  fetch('/restock-want-list/watchlist/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNumberBase: pn, description: desc || null }) })
-    .then(function() { document.getElementById('watchInput').value = ''; document.getElementById('watchDesc').value = ''; loadWatchlist(); });
-}
-function removeWatch(id) {
-  fetch('/restock-want-list/watchlist/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
-    .then(function() { loadWatchlist(); });
-}
-
-document.getElementById('watchInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') addToWatchlist(); });
-loadWatchlist();
-
-// ── WANT LIST (original) ─────────────────────────────────────
-document.getElementById('addInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') addPart(); });
+// ── WANT LIST ─────────────────────────────────────
+document.getElementById('addPN').addEventListener('keydown', function(e) { if (e.key === 'Enter') addPart(); });
+document.getElementById('addDesc').addEventListener('keydown', function(e) { if (e.key === 'Enter') addPart(); });
 
 function load() {
   fetch('/restock-want-list/items?manual_only=true')
@@ -411,19 +360,22 @@ function findInYard(id, btn) {
 }
 
 function addPart() {
-  var inp = document.getElementById('addInput');
-  var title = inp.value.trim();
-  if (!title) return;
+  var pn = document.getElementById('addPN').value.trim();
+  var desc = document.getElementById('addDesc').value.trim();
+  var make = document.getElementById('addMake').value.trim();
+  var model = document.getElementById('addModel').value.trim();
+  var notes = document.getElementById('addNotes').value.trim();
+  if (!pn && !desc) { alert('Part number or description required'); return; }
   var btn = document.getElementById('addBtn');
   btn.disabled = true; btn.textContent = '...';
-  fetch('/restock-want-list/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title }) })
+  fetch('/restock-want-list/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNumber: pn || null, description: desc || null, make: make || null, model: model || null, notes: notes || null }) })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d.success) { inp.value = ''; load(); }
+      if (d.success) { document.getElementById('addPN').value = ''; document.getElementById('addDesc').value = ''; document.getElementById('addMake').value = ''; document.getElementById('addModel').value = ''; document.getElementById('addNotes').value = ''; load(); }
       else alert('Error: ' + (d.error || 'Unknown'));
     })
     .catch(function(err) { alert('Error: ' + err.message); })
-    .finally(function() { btn.disabled = false; btn.textContent = 'Add'; });
+    .finally(function() { btn.disabled = false; btn.textContent = '+ Add'; });
 }
 
 function delPart(id, btn) {
@@ -486,6 +438,62 @@ function inlineEditWL(el, wlId, field) {
 }
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── OVERSTOCK SCANNERS ───────────────────────────────────────
+function scanDuplicates() {
+  var btn = document.getElementById('scanDupBtn');
+  btn.disabled = true; btn.textContent = 'Scanning...';
+  fetch('/restock-want-list/overstock/scan-duplicates')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || d.duplicates.length === 0) {
+        document.getElementById('scanResults').innerHTML = '<div class="card" style="text-align:center;color:#22c55e;font-size:13px;font-weight:600">No duplicates found</div>';
+        return;
+      }
+      var h = '<div class="card"><div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:8px">DUPLICATE LISTINGS (' + d.total + ')</div>';
+      d.duplicates.forEach(function(dup) {
+        h += '<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
+        h += '<div style="font-size:12px;font-weight:700;color:#F0F0F0"><span style="font-family:monospace;color:#3498DB">' + esc(dup.partNumberBase || '?') + '</span> ' + esc((dup.extractedMake || '') + ' ' + (dup.extractedModel || '')) + ' — <span style="color:#dc2626">' + dup.cnt + ' duplicates</span></div>';
+        if (dup.titles) {
+          for (var i = 0; i < Math.min(dup.titles.length, 5); i++) {
+            h += '<div style="font-size:10px;color:#9CA3AF;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(dup.titles[i]) + (dup.prices && dup.prices[i] ? ' — $' + dup.prices[i] : '') + '</div>';
+          }
+        }
+        h += '</div>';
+      });
+      h += '<button onclick="document.getElementById(\'scanResults\').innerHTML=\'\'" style="margin-top:8px;padding:6px 12px;border:1px solid #333;border-radius:6px;background:#1a1a1a;color:#6B7280;font-size:11px;cursor:pointer;width:100%">Clear Results</button></div>';
+      document.getElementById('scanResults').innerHTML = h;
+    })
+    .catch(function(err) { document.getElementById('scanResults').innerHTML = '<div class="card" style="color:#dc2626">Error: ' + err.message + '</div>'; })
+    .finally(function() { btn.disabled = false; btn.textContent = 'Scan Duplicates'; });
+}
+
+function scanHighQty() {
+  var btn = document.getElementById('scanHqBtn');
+  btn.disabled = true; btn.textContent = 'Scanning...';
+  fetch('/restock-want-list/overstock/scan-high-qty')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || d.items.length === 0) {
+        document.getElementById('scanResults').innerHTML = '<div class="card" style="text-align:center;color:#22c55e;font-size:13px;font-weight:600">No high-qty new listings found</div>';
+        return;
+      }
+      var h = '<div class="card"><div style="font-size:11px;font-weight:700;color:#eab308;text-transform:uppercase;margin-bottom:8px">HIGH-QTY NEW LISTINGS (' + d.total + ')</div>';
+      d.items.forEach(function(item) {
+        var daysAgo = item.startTime ? Math.floor((Date.now() - new Date(item.startTime).getTime()) / 86400000) : '?';
+        h += '<div style="padding:6px 0;border-bottom:1px solid #1f1f1f;font-size:11px">';
+        h += '<span style="color:#F0F0F0;font-weight:600">' + esc(item.title ? item.title.substring(0, 60) : '?') + '</span>';
+        h += ' <span style="color:#eab308;font-weight:700">Qty: ' + item.quantityAvailable + '</span>';
+        h += ' <span style="color:#22c55e">$' + (item.currentPrice || '?') + '</span>';
+        h += ' <span style="color:#6B7280">' + daysAgo + 'd ago</span>';
+        h += '</div>';
+      });
+      h += '<button onclick="document.getElementById(\'scanResults\').innerHTML=\'\'" style="margin-top:8px;padding:6px 12px;border:1px solid #333;border-radius:6px;background:#1a1a1a;color:#6B7280;font-size:11px;cursor:pointer;width:100%">Clear Results</button></div>';
+      document.getElementById('scanResults').innerHTML = h;
+    })
+    .catch(function(err) { document.getElementById('scanResults').innerHTML = '<div class="card" style="color:#dc2626">Error: ' + err.message + '</div>'; })
+    .finally(function() { btn.disabled = false; btn.textContent = 'Scan High-Qty New'; });
+}
 
 function loadJustSold() {
   fetch('/restock-want-list/just-sold')

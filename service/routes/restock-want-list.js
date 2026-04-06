@@ -302,11 +302,22 @@ router.post('/find-in-yard', async (req, res) => {
 
 // Add a new part
 router.post('/add', async (req, res) => {
-  const { title, notes } = req.body;
-  if (!title || !title.trim()) return res.status(400).json({ error: 'Title required' });
+  const { title, partNumber, description, make, model, notes } = req.body;
+  // Support both old (title-only) and new (PN+description) modes
+  let finalTitle = title;
+  if (!finalTitle && (partNumber || description)) {
+    const parts = [make, model, description, partNumber].filter(Boolean);
+    finalTitle = parts.join(' ');
+  }
+  if (!finalTitle || !finalTitle.trim()) return res.status(400).json({ error: 'Title or description required' });
+
+  const entry = { title: finalTitle.trim(), notes: notes || null, active: true };
+  if (partNumber) entry.part_number = partNumber.trim().toUpperCase();
+  if (make) entry.make = make.trim();
+  if (model) entry.model = model.trim();
 
   const [item] = await database('restock_want_list')
-    .insert({ title: title.trim(), notes: notes || null, active: true })
+    .insert(entry)
     .returning('*');
 
   res.json({ success: true, item });
@@ -544,6 +555,53 @@ function detectPartType(title) {
   }
   return null;
 }
+
+/**
+ * GET /restock-want-list/overstock/scan-duplicates
+ * Find duplicate listings: same partNumberBase + make + model listed more than once.
+ */
+router.get('/overstock/scan-duplicates', async (req, res) => {
+  try {
+    const dupes = await database.raw(`
+      SELECT "partNumberBase", "extractedMake", "extractedModel",
+        COUNT(*) as cnt,
+        array_agg("ebayItemId") as item_ids,
+        array_agg(title) as titles,
+        array_agg("currentPrice"::text) as prices,
+        array_agg("startTime"::text) as dates
+      FROM "YourListing"
+      WHERE "listingStatus" = 'Active'
+        AND "partNumberBase" IS NOT NULL AND "partNumberBase" != ''
+      GROUP BY "partNumberBase", "extractedMake", "extractedModel"
+      HAVING COUNT(*) > 1
+      ORDER BY COUNT(*) DESC
+      LIMIT 50
+    `);
+    res.json({ success: true, duplicates: dupes.rows, total: dupes.rows.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /restock-want-list/overstock/scan-high-qty
+ * Find recently listed items with quantity > 1.
+ */
+router.get('/overstock/scan-high-qty', async (req, res) => {
+  try {
+    const items = await database('YourListing')
+      .where('listingStatus', 'Active')
+      .where('quantityAvailable', '>', 1)
+      .whereRaw("\"startTime\" >= NOW() - INTERVAL '30 days'")
+      .select('ebayItemId', 'title', 'partNumberBase', 'extractedMake', 'extractedModel', 'quantityAvailable', 'currentPrice', 'startTime')
+      .orderBy('quantityAvailable', 'desc')
+      .orderBy('currentPrice', 'desc')
+      .limit(50);
+    res.json({ success: true, items, total: items.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 router.get('/overstock', async (req, res) => {
   try {
