@@ -433,15 +433,14 @@ class AttackListService {
    * Returns ALL scored vehicles sorted by score descending.
    */
   async getAttackList(yardId, options = {}) {
-    const { daysBack = 90, limit = 200 } = options;
+    const { daysBack = 90 } = options;
 
     this.log.info({ yardId, daysBack }, 'Generating attack list');
 
     const vehicles = await database('yard_vehicle')
       .where('yard_id', yardId)
       .where('active', true)
-      .orderBy('date_added', 'desc')
-      .limit(limit);
+      .orderBy('date_added', 'desc');
 
     if (!vehicles.length) {
       return { vehicles: [], scored_at: new Date().toISOString(), total: 0 };
@@ -1395,12 +1394,15 @@ class AttackListService {
       const sold = p.sold_90d || 0;
       if (stock === 0 && sold === 0) {
         p.noveltyTier = 'NOVEL';
+        p.noveltyBoost = 20;
         p._scoringValue = Math.round((p.price || 0) * 1.20);
       } else if (stock === 0 && sold > 0) {
         p.noveltyTier = 'RESTOCK';
+        p.noveltyBoost = 10;
         p._scoringValue = Math.round((p.price || 0) * 1.10);
       } else {
         p.noveltyTier = 'STOCKED';
+        p.noveltyBoost = 0;
         p._scoringValue = p.price || 0;
       }
     }
@@ -1480,13 +1482,15 @@ class AttackListService {
     let rarityTier = 'NORMAL', rarityBoost = 0, rarityColor = '#2ECC40', rarityPulses = false;
     if (totalSeen <= 1 || avgDays === null) {
       rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
-    } else if (avgDays >= 7) {
+    } else if (avgDays >= 180) {
+      rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
+    } else if (avgDays >= 90) {
       rarityTier = 'RARE'; rarityBoost = 20; rarityColor = '#C39BD3'; rarityPulses = true;
-    } else if (avgDays >= 3) {
+    } else if (avgDays >= 45) {
       rarityTier = 'UNCOMMON'; rarityBoost = 10; rarityColor = '#3498DB';
-    } else if (avgDays >= 1) {
+    } else if (avgDays >= 15) {
       rarityTier = 'NORMAL'; rarityBoost = 0; rarityColor = '#2ECC40';
-    } else if (avgDays >= 0.3) {
+    } else if (avgDays >= 7) {
       rarityTier = 'COMMON'; rarityBoost = -5; rarityColor = '#FF8C00';
     } else {
       rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = '#FF4136';
@@ -1496,7 +1500,7 @@ class AttackListService {
       score = Math.round(score * (1 + rarityBoost / 100));
     }
 
-    score = Math.max(0, Math.min(100, score));
+    score = Math.max(0, score); // uncapped — scores over 100 indicate boosted vehicles
 
     // Color based on TOTAL ESTIMATED VALUE, not score number
     let color = 'gray';
@@ -1701,8 +1705,7 @@ class AttackListService {
     for (const yard of yards) {
       let vQuery = database('yard_vehicle')
         .where('yard_id', yard.id)
-        .orderBy('date_added', 'desc')
-        .limit(500);
+        .orderBy('date_added', 'desc');
 
       if (activeOnly) {
         vQuery = vQuery.where('active', true);
