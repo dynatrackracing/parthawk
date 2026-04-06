@@ -56,9 +56,19 @@ async function run() {
   console.log('Cleared existing vehicle_frequency data.\n');
 
   // Get all yard_vehicles grouped by make+model+year
+  // Use GREATEST to pick the earliest VALID date: first_seen or createdAt, but never before 2020
   const vehicles = await database.raw(`
     SELECT make, model, year::integer as year, COUNT(*) as cnt,
-      MIN(first_seen) as first_seen, MAX(first_seen) as last_seen
+      MIN(CASE
+        WHEN first_seen > '2020-01-01' THEN first_seen
+        WHEN "createdAt" > '2020-01-01' THEN "createdAt"
+        ELSE NULL
+      END) as first_seen,
+      MAX(CASE
+        WHEN first_seen > '2020-01-01' THEN first_seen
+        WHEN "createdAt" > '2020-01-01' THEN "createdAt"
+        ELSE NULL
+      END) as last_seen
     FROM yard_vehicle
     WHERE make IS NOT NULL AND model IS NOT NULL AND year IS NOT NULL
     GROUP BY make, model, year
@@ -88,10 +98,14 @@ async function run() {
 
     const g = genGroups[key];
     g.total_seen += parseInt(row.cnt);
-    const fs = new Date(row.first_seen);
-    const ls = new Date(row.last_seen);
-    if (!g.first_seen || fs < g.first_seen) g.first_seen = fs;
-    if (!g.last_seen || ls > g.last_seen) g.last_seen = ls;
+    if (row.first_seen) {
+      const fs = new Date(row.first_seen);
+      if (!g.first_seen || fs < g.first_seen) g.first_seen = fs;
+    }
+    if (row.last_seen) {
+      const ls = new Date(row.last_seen);
+      if (!g.last_seen || ls > g.last_seen) g.last_seen = ls;
+    }
     resolved++;
   }
 
@@ -99,8 +113,13 @@ async function run() {
   const entries = Object.values(genGroups);
   let inserted = 0;
   for (const g of entries) {
+    // Use NOW() as fallback if no valid dates
+    if (!g.first_seen) g.first_seen = new Date();
+    if (!g.last_seen) g.last_seen = new Date();
+
+    const daysSpan = (g.last_seen.getTime() - g.first_seen.getTime()) / 86400000;
     const avgDays = g.total_seen <= 1 ? null :
-      (g.last_seen.getTime() - g.first_seen.getTime()) / 86400000 / (g.total_seen - 1);
+      daysSpan < 1 ? 0 : daysSpan / (g.total_seen - 1);
 
     await database.raw(`
       INSERT INTO vehicle_frequency (make, model, gen_start, gen_end, total_seen, first_tracked_at, last_seen_at, avg_days_between, updated_at)

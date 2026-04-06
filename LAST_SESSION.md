@@ -252,3 +252,16 @@ Deploys this session (13 total):
 - Frontend: rarity badge detail text shows rarityReason
 - CLAUDE_RULES rule 21b updated with generation + override logic
 - Files: migration, backfill script, AttackListService.js, index.js, attack-list.html, CLAUDE_RULES.md
+
+## Fix: vehicle_frequency epoch zero corruption — 2026-04-06
+- ROOT CAUSE: backfill-vehicle-frequency-gen.js used MIN(first_seen) from yard_vehicle, but 174 rows had first_seen=1970-01-01 (epoch zero from old LKQ scraper)
+- This inflated avg_days_between (Titan: 428d, Explorer: 761d) causing false LEGENDARY ratings for common vehicles
+- FIX 1: Backfill query now uses CASE to pick earliest valid date (first_seen or createdAt, but only if > 2020-01-01)
+- FIX 2: Daily cron (6:30 AM) guards against epoch zero in avg_days recalculation
+- FIX 3: AttackListService min-data guard — tracks days of observation window:
+  - <30 days of data: cap at UNCOMMON (no RARE/LEGENDARY claims)
+  - 30-60 days: cap at RARE
+  - 60+ days: full tiers unlocked
+  - Single-sighting vehicles (totalSeen=1) still get LEGENDARY regardless (genuinely rare)
+- Re-backfilled: 895 rows, 0 epoch zero dates. Titan now SATURATED (avg 0.37d), Explorer SATURATED (avg 0.61d)
+- Distribution: 61% SATURATED, 35% single-sighting (will be capped to UNCOMMON by min-data guard), 2% COMMON, 1% NORMAL

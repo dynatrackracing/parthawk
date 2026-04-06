@@ -1495,6 +1495,14 @@ class AttackListService {
     // Frequency-based rarity tier
     let rarityTier = 'NORMAL', rarityBoost = 0, rarityColor = '#2ECC40', rarityPulses = false;
     let rarityReason = '';
+
+    // Minimum-data guard: how many days of tracking data do we have?
+    const trackingDays = freqData && freqData.first_tracked_at && freqData.last_seen_at
+      ? (new Date(freqData.last_seen_at).getTime() - new Date(freqData.first_tracked_at).getTime()) / 86400000
+      : 0;
+    // With <30d of data, cap at UNCOMMON. With <60d, cap at RARE. 60+ = full tiers.
+    const maxTierRank = trackingDays >= 60 ? 6 : trackingDays >= 30 ? 5 : 4; // 6=LEGENDARY, 5=RARE, 4=UNCOMMON
+
     if (totalSeen <= 1 || avgDays === null) {
       rarityTier = 'LEGENDARY'; rarityBoost = 30; rarityColor = '#FFD700'; rarityPulses = true;
       rarityReason = totalSeen <= 1 ? '1 sighting' : 'No frequency data';
@@ -1516,6 +1524,18 @@ class AttackListService {
     } else {
       rarityTier = 'SATURATED'; rarityBoost = -15; rarityColor = '#FF4136';
       rarityReason = `~${(avgDays || 0).toFixed(1)}d avg`;
+    }
+
+    // Apply minimum-data cap — prevent wild claims with thin tracking data
+    const RARITY_TIERS_ORDERED = ['SATURATED', 'COMMON', 'NORMAL', 'UNCOMMON', 'RARE', 'LEGENDARY'];
+    const tierRank = RARITY_TIERS_ORDERED.indexOf(rarityTier) + 1;
+    if (tierRank > maxTierRank && totalSeen > 1) {
+      const cappedTier = RARITY_TIERS_ORDERED[maxTierRank - 1];
+      rarityTier = cappedTier;
+      rarityBoost = cappedTier === 'UNCOMMON' ? 10 : cappedTier === 'RARE' ? 20 : rarityBoost;
+      rarityColor = cappedTier === 'UNCOMMON' ? '#3498DB' : cappedTier === 'RARE' ? '#C39BD3' : rarityColor;
+      rarityPulses = cappedTier === 'RARE';
+      rarityReason += ` (${Math.round(trackingDays)}d data)`;
     }
 
     // Trim-driven rarity FLOOR — overrides only RAISE, never lower

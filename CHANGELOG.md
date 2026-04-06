@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix: vehicle_frequency Epoch Zero Corruption — 2026-04-06
+- 174/895 rows had first_tracked_at=1970-01-01 from old LKQ scraper NULL first_seen dates
+- Backfill now uses earliest valid date (first_seen or createdAt, > 2020-01-01 guard)
+- Daily cron guards against epoch zero in avg_days recalculation
+- Min-data guard in AttackListService: <30d data caps at UNCOMMON, 30-60d caps at RARE, 60+ full tiers
+- Re-backfilled: 0 epoch zero, Titan SATURATED (was LEGENDARY), Explorer SATURATED (was LEGENDARY)
+- Files: backfill-vehicle-frequency-gen.js, index.js, AttackListService.js
+
+---
+
 ## Generation-Aware Rarity + Trim-Driven Badge Overrides — 2026-04-06
 - vehicle_frequency generation-aware: gen_start/gen_end from trim_tier_reference, decade fallback
 - Trim overrides: PERFORMANCE→LEGENDARY, PREMIUM→RARE, 4WD+MT→RARE, DIESEL→RARE (floor only, never lower)

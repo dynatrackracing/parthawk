@@ -972,7 +972,10 @@ async function start() {
                 gen_end = COALESCE(EXCLUDED.gen_end, vehicle_frequency.gen_end),
                 total_seen = vehicle_frequency.total_seen + ?,
                 last_seen_at = NOW(),
-                avg_days_between = EXTRACT(EPOCH FROM (NOW() - vehicle_frequency.first_tracked_at)) / 86400 / NULLIF(vehicle_frequency.total_seen + ? - 1, 0),
+                avg_days_between = CASE
+                  WHEN vehicle_frequency.first_tracked_at < '2020-01-01' THEN NULL
+                  ELSE EXTRACT(EPOCH FROM (NOW() - vehicle_frequency.first_tracked_at)) / 86400 / NULLIF(vehicle_frequency.total_seen + ? - 1, 0)
+                END,
                 updated_at = NOW()
             `, [g.make, g.model, g.gen_start, g.gen_end, g.cnt, g.cnt, g.cnt]);
             updated++;

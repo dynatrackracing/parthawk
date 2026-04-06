@@ -90,11 +90,13 @@ If anything appears incorrect when your order arrives, contact us through eBay b
       {
         template_key: 'post_delivery',
         subject: 'Your DynaTrack Order Has Been Delivered',
-        body: `Your DynaTrack order for {ITEM_TITLE} shows as delivered.
+        body: `Your Dynatrack order for {ITEM_TITLE} shows as delivered.
 
 Please inspect the part and confirm it matches your application before installation. If anything seems off, message us through eBay right away so we can help.
 
-If the part needs to be returned, the core unit must come back complete and unaltered — all original internal components intact, with no parts removed, swapped, or substituted. Normal installation and removal is expected, but items returned with missing or substituted components will not qualify for a full refund.`,
+We ask that you please contact us before opening a return — in many cases we can send a replacement quickly and save you the hassle of a return.
+
+If the part needs to be returned, the unit must come back complete and unaltered, with no parts removed, swapped, or substituted. Normal installation and removal is expected, but items returned with missing or substituted components will not qualify for a full refund.`,
         is_active: true,
         api_target: 'trading',
       },
