@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Vehicle Card 4-Line Layout — 2026-04-06
+- Collapsed cards: headline (score+YMM+rarity) / attributes (trim+diesel+4WD+MT) / location (row+color+age+NEW) / parts (colored chips with novelty dots)
+- Score uncapped display (120+ = gold pulse), attribute boost as cyan ↑XX%
+- 6 rarity badge tiers with existing pulse animations, right-aligned with detail text
+- Part novelty: cyan dot = NOVEL, green dot = RESTOCK. Chips increased to 6 max.
+- Files: attack-list.html, attack-list.js
+
+---
+
 ## Rarity Thresholds + Score Uncap + Vehicle Limit Removed — 2026-04-06
 - Rarity: long-term thresholds (LEGENDARY 180+d through SATURATED <7d)
 - Score uncapped — can exceed 100 with attribute/rarity/novelty boosts

@@ -225,3 +225,15 @@ Deploys this session (13 total):
 - Part noveltyBoost field exposed in response (20/10/0) alongside existing noveltyTier
 - ALL filter already correct (pillDays=999, groups by age, no date restriction)
 - Files: AttackListService.js, attack-list.html, CLAUDE_RULES.md
+
+## 05:00 — Frontend: Vehicle Card 4-Line Layout Restructure
+- Collapsed vehicle cards restructured into 4 clear lines:
+  Line 1: Score badge (color-coded, gold pulse 120+) + YMM + engine + rarity badge (right-aligned)
+  Line 2: Attribute badges (TRIM/DIESEL/4WD/MANUAL/CULT) — collapses when none apply
+  Line 3: Location + freshness (Row · Color · Xd ago + NEW badge)
+  Line 4: Part type chips colored by price tier with novelty dots (cyan=NOVEL, green=RESTOCK)
+- Score color tiers: 120+ gold, 100+ bright green, 80+ green, 60+ yellow, 40+ orange, <40 red
+- Rarity badge right-aligned on Line 1 with detail text below (~52d · 7 seen)
+- Part chips: 6 max (was 4), noveltyTier passed in slim part_chips response
+- Expanded view unchanged — parts load on demand, pull buttons work, cache sync works
+- Files: attack-list.html, attack-list.js (route)
