@@ -190,6 +190,14 @@ FOLLOW-UP (next session):
 - Mustang ABS chip leak (collapsed-card part_chips path)
 - Flyway 401 audit
 
+## Remove pause from scheduled .bat files — 2026-04-07
+- Audited all 8 .bat files in repo root for `pause` command
+- Removed `pause` from 3 scheduled files: run-price-refresh.bat, run-fitment-scrape.bat, run-scrape.bat
+- run-importapart-drip.bat already had no pause
+- run-apify-your-inventory.bat does not exist in repo
+- Left `pause` in 3 manual-run files: run-restock-generate.bat, run-validate-trims.bat, run-yard-market-sniper.bat
+- Why: `pause` blocks Task Scheduler from completing the task — window stays open waiting for keypress
+
 ## Local path migration: C:\Users\atenr → C:\DarkHawk — 2026-04-07
 - Updated 13 files: 7 .bat scripts, 4 .js usage comments, 2 .js hardcoded paths
 - All local scripts now use C:\DarkHawk\parthawk-deploy instead of C:\Users\atenr\Downloads\parthawk-complete\parthawk-deploy

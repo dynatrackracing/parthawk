@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Remove Pause from Scheduled .bat Files — 2026-04-07
+- Removed `pause` from run-price-refresh.bat, run-fitment-scrape.bat, run-scrape.bat
+- These run unattended via Windows Task Scheduler; `pause` blocked task completion
+- Manual-run .bat files (restock-generate, validate-trims, yard-market-sniper) left unchanged
+- run-importapart-drip.bat already had no pause; run-apify-your-inventory.bat does not exist
+
+---
+
 ## Local Path Migration: C:\Users\atenr → C:\DarkHawk — 2026-04-07
 - 13 files updated: .bat scripts, .js hardcoded paths, .js usage comments
 - Zero remaining references to old user path in repo
