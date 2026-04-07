@@ -1,4 +1,4 @@
-# cache-bust: 2026-04-07-cachefix
+# cache-bust: 2026-04-07-soldfix-async
 [phases.setup]
 aptPkgs = [
   "libnss3", "libnss3-tools", "libnspr4",

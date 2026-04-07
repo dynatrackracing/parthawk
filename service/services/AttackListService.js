@@ -450,9 +450,11 @@ class AttackListService {
     const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
     const salesIndex = await this.buildSalesIndex(cutoff);
     const { byMakeModel: stockIdx, byPartNumber: stockPNs } = await this.buildStockIndex();
+    const _blockedSvc = require('./BlockedCompsService');
+    const { soldKeys: _soldKeys } = await _blockedSvc.getBlockedSet();
 
     const scored = vehicles.map(v =>
-      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs)
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs, undefined, undefined, undefined, _soldKeys)
     );
     // Sort: highest total extractable value first, max single part tiebreaker
     scored.sort((a, b) => {
@@ -907,7 +909,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, frequencyMap = {}) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, frequencyMap = {}, soldKeys = new Set()) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -1416,18 +1418,15 @@ class AttackListService {
     }
 
     // === SOLD BLOCK FILTER — remove sold parts blocked for this exact vehicle ===
-    try {
+    if (soldKeys && soldKeys.size > 0) {
       const blockedComps = require('./BlockedCompsService');
-      const { soldKeys } = await blockedComps.getBlockedSet();
-      if (soldKeys.size > 0) {
-        for (let i = filteredParts.length - 1; i >= 0; i--) {
-          const p = filteredParts[i];
-          if (p.priceSource !== 'sold') continue;
-          const key = blockedComps.makeSoldKey(p.partType, year, make, model);
-          if (soldKeys.has(key)) filteredParts.splice(i, 1);
-        }
+      for (let i = filteredParts.length - 1; i >= 0; i--) {
+        const p = filteredParts[i];
+        if (p.priceSource !== 'sold') continue;
+        const key = blockedComps.makeSoldKey(p.partType, year, make, model);
+        if (soldKeys.has(key)) filteredParts.splice(i, 1);
       }
-    } catch (e) { /* non-fatal */ }
+    }
 
     // === PART NOVELTY — boost scoring value for parts we've never had or need to restock ===
     for (const p of filteredParts) {
@@ -1747,9 +1746,11 @@ class AttackListService {
     const salesIndex = await this.buildSalesIndex(cutoff);
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
+    const _blockedSvc2 = require('./BlockedCompsService');
+    const { soldKeys: _soldKeys2 } = await _blockedSvc2.getBlockedSet();
 
     const scored = vehicles.map(v =>
-      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers)
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, undefined, undefined, undefined, _soldKeys2)
     );
 
     scored.sort((a, b) => {
@@ -1868,6 +1869,10 @@ class AttackListService {
       markIndex.byPN.delete(pn);
     }
 
+    // Load sold block keys once for all vehicles
+    const _blockedSvc3 = require('./BlockedCompsService');
+    const { soldKeys: _soldKeys3 } = await _blockedSvc3.getBlockedSet();
+
     // 7-day retention: show vehicles last seen within 7 days
     const retentionCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const activeOnly = options.activeOnly === true;
@@ -1910,7 +1915,7 @@ class AttackListService {
       for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3)
       );
       // Sort: active first, then highest total value, then max single part tiebreaker
       scored.sort((a, b) => {

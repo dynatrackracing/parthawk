@@ -183,6 +183,10 @@ class FlywayService {
       }
     } catch (e) { /* non-fatal */ }
 
+    // Load sold block keys
+    const _flywayBlockedSvc = require('./BlockedCompsService');
+    const { soldKeys: _flywaySoldKeys } = await _flywayBlockedSvc.getBlockedSet();
+
     // Score floor tiered by trip distance
     const maxDistance = Math.max(...trip.yards.map(y => parseFloat(y.distance_from_base) || 0), 0);
     const SCORE_FLOOR = maxDistance >= 150 ? 1000 : 600;
@@ -193,7 +197,7 @@ class FlywayService {
     for (const vehicle of vehicles) {
       try {
         const result = attackService.scoreVehicle(
-          vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap
+          vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _flywaySoldKeys
         );
 
         const daysInYard = this.calculateDaysInYard(vehicle.date_added);

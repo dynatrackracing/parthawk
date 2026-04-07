@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix scoreVehicle SyntaxError — await in Non-Async Function — 2026-04-07
+- scoreVehicle() is sync but sold block filter used inline await → SyntaxError → 6 hours of failed deploys
+- soldKeys now loaded once per request in async callers, passed as parameter
+- Files: AttackListService.js, FlywayService.js
+
+---
+
 ## Fix Blocked Comps Migration — DROP CONSTRAINT not DROP INDEX — 2026-04-07
 - Migration 20260407100000 failed silently on every boot: tried DROP INDEX on a Knex-created CONSTRAINT
 - Fixed to ALTER TABLE DROP CONSTRAINT. Ran manually on prod. 19 comp blocks now filtering.

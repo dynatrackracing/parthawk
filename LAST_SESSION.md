@@ -152,3 +152,8 @@
 - getBlockedSet() then threw on every call (column block_type doesn't exist), caught returned empty sets, so zero filtering ever happened for any block type.
 - FIX: Changed migration line 17 from DROP INDEX to ALTER TABLE DROP CONSTRAINT. Ran manually. Verified: 19 compIds now in blockedSet, columns present, sold blocks ready.
 - Also added to CLAUDE_RULES.md: "getBlockedSet catch should log, not silently swallow"
+
+## Fix scoreVehicle SyntaxError — await in non-async function — 2026-04-07
+- ROOT CAUSE: scoreVehicle() is synchronous. The sold block filter at line 1418 used `await blockedComps.getBlockedSet()` inside it. Node refused to parse the file → SyntaxError on boot → every deploy for 6 hours crashed silently (previous container kept serving).
+- FIX: Load soldKeys ONCE in each async caller (getAttackList, scoreManualVehicles, getAllYardsAttackList, FlywayService.getFlywayAttackList). Pass as trailing parameter to scoreVehicle. Inside scoreVehicle, synchronous Set.has() only.
+- Also updated FlywayService to pass soldKeys through.
