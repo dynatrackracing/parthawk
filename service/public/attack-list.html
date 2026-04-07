@@ -942,6 +942,7 @@
           ${isCached
             ? `<button class="btn-cached" onclick="unclaimPart('${v.id}','${pid}',event)">✓ Cached</button>`
             : `<button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>`}
+          ${p.itemId ? `<button style="padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer;min-height:32px;" onclick="blockComp('${v.id}','${p.itemId}','${(p.title||'').replace(/'/g,'\\\\\\'')}',this,event)" title="Block this comp from matching">✕ Block</button>` : ''}
         </div>
       </div>`;
     }
@@ -1060,6 +1061,39 @@
   }
 
   // === Part actions ===
+
+  function blockComp(vid, itemId, title, btn, evt) {
+    evt.stopPropagation();
+    const reason = prompt('Block "' + title.substring(0, 60) + '" from matching?\n\nOptional reason (e.g. "engine miscategorized as OTHER"):');
+    if (reason === null) return; // cancelled
+    btn.disabled = true; btn.textContent = '...';
+    fetch('/blocked-comps/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, reason: reason || null }),
+    }).then(function(r) {
+      if (r.ok) {
+        const el = document.getElementById('pd-' + vid + '-' + itemId);
+        if (el) {
+          el.style.transition = 'opacity .3s';
+          el.style.opacity = '0.3';
+          el.innerHTML = '<div style="padding:8px;font-size:11px;color:#6B7280;">Blocked. <a href="#" onclick="unblockComp(\'' + vid + '\',\'' + itemId + '\',event);return false" style="color:#3b82f6">Undo</a></div>';
+          setTimeout(function() { if (el.querySelector('a') === null) el.remove(); }, 5000);
+        }
+      } else { btn.disabled = false; btn.textContent = '✕ Block'; alert('Block failed'); }
+    }).catch(function() { btn.disabled = false; btn.textContent = '✕ Block'; });
+  }
+
+  function unblockComp(vid, itemId, evt) {
+    evt.preventDefault();
+    fetch('/blocked-comps/' + itemId, { method: 'DELETE' }).then(function(r) {
+      if (r.ok) {
+        // Reload the vehicle's parts
+        const exp = document.getElementById('exp-' + vid);
+        if (exp) { exp.innerHTML = '<div style="padding:12px;color:#9CA3AF;font-size:12px;text-align:center;">Restored. Reload to see updated parts.</div>'; }
+      }
+    });
+  }
 
   function markPulled(vid, pidStr, evt) {
     evt.stopPropagation();

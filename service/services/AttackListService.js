@@ -522,7 +522,13 @@ class AttackListService {
       for (const r of rows) { if (r.manufacturerPartNumber) itemPriceMap.set(r.manufacturerPartNumber, parseFloat(r.price) || 0); }
       const cacheIndex = await resolvePricesBatch(allPNs, { itemPrices: itemPriceMap });
 
+      // Load blocked comps set to exclude from match pool
+      const blockedComps = require('./BlockedCompsService');
+      const blockedSet = await blockedComps.getBlockedSet();
+
       for (const row of rows) {
+        if (blockedSet.has(String(row.itemId))) continue; // Blocked comp — skip entirely
+
         const key = `${row.make.toLowerCase()}|${row.model.toLowerCase()}|${row.year}`;
         if (!index[key]) {
           index[key] = { items: [], count: 0, totalValue: 0, avgPrice: 0 };

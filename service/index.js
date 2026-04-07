@@ -93,6 +93,7 @@ app.use('/api/parts-lookup', require('./routes/partsLookup'));
 app.use('/restock', require('./routes/restockReport'));
 app.use('/restock-want-list', require('./routes/restock-want-list'));
 app.use('/scout-alerts', require('./routes/scout-alerts'));
+app.use('/blocked-comps', require('./routes/blocked-comps'));
 app.use('/opportunities', require('./routes/opportunities'));
 app.use('/api/fitment', require('./routes/fitment'));
 app.use('/api/listing-tool', require('./routes/listing-tool'));
@@ -233,6 +234,9 @@ app.get('/admin/carcass', (req, res) => {
 });
 app.get('/admin/scout-alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'scout-alerts.html'));
+});
+app.get('/admin/blocked-comps', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'blocked-comps.html'));
 });
 app.get('/admin/alerts', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'alerts.html'));

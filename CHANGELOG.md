@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Blocked Comps System — 2026-04-07
+- One-click block on expanded parts, with undo. Blocked items excluded from inventory index.
+- BlockedCompsService: block/unblock/list/getBlockedSet (60s cache), cache invalidation on block
+- /admin/blocked-comps page with search + restore + pagination
+- CLAUDE_RULES.md rule 33: all Item queries must filter through blocked_comps
+- Files: migration, BlockedCompsService.js, blocked-comps.js, blocked-comps.html, AttackListService.js, attack-list.html, dh-nav.js, index.js, CLAUDE_RULES.md
+
+---
+
 ## Fix: Newest Tab Empty — Use createdAt for Age Calc — 2026-04-07
 - date_added (LKQ set date) is stale on new arrivals — never equals today
 - Age functions now use createdAt (scrape time) as primary, date_added fallback

@@ -100,3 +100,14 @@
 ## Fix: Newest tab empty — use createdAt for age calc, not date_added — 2026-04-07
 - ROOT CAUSE: date_added is LKQ's "set" date (when LKQ placed the car). New vehicles are typically set "1d ago" by the time our overnight scraper sees them, so date_added is never today → getDaysFromNewest returns 1+ → Newest tab always empty.
 - FIX: getNewestDate() and getDaysFromNewest() now use createdAt (row insert time = when WE scraped it) as primary, date_added as fallback. Display labels (timeAgo on line 761) still use date_added for puller-facing "set Xd ago" display.
+
+## Blocked Comps System — 2026-04-07
+- blocked_comps table: source_item_id (unique), title/PN/category snapshot, reason, blocked_at
+- BlockedCompsService: block(), unblock(), list(), getBlockedSet() (60s TTL cache), recomputeAffectedCache()
+- On block: snapshots Item data, invalidates matching market_demand_cache rows for immediate recompute
+- AttackListService.buildInventoryIndex(): loads blockedSet, skips blocked items before they enter the match pool
+- Routes: POST /blocked-comps/block, DELETE /blocked-comps/:itemId, GET /blocked-comps (search+pagination)
+- Frontend attack-list.html: "Block" button on expanded parts, confirm via prompt, fade+undo pattern
+- /admin/blocked-comps page: search, table with restore button, pagination
+- Nav: "BLOCKED" link added to intel row in dh-nav.js
+- CLAUDE_RULES.md rule 33: all Item/SoldItem/CompetitorListing queries must filter through blocked_comps

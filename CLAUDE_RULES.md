@@ -124,6 +124,12 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 ---
 
+## BLOCKED COMPS RULE
+
+33. **Any new query against Item, SoldItem, CompetitorListing, or market_demand_cache source set MUST filter through blocked_comps.** Use `BlockedCompsService.getBlockedSet()` (60s TTL cache) and skip items in the set. No exceptions.
+
+---
+
 ## KNOWN TECH DEBT (do not make worse)
 
 - Unauthenticated write endpoints (end-item/relist/revise/bulk-end)

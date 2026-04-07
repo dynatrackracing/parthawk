@@ -23,6 +23,7 @@ function dhNav(activePage) {
     { key: 'prey-cycle', label: 'PREY-CYCLE',   href: '/admin/prey-cycle' },
     { key: 'carcass',  label: 'CARCASS',         href: '/admin/carcass' },
     { key: 'phoenix', label: '\uD83D\uDD25 PHOENIX',     href: '/admin/phoenix' },
+    { key: 'blocked', label: 'BLOCKED',        href: '/admin/blocked-comps' },
   ];
 
   function linkHTML(item, isField) {

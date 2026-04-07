@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DarkHawk — Blocked Comps</title>
+<link rel="stylesheet" href="/admin/dh-parts.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#F0F0F0;min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:12px 16px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #2a2a2a;margin-bottom:12px}
+.header h1{font-size:16px;font-weight:700}
+.header .count{font-size:12px;color:#6B7280;margin-left:8px}
+.search{width:100%;padding:10px 14px;border:1px solid #2a2a2a;border-radius:8px;background:#141414;color:#F0F0F0;font-size:14px;outline:none;margin-bottom:12px}
+.search:focus{border-color:#dc2626}
+.search::placeholder{color:#6B7280}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:6px 8px;color:#6B7280;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #2a2a2a}
+td{padding:8px;border-bottom:1px solid #1f1f1f;color:#d1d5db;vertical-align:top}
+tr:hover td{background:#1a1a1a}
+.title{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mono{font-family:SFMono-Regular,Menlo,monospace;font-size:11px;color:#9CA3AF}
+.reason{color:#eab308;font-size:11px;font-style:italic;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-restore{padding:5px 10px;border-radius:6px;border:1px solid #064e3b;background:#0a1a0a;color:#22c55e;font-size:11px;font-weight:600;cursor:pointer}
+.btn-restore:active{opacity:.6}
+.empty{text-align:center;color:#6B7280;padding:40px 10px;font-size:13px}
+.pagination{display:flex;justify-content:center;gap:8px;padding:16px 0}
+.pg-btn{padding:6px 14px;border-radius:6px;border:1px solid #2a2a2a;background:#141414;color:#d1d5db;font-size:12px;font-weight:600;cursor:pointer}
+.pg-btn:disabled{opacity:.3;cursor:default}
+.pg-btn.active{background:#dc2626;color:#fff;border-color:#dc2626}
+.spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="dh-nav"></div>
+<script src="/admin/dh-nav.js?v=3"></script><script>dhNav('blocked')</script>
+<div class="container">
+  <div class="header">
+    <div><h1>Blocked Comps <span class="count" id="count"></span></h1></div>
+  </div>
+  <input type="text" class="search" id="searchBox" placeholder="Search by title, PN, or reason..." autocomplete="off">
+  <div id="content"><div style="text-align:center;padding:30px"><div class="spinner"></div></div></div>
+  <div id="pagination" class="pagination"></div>
+</div>
+<script>
+var currentPage = 1;
+var searchTimeout = null;
+
+document.getElementById('searchBox').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(function() { currentPage = 1; load(); }, 300);
+});
+
+function timeAgo(d) {
+  if (!d) return '';
+  var diff = Math.max(0, Date.now() - new Date(d).getTime());
+  var mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins + 'm ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
+
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function load() {
+  var search = document.getElementById('searchBox').value.trim();
+  var url = '/blocked-comps?limit=100&offset=' + ((currentPage - 1) * 100);
+  if (search) url += '&search=' + encodeURIComponent(search);
+
+  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.success) { document.getElementById('content').innerHTML = '<div class="empty">Error: ' + (d.error || 'Unknown') + '</div>'; return; }
+
+    document.getElementById('count').textContent = '(' + d.total + ')';
+
+    if (d.rows.length === 0) {
+      document.getElementById('content').innerHTML = '<div class="empty">No blocked comps' + (search ? ' matching "' + esc(search) + '"' : ' yet') + '.</div>';
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+
+    var h = '<table><tr><th>Title</th><th>PN</th><th>Category</th><th>Reason</th><th>Blocked</th><th></th></tr>';
+    for (var i = 0; i < d.rows.length; i++) {
+      var r = d.rows[i];
+      h += '<tr id="bc-' + esc(r.source_item_id) + '">';
+      h += '<td class="title" title="' + esc(r.source_title) + '">' + esc(r.source_title || '-') + '</td>';
+      h += '<td class="mono">' + esc(r.source_part_number || '-') + '</td>';
+      h += '<td>' + esc(r.source_category || '-') + '</td>';
+      h += '<td class="reason" title="' + esc(r.blocked_reason) + '">' + esc(r.blocked_reason || '-') + '</td>';
+      h += '<td style="white-space:nowrap;font-size:11px;color:#6B7280">' + timeAgo(r.blocked_at) + '</td>';
+      h += '<td><button class="btn-restore" onclick="restore(\'' + esc(r.source_item_id) + '\',this)">Restore</button></td>';
+      h += '</tr>';
+    }
+    h += '</table>';
+    document.getElementById('content').innerHTML = h;
+
+    // Pagination
+    var totalPages = Math.ceil(d.total / 100);
+    if (totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+    var ph = '';
+    if (currentPage > 1) ph += '<button class="pg-btn" onclick="goPage(' + (currentPage-1) + ')">Prev</button>';
+    ph += '<span style="font-size:11px;color:#6B7280;padding:6px">Page ' + currentPage + ' of ' + totalPages + '</span>';
+    if (currentPage < totalPages) ph += '<button class="pg-btn" onclick="goPage(' + (currentPage+1) + ')">Next</button>';
+    document.getElementById('pagination').innerHTML = ph;
+  }).catch(function(e) {
+    document.getElementById('content').innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
+  });
+}
+
+function goPage(p) { currentPage = p; load(); window.scrollTo(0, 0); }
+
+function restore(itemId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/blocked-comps/' + itemId, { method: 'DELETE' }).then(function(r) {
+    if (r.ok) {
+      var row = document.getElementById('bc-' + itemId);
+      if (row) { row.style.transition = 'opacity .3s'; row.style.opacity = '0'; setTimeout(function() { row.remove(); }, 300); }
+    } else { btn.disabled = false; btn.textContent = 'Restore'; }
+  }).catch(function() { btn.disabled = false; btn.textContent = 'Restore'; });
+}
+
+load();
+</script>
+</body>
+</html>
