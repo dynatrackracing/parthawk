@@ -6,6 +6,7 @@ const AttackListService = require('../services/AttackListService');
 const DeadInventoryService = require('../services/DeadInventoryService');
 const { database } = require('../database/database');
 const { v4: uuidv4 } = require('uuid');
+const { parseYearRange } = require('../utils/yearParser');
 
 /**
  * GET /attack-list
@@ -646,19 +647,14 @@ function parseVehicleLine(line, idx) {
     }
   }
 
-  // Extract year — full (2009) or short (09)
+  // Extract year — delegated to canonical yearParser
   let year = null;
-  const fullYearMatch = cleaned.match(/\b((?:19|20)\d{2})\b/);
-  if (fullYearMatch) {
-    year = parseInt(fullYearMatch[1]);
-    cleaned = cleaned.replace(fullYearMatch[0], ' ').trim();
-  } else {
-    const shortYearMatch = cleaned.match(/\b(\d{2})\b/);
-    if (shortYearMatch) {
-      let y = parseInt(shortYearMatch[1]);
-      year = y >= 70 ? 1900 + y : 2000 + y;
-      cleaned = cleaned.replace(shortYearMatch[0], ' ').trim();
-    }
+  const _yrRange = parseYearRange(cleaned);
+  if (_yrRange) {
+    year = _yrRange.start;
+    // Remove the matched year(s) from cleaned string for make/model extraction
+    const yrStr = String(year);
+    cleaned = cleaned.replace(new RegExp('\\b' + yrStr + '\\b'), ' ').trim();
   }
 
   // Normalize remaining tokens

@@ -1,3 +1,30 @@
+# LAST SESSION — 2026-04-07
+
+## 2-Digit Year Parser Platform Fix — 2026-04-07
+- Created service/utils/yearParser.js — canonical year parser for all title-to-year extraction
+- parseYearRange() handles 8 patterns in priority order:
+  1. 4-digit dash range ("2007-2011", "1994-97")
+  2. 2-digit dash range ("07-11", "94-97")
+  3. 4-digit space-separated ("2005 2006", "2005 2006 2007")
+  4. 2-digit space-separated with 80-99/00-35 wrap ("97 98", "99 00 01")
+  5. 2-digit slash range ("07/11")
+  6. Single 4-digit year ("2014")
+  7. 2-digit at start of string + make following ("94 Lexus...")
+  8. 2-digit mid-title + make following ("REBUILT PROGRAMMED 94 LEXUS...")
+- Contextual safety: standalone 2-digit years ONLY parse if followed by a known make name within 3 words
+- False-positive guards: part numbers (89661-33340, F65B-14B205-BB), model numbers, dimensions all correctly return null
+- Migrated 3 weaker parsers to delegate to yearParser.js:
+  - partIntelligence.parseYearRange() → re-exports from yearParser.js
+  - partMatcher.parseTitle() year block → calls yearParser
+  - partMatcher.extractYearsFromTitle() → calls yearParser
+  - AttackListService.extractYearRange() → calls piParseYearRange (which flows through yearParser)
+  - restock-want-list.js extractYearsFromListingTitle() → calls yearParser
+  - routes/attack-list.js inline parser → calls yearParser
+- vehicleYearMatchesPart() / findMatchedParts() generational fallback / filterByYear() left intact (intentional)
+- Bug 1 fixed: "REBUILT PROGRAMMED 94 LEXUS ES300" now parses to 1994, no longer matches 2002 in scout alerts
+- Bug 2 fixed: "97 98 Ford F-150" now parses to 1997-1998, find-in-yard returns only those years
+- 19 test cases passing including false-positive guards
+
 # LAST SESSION — 2026-04-06
 
 ## Mark + Hidden System: Four-Bug Cascade

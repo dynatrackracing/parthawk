@@ -158,42 +158,10 @@ function extractPartNumbers(text) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// YEAR RANGE PARSING
+// YEAR RANGE PARSING — delegated to canonical yearParser.js
 // ═══════════════════════════════════════════════════════════════
 
-function parseYearRange(title) {
-  if (!title) return null;
-  const rangeMatch = title.match(/\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)?\d{2,4})\b/);
-  if (rangeMatch) {
-    let start = parseInt(rangeMatch[1]);
-    let end = parseInt(rangeMatch[2]);
-    if (end < 100) end += (end < 50 ? 2000 : 1900);
-    return { start: Math.min(start, end), end: Math.max(start, end) };
-  }
-  const shortRange = title.match(/\b(\d{2})\s*[-–]\s*(\d{2})\b/);
-  if (shortRange) {
-    let s = parseInt(shortRange[1]);
-    let e = parseInt(shortRange[2]);
-    s += (s < 50 ? 2000 : 1900);
-    e += (e < 50 ? 2000 : 1900);
-    if (s >= 1980 && s <= 2030 && e >= 1980 && e <= 2030) {
-      return { start: Math.min(s, e), end: Math.max(s, e) };
-    }
-  }
-  const singleMatch = title.match(/\b((?:19|20)\d{2})\b/);
-  if (singleMatch) {
-    const yr = parseInt(singleMatch[1]);
-    if (yr >= 1980 && yr <= 2030) return { start: yr, end: yr };
-  }
-  // 2-digit year at start of string: "13 Caravan..." → 2013
-  const shortStart = title.match(/^(\d{2})\b/);
-  if (shortStart) {
-    let y = parseInt(shortStart[1]);
-    y += (y < 50 ? 2000 : 1900);
-    if (y >= 1980 && y <= 2030) return { start: y, end: y };
-  }
-  return null;
-}
+const { parseYearRange } = require('./yearParser');
 
 function vehicleYearMatchesPart(vehicleYear, partTitle) {
   const range = parseYearRange(partTitle);

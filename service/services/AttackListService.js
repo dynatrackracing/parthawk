@@ -657,32 +657,9 @@ class AttackListService {
    *   "2012 2013 Honda Civic"    → { start: 2012, end: 2013 }
    */
   extractYearRange(title) {
-    // Pattern 1: explicit range "YYYY-YYYY"
-    const rangeMatch = title.match(/\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b/);
-    if (rangeMatch) {
-      return { start: parseInt(rangeMatch[1]), end: parseInt(rangeMatch[2]) };
-    }
-
-    // Pattern 2: two years separated by comma or space "YYYY, YYYY" or "YYYY YYYY"
-    const twoYearMatch = title.match(/\b((?:19|20)\d{2})\s*[,\s]\s*((?:19|20)\d{2})\b/);
-    if (twoYearMatch) {
-      const y1 = parseInt(twoYearMatch[1]);
-      const y2 = parseInt(twoYearMatch[2]);
-      // Only treat as range if years are close together (within 10 years)
-      if (Math.abs(y2 - y1) <= 10) {
-        return { start: Math.min(y1, y2), end: Math.max(y1, y2) };
-      }
-    }
-
-    // Pattern 3: single year "YYYY"
-    const singleMatch = title.match(/\b((?:19|20)\d{2})\b/);
-    if (singleMatch) {
-      const y = parseInt(singleMatch[1]);
-      return { start: y, end: y };
-    }
-
-    // No year found
-    return { start: 0, end: 0 };
+    const range = piParseYearRange(title);
+    if (!range) return { start: 0, end: 0 };
+    return { start: range.start, end: range.end };
   }
 
   /**

@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## 2-Digit Year Parser Platform Fix — 2026-04-07
+- Created service/utils/yearParser.js — canonical year parser with 8 pattern tiers
+- Enhanced 2-digit year support: space-separated pairs/triples, slash ranges, standalone mid-title with contextual make-following rule
+- Consolidated 4 independent parsers down to 1 canonical implementation (3 now delegate)
+- Fixes scout alerts, find-in-yard, attack list scoring, and stock filter false matches on 2-digit year titles
+- 19 test cases passing including critical false-positive guards (PN digits, model numbers, dimensions)
+- Files: yearParser.js (new), partIntelligence.js, partMatcher.js, AttackListService.js, restock-want-list.js, attack-list.js
+
+---
+
 ## Remove Pause from Scheduled .bat Files — 2026-04-07
 - Removed `pause` from run-price-refresh.bat, run-fitment-scrape.bat, run-scrape.bat
 - These run unattended via Windows Task Scheduler; `pause` blocked task completion

@@ -3,7 +3,8 @@
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { matchPartToSales, matchPartToYardVehicles, parseTitle, loadModelsFromDB } = require('../utils/partMatcher');
-const { extractPartNumbers, parseYearRange: piParseYearRange } = require('../utils/partIntelligence');
+const { extractPartNumbers } = require('../utils/partIntelligence');
+const { parseYearRange: piParseYearRange } = require('../utils/yearParser');
 
 /**
  * Count stocked items for a HUNTERS PERCH entry.
@@ -95,15 +96,9 @@ async function countStockedForEntry(knex, title, entryPartNumber, entryMake, ent
 }
 
 function extractYearsFromListingTitle(title) {
-  const range = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
-  if (range) {
-    const start = parseInt(range[1] + range[2]);
-    const end = range[3] ? parseInt(range[3] + range[4]) : parseInt(range[1] + range[4]);
-    return { start, end };
-  }
-  const single = title.match(/\b((?:19|20)\d{2})\b/);
-  if (single) { const y = parseInt(single[1]); return { start: y, end: y }; }
-  return null;
+  const range = piParseYearRange(title);
+  if (!range) return null;
+  return { start: range.start, end: range.end };
 }
 
 // Diagnostic endpoint

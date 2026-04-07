@@ -17,6 +17,7 @@
 
 const { database } = require('../database/database');
 const { log } = require('../lib/logger');
+const { parseYearRange: _parseYearRange } = require('./yearParser');
 
 // ============================================================
 // OEM PART NUMBER PATTERNS
@@ -331,27 +332,11 @@ function parseTitle(title) {
   if (!title) return null;
   const titleLower = title.toLowerCase();
 
-  // Extract year range
-  let yearStart = null, yearEnd = null;
-  const rangeMatch = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
-  if (rangeMatch) {
-    yearStart = parseInt(rangeMatch[1] + rangeMatch[2]);
-    const endDigits = rangeMatch[4];
-    yearEnd = rangeMatch[3]
-      ? parseInt(rangeMatch[3] + endDigits)
-      : (endDigits.length === 2 ? parseInt(rangeMatch[1] + endDigits) : parseInt(endDigits));
-  } else {
-    const singleYear = title.match(/\b(19|20)\d{2}\b/);
-    if (singleYear) { yearStart = parseInt(singleYear[0]); yearEnd = yearStart; }
-    const shortRange = title.match(/\b(\d{2})\s*[-–]\s*(\d{2})\b/);
-    if (shortRange && !rangeMatch) {
-      const s = parseInt(shortRange[1]), e = parseInt(shortRange[2]);
-      if (s >= 89 && s <= 99) yearStart = 1900 + s;
-      else if (s >= 0 && s <= 30) yearStart = 2000 + s;
-      if (e >= 89 && e <= 99) yearEnd = 1900 + e;
-      else if (e >= 0 && e <= 30) yearEnd = 2000 + e;
-    }
-  }
+  // Extract year range — delegated to canonical yearParser
+  const _yr = _parseYearRange(title);
+  let yearStart = _yr ? _yr.start : null;
+  let yearEnd = _yr ? _yr.end : null;
+  // "2007+" pattern: open-ended range to current year
   const plusMatch = title.match(/\b(19|20)(\d{2})\+/);
   if (plusMatch && !yearStart) {
     yearStart = parseInt(plusMatch[1] + plusMatch[2]);
@@ -498,15 +483,9 @@ async function findSimilarPartNumbers(partNumbers) {
  * Returns { start, end } or null.
  */
 function extractYearsFromTitle(title) {
-  const range = title.match(/\b(19|20)(\d{2})\s*[-–]\s*(19|20)?(\d{2})\b/);
-  if (range) {
-    const start = parseInt(range[1] + range[2]);
-    const end = range[3] ? parseInt(range[3] + range[4]) : parseInt(range[1] + range[4]);
-    return { start, end };
-  }
-  const single = title.match(/\b((?:19|20)\d{2})\b/);
-  if (single) { const y = parseInt(single[1]); return { start: y, end: y }; }
-  return null;
+  const range = _parseYearRange(title);
+  if (!range) return null;
+  return { start: range.start, end: range.end };
 }
 
 /**
