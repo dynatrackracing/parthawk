@@ -524,10 +524,10 @@ class AttackListService {
 
       // Load blocked comps set to exclude from match pool
       const blockedComps = require('./BlockedCompsService');
-      const blockedSet = await blockedComps.getBlockedSet();
+      const { compIds: blockedCompIds } = await blockedComps.getBlockedSet();
 
       for (const row of rows) {
-        if (blockedSet.has(String(row.itemId))) continue; // Blocked comp — skip entirely
+        if (blockedCompIds.has(String(row.itemId))) continue; // Blocked comp — skip entirely
 
         const key = `${row.make.toLowerCase()}|${row.model.toLowerCase()}|${row.year}`;
         if (!index[key]) {
@@ -1414,6 +1414,20 @@ class AttackListService {
         p.priceFloor = floor || null;
       }
     }
+
+    // === SOLD BLOCK FILTER — remove sold parts blocked for this exact vehicle ===
+    try {
+      const blockedComps = require('./BlockedCompsService');
+      const { soldKeys } = await blockedComps.getBlockedSet();
+      if (soldKeys.size > 0) {
+        for (let i = filteredParts.length - 1; i >= 0; i--) {
+          const p = filteredParts[i];
+          if (p.priceSource !== 'sold') continue;
+          const key = blockedComps.makeSoldKey(p.partType, year, make, model);
+          if (soldKeys.has(key)) filteredParts.splice(i, 1);
+        }
+      }
+    } catch (e) { /* non-fatal */ }
 
     // === PART NOVELTY — boost scoring value for parts we've never had or need to restock ===
     for (const p of filteredParts) {

@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Add SOLD Block Type + Wire Blocked Filter into Flyway — 2026-04-07
+- SOLD block: blocks (partType, year, make, model) combo for sold-aggregated chips. Year-exact, no fuzzy.
+- COMP block: existing, blocks single Item.id for item_reference chips.
+- Both filters in scoreVehicle() → Flyway inherits automatically
+- Hidden page: All/Comp/Sold tabs, blue COMP badge, orange SOLD badge
+- Files: migration, BlockedCompsService.js, AttackListService.js, blocked-comps.js, blocked-comps.html, attack-list.html, CompetitorMonitorService.js, DeadInventoryService.js, CLAUDE_RULES.md
+
+---
+
 ## Fix Blocked Comps — ebayId Column, Cache Invalidation, Title Backfill — 2026-04-07
 - BlockedCompsService.block() fixed: ebayItemId→ebayId for Item snapshot query
 - Inventory index cache invalidated immediately on block/unblock (was 10-min stale)

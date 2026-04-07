@@ -942,7 +942,7 @@
           ${isCached
             ? `<button class="btn-cached" onclick="unclaimPart('${v.id}','${pid}',event)">✓ Cached</button>`
             : `<button class="btn-pull" onclick="markPulled('${v.id}','${pid}',event)">Pull</button>`}
-          ${p.itemId ? `<button style="padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer;min-height:32px;" data-vid="${v.id}" data-item-id="${p.itemId}" data-title="${(p.title||'').replace(/"/g,'&quot;')}" onclick="blockComp(this,event)" title="Block this comp from matching">\u2715 Block</button>` : ''}
+          ${(p.priceSource === 'item_reference' && p.itemId) ? `<button style="padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer;min-height:32px;" data-block-type="comp" data-vid="${v.id}" data-item-id="${p.itemId}" data-title="${(p.title||'').replace(/"/g,'&quot;')}" onclick="blockPart(this,event)" title="Block this comp listing">\u2715 Block</button>` : ''}${p.priceSource === 'sold' ? `<button style="padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer;min-height:32px;" data-block-type="sold" data-vid="${v.id}" data-part-type="${p.partType||''}" data-year="${v.year||''}" data-make="${(v.make||'').replace(/"/g,'&quot;')}" data-model="${(v.model||'').replace(/"/g,'&quot;')}" data-title="${(p.title||'').replace(/"/g,'&quot;')}" data-pn="${p.partNumber||''}" onclick="blockPart(this,event)" title="Block this part type on this vehicle">\u2715 Block</button>` : ''}
         </div>
       </div>`;
     }
@@ -1062,36 +1062,59 @@
 
   // === Part actions ===
 
-  function blockComp(btn, evt) {
+  function blockPart(btn, evt) {
     evt.stopPropagation();
-    var itemId = btn.dataset.itemId;
+    var blockType = btn.dataset.blockType;
     var vid = btn.dataset.vid;
     var title = btn.dataset.title || '';
-    var reason = prompt('Block "' + title.substring(0, 60) + '" from matching?\n\nOptional reason (e.g. "engine miscategorized as OTHER"):');
-    if (reason === null) return;
+    var url, body, promptText;
+
+    if (blockType === 'sold') {
+      var pt = btn.dataset.partType;
+      var yr = btn.dataset.year;
+      var mk = btn.dataset.make;
+      var md = btn.dataset.model;
+      promptText = 'Block ALL ' + pt + ' chips on ' + yr + ' ' + mk + ' ' + md + '? (Only this exact year/make/model.)\n\nOptional reason:';
+      url = '/blocked-comps/block-sold';
+      var reason = prompt(promptText);
+      if (reason === null) return;
+      body = { partType: pt, year: parseInt(yr), make: mk, model: md, exampleTitle: title, examplePN: btn.dataset.pn || null, reason: reason || null };
+    } else {
+      var itemId = btn.dataset.itemId;
+      promptText = 'Block this individual comp listing?\n"' + title.substring(0, 60) + '"\n\nOptional reason:';
+      url = '/blocked-comps/block';
+      var reason = prompt(promptText);
+      if (reason === null) return;
+      body = { itemId: itemId, reason: reason || null };
+    }
+
     btn.disabled = true; btn.textContent = '...';
-    fetch('/blocked-comps/block', {
+    fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: itemId, reason: reason || null }),
+      body: JSON.stringify(body),
     }).then(function(r) {
       if (r.ok) {
-        var el = btn.closest('.part-detail');
-        if (el) {
-          el.style.transition = 'opacity .3s';
-          el.style.opacity = '0.3';
-          el.innerHTML = '<div style="padding:8px;font-size:11px;color:#6B7280;">Blocked. <a href="#" data-vid="' + vid + '" data-item-id="' + itemId + '" onclick="unblockComp(this,event);return false" style="color:#3b82f6">Undo</a></div>';
-          setTimeout(function() { if (el.querySelector('a') === null) el.remove(); }, 5000);
-        }
+        return r.json().then(function(data) {
+          var el = btn.closest('.part-detail');
+          if (el) {
+            el.style.transition = 'opacity .3s';
+            el.style.opacity = '0.3';
+            var rowId = data.blocked && data.blocked.id ? data.blocked.id : '';
+            var undoUrl = blockType === 'comp' ? '/blocked-comps/' + body.itemId : '/blocked-comps/by-id/' + rowId;
+            el.innerHTML = '<div style="padding:8px;font-size:11px;color:#6B7280;">Blocked. <a href="#" data-undo-url="' + undoUrl + '" data-vid="' + vid + '" onclick="undoBlock(this,event);return false" style="color:#3b82f6">Undo</a></div>';
+            setTimeout(function() { if (el.querySelector('a') === null) el.remove(); }, 5000);
+          }
+        });
       } else { btn.disabled = false; btn.textContent = '\u2715 Block'; alert('Block failed'); }
     }).catch(function() { btn.disabled = false; btn.textContent = '\u2715 Block'; });
   }
 
-  function unblockComp(link, evt) {
+  function undoBlock(link, evt) {
     evt.preventDefault();
-    var itemId = link.dataset.itemId;
+    var url = link.dataset.undoUrl;
     var vid = link.dataset.vid;
-    fetch('/blocked-comps/' + itemId, { method: 'DELETE' }).then(function(r) {
+    fetch(url, { method: 'DELETE' }).then(function(r) {
       if (r.ok) {
         var exp = document.getElementById('exp-' + vid);
         if (exp) { exp.innerHTML = '<div style="padding:12px;color:#9CA3AF;font-size:12px;text-align:center;">Restored. Reload to see updated parts.</div>'; }

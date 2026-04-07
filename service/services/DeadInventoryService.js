@@ -311,8 +311,8 @@ class DeadInventoryService {
     // Filter out blocked comps
     try {
       const blockedComps = require('./BlockedCompsService');
-      const blockedSet = await blockedComps.getBlockedSet();
-      if (blockedSet.size > 0) items = items.filter(i => !blockedSet.has(String(i.id)));
+      const { compIds } = await blockedComps.getBlockedSet();
+      if (compIds.size > 0) items = items.filter(i => !compIds.has(String(i.id)));
     } catch (e) { /* non-fatal */ }
 
     let flagged = 0;

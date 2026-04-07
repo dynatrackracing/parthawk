@@ -125,3 +125,15 @@
 - FIX 3: Backfilled 2 existing blocked_comps rows with titles/PNs/categories from Item table
 - FIX 4: Added CLAUDE_RULES.md rule 34 documenting Item.id vs ebayId column names
 - NOTE: row.itemId in AttackListService is correct — it's aliased from Item.id via 'Item.id as itemId' in the JOIN query
+
+## Dual Block Type (COMP + SOLD) + Flyway Wiring — 2026-04-07
+- Migration: block_type, part_type, year, make, model columns on blocked_comps. Partial unique indexes per type.
+- BlockedCompsService: blockSold(), unblockSold(), unblockById(), getBlockedSet() returns { compIds, soldKeys }
+- COMP block: by Item.id (item_reference chips). SOLD block: by (partType, year, make, model) uppercase (sold chips).
+- AttackListService: comp filter in buildInventoryIndex(), sold filter before PART NOVELTY in scoreVehicle()
+- FlywayService: inherits both filters via shared scoreVehicle() call — no separate wiring needed
+- CompetitorMonitorService, DeadInventoryService: updated to use { compIds } from new shape
+- Routes: POST /block-sold, DELETE /by-id/:id (unified), kept existing comp routes
+- Frontend: blockPart() handles both types via data-block-type attribute. Separate prompts per type.
+- Hidden page: type tabs (All/Comp/Sold), COMP=blue badge, SOLD=orange badge, restore via /by-id/:id
+- CLAUDE_RULES.md rule 33 updated with dual block type documentation

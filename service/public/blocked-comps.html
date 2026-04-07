@@ -12,6 +12,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #2a2a2a;margin-bottom:12px}
 .header h1{font-size:16px;font-weight:700}
 .header .count{font-size:12px;color:#6B7280;margin-left:8px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{padding:5px 12px;border-radius:6px;border:1px solid #2a2a2a;background:#1a1a1a;color:#6B7280;font-size:11px;font-weight:600;cursor:pointer}
+.tab.active{background:#dc2626;color:#fff;border-color:#dc2626}
 .search{width:100%;padding:10px 14px;border:1px solid #2a2a2a;border-radius:8px;background:#141414;color:#F0F0F0;font-size:14px;outline:none;margin-bottom:12px}
 .search:focus{border-color:#dc2626}
 .search::placeholder{color:#6B7280}
@@ -22,13 +25,13 @@ tr:hover td{background:#1a1a1a}
 .title{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mono{font-family:SFMono-Regular,Menlo,monospace;font-size:11px;color:#9CA3AF}
 .reason{color:#eab308;font-size:11px;font-style:italic;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge-comp{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#1e3a5f;color:#3b82f6}
+.badge-sold{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#7c2d12;color:#ea580c}
 .btn-restore{padding:5px 10px;border-radius:6px;border:1px solid #064e3b;background:#0a1a0a;color:#22c55e;font-size:11px;font-weight:600;cursor:pointer}
 .btn-restore:active{opacity:.6}
 .empty{text-align:center;color:#6B7280;padding:40px 10px;font-size:13px}
 .pagination{display:flex;justify-content:center;gap:8px;padding:16px 0}
 .pg-btn{padding:6px 14px;border-radius:6px;border:1px solid #2a2a2a;background:#141414;color:#d1d5db;font-size:12px;font-weight:600;cursor:pointer}
-.pg-btn:disabled{opacity:.3;cursor:default}
-.pg-btn.active{background:#dc2626;color:#fff;border-color:#dc2626}
 .spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -38,15 +41,27 @@ tr:hover td{background:#1a1a1a}
 <script src="/admin/dh-nav.js?v=3"></script><script>dhNav('blocked')</script>
 <div class="container">
   <div class="header">
-    <div><h1>Blocked Comps <span class="count" id="count"></span></h1></div>
+    <div><h1>Hidden <span class="count" id="count"></span></h1></div>
   </div>
-  <input type="text" class="search" id="searchBox" placeholder="Search by title, PN, or reason..." autocomplete="off">
+  <div class="tabs">
+    <button class="tab active" onclick="setType(null,this)">All</button>
+    <button class="tab" onclick="setType('comp',this)">Comp</button>
+    <button class="tab" onclick="setType('sold',this)">Sold</button>
+  </div>
+  <input type="text" class="search" id="searchBox" placeholder="Search by title, PN, part type, make, model, or reason..." autocomplete="off">
   <div id="content"><div style="text-align:center;padding:30px"><div class="spinner"></div></div></div>
   <div id="pagination" class="pagination"></div>
 </div>
 <script>
-var currentPage = 1;
-var searchTimeout = null;
+var currentPage = 1, currentType = null, searchTimeout = null;
+
+function setType(type, el) {
+  currentType = type;
+  currentPage = 1;
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  load();
+}
 
 document.getElementById('searchBox').addEventListener('input', function() {
   clearTimeout(searchTimeout);
@@ -69,34 +84,37 @@ function load() {
   var search = document.getElementById('searchBox').value.trim();
   var url = '/blocked-comps?limit=100&offset=' + ((currentPage - 1) * 100);
   if (search) url += '&search=' + encodeURIComponent(search);
+  if (currentType) url += '&type=' + currentType;
 
   fetch(url).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.success) { document.getElementById('content').innerHTML = '<div class="empty">Error: ' + (d.error || 'Unknown') + '</div>'; return; }
-
     document.getElementById('count').textContent = '(' + d.total + ')';
 
     if (d.rows.length === 0) {
-      document.getElementById('content').innerHTML = '<div class="empty">No blocked comps' + (search ? ' matching "' + esc(search) + '"' : ' yet') + '.</div>';
+      document.getElementById('content').innerHTML = '<div class="empty">No hidden parts' + (search ? ' matching "' + esc(search) + '"' : '') + '.</div>';
       document.getElementById('pagination').innerHTML = '';
       return;
     }
 
-    var h = '<table><tr><th>Title</th><th>PN</th><th>Category</th><th>Reason</th><th>Blocked</th><th></th></tr>';
+    var h = '<table><tr><th>Type</th><th>Block</th><th>PN</th><th>Reason</th><th>When</th><th></th></tr>';
     for (var i = 0; i < d.rows.length; i++) {
       var r = d.rows[i];
-      h += '<tr id="bc-' + esc(r.source_item_id) + '">';
-      h += '<td class="title" title="' + esc(r.source_title) + '">' + esc(r.source_title || '-') + '</td>';
+      var typeBadge = r.block_type === 'sold' ? '<span class="badge-sold">SOLD</span>' : '<span class="badge-comp">COMP</span>';
+      var display = r.block_type === 'sold'
+        ? '<strong>ALL ' + esc(r.part_type) + '</strong> on ' + esc(r.year + ' ' + r.make + ' ' + r.model)
+        : '<span class="title" title="' + esc(r.source_title) + '">' + esc(r.source_title || '-') + '</span>';
+      h += '<tr id="bc-' + r.id + '">';
+      h += '<td>' + typeBadge + '</td>';
+      h += '<td>' + display + '</td>';
       h += '<td class="mono">' + esc(r.source_part_number || '-') + '</td>';
-      h += '<td>' + esc(r.source_category || '-') + '</td>';
       h += '<td class="reason" title="' + esc(r.blocked_reason) + '">' + esc(r.blocked_reason || '-') + '</td>';
       h += '<td style="white-space:nowrap;font-size:11px;color:#6B7280">' + timeAgo(r.blocked_at) + '</td>';
-      h += '<td><button class="btn-restore" onclick="restore(\'' + esc(r.source_item_id) + '\',this)">Restore</button></td>';
+      h += '<td><button class="btn-restore" onclick="restore(' + r.id + ',this)">Restore</button></td>';
       h += '</tr>';
     }
     h += '</table>';
     document.getElementById('content').innerHTML = h;
 
-    // Pagination
     var totalPages = Math.ceil(d.total / 100);
     if (totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
     var ph = '';
@@ -111,11 +129,11 @@ function load() {
 
 function goPage(p) { currentPage = p; load(); window.scrollTo(0, 0); }
 
-function restore(itemId, btn) {
+function restore(rowId, btn) {
   btn.disabled = true; btn.textContent = '...';
-  fetch('/blocked-comps/' + itemId, { method: 'DELETE' }).then(function(r) {
+  fetch('/blocked-comps/by-id/' + rowId, { method: 'DELETE' }).then(function(r) {
     if (r.ok) {
-      var row = document.getElementById('bc-' + itemId);
+      var row = document.getElementById('bc-' + rowId);
       if (row) { row.style.transition = 'opacity .3s'; row.style.opacity = '0'; setTimeout(function() { row.remove(); }, 300); }
     } else { btn.disabled = false; btn.textContent = 'Restore'; }
   }).catch(function() { btn.disabled = false; btn.textContent = 'Restore'; });

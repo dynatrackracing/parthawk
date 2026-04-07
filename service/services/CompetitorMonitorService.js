@@ -42,8 +42,8 @@ class CompetitorMonitorService {
     // Filter out blocked comps
     try {
       const blockedComps = require('./BlockedCompsService');
-      const blockedSet = await blockedComps.getBlockedSet();
-      if (blockedSet.size > 0) competitorItems = competitorItems.filter(i => !blockedSet.has(String(i.id)));
+      const { compIds } = await blockedComps.getBlockedSet();
+      if (compIds.size > 0) competitorItems = competitorItems.filter(i => !compIds.has(String(i.id)));
     } catch (e) { /* BlockedCompsService may not exist yet */ }
 
     // Build competitor price index by normalized part number

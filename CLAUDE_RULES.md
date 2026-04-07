@@ -126,7 +126,7 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 ## BLOCKED COMPS RULE
 
-33. **Any new query against Item, SoldItem, CompetitorListing, or market_demand_cache source set MUST filter through blocked_comps.** Use `BlockedCompsService.getBlockedSet()` (60s TTL cache) and skip items in the set. No exceptions.
+33. **blocked_comps has two block types:** (1) COMP — keyed on source_item_id (Item.id UUID). Filters chips with priceSource='item_reference'. Whack-a-mole by design — each block is a precision strike on one Item row. (2) SOLD — keyed on (part_type, year, make, model) UPPERCASE. Filters chips with priceSource='sold'. Year-exact, make/model-exact — no fuzzy matching. Both filters apply to AttackListService AND FlywayService (via shared scoreVehicle). Use `BlockedCompsService.getBlockedSet()` → `{ compIds, soldKeys }`. No exceptions.
 
 34. **Item table columns:** `id` (UUID primary key) and `ebayId` (eBay item number). The codebase uses `itemId` as an alias for `Item.id` in JOINs (e.g. `Item.id as itemId`). When querying Item directly, use `id`. When working with already-built part objects, use `itemId`.
 
