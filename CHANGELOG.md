@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Wire Blocked Comps into All Aggregation Sites — 2026-04-07
+- CompetitorMonitorService, DeadInventoryService, market drip (run-importapart-drip.js) now filter blocked items
+- All Item table aggregation sites covered. SoldItem/CompetitorListing/market_demand_cache inherit via cache invalidation.
+- Files: CompetitorMonitorService.js, DeadInventoryService.js, run-importapart-drip.js
+
+---
+
 ## Blocked Comps System — 2026-04-07
 - One-click block on expanded parts, with undo. Blocked items excluded from inventory index.
 - BlockedCompsService: block/unblock/list/getBlockedSet (60s cache), cache invalidation on block

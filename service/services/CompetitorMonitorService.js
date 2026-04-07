@@ -36,8 +36,15 @@ class CompetitorMonitorService {
     try {
       competitorItems = await database('Item')
         .whereNotNull('manufacturerPartNumber')
-        .select('title', 'price', 'seller', 'manufacturerPartNumber');
+        .select('id', 'title', 'price', 'seller', 'manufacturerPartNumber');
     } catch (e) { competitorItems = []; }
+
+    // Filter out blocked comps
+    try {
+      const blockedComps = require('./BlockedCompsService');
+      const blockedSet = await blockedComps.getBlockedSet();
+      if (blockedSet.size > 0) competitorItems = competitorItems.filter(i => !blockedSet.has(String(i.id)));
+    } catch (e) { /* BlockedCompsService may not exist yet */ }
 
     // Build competitor price index by normalized part number
     const compIndex = {};

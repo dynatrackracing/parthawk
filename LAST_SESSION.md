@@ -111,3 +111,9 @@
 - /admin/blocked-comps page: search, table with restore button, pagination
 - Nav: "BLOCKED" link added to intel row in dh-nav.js
 - CLAUDE_RULES.md rule 33: all Item/SoldItem/CompetitorListing queries must filter through blocked_comps
+
+## Wire blocked comps into remaining aggregation sites — 2026-04-07
+- CompetitorMonitorService.js: loads blockedSet, filters Item rows before building comp index
+- DeadInventoryService.js: loads blockedSet, filters Item rows before dead inventory scan
+- run-importapart-drip.js: SQL NOT IN blocked_comps on Item bucket 3 query
+- Sites that DON'T need filtering: PhoenixService (SoldItem not Item), DemandAnalysis/PricePrediction (CompetitorListing not Item), priceResolver/MarketPricing/Stale (read market_demand_cache which inherits protection), restockReport (reads YourSale)

@@ -308,6 +308,13 @@ class DeadInventoryService {
       return { scanned: 0, flagged: 0 };
     }
 
+    // Filter out blocked comps
+    try {
+      const blockedComps = require('./BlockedCompsService');
+      const blockedSet = await blockedComps.getBlockedSet();
+      if (blockedSet.size > 0) items = items.filter(i => !blockedSet.has(String(i.id)));
+    } catch (e) { /* non-fatal */ }
+
     let flagged = 0;
     for (const item of items) {
       const base = item.partNumberBase || normalizePartNumber(item.manufacturerPartNumber);

@@ -224,7 +224,7 @@ async function main() {
   var bucket2 = b2.rows;
 
   // Bucket 3: Importapart catalog (with titles + prices)
-  var b3 = await knex.raw('SELECT DISTINCT ON (UPPER("manufacturerPartNumber")) UPPER("manufacturerPartNumber") as pn, title, COALESCE(price::numeric, 0) as price FROM "Item" WHERE seller = \'importapart\' AND "manufacturerPartNumber" IS NOT NULL AND "manufacturerPartNumber" != \'\' ORDER BY UPPER("manufacturerPartNumber"), price DESC NULLS LAST');
+  var b3 = await knex.raw('SELECT DISTINCT ON (UPPER("manufacturerPartNumber")) UPPER("manufacturerPartNumber") as pn, title, COALESCE(price::numeric, 0) as price FROM "Item" WHERE seller = \'importapart\' AND "manufacturerPartNumber" IS NOT NULL AND "manufacturerPartNumber" != \'\' AND id::varchar NOT IN (SELECT source_item_id FROM blocked_comps) ORDER BY UPPER("manufacturerPartNumber"), price DESC NULLS LAST');
   var bucket3 = b3.rows.map(function(r) { return { pn: (r.pn || '').replace(/[\s\-\.]/g, '').toUpperCase(), title: r.title, price: r.price }; }).filter(function(r) { return r.pn.length >= 5; });
 
   // Existing cache prices for fallback
