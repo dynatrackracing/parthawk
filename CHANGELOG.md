@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix: Attack List Pill Filter — Strict Window — 2026-04-07
+- Pills now show ONLY vehicles within the selected window (was highlight+rest stacked)
+- "Newest" = only today's vehicles, "3d" = only ≤3 days, etc. No older sections below.
+- "All" tab unchanged — still shows full age-tier breakdown
+- Files: attack-list.html
+
+---
+
 ## Fix: Attack List Date Filter — Relative-to-Today — 2026-04-07
 - getDaysFromNewest() was comparing against newest vehicle in dataset, not today
 - If scraper was 4 days stale, "Newest" showed 4-day-old vehicles as day 0

@@ -581,22 +581,12 @@
           { label: '30+ DAYS', vehicles: filtered.filter(v => getDaysFromNewest(v) > 30) },
         ].filter(s => s.vehicles.length > 0);
       } else {
+        // Strict pill filter: only show vehicles within the pill window. No "rest" fallback.
         const highlighted = filtered.filter(v => getDaysFromNewest(v) <= pillDays);
-        const rest = filtered.filter(v => getDaysFromNewest(v) > pillDays);
         const pillLabel = pillDays === 0 ? 'NEWEST ARRIVALS' : 'LAST ' + pillDays + ' DAYS';
-        sections = [];
-        if (highlighted.length > 0) sections.push({ label: pillLabel, vehicles: highlighted, isFresh: true });
-        // Sub-group the rest by age tiers
-        const restTiers = [
-          { label: '1-3 DAYS', test: v => { const d = getDaysFromNewest(v); return d >= 1 && d <= 3; } },
-          { label: '4-7 DAYS', test: v => { const d = getDaysFromNewest(v); return d >= 4 && d <= 7; } },
-          { label: '8-30 DAYS', test: v => { const d = getDaysFromNewest(v); return d >= 8 && d <= 30; } },
-          { label: '30+ DAYS', test: v => getDaysFromNewest(v) > 30 },
-        ];
-        for (const tier of restTiers) {
-          const tv = rest.filter(tier.test);
-          if (tv.length > 0) sections.push({ label: tier.label, vehicles: tv });
-        }
+        sections = highlighted.length > 0
+          ? [{ label: pillLabel, vehicles: highlighted, isFresh: true }]
+          : [];
       }
 
       const yardCap = VEHICLE_CAPS[dateFilter] || 500;
