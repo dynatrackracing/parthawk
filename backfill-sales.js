@@ -103,7 +103,7 @@ async function main() {
   console.log('Before:', parseInt(pre).toLocaleString(), 'records\n');
 
   // Parse all CSVs
-  const csvDir = 'C:\\Users\\atenr\\Downloads';
+  const csvDir = 'C:\\DarkHawk\\csv-imports';
   let allRows = [];
   for (const { file, store } of CSV_FILES) {
     const fp = path.join(csvDir, file);

@@ -3,7 +3,7 @@
  * Shows raw response structure to understand where fitment data lives
  * 
  * Usage:
- *   cd C:\Users\atenr\Downloads\parthawk-complete\parthawk-deploy
+ *   cd C:\DarkHawk\parthawk-deploy
  *   set DATABASE_URL=postgresql://postgres:jOWykUhLuUbWSVASAAZZHqsDVfyqaFTN@switchyard.proxy.rlwy.net:12023/railway
  *   node debug-getitem-response.js
  */

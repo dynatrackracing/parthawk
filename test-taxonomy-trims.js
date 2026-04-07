@@ -9,7 +9,7 @@
  * NOT the Trading API token.
  * 
  * Usage:
- *   cd C:\Users\atenr\Downloads\parthawk-complete\parthawk-deploy
+ *   cd C:\DarkHawk\parthawk-deploy
  *   set DATABASE_URL=postgresql://postgres:jOWykUhLuUbWSVASAAZZHqsDVfyqaFTN@switchyard.proxy.rlwy.net:12023/railway
  *   node test-taxonomy-trims.js
  */

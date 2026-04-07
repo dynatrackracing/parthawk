@@ -5,7 +5,7 @@
  *
  * Usage: DATABASE_URL=postgres://... node service/scripts/import-all-data.js
  *
- * Reads from: C:\Users\atenr\Downloads\parthawk-update\parthawk-update\data\
+ * Reads from: C:\DarkHawk\parthawk-deploy\data\
  *   all-items.json    → Item table (21,221 competitor/reference items)
  *   all-listings.json → YourListing table (3,919 active listings)
  *   all-sales.json    → YourSale table (1,920 recent sales, deduped against existing 14K)
@@ -19,7 +19,7 @@ const { normalizePartNumber } = require('../lib/partNumberUtils');
 
 Model.knex(database);
 
-const DATA_DIR = path.resolve('C:/Users/atenr/Downloads/parthawk-update/parthawk-update/data');
+const DATA_DIR = path.resolve('C:/DarkHawk/parthawk-deploy/data');
 
 async function importItems() {
   const filePath = path.join(DATA_DIR, 'all-items.json');

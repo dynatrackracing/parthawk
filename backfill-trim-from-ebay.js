@@ -12,7 +12,7 @@
  * With 3,919 active listings and 500ms pacing = ~33 minutes.
  * 
  * Usage:
- *   cd C:\Users\atenr\Downloads\parthawk-complete\parthawk-deploy
+ *   cd C:\DarkHawk\parthawk-deploy
  *   set DATABASE_URL=postgresql://postgres:jOWykUhLuUbWSVASAAZZHqsDVfyqaFTN@switchyard.proxy.rlwy.net:12023/railway
  *   node backfill-trim-from-ebay.js
  * 
