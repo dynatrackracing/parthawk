@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Blocked Comps Migration — DROP CONSTRAINT not DROP INDEX — 2026-04-07
+- Migration 20260407100000 failed silently on every boot: tried DROP INDEX on a Knex-created CONSTRAINT
+- Fixed to ALTER TABLE DROP CONSTRAINT. Ran manually on prod. 19 comp blocks now filtering.
+- Root cause of all blocked_comps failures today: getBlockedSet() threw → catch returned empty sets → zero filtering
+- Files: 20260407100000_add_sold_block_type.js
+
+---
+
 ## Fix Sold Block Restore — Clear All Part-Matching Caches — 2026-04-07
 - invalidateInventoryCache() now clears sales + stock caches alongside inventory
 - Sold block restore is now instant (was 10-min stale)

@@ -146,3 +146,9 @@
 - Reverted the revert. Original failure was transient Railway issue, not code.
 - Deploy succeeded, /test returns 200 "haribol". Production healthy.
 - invalidateInventoryCache() now clears all 3 caches (inventory + sales + stock) as intended.
+
+## Migration 20260407100000 ran — root cause of all blocked_comps failures — 2026-04-07
+- ROOT CAUSE: The dual-block-type migration failed silently on every boot because it tried DROP INDEX on a CONSTRAINT (Knex creates UNIQUE as constraints, not plain indexes). The error was caught by index.js line 792 and swallowed with "Migration failed — server will start anyway".
+- getBlockedSet() then threw on every call (column block_type doesn't exist), caught returned empty sets, so zero filtering ever happened for any block type.
+- FIX: Changed migration line 17 from DROP INDEX to ALTER TABLE DROP CONSTRAINT. Ran manually. Verified: 19 compIds now in blockedSet, columns present, sold blocks ready.
+- Also added to CLAUDE_RULES.md: "getBlockedSet catch should log, not silently swallow"

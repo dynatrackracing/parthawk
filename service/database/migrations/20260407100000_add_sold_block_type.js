@@ -13,8 +13,9 @@ exports.up = async function(knex) {
   await knex.raw('ALTER TABLE blocked_comps ALTER COLUMN source_item_id DROP NOT NULL');
 
   // Drop old unique constraint, replace with partial unique indexes
+  // Knex creates UNIQUE as a constraint, not a plain index — must drop as constraint
   await knex.raw('ALTER TABLE blocked_comps DROP CONSTRAINT IF EXISTS blocked_comps_source_item_id_key');
-  await knex.raw('DROP INDEX IF EXISTS blocked_comps_source_item_id_unique');
+  await knex.raw('ALTER TABLE blocked_comps DROP CONSTRAINT IF EXISTS blocked_comps_source_item_id_unique');
 
   await knex.raw(`
     CREATE UNIQUE INDEX IF NOT EXISTS blocked_comps_unique_comp

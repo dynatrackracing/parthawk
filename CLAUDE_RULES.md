@@ -132,6 +132,10 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 ---
 
+35. **BlockedCompsService.getBlockedSet() must log errors, not silently swallow.** The catch block returns empty sets on failure — this hid a broken migration for an entire day. Any future changes to getBlockedSet must log the exception before returning the fallback.
+
+---
+
 ## KNOWN TECH DEBT (do not make worse)
 
 - Unauthenticated write endpoints (end-item/relist/revise/bulk-end)
