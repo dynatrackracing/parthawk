@@ -189,3 +189,11 @@ FOLLOW-UP (next session):
 - Audit boot-time migration runner — should crash on failure, not continue
 - Mustang ABS chip leak (collapsed-card part_chips path)
 - Flyway 401 audit
+
+## Local path migration: C:\Users\atenr → C:\DarkHawk — 2026-04-07
+- Updated 13 files: 7 .bat scripts, 4 .js usage comments, 2 .js hardcoded paths
+- All local scripts now use C:\DarkHawk\parthawk-deploy instead of C:\Users\atenr\Downloads\parthawk-complete\parthawk-deploy
+- backfill-sales.js CSV dir → C:\DarkHawk\csv-imports
+- import-all-data.js data dir → C:\DarkHawk\parthawk-deploy\data
+- All .bat files now use cd /d for cross-drive safety
+- Verified: zero remaining references to "atenr" or "parthawk-complete" in the repo

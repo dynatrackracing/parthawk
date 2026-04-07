@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Local Path Migration: C:\Users\atenr → C:\DarkHawk — 2026-04-07
+- 13 files updated: .bat scripts, .js hardcoded paths, .js usage comments
+- Zero remaining references to old user path in repo
+- Files: 7 .bat, backfill-sales.js, import-all-data.js, 4 .js comment blocks
+
+---
+
 ## Blocked Comps Dual Block Type — 2026-04-07
 - COMP block: by Item.id, surgical, for priceSource='item_reference' chips
 - SOLD block: by (partType, year, make, model), for priceSource='sold' chips
