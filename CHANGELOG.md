@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix: Attack List Date Filter — Relative-to-Today — 2026-04-07
+- getDaysFromNewest() was comparing against newest vehicle in dataset, not today
+- If scraper was 4 days stale, "Newest" showed 4-day-old vehicles as day 0
+- Fixed to compare against today's date. All pill filters now show real calendar age.
+- Files: attack-list.html
+
+---
+
 ## The Mark — Search Bar + Find in Yard — 2026-04-06
 - Sticky search bar: debounced 150ms client-side filter across all mark fields
 - Find-in-yard button on each mark card (same endpoint as Scour Stream)

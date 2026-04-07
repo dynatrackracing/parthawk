@@ -85,3 +85,9 @@
 - instrumentclusterstore scraper: 0 items, needs debug-scrape diagnosis
 - Nissan trim coverage still low (30.8%) — vPIC doesn't return Trim for many Nissan models
 - market_demand_cache needs more coverage — market drip filling ~600/day
+
+## Fix: Attack list date filter — relative-to-newest → relative-to-today — 2026-04-07
+- ROOT CAUSE: getDaysFromNewest() computed age relative to the newest vehicle in the dataset, not relative to today. If a yard's scraper hadn't run in 4 days, all vehicles showed as 0-3 days old (relative to the 4-day-old newest), when they were actually 4-7 days old from today.
+- FIX: Changed getDaysFromNewest() to compare against today's date instead of newestDate. Removed newestDate parameter from all 14 call sites.
+- "Newest" now shows vehicles added TODAY (0 days), "3d" shows vehicles ≤3 days old from today, etc.
+- getNewestDate() and _currentNewestDate still exist (used elsewhere) but are no longer used for age calculation.
