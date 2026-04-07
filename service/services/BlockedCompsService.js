@@ -18,7 +18,7 @@ class BlockedCompsService {
     // Snapshot item data
     let title = null, partNumber = null, category = null;
     try {
-      const item = await database('Item').where('id', idStr).orWhere('ebayItemId', idStr).first();
+      const item = await database('Item').where('id', idStr).orWhere('ebayId', idStr).first();
       if (item) {
         title = item.title;
         partNumber = item.manufacturerPartNumber;
@@ -36,8 +36,9 @@ class BlockedCompsService {
       blocked_at: new Date(),
     }).onConflict('source_item_id').ignore().returning('*');
 
-    // Invalidate caches
+    // Invalidate caches — both blockedSet and inventory index
     _blockedSetCache = null;
+    try { require('./AttackListService').invalidateInventoryCache(); } catch (e) {}
     await this.recomputeAffectedCache(idStr, partNumber);
 
     log.info({ itemId: idStr, partNumber, reason }, 'Comp blocked');
@@ -54,6 +55,7 @@ class BlockedCompsService {
 
     await database('blocked_comps').where('source_item_id', idStr).del();
     _blockedSetCache = null;
+    try { require('./AttackListService').invalidateInventoryCache(); } catch (e) {}
 
     // Invalidate cache so it recomputes with the restored item
     if (pn) await this.recomputeAffectedCache(idStr, pn);

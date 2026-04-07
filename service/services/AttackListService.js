@@ -2058,4 +2058,9 @@ class AttackListService {
   }
 }
 
+AttackListService.invalidateInventoryCache = function() {
+  _inventoryIndexCache = null;
+  _inventoryIndexCacheTime = 0;
+};
+
 module.exports = AttackListService;

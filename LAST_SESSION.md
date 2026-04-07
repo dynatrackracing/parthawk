@@ -117,3 +117,11 @@
 - DeadInventoryService.js: loads blockedSet, filters Item rows before dead inventory scan
 - run-importapart-drip.js: SQL NOT IN blocked_comps on Item bucket 3 query
 - Sites that DON'T need filtering: PhoenixService (SoldItem not Item), DemandAnalysis/PricePrediction (CompetitorListing not Item), priceResolver/MarketPricing/Stale (read market_demand_cache which inherits protection), restockReport (reads YourSale)
+
+## Fix blocked comps — Item.id column, cache invalidation, backfill titles — 2026-04-07
+- ROOT CAUSE: BlockedCompsService.block() used .orWhere('ebayItemId') but column is 'ebayId' — snapshot query silently failed, titles stored as null
+- FIX 1: Changed to .orWhere('ebayId', idStr) in BlockedCompsService
+- FIX 2: Added AttackListService.invalidateInventoryCache() static method. Called from block() and unblock() to bust the 10-minute inventory index cache immediately.
+- FIX 3: Backfilled 2 existing blocked_comps rows with titles/PNs/categories from Item table
+- FIX 4: Added CLAUDE_RULES.md rule 34 documenting Item.id vs ebayId column names
+- NOTE: row.itemId in AttackListService is correct — it's aliased from Item.id via 'Item.id as itemId' in the JOIN query

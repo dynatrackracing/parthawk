@@ -128,6 +128,8 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 33. **Any new query against Item, SoldItem, CompetitorListing, or market_demand_cache source set MUST filter through blocked_comps.** Use `BlockedCompsService.getBlockedSet()` (60s TTL cache) and skip items in the set. No exceptions.
 
+34. **Item table columns:** `id` (UUID primary key) and `ebayId` (eBay item number). The codebase uses `itemId` as an alias for `Item.id` in JOINs (e.g. `Item.id as itemId`). When querying Item directly, use `id`. When working with already-built part objects, use `itemId`.
+
 ---
 
 ## KNOWN TECH DEBT (do not make worse)

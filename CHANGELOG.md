@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Blocked Comps — ebayId Column, Cache Invalidation, Title Backfill — 2026-04-07
+- BlockedCompsService.block() fixed: ebayItemId→ebayId for Item snapshot query
+- Inventory index cache invalidated immediately on block/unblock (was 10-min stale)
+- Backfilled 2 existing rows with titles from Item table
+- CLAUDE_RULES.md rule 34: Item.id vs ebayId column naming convention
+- Files: BlockedCompsService.js, AttackListService.js, CLAUDE_RULES.md
+
+---
+
 ## Wire Blocked Comps into All Aggregation Sites — 2026-04-07
 - CompetitorMonitorService, DeadInventoryService, market drip (run-importapart-drip.js) now filter blocked items
 - All Item table aggregation sites covered. SoldItem/CompetitorListing/market_demand_cache inherit via cache invalidation.
