@@ -141,3 +141,8 @@
 ## Fix sold block restore — clear all part-matching caches — 2026-04-07
 - invalidateInventoryCache() only cleared _inventoryIndexCache. Sold blocks filter against salesIndex, so restoring a sold block left parts hidden until 10-min TTL expired.
 - Now clears _inventoryIndexCache, _salesIndexCache, _stockIndexCache. Validation cache intentionally excluded (unrelated).
+
+## Re-applied sold block cache fix (dc8ca60) — 2026-04-07
+- Reverted the revert. Original failure was transient Railway issue, not code.
+- Deploy succeeded, /test returns 200 "haribol". Production healthy.
+- invalidateInventoryCache() now clears all 3 caches (inventory + sales + stock) as intended.
