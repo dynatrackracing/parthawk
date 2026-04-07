@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Sold Block Restore — Clear All Part-Matching Caches — 2026-04-07
+- invalidateInventoryCache() now clears sales + stock caches alongside inventory
+- Sold block restore is now instant (was 10-min stale)
+- Files: AttackListService.js
+
+---
+
 ## Add SOLD Block Type + Wire Blocked Filter into Flyway — 2026-04-07
 - SOLD block: blocks (partType, year, make, model) combo for sold-aggregated chips. Year-exact, no fuzzy.
 - COMP block: existing, blocks single Item.id for item_reference chips.
