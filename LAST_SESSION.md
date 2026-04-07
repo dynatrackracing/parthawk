@@ -162,3 +162,30 @@
 - Knex .onConflict(database.raw('(col) WHERE ...')).ignore() puts WHERE inside conflict target parens → invalid Postgres SQL
 - Replaced both block() and blockSold() with raw INSERT...ON CONFLICT WHERE...DO NOTHING
 - Added CLAUDE_RULES.md rule: always use database.raw() for ON CONFLICT with partial unique indexes
+
+## 2026-04-07 — Blocked Comps Dual Block Type (full afternoon arc)
+
+Final state: COMP block (by Item.id) and SOLD block (by partType+year+make+model) both work end-to-end on Daily Feed and Flyway. Block, restore, and search all functional. Hidden page at /admin/blocked-comps.
+
+Bugs hit and fixed today (in order):
+1. Attack list pill filter rendered "highlighted + rest" stacked sections — pills only highlighted, never filtered. FIX: drop rest fallback, strict pill window.
+2. Newest tab empty — getDaysFromNewest used date_added (LKQ set date) which lags. FIX: use createdAt as primary.
+3. Block feature: blocked rows had null source_title because block() looked up Item by 'ebayItemId' instead of 'ebayId'. FIX: correct column name.
+4. Block feature: Item.id vs row.itemId confirmed NOT a real issue — row.itemId is aliased from Item.id at line 514.
+5. SOLD block type needed: sold-aggregation chips have no Item.id. Built dual block type: block_type column, partial unique indexes, separate routes+handlers.
+6. Deploy crashed silently for 6 HOURS because scoreVehicle() is sync but sold filter used await inline → SyntaxError on parse → boot crash → previous container kept serving. FIX: pass soldKeys as parameter from async callers.
+7. Migration failed silently: DROP INDEX on a Knex CONSTRAINT. Rerun manually with ALTER TABLE DROP CONSTRAINT.
+8. Knex .onConflict(raw('(col) WHERE ...')).ignore() generates invalid SQL for partial indexes. FIX: raw INSERT...ON CONFLICT WHERE...DO NOTHING.
+9. getBlockedSet() try/catch silently swallowed schema errors, hiding bug 7 for hours.
+
+Lessons:
+- Get Railway dashboard logs FIRST, stop guessing at runtime errors.
+- Stale containers: successful deploy does not mean latest commit is running.
+- Catch blocks that swallow boot/schema errors are toxic.
+- Verify schema matches expectation after migration runs.
+
+FOLLOW-UP (next session):
+- Remove silent catch in getBlockedSet(), make it throw
+- Audit boot-time migration runner — should crash on failure, not continue
+- Mustang ABS chip leak (collapsed-card part_chips path)
+- Flyway 401 audit

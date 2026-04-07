@@ -4,10 +4,20 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Blocked Comps Dual Block Type — 2026-04-07
+- COMP block: by Item.id, surgical, for priceSource='item_reference' chips
+- SOLD block: by (partType, year, make, model), for priceSource='sold' chips
+- Both filter on Daily Feed AND Flyway via scoreVehicle() with soldKeys parameter
+- Hidden page /admin/blocked-comps with All/Comp/Sold tabs, search, restore
+- Migration: block_type + part_type/year/make/model + partial unique indexes
+- Raw SQL for INSERT...ON CONFLICT WHERE...DO NOTHING (Knex builder broken for partial indexes)
+- Cache invalidation clears all part-matching caches on block/unblock
+- Files: BlockedCompsService.js, AttackListService.js, FlywayService.js, blocked-comps.js, blocked-comps.html, attack-list.html, dh-nav.js, migration
+
+---
+
 ## Fix blocked_comps onConflict — Raw SQL for Partial Index — 2026-04-07
-- Knex .onConflict(raw(...)).ignore() generates invalid SQL for partial unique indexes
-- Replaced with raw INSERT...ON CONFLICT WHERE...DO NOTHING in block() and blockSold()
-- Files: BlockedCompsService.js, CLAUDE_RULES.md
+- (Subsumed by consolidated entry above)
 
 ---
 

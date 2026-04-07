@@ -136,6 +136,8 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 36. **ON CONFLICT with partial unique indexes: always use database.raw() for the entire INSERT.** Knex's `.onConflict(raw(...)).ignore()` builder puts the WHERE clause inside the conflict target parens, which is invalid Postgres SQL. Use raw `INSERT INTO ... ON CONFLICT (col) WHERE condition DO NOTHING` instead.
 
+37. **scoreVehicle() is SYNCHRONOUS. Do NOT add await inside it.** The sold filter loads soldKeys from its async callers (getAttackList, getAllYardsAttackList, scoreManualVehicles) and passes it as a parameter. Any inline `await` crashes Node at parse time with SyntaxError. This caused 6 hours of silent boot failures on 2026-04-07.
+
 ---
 
 ## KNOWN TECH DEBT (do not make worse)

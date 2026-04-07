@@ -7,7 +7,7 @@ Generated 2026-04-06
 - Two-bar sticky nav: FIELD row (6 links, red active) + INTEL row (10 links, yellow active)
 - Logo + "DARKHAWK" links to /admin/home. INTEL row hidden on mobile.
 - **FIELD:** feed, alerts, cache, vin, gate, flyway
-- **INTEL:** scour, quarry, sky, perch, mark, velocity, instincts, prey-cycle, carcass, phoenix
+- **INTEL:** scour, quarry, sky, perch, mark, velocity, instincts, prey-cycle, carcass, phoenix, blocked
 
 ### dh-parts.js + dh-parts.css (Part Value Utilities)
 - **Loaded by:** all 6 field pages
@@ -33,7 +33,7 @@ Generated 2026-04-06
 - **VEHICLE_CAPS:** `{ newest: 50, '3d': 150, '7d': 300, '30d': 500, '60d': 1000, '90d': 2000, all: 5000 }`
 - **Filters:** Newest / 3d / 7d / 30d / 60d / All. ALL uses pillDays=999, groups by age tiers, no date restriction.
 - **Cache sync:** Loads GET /cache/claimed-keys on init. Two-key matching: PN + itemId. Pull → checkmark, checkmark → unclaim.
-- **Expanded view:** On-demand part loading (GET /attack-list/vehicle/:id/parts). Price badges (6-tier), cache claim buttons, below-floor section, spec mismatch section, trim intelligence, part location.
+- **Expanded view:** On-demand part loading (GET /attack-list/vehicle/:id/parts). Price badges (6-tier), cache claim buttons, below-floor section, spec mismatch section, trim intelligence, part location. **Block button** on chips with priceSource in (item_reference, sold) — routes to /blocked-comps/block (COMP) or /blocked-comps/block-sold (SOLD) based on type. Optimistic UI with 5s undo.
 - **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claimed-keys`, `/cache/claim`, `/cache/:id/return`, `/part-location/...`, `/yards/scrape/...`, `/scout-alerts/claim`, `/attack-list/manual`, `/vin/decode-photo`, `/vin/scan`
 
 ### scout-alerts.html (Scout Alerts)
@@ -110,6 +110,15 @@ Generated 2026-04-06
 - **Nav key:** `quarry`
 - **Features:** Restock report with CRITICAL/LOW/WATCH tiers, period pills (7d/30d/60d/90d), found items tracking, hide-found toggle
 - **API:** `/restock/report`, `/restock/found-items`
+
+### blocked-comps.html (Hidden / Blocked Comps)
+- **URL:** `/admin/blocked-comps`
+- **Nav key:** `blocked`
+- All/Comp/Sold tab filters. Search box (debounced 300ms) across title, PN, part type, make, model, reason.
+- Table: Type badge (COMP blue / SOLD orange), Block description, PN, Reason, When, Restore button.
+- COMP display: source_title (truncated). SOLD display: "ALL {partType} on {year} {make} {model}".
+- Restore via DELETE /blocked-comps/by-id/:id (works for both types). Row fades on restore.
+- Pagination: 100 per page, Prev/Next.
 
 ### phoenix.html (The Phoenix)
 - **URL:** `/admin/phoenix`

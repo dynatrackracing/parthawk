@@ -29,6 +29,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
 | `/restock` | restockReport.js | GET `/report` (paginated: page/pageSize, timeframe sort, CRITICAL upgrade) `/found-items`, POST `/quarry-sync` |
 | `/restock-want-list` | restock-want-list.js | GET `/items` `/titles` (lightweight, no stock check) `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
+| `/blocked-comps` | blocked-comps.js | POST `/block` (comp by itemId) `/block-sold` (by partType+year+make+model), DELETE `/by-id/:id` (unified restore) `/:itemId` (comp compat), GET `/` (list with ?search&type&limit&offset) |
 | `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
 | `/api/fitment` | fitment.js | GET `/lookup` `/stats` |
@@ -93,6 +94,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/admin/instincts` | instincts.html |
 | `/admin/prey-cycle` | prey-cycle.html |
 | `/admin/carcass` | stale-inventory.html |
+| `/admin/blocked-comps` | blocked-comps.html |
 | `/admin/scout-alerts` | scout-alerts.html |
 | `/admin/alerts` | alerts.html |
 | `/admin/sales` | sales.html |

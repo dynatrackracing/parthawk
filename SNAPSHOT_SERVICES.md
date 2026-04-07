@@ -33,6 +33,14 @@ Generated 2026-04-06
 - **Sort:** Vehicles by est_value DESC, max_part_value DESC tiebreaker. Parts by price DESC, noveltyTier ASC.
 - **No vehicle limit** — full yard inventory served. Frontend VEHICLE_CAPS raised to 5000.
 - **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons, intel_match_count, est_value, max_part_value, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor
+- **Blocked comps:** COMP filter in buildInventoryIndex() via compIds from BlockedCompsService.getBlockedSet(). SOLD filter in scoreVehicle() via soldKeys parameter (loaded once per request in async callers). scoreVehicle is SYNC — do NOT add await inside it.
+
+### BlockedCompsService.js
+- Purpose: Manages blocked comp items — two block types (COMP by Item.id, SOLD by partType+year+make+model)
+- Key methods: `block(itemId)`, `blockSold({partType, year, make, model})`, `unblock(itemId)`, `unblockSold({...})`, `unblockById(rowId)`, `list({search, type, limit, offset})`, `getBlockedSet()` → `{ compIds: Set, soldKeys: Set }`, `makeSoldKey(partType, year, make, model)`
+- Cache: 60s in-memory TTL for getBlockedSet(). Invalidated on every block/unblock.
+- On block: snapshots Item data (title/PN/category), invalidates matching market_demand_cache rows, clears all AttackListService part-matching caches.
+- Partial unique indexes: `blocked_comps_unique_comp` on source_item_id, `blocked_comps_unique_sold` on (part_type, year, make, model). INSERT uses raw SQL (Knex builder broken for partial indexes).
 
 ### CacheService.js (The Cache)
 - Purpose: Full lifecycle for claimed parts — yard claim through eBay listing
@@ -52,6 +60,7 @@ Generated 2026-04-06
 - Purpose: Multi-yard trip planning CRUD — trips, yard routing, trip-specific attack lists
 - Key methods: `getTrips()`, `createTrip()`, `getFlywayAttackList()`, `cleanupExpiredTripVehicles()`, `getCoreYardIds()`
 - getCoreYardIds() reads `is_core` flag from yard table (4 LKQ NC yards)
+- **Blocked comps:** Inherits both COMP and SOLD filters via AttackListService.scoreVehicle() — loads soldKeys once before the scoring loop, passes as parameter
 - cleanupExpiredTripVehicles() deactivates vehicles 24h after trip completion, protects core yards + active trip yards
 - **getFlywayAttackList():** Builds full intelIndex + frequencyMap (same as Daily Feed). Road trip filter: only LEGENDARY + RARE + MARK vehicles. Day trip: no filter (identical to Daily Feed). Part chips: 6 max with noveltyTier + intelSource.
 
