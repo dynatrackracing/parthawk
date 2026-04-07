@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix blocked_comps onConflict — Raw SQL for Partial Index — 2026-04-07
+- Knex .onConflict(raw(...)).ignore() generates invalid SQL for partial unique indexes
+- Replaced with raw INSERT...ON CONFLICT WHERE...DO NOTHING in block() and blockSold()
+- Files: BlockedCompsService.js, CLAUDE_RULES.md
+
+---
+
 ## Fix scoreVehicle SyntaxError — await in Non-Async Function — 2026-04-07
 - scoreVehicle() is sync but sold block filter used inline await → SyntaxError → 6 hours of failed deploys
 - soldKeys now loaded once per request in async callers, passed as parameter

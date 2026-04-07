@@ -157,3 +157,8 @@
 - ROOT CAUSE: scoreVehicle() is synchronous. The sold block filter at line 1418 used `await blockedComps.getBlockedSet()` inside it. Node refused to parse the file → SyntaxError on boot → every deploy for 6 hours crashed silently (previous container kept serving).
 - FIX: Load soldKeys ONCE in each async caller (getAttackList, scoreManualVehicles, getAllYardsAttackList, FlywayService.getFlywayAttackList). Pass as trailing parameter to scoreVehicle. Inside scoreVehicle, synchronous Set.has() only.
 - Also updated FlywayService to pass soldKeys through.
+
+## Fix blocked_comps onConflict — raw SQL for partial index — 2026-04-07
+- Knex .onConflict(database.raw('(col) WHERE ...')).ignore() puts WHERE inside conflict target parens → invalid Postgres SQL
+- Replaced both block() and blockSold() with raw INSERT...ON CONFLICT WHERE...DO NOTHING
+- Added CLAUDE_RULES.md rule: always use database.raw() for ON CONFLICT with partial unique indexes

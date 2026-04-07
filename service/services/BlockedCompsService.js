@@ -30,11 +30,14 @@ class BlockedCompsService {
       if (item) { title = item.title; partNumber = item.manufacturerPartNumber; category = item.categoryTitle; }
     } catch (e) {}
 
-    await database('blocked_comps').insert({
-      source_item_id: idStr, block_type: 'comp',
-      source_title: title, source_part_number: partNumber, source_category: category,
-      blocked_reason: reason || null, blocked_by: blockedBy || null, blocked_at: new Date(),
-    }).onConflict(database.raw('(source_item_id) WHERE block_type = \'comp\' AND source_item_id IS NOT NULL')).ignore();
+    await database.raw(`
+      INSERT INTO blocked_comps
+        (source_item_id, block_type, source_title, source_part_number, source_category,
+         blocked_reason, blocked_by, blocked_at)
+      VALUES (?, 'comp', ?, ?, ?, ?, ?, NOW())
+      ON CONFLICT (source_item_id) WHERE block_type = 'comp' AND source_item_id IS NOT NULL
+      DO NOTHING
+    `, [idStr, title, partNumber, category, reason || null, blockedBy || null]);
 
     invalidateCaches();
     await this.recomputeAffectedCache(idStr, partNumber);
@@ -61,11 +64,14 @@ class BlockedCompsService {
     const mk = String(make).toUpperCase().trim();
     const md = String(model).toUpperCase().trim();
 
-    await database('blocked_comps').insert({
-      block_type: 'sold', part_type: pt, year: yr, make: mk, model: md,
-      source_title: exampleTitle || null, source_part_number: examplePN || null,
-      blocked_reason: reason || null, blocked_by: blockedBy || null, blocked_at: new Date(),
-    }).onConflict(database.raw('(part_type, year, make, model) WHERE block_type = \'sold\' AND part_type IS NOT NULL')).ignore();
+    await database.raw(`
+      INSERT INTO blocked_comps
+        (block_type, part_type, year, make, model,
+         source_title, source_part_number, blocked_reason, blocked_by, blocked_at)
+      VALUES ('sold', ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ON CONFLICT (part_type, year, make, model) WHERE block_type = 'sold' AND part_type IS NOT NULL
+      DO NOTHING
+    `, [pt, yr, mk, md, exampleTitle || null, examplePN || null, reason || null, blockedBy || null]);
 
     invalidateCaches();
     log.info({ partType: pt, year: yr, make: mk, model: md, reason }, 'Sold block created');
