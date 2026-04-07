@@ -2072,9 +2072,15 @@ class AttackListService {
   }
 }
 
+// Clears all part-matching caches. Called on block/unblock so changes
+// take effect on the very next request instead of waiting for TTL expiry.
 AttackListService.invalidateInventoryCache = function() {
   _inventoryIndexCache = null;
   _inventoryIndexCacheTime = 0;
+  _salesIndexCache = null;
+  _salesIndexCacheTime = 0;
+  _stockIndexCache = null;
+  _stockIndexCacheTime = 0;
 };
 
 module.exports = AttackListService;
