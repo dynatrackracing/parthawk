@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix: Newest Tab Empty — Use createdAt for Age Calc — 2026-04-07
+- date_added (LKQ set date) is stale on new arrivals — never equals today
+- Age functions now use createdAt (scrape time) as primary, date_added fallback
+- Display labels still show LKQ set date for pullers
+- Files: attack-list.html
+
+---
+
 ## Fix: Attack List Pill Filter — Strict Window — 2026-04-07
 - Pills now show ONLY vehicles within the selected window (was highlight+rest stacked)
 - "Newest" = only today's vehicles, "3d" = only ≤3 days, etc. No older sections below.

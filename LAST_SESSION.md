@@ -96,3 +96,7 @@
 - ROOT CAUSE: pill handler built "highlighted" (within window) AND "rest" (outside window) arrays, then rendered BOTH stacked as sections. "Newest" showed "NEWEST ARRIVALS" + "1-3 DAYS" + "4-7 DAYS" etc. underneath — no actual filtering, just highlighting.
 - FIX: else branch now renders ONLY highlighted vehicles. No rest sub-tiers. "All" tab unchanged (still shows full age breakdown).
 - Result: Raleigh→Newest = empty (no vehicles today), Durham→Newest = 23 (today's scrape), 7d = only vehicles ≤7 days old.
+
+## Fix: Newest tab empty — use createdAt for age calc, not date_added — 2026-04-07
+- ROOT CAUSE: date_added is LKQ's "set" date (when LKQ placed the car). New vehicles are typically set "1d ago" by the time our overnight scraper sees them, so date_added is never today → getDaysFromNewest returns 1+ → Newest tab always empty.
+- FIX: getNewestDate() and getDaysFromNewest() now use createdAt (row insert time = when WE scraped it) as primary, date_added as fallback. Display labels (timeAgo on line 761) still use date_added for puller-facing "set Xd ago" display.

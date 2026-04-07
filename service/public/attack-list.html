@@ -380,7 +380,7 @@
   function getNewestDate(vehicles) {
     let newest = null;
     for (const v of vehicles) {
-      const d = parseLocalDate(v.date_added || v.createdAt);
+      const d = parseLocalDate(v.createdAt || v.date_added);
       if (d && (!newest || d > newest)) newest = d;
     }
     return newest;
@@ -388,7 +388,7 @@
 
   // Days between a vehicle's date and TODAY
   function getDaysFromNewest(v) {
-    const d = parseLocalDate(v.date_added || v.createdAt);
+    const d = parseLocalDate(v.createdAt || v.date_added);
     if (!d) return 999;
     const vDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const now = new Date();
