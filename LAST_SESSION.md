@@ -137,3 +137,7 @@
 - Frontend: blockPart() handles both types via data-block-type attribute. Separate prompts per type.
 - Hidden page: type tabs (All/Comp/Sold), COMP=blue badge, SOLD=orange badge, restore via /by-id/:id
 - CLAUDE_RULES.md rule 33 updated with dual block type documentation
+
+## Fix sold block restore — clear all part-matching caches — 2026-04-07
+- invalidateInventoryCache() only cleared _inventoryIndexCache. Sold blocks filter against salesIndex, so restoring a sold block left parts hidden until 10-min TTL expired.
+- Now clears _inventoryIndexCache, _salesIndexCache, _stockIndexCache. Validation cache intentionally excluded (unrelated).
