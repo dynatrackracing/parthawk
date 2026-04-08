@@ -383,29 +383,38 @@ function classifyPowertrain(fuelType, make, model, trim) {
   if (engineType === 'Plug-in Hybrid') return { isHybrid: false, isPHEV: true, isElectric: false, engineType: engineType };
   if (engineType === 'Hybrid') return { isHybrid: true, isPHEV: false, isElectric: false, engineType: engineType };
 
-  // Model name fallback — well-known EVs
-  var ml = ((make || '') + ' ' + (model || '')).toLowerCase();
-  var EV_MODELS = ['tesla', 'leaf', 'bolt ev', 'bolt euv', 'mach-e', 'mach e', 'model 3', 'model y', 'model s', 'model x',
-    'ioniq 5', 'ioniq 6', 'ev6', 'id.4', 'id 4', 'lightning', 'r1t', 'r1s', 'lyriq', 'i3', 'i4', 'ix', 'eqs', 'eqe', 'taycan',
-    'e-tron gt', 'hummer ev', 'equinox ev', 'blazer ev', 'silverado ev', 'f-150 lightning'];
+  // Model name fallback — well-known EVs (word-boundary matching to avoid I30→i3, Matrix→ix)
+  var modelLower = (model || '').toLowerCase().trim();
+  var makeLower = (make || '').toLowerCase().trim();
+  var EV_MODELS = ['leaf', 'bolt ev', 'bolt euv', 'mach-e', 'mach e', 'model 3', 'model y', 'model s', 'model x',
+    'ioniq 5', 'ioniq 6', 'ev6', 'id.4', 'id 4', 'lyriq', 'taycan', 'e-tron gt', 'hummer ev',
+    'equinox ev', 'blazer ev', 'silverado ev', 'f-150 lightning'];
+  // Make-specific: Tesla is always EV
+  if (makeLower === 'tesla') return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+  // BMW i-series: only exact model matches (i3, i4, ix — must be entire model, not substring of I30/IX35)
+  if (makeLower === 'bmw' && /^i[34x]$/i.test(modelLower)) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+  // Rivian
+  if (makeLower === 'rivian') return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+  // Mercedes EQ
+  if (makeLower.includes('mercedes') && /^eq[se]/i.test(modelLower)) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
   for (var i = 0; i < EV_MODELS.length; i++) {
-    if (ml.includes(EV_MODELS[i])) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+    if (modelLower === EV_MODELS[i] || modelLower.startsWith(EV_MODELS[i] + ' ')) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
   }
 
-  // Model name fallback — well-known PHEVs
-  var PHEV_MODELS = ['volt', 'rav4 prime', 'prius prime', 'outlander phev', 'wrangler 4xe', 'x5 xdrive45e',
-    'xc60 recharge', 'xc90 recharge', 'aviator grand touring', 'corsair grand touring', 'escape plug', 'tucson plug'];
+  // Model name fallback — well-known PHEVs (exact model match)
+  var PHEV_MODELS = ['volt', 'rav4 prime', 'prius prime', 'outlander phev', 'wrangler 4xe'];
   for (var i = 0; i < PHEV_MODELS.length; i++) {
-    if (ml.includes(PHEV_MODELS[i])) return { isHybrid: false, isPHEV: true, isElectric: false, engineType: 'Plug-in Hybrid' };
+    if (modelLower === PHEV_MODELS[i] || modelLower.startsWith(PHEV_MODELS[i] + ' ')) return { isHybrid: false, isPHEV: true, isElectric: false, engineType: 'Plug-in Hybrid' };
   }
 
-  // Model name fallback — well-known hybrids
-  var HYBRID_MODELS = ['prius', 'prius c', 'prius v', 'camry hybrid', 'highlander hybrid', 'rav4 hybrid',
-    'accord hybrid', 'cr-v hybrid', 'insight', 'civic hybrid', 'fusion hybrid', 'escape hybrid', 'explorer hybrid',
-    'maverick hybrid', 'tucson hybrid', 'sonata hybrid', 'ioniq hybrid', 'niro', 'c-max'];
-  for (var i = 0; i < HYBRID_MODELS.length; i++) {
-    if (ml.includes(HYBRID_MODELS[i])) return { isHybrid: true, isPHEV: false, isElectric: false, engineType: 'Hybrid' };
+  // Model name fallback — well-known hybrids (exact model match or model contains keyword)
+  // These models are ALWAYS hybrid — no pure-gas variant exists
+  var ALWAYS_HYBRID = ['prius', 'prius c', 'prius v', 'insight', 'niro', 'c-max'];
+  for (var i = 0; i < ALWAYS_HYBRID.length; i++) {
+    if (modelLower === ALWAYS_HYBRID[i]) return { isHybrid: true, isPHEV: false, isElectric: false, engineType: 'Hybrid' };
   }
+  // These are hybrid VARIANTS of models that also come in gas — only match if model name includes "hybrid"
+  if (/\bhybrid\b/i.test(modelLower)) return { isHybrid: true, isPHEV: false, isElectric: false, engineType: 'Hybrid' };
 
   // Trim fallback
   var tl = (trim || '').toLowerCase();
