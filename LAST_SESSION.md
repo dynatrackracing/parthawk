@@ -161,6 +161,25 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Dry-run V2 after cylinder backfill — 2026-04-08
+- Fixed scoring-dry-run.js join bug (was duplicating via LEFT JOIN, now uses vehicle index with first-match)
+- Added per-part-type title coverage stats, outlier samples with full reasons, tuning hints
+- decoded_cylinders backfill: 8,664/9,803 = 88% populated
+- Results: 5,913 alerts scored (2 hard-gated, 0 orphaned). Histogram centered at 50 (baseline) with discrimination from engine/diesel/drivetrain paths
+- Survival: 37% at threshold 55, 22% at 60, 13% at 65
+- Engine match fired 489 times, mismatch 293, no signal 504 (engine-sensitive parts)
+- ABS drivetrain match/mismatch working (12 match, 10 mismatch)
+- Audio trim path working (Bose+PREMIUM = score 90)
+- AWAITS OWNER REVIEW before rescore
+
+## Scoring calibration diagnostic ran (read-only) — 2026-04-08
+- Produced SCORING_CALIBRATION_DATA.md at repo root
+- No commits, no code changes
+- Key finding: named engines (HEMI/EcoBoost) exist NOWHERE in vehicle data -- only displacement. Titles have 0% displacement. Engine matching works via title extraction but is sparse (2% of titles).
+- Key finding: default PART_TYPE_SENSITIVITY fallback ['engine'] causes 44% of alerts to get false HIGH (body parts pass engine check vacuously)
+- Key finding: drivetrain coverage varies 2-99% by make -- ABS mismatch unreliable for Honda/BMW/VW/Acura
+- Awaits owner review before scoring rewrite is designed
+
 ## Intel source icons deployed — 2026-04-08
 - Diagnostic: scout_alerts.source already distinguishes PERCH(Mark)/bone_pile(Quarry)/hunters_perch+restock(Stream). AttackListService intelSources[] already carries mark/quarry/stream/overstock. No backend changes needed.
 - Frontend: renderIntelIcon() in dh-parts.js, fire pulse CSS in dh-parts.css
