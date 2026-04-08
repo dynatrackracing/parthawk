@@ -544,43 +544,60 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN env var. Called by cron every 15 minutes.
    */
   async pollReturns() {
-    // Post-Order API: prefer OAuth token (Bearer), fall back to TRADING_API_TOKEN (TOKEN scheme)
     const freshOAuth = await oauthManager.getToken();
     const legacyToken = process.env.TRADING_API_TOKEN;
-    const token = freshOAuth || legacyToken;
-    const authScheme = freshOAuth ? 'Bearer' : 'TOKEN';
 
-    if (!token) {
+    if (!freshOAuth && !legacyToken) {
       this.log.debug('No eBay auth token available — return polling disabled');
       return { checked: 0, queued: 0, skipped: true };
     }
 
     const startTime = Date.now();
     let checked = 0, queued = 0;
+    let authUsed = freshOAuth ? 'Bearer' : 'TOKEN';
+
+    const axios = require('axios');
+    const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const toDate = new Date().toISOString();
+
+    const makeRequest = (scheme, tok) => axios.get('https://api.ebay.com/post-order/v2/return/search', {
+      params: {
+        creation_date_range_from: fromDate,
+        creation_date_range_to: toDate,
+        limit: 50,
+        offset: 0,
+      },
+      headers: {
+        'Authorization': `${scheme} ${tok}`,
+        'Content-Type': 'application/json',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+      },
+      timeout: 15000,
+    });
 
     try {
-      const axios = require('axios');
-      // Search for returns created in the last 24 hours
-      const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const toDate = new Date().toISOString();
+      let response;
 
-      const response = await axios.get('https://api.ebay.com/post-order/v2/return/search', {
-        params: {
-          creation_date_range_from: fromDate,
-          creation_date_range_to: toDate,
-          limit: 50,
-          offset: 0,
-        },
-        headers: {
-          'Authorization': `${authScheme} ${token}`,
-          'Content-Type': 'application/json',
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-        },
-        timeout: 15000,
-      });
+      // Try OAuth first, fall back to legacy token on 401
+      if (freshOAuth) {
+        try {
+          response = await makeRequest('Bearer', freshOAuth);
+        } catch (oauthErr) {
+          if (oauthErr.response?.status === 401 && legacyToken) {
+            this.log.warn('Post-Order API rejected OAuth Bearer (401), falling back to TRADING_API_TOKEN');
+            authUsed = 'TOKEN_fallback';
+            response = await makeRequest('TOKEN', legacyToken);
+          } else {
+            throw oauthErr;
+          }
+        }
+      } else {
+        authUsed = 'TOKEN';
+        response = await makeRequest('TOKEN', legacyToken);
+      }
 
       const returns = response.data?.members || response.data?.returns || [];
-      this.log.info({ returnCount: returns.length }, 'Polled returns');
+      this.log.info({ returnCount: returns.length, authUsed }, 'Polled returns');
 
       for (const ret of returns) {
         checked++;
@@ -612,15 +629,15 @@ class EbayMessagingService {
       }
     } catch (err) {
       if (err.response?.status === 401) {
-        this.log.warn({ authScheme }, 'Return poll auth rejected (401)');
+        this.log.warn({ authUsed }, 'Return poll auth rejected (401) — no fallback available');
       } else {
         this.log.error({ err: err.message }, 'Return polling failed');
       }
     }
 
     const elapsed = Date.now() - startTime;
-    this.log.info({ checked, queued, elapsed }, 'Return polling complete');
-    return { checked, queued, elapsed };
+    this.log.info({ checked, queued, authUsed, elapsed }, 'Return polling complete');
+    return { checked, queued, authUsed, elapsed };
   }
 
   /**
@@ -628,30 +645,59 @@ class EbayMessagingService {
    * Requires EBAY_OAUTH_TOKEN.
    */
   async _sendPostOrderMessage(returnId, messageBody) {
-    // Post-Order API: prefer OAuth (Bearer), fall back to TRADING_API_TOKEN (TOKEN scheme)
     const freshOAuth = await oauthManager.getToken();
     const legacyToken = process.env.TRADING_API_TOKEN;
-    const token = freshOAuth || legacyToken;
-    const authScheme = freshOAuth ? 'Bearer' : 'TOKEN';
 
-    if (!token) {
+    if (!freshOAuth && !legacyToken) {
       return { success: false, errorCode: 'NO_TOKEN', errorMessage: 'No eBay auth token configured' };
     }
 
-    try {
-      const axios = require('axios');
-      await axios.post(
-        `https://api.ebay.com/post-order/v2/return/${returnId}/send_message`,
-        { message: { content: messageBody } },
-        {
-          headers: {
-            'Authorization': `${authScheme} ${token}`,
-            'Content-Type': 'application/json',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-          },
-          timeout: 15000,
+    const axios = require('axios');
+    const makeRequest = (scheme, tok) => axios.post(
+      `https://api.ebay.com/post-order/v2/return/${returnId}/send_message`,
+      { message: { content: messageBody } },
+      {
+        headers: {
+          'Authorization': `${scheme} ${tok}`,
+          'Content-Type': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+        timeout: 15000,
+      }
+    );
+
+    // Try OAuth first, fall back to legacy token on 401
+    if (freshOAuth) {
+      try {
+        await makeRequest('Bearer', freshOAuth);
+        return { success: true };
+      } catch (oauthErr) {
+        if (oauthErr.response?.status === 401 && legacyToken) {
+          this.log.warn({ returnId }, 'Post-Order send_message rejected OAuth (401), falling back to TRADING_API_TOKEN');
+          try {
+            await makeRequest('TOKEN', legacyToken);
+            return { success: true };
+          } catch (fallbackErr) {
+            return {
+              success: false,
+              errorCode: String(fallbackErr.response?.status || 'UNKNOWN'),
+              errorMessage: fallbackErr.response?.data?.message || fallbackErr.message,
+              rawResponse: JSON.stringify(fallbackErr.response?.data || {}).substring(0, 500),
+            };
+          }
         }
-      );
+        return {
+          success: false,
+          errorCode: String(oauthErr.response?.status || 'UNKNOWN'),
+          errorMessage: oauthErr.response?.data?.message || oauthErr.message,
+          rawResponse: JSON.stringify(oauthErr.response?.data || {}).substring(0, 500),
+        };
+      }
+    }
+
+    // No OAuth — use legacy token directly
+    try {
+      await makeRequest('TOKEN', legacyToken);
       return { success: true };
     } catch (err) {
       return {

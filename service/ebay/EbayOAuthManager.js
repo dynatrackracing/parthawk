@@ -22,11 +22,15 @@ const axios = require('axios').default;
 
 const TOKEN_ENDPOINT = 'https://api.ebay.com/identity/v1/oauth2/token';
 
-// Scopes granted during consent flow (must match exactly)
+// Scopes granted during consent flow (must match exactly).
+// The Post-Order API (returns) is a "traditional" API that uses the base api_scope,
+// but we also request sell.return scopes for future RESTful return endpoints.
 const SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.return',
+  'https://api.ebay.com/oauth/api_scope/sell.return.readonly',
 ].join(' ');
 
 class EbayOAuthManager {
@@ -97,6 +101,20 @@ class EbayOAuthManager {
     } catch (err) {
       return { success: false, error: err.message };
     }
+  }
+
+  /**
+   * Build the consent authorization URL that includes all SCOPES.
+   * Visit this URL in a browser, authorize, then exchange the code for a refresh token.
+   */
+  getAuthorizationUrl(ruName) {
+    const clientId = process.env.EBAY_CLIENT_ID;
+    if (!clientId) return { error: 'EBAY_CLIENT_ID not set' };
+    if (!ruName) return { error: 'ruName (redirect URI name) is required' };
+
+    const encodedScopes = encodeURIComponent(SCOPES);
+    const url = `https://auth.ebay.com/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(ruName)}&scope=${encodedScopes}`;
+    return { url, scopes: SCOPES.split(' ') };
   }
 
   /**
