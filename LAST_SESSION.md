@@ -1,5 +1,11 @@
 # LAST SESSION — 2026-04-07
 
+## Quarry display fixes — per-tier cap + FOUND from Cache — 2026-04-07
+- BUG 1 FIX: Replaced global pageSize=100 pagination with per-tier 100-row cap. Each tier (RESTOCK NOW, STRONG BUY, CONSIDER) now independently sorted and capped. Summary tiles unchanged (still show full counts).
+- BUG 2 FIX: FOUND tile now reads from the_cache (actual Attack List claims) instead of bone_pile scout_alerts. Period-aware (uses currentDays). Matches by part_number instead of broken 40-char title prefix dedupe.
+- Removed old /restock/found-items endpoint call from frontend — FOUND data now returned inline from /restock/report
+- foundMap keyed by part_number (uppercase) for reliable matching to Quarry items
+
 ## Attack list QUARRY badge rename — 2026-04-07
 - Renamed ⚡ PERCH badge to ⚡ QUARRY on attack list part detail (display only)
 - Leftover label from when Quarry was briefly called Perch before rebrand

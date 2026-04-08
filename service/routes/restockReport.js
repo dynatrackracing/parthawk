@@ -162,42 +162,62 @@ router.get('/report', async (req, res) => {
       });
     }
 
-    // Sort: urgency tier (CRITICAL first), then timeframe-aware secondary sort
-    const urgencyOrder = { CRITICAL: 0, LOW: 1, WATCH: 2 };
-    if (days <= 7) {
-      // Short-term: velocity matters most
-      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.timesSold - a.timesSold || b.avgPrice - a.avgPrice);
-    } else if (days <= 30) {
-      // Monthly: revenue impact
-      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.revenue - a.revenue || b.velocityRatio - a.velocityRatio);
-    } else {
-      // Long-term: sustained demand (ratio), then revenue
-      items.sort((a, b) => (urgencyOrder[a.urgency] || 9) - (urgencyOrder[b.urgency] || 9) || b.velocityRatio - a.velocityRatio || b.revenue - a.revenue);
+    // ── 7. Split into tiers and sort each independently ──
+    const tierItems = { CRITICAL: [], LOW: [], WATCH: [] };
+    for (const item of items) {
+      if (tierItems[item.urgency]) tierItems[item.urgency].push(item);
     }
 
-    // Pagination
-    const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize) || 100, 10), 500);
+    // Sort within each tier using timeframe-aware tiebreaker
+    const tierSorter = days <= 7
+      ? (a, b) => b.timesSold - a.timesSold || b.avgPrice - a.avgPrice
+      : days <= 30
+        ? (a, b) => b.revenue - a.revenue || b.velocityRatio - a.velocityRatio
+        : (a, b) => b.velocityRatio - a.velocityRatio || b.revenue - a.revenue;
+
+    for (const tier of Object.values(tierItems)) tier.sort(tierSorter);
+
+    // Full tier counts (before cap — for summary tiles)
+    const fullCritical = tierItems.CRITICAL.length;
+    const fullLow = tierItems.LOW.length;
+    const fullWatch = tierItems.WATCH.length;
     const totalCount = items.length;
-    const paged = items.slice((page - 1) * pageSize, page * pageSize);
 
-    // Tier assignment (for paged items)
-    const tiers = { critical: [], low: [], watch: [] };
-    for (const item of paged) {
-      tiers[item.urgency.toLowerCase()].push(item);
-    }
+    // Cap each tier at 100 rows independently
+    const perTierCap = 100;
+    const tiers = {
+      critical: tierItems.CRITICAL.slice(0, perTierCap),
+      low: tierItems.LOW.slice(0, perTierCap),
+      watch: tierItems.WATCH.slice(0, perTierCap),
+    };
 
-    // Full tier counts (across ALL items, not just current page)
-    const fullCritical = items.filter(i => i.urgency === 'CRITICAL').length;
-    const fullLow = items.filter(i => i.urgency === 'LOW').length;
-    const fullWatch = items.filter(i => i.urgency === 'WATCH').length;
+    // ── 8. FOUND count — Cache entries (claimed from Attack List) within the period ──
+    let foundCount = 0;
+    let foundMap = {};
+    try {
+      const foundRows = await database('the_cache')
+        .where('status', '!=', 'deleted')
+        .where('claimed_at', '>=', database.raw("NOW() - INTERVAL '1 day' * ?", [days]))
+        .select('part_number', 'yard_name', 'claimed_at', 'vehicle_year', 'vehicle_make', 'vehicle_model');
+      for (const f of foundRows) {
+        if (f.part_number) {
+          foundMap[f.part_number.toUpperCase()] = {
+            yard: f.yard_name,
+            date: f.claimed_at,
+            vehicle: [f.vehicle_year, f.vehicle_make, f.vehicle_model].filter(Boolean).join(' '),
+          };
+        }
+      }
+      foundCount = foundRows.length;
+    } catch (e) { /* the_cache may not exist */ }
 
     res.json({
       success: true, generatedAt: new Date().toISOString(), days,
       period: days === 1 ? 'Last 24 hours' : `Last ${days} days`,
       tiers,
-      items: paged,
-      total: totalCount, page, pageSize, totalPages: Math.ceil(totalCount / pageSize),
+      total: totalCount, page: 1, pageSize: perTierCap, totalPages: 1,
+      foundCount,
+      foundMap,
       summary: {
         critical: fullCritical, low: fullLow, watch: fullWatch,
         total: totalCount, salesAnalyzed, activeListings: activeListingCount,

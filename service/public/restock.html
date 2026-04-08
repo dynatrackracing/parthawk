@@ -84,25 +84,21 @@ function toggleHideFound() {
   load();
 }
 
-// Check if a report item has been FOUND (pulled from a yard via Scout Alerts)
+// Check if a report item has been FOUND (claimed in the_cache)
 function getFoundInfo(item) {
-  // Match by sample title prefix (same key used in alert generation)
-  const key = (item.sampleTitle || '').substring(0, 40).toLowerCase();
-  return foundItems[key] || null;
+  const pn = (item.basePn || '').toUpperCase();
+  return pn ? (foundItems[pn] || null) : null;
 }
 
 async function load() {
   document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Generating report...</div>';
   try {
-    const [reportRes, foundRes] = await Promise.all([
-      fetch('/restock/report?days=' + currentDays + '&page=' + currentPage + '&pageSize=100').then(r => r.json()),
-      fetch('/restock/found-items').then(r => r.json()).catch(() => ({ found: {} })),
-    ]);
-    const d = reportRes;
-    foundItems = foundRes.found || {};
+    const d = await fetch('/restock/report?days=' + currentDays).then(r => r.json());
     if (!d.success) throw new Error(d.error);
 
-    const foundCount = Object.keys(foundItems).length;
+    // FOUND from the_cache — period-aware, PN-keyed
+    foundItems = d.foundMap || {};
+    const foundCount = d.foundCount || 0;
     const listingsNote = d.summary.activeListings != null ? ' | ' + d.summary.activeListings + ' active listings' : '';
     document.getElementById('sub').textContent = (d.period || 'Last 30 days') + ' — ' + d.summary.total + ' restock candidates (' + (d.summary.salesAnalyzed || 0) + ' sales analyzed' + listingsNote + ')';
 
@@ -137,13 +133,9 @@ async function load() {
       }
       html += '</div>';
     }
-    // Pagination controls
-    if (d.totalPages > 1) {
-      html += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:16px 20px;">';
-      if (currentPage > 1) html += '<button class="toggle-btn" onclick="goPage(' + (currentPage - 1) + ')">← Prev</button>';
-      html += '<span style="font-size:11px;color:#6B7280">Page ' + d.page + ' of ' + d.totalPages + ' (' + d.total + ' items)</span>';
-      if (currentPage < d.totalPages) html += '<button class="toggle-btn" onclick="goPage(' + (currentPage + 1) + ')">Next →</button>';
-      html += '</div>';
+    // Per-tier cap note (each tier shows up to 100 rows)
+    if (d.total > 300) {
+      html += '<div style="text-align:center;padding:12px 20px;font-size:11px;color:#6B7280">Showing up to 100 per tier (' + d.total + ' total candidates)</div>';
     }
 
     document.getElementById('content').innerHTML = html;

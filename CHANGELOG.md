@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Quarry Display Fixes — Per-Tier Cap + FOUND from Cache — 2026-04-07
+- Per-tier 100-row cap replaces global pageSize=100 pagination (all 3 tiers now render at 30d+)
+- FOUND tile wired to the_cache instead of bone_pile scout_alerts; period-aware, PN-keyed
+- Files: restockReport.js, restock.html
+
+---
+
 ## Attack List QUARRY Badge Rename — 2026-04-07
 - Display-only label fix on attack list. ⚡ PERCH → ⚡ QUARRY. Lightning bolt unchanged.
 
