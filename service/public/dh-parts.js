@@ -94,3 +94,19 @@ function isExcludedPart(title) {
 
   return false;
 }
+
+/**
+ * Render intel source icon for a part chip.
+ * Priority: mark > quarry > stream > overstock.
+ * @param {string[]} sources - array of source strings ('mark','quarry','stream','overstock','flag','sold')
+ * @returns {string} HTML for the icon prefix, or '' if no intel source
+ */
+function renderIntelIcon(sources) {
+  if (!sources || sources.length === 0) return '';
+  if (sources.includes('mark'))      return '<span style="font-size:10px" title="Mark (target)">&#x1F3AF;</span>';
+  if (sources.includes('quarry'))    return '<span class="intel-fire" style="font-size:10px" title="Quarry (hot seller)">&#x1F525;</span>';
+  if (sources.includes('stream') || sources.includes('restock'))
+    return '<span style="font-size:10px" title="Scour Stream">&#x1F501;</span>';
+  if (sources.includes('overstock')) return '<span style="color:#ef4444" title="Overstock">&#x2715;</span>';
+  return '';
+}

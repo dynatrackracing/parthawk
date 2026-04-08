@@ -19,6 +19,13 @@
   50% { background: #3a2250; color: #D7BDE2; box-shadow: 0 0 8px rgba(155,89,182,0.5); }
 }
 
+/* Intel source icon pulse — fire emoji on Quarry chips */
+.intel-fire { animation: pulse-fire 1.5s ease-in-out infinite; }
+@keyframes pulse-fire {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* Part badge base */
 .part-badge {
   font-size: 10px; font-weight: 700; padding: 2px 7px;

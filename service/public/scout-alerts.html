@@ -316,9 +316,9 @@ async function load(page) {
 
       // Summary cards — filtered counts
       var sh = '<div class="summary-bar">';
-      sh += '<div class="summary-card"><div class="summary-num" style="color:#eab308">' + (d.markCount || 0) + '</div><div class="summary-label">★ MARK</div></div>';
-      sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">QUARRY</div></div>';
-      sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">STREAM</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#eab308">' + (d.markCount || 0) + '</div><div class="summary-label">\uD83C\uDFAF MARK</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#dc2626">' + (d.boneCount || 0) + '</div><div class="summary-label">\uD83D\uDD25 QUARRY</div></div>';
+      sh += '<div class="summary-card"><div class="summary-num" style="color:#ea580c">' + (d.perchCount || 0) + '</div><div class="summary-label">\uD83D\uDD01 STREAM</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#F59E0B">' + (d.overstockCount || 0) + '</div><div class="summary-label">OVERSTOCK</div></div>';
       sh += '<div class="summary-card"><div class="summary-num" style="color:#22c55e">' + (d.justSoldCount || 0) + '</div><div class="summary-label">JUST SOLD</div></div>';
       sh += '<div class="summary-card"><div class="summary-num">' + (d.yardCounts ? d.yardCounts.length : 0) + '</div><div class="summary-label">YARDS</div></div>';
@@ -345,7 +345,7 @@ async function load(page) {
           _alertLookup[a.id] = a;
           var bc = a.confidence === 'high' ? 'b-high' : a.confidence === 'medium' ? 'b-med' : 'b-low';
           var srcClass = a.source === 'PERCH' ? 'b-mark' : a.source === 'OVERSTOCK' ? 'b-overstock' : a.source === 'bone_pile' ? 'b-bone' : 'b-perch';
-          var srcLabel = a.source === 'PERCH' ? '★ MARK' : a.source === 'OVERSTOCK' ? 'OVERSTOCK' : a.source === 'bone_pile' ? 'QUARRY' : 'STREAM';
+          var srcLabel = a.source === 'PERCH' ? '\uD83C\uDFAF MARK' : a.source === 'OVERSTOCK' ? '\u2715 OVER' : a.source === 'bone_pile' ? '\uD83D\uDD25 QUARRY' : '\uD83D\uDD01 STREAM';
           var soldTag = a.justSold ? '<span class="badge b-sold">SOLD ' + a.justSold.toUpperCase() + '</span>' : '';
           var priceStr = a.part_value ? '$' + a.part_value : '';
           var setStr = '';

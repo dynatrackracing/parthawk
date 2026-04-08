@@ -161,6 +161,15 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Intel source icons deployed — 2026-04-08
+- Diagnostic: scout_alerts.source already distinguishes PERCH(Mark)/bone_pile(Quarry)/hunters_perch+restock(Stream). AttackListService intelSources[] already carries mark/quarry/stream/overstock. No backend changes needed.
+- Frontend: renderIntelIcon() in dh-parts.js, fire pulse CSS in dh-parts.css
+- attack-list.html collapsed chips: Target(Mark), Fire(Quarry), Repeat(Stream), X(Over) -- replaces old star icons
+- attack-list.html expanded chips: MARK/QUARRY/STREAM labels with emoji icons
+- scout-alerts.html: source badges and summary cards updated with emoji icons
+- Priority: mark > quarry > stream > overstock (mark wins when part in both)
+- No scoring math touched
+
 ## Tech debt noted: TradingAPI write methods are dead code — 2026-04-08
 - TradingAPI.js still contains reviseItem, endItem, relistItem method definitions with no callers anywhere in the codebase (verified via grep in previous session same day).
 - Current state is safe: no triggers, no exposed routes, no crons. But the methods sitting in the file is a rediscovery risk — a future session could accidentally rewire them into a new feature thinking they are still wired.

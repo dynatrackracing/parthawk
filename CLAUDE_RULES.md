@@ -168,3 +168,13 @@ Any future feature that needs to write to eBay listings requires explicit owner 
 - CompetitorMonitor reads frozen SoldItem (degraded until Sunday scrape)
 - LifecycleService loads all YourSale into memory (fine at 22K, watch at 50K+)
 - TradingAPI.js write methods (reviseItem, endItem, relistItem) and StaleInventoryService.js inline ReviseItem call are dead code with no callers. Rediscovery risk. Delete or hard-throw when convenient. See LAST_SESSION.md 2026-04-08 entry for cleanup options.
+
+## INTEL SOURCE ICONS
+
+43. **Intent source icons are standardized across all field pages.**
+- Target = Mark (human-curated competitor intel). Gold.
+- Fire = Quarry (auto-promoted hot seller, pulse animation). Red-orange.
+- Repeat = Stream (manual Scour Stream want list). Blue.
+- X = Overstock warning. Red.
+Priority when a part matches multiple sources: Mark > Quarry > Stream.
+Icons must render identically on /admin/scout-alerts and /admin/pull and any future page that displays intent-scored parts. All rendering routed through dh-parts.js renderIntelIcon().

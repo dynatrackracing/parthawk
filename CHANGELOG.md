@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Intel Source Icons: Fire / Target / Repeat — 2026-04-08
+- renderIntelIcon() helper in dh-parts.js, fire pulse CSS in dh-parts.css
+- attack-list.html chip rendering uses emoji icons: Target=Mark, Fire=Quarry, Repeat=Stream, X=Over
+- scout-alerts.html alerts show intent source icon next to each alert
+- Expanded-view intel chips updated to match (MARK/QUARRY/STREAM labels with icons)
+- No backend changes needed -- sources already separated in intelSources[] and scout_alerts.source
+- CLAUDE_RULES rule 43 (intel source icons)
+- Files: dh-parts.js, dh-parts.css, attack-list.html, scout-alerts.html, CLAUDE_RULES.md
+
+---
+
 ## Disable All eBay Write Code Paths — Read-Only Carcass — 2026-04-08
 - 5 POST routes under /stale-inventory return 410 Gone (revise-price, end-item, relist-item, bulk-end, run)
 - Action buttons and handlers removed from stale-inventory.html
