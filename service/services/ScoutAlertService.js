@@ -560,9 +560,12 @@ function _extractDieselMarker(title) {
 const PN_EXACT_YEAR_TYPES = new Set(['ECM','PCM','ECU','BCM','TIPM','ABS','TCM','TCU','AMP','RADIO','CLUSTER','THROTTLE','FUSE','JUNCTION']);
 
 function computeMatchScore(wantTitle, vehicleData, partType) {
+  const ENGINE_SENSITIVE_TYPES = new Set(['ECM', 'PCM', 'ECU', 'TCM', 'TCU', 'THROTTLE']);
   const reasons = [];
-  let score = 50;
-  reasons.push('Year/make/model match: +50');
+  let score = ENGINE_SENSITIVE_TYPES.has(partType) ? 55 : 50;
+  reasons.push(ENGINE_SENSITIVE_TYPES.has(partType)
+    ? 'YMM match (engine-sensitive): +55'
+    : 'YMM match: +50');
 
   const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || []) : [];
   const vMake = (vehicleData.make || '').toUpperCase();

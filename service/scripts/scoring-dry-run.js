@@ -59,9 +59,10 @@ const PART_TYPE_SENSITIVITY = {
 const PN_EXACT_YEAR_TYPES = new Set(['ECM','PCM','ECU','BCM','TIPM','ABS','TCM','TCU','AMP','RADIO','CLUSTER','THROTTLE','FUSE','JUNCTION']);
 
 function computeMatchScore(wantTitle, vd, partType) {
+  const ENGINE_SENSITIVE_TYPES = new Set(['ECM', 'PCM', 'ECU', 'TCM', 'TCU', 'THROTTLE']);
   const reasons = [];
-  let score = 50;
-  reasons.push('YMM match: +50');
+  let score = ENGINE_SENSITIVE_TYPES.has(partType) ? 55 : 50;
+  reasons.push(ENGINE_SENSITIVE_TYPES.has(partType) ? 'YMM match (eng-sens): +55' : 'YMM match: +50');
   const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || []) : [];
   const vMake = (vd.make || '').toUpperCase();
 
