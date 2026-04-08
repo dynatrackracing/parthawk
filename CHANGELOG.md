@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Attack List QUARRY Badge Rename — 2026-04-07
+- Display-only label fix on attack list. ⚡ PERCH → ⚡ QUARRY. Lightning bolt unchanged.
+
+---
+
 ## Scour Stream Want List Search — 2026-04-07
 - Added sticky search input to the Want List tab on /admin/restock-list
 - Client-side filter on title, notes, matched yard vehicle titles, and similar-PN debug info

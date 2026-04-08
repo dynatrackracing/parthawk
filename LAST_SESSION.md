@@ -1,5 +1,10 @@
 # LAST SESSION — 2026-04-07
 
+## Attack list QUARRY badge rename — 2026-04-07
+- Renamed ⚡ PERCH badge to ⚡ QUARRY on attack list part detail (display only)
+- Leftover label from when Quarry was briefly called Perch before rebrand
+- Frontend string change only — no logic, no data, no other files touched
+
 ## Scour Stream Want List search — 2026-04-07
 - Added sticky search input to Want List tab on /admin/restock-list
 - 150ms debounce, client-side filter, "Showing X of Y" count
