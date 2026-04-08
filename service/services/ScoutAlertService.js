@@ -24,6 +24,12 @@ const PART_TYPE_SENSITIVITY = {
   BLIND_SPOT: [], HVAC: [], ALTERNATOR: [], STARTER: [], BLOWER: [],
   AIR_RIDE: [], REGULATOR: [], LIFTGATE: [], LOCK: [], PARK_SENSOR: [],
   CLOCK_SPRING: [], IGNITION: [], FUEL_MODULE: [],
+  // Additional universal part types (body/interior — no engine/drivetrain sensitivity)
+  HANDLE: [], SWITCH: [], MOLDING: [], EMBLEM: [], COVER: [], PANEL: [],
+  SENSOR: [], RELAY: [], BRACKET: [], HARNESS: [], DOOR_MODULE: [],
+  WIPER_MODULE: [], SEAT_MODULE: [], BLEND_DOOR: [], TRAILER_MODULE: [],
+  LANE_ASSIST: [], ADAPTIVE_CRUISE: [], ROLLOVER_SENSOR: [], YAW_SENSOR: [],
+  OCCUPANT_SENSOR: [],
 };
 
 // Model conflict pairs — one must NOT match the other
@@ -585,7 +591,10 @@ function scoreMatch(part, vehicle) {
   // RULE 4: Part-type-sensitive attribute verification
   const titleLower = (part.title || '').toLowerCase();
   const partType = detectPartType(part.title) || null;
-  const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || ['engine']) : ['engine'];
+  // Default to [] (universal, no sensitivity check) for unrecognized part types.
+  // Previous default of ['engine'] caused 92% false HIGH because unrecognized body/interior
+  // parts vacuously passed the engine check (no displacement in title to compare against).
+  const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || []) : [];
   const notes = [];
   let worstConfidence = 'high';
 
