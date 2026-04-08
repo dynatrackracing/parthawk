@@ -178,3 +178,7 @@ Any future feature that needs to write to eBay listings requires explicit owner 
 - X = Overstock warning. Red.
 Priority when a part matches multiple sources: Mark > Quarry > Stream.
 Icons must render identically on /admin/scout-alerts and /admin/pull and any future page that displays intent-scored parts. All rendering routed through dh-parts.js renderIntelIcon().
+
+## SCOUT ALERT SCORING
+
+44. **Scout Alert matching uses numeric match_score 0-100, not text confidence.** Year/make/model is a HARD GATE. Engine-sensitive part types (ECM/PCM/ECU/TCM/TCU/THROTTLE) start at baseline 55; all others at 50. Engine signals (cylinders/named/displacement) add or subtract based on PART_TYPE_SENSITIVITY map. Diesel flag is 100% reliable (+35 match, -80 mismatch). Drivetrain and trim signals consult decoderCapability.isReliable(make, signal). Per-part-type ceilings cap scores: ECM/PCM/ECU=85, TCM/TCU=85, ABS=90, BCM/TIPM/CLUSTER/FUSE=80, AMP/RADIO/NAV=100 with premium brand 75 without, THROTTLE=90, OTHER=65. Display tiers: 75+ HIGH gold, 60-74 MED-HIGH green, 50-59 MEDIUM yellow, 40-49 LOW-MEDIUM orange, <40 LOW red. Attack list inclusion threshold (Deploy B): score >= 50. All scoring constants live in service/lib/decoderCapability.js and ScoutAlertService.js computeMatchScore(). Default PART_TYPE_SENSITIVITY fallback is [] (universal), not ['engine'].

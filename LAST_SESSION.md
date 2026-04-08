@@ -161,6 +161,16 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Deploy A complete: scoring rescored — 2026-04-08
+- V3 dry-run: engine-sensitive ECM avg 55 (up from 51), ABS 59, AMP 38, BCM 50. Survival at threshold 50: ~61%
+- Tuning applied: engine-sensitive baseline 55, threshold 50
+- Rescore: 5,948 updated, 2 deleted (hard-gated), 51 min elapsed
+- Frontend: scout-alerts.html updated with score badges (75+ gold, 60-74 green, 50-59 yellow, 40-49 orange, <40 red) + reasons display
+- Sort by match_score DESC replaces old confidence CASE sort
+- decoded_cylinders backfill: 8,664/9,803 done earlier today
+- Deploy A status: COMPLETE
+- Deploy B (AttackListService wiring to read scout_alert): NOT shipped
+
 ## Dry-run V2 after cylinder backfill — 2026-04-08
 - Fixed scoring-dry-run.js join bug (was duplicating via LEFT JOIN, now uses vehicle index with first-match)
 - Added per-part-type title coverage stats, outlier samples with full reasons, tuning hints

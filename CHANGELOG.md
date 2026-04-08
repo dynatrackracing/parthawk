@@ -25,6 +25,19 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Deploy A: Scout Alert Scoring Rewrite — 2026-04-08
+- Fixed default PART_TYPE_SENSITIVITY fallback ['engine'] to [] (92% false HIGH fix)
+- Added decoded_cylinders column on yard_vehicle + backfill (88% coverage via vPIC)
+- Added match_score (int 0-100) + match_reasons (jsonb) on scout_alerts
+- Added decoderCapability.js: per-make signal reliability, named engine table, part type ceilings
+- Rewritten computeMatchScore(): year hard gate, engine-sensitive baseline 55, cylinders/named/displacement paths, diesel/drivetrain/trim verification, per-make capability awareness
+- Tuned: engine-sensitive baseline 55, attack list threshold 50
+- Rescored 5,948 existing alerts, deleted 2 hard-gated
+- Scout Alerts UI: numeric score badges (gold/green/yellow/orange/red), reasons display, sort by score
+- Files: ScoutAlertService.js, PostScrapeService.js, decoderCapability.js, scout-alerts.js, scout-alerts.html, migration, 4 scripts
+
+---
+
 ## Hybrid / PHEV / EV Detection + Badges — 2026-04-08
 - VIN decoder distinguishes Gas / Hybrid / Plug-in Hybrid / Electric via layered detection
 - Detection: corgi fuelType → model-name fallback (Prius, Leaf, Volt, Tesla, etc.) → trim fallback
