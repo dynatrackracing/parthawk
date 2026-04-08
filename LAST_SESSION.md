@@ -1,5 +1,13 @@
 # LAST SESSION — 2026-04-07
 
+## Scour Stream Want List search — 2026-04-07
+- Added sticky search input to Want List tab on /admin/restock-list
+- 150ms debounce, client-side filter, "Showing X of Y" count
+- Searches: title + notes + matchedTitles + matchDebug
+- Pattern copied from the-mark.html lines 72-120
+- Frontend-only change, no backend touched
+- Overstock tab unchanged
+
 ## Mark structured vehicle fields + editable Mark list — 2026-04-07
 - Added year_start/year_end/make/model/needs_review columns to the_mark (migration 20260407000001)
 - Created service/lib/markVehicleExtractor.js — best-effort extraction from title via yearParser + parseTitle

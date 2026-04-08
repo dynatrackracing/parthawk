@@ -99,6 +99,10 @@ nav a.active{color:#DC2626;font-weight:700}
       <button class="btn-add" id="addBtn" onclick="addPart()">+ Add</button>
     </div>
   </div>
+  <div style="position:sticky;top:0;z-index:10;background:#0a0a0a;padding:8px 0 4px">
+    <input type="text" class="add-input" id="wantSearch" placeholder="Search want list by title, notes, or matched vehicles..." style="font-size:12px;padding:8px 10px">
+    <div id="wantSearchCount" style="font-size:10px;color:#6B7280;margin-top:4px"></div>
+  </div>
   <div id="loading" style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:8px;color:#6B7280;font-size:12px">Loading want list...</div></div>
   <div id="list"></div>
   <div id="pagination" class="pg-row"></div>
@@ -145,6 +149,8 @@ var page = 1;
 var perPage = 50;
 var currentTab = 'wantlist';
 
+var _wantSearchQuery = '';
+var _wantSearchTimer = null;
 var overstockItems = [];
 var overstockLoaded = false;
 
@@ -165,6 +171,15 @@ function switchTab(tab) {
 document.getElementById('addPN').addEventListener('keydown', function(e) { if (e.key === 'Enter') addPart(); });
 document.getElementById('addDesc').addEventListener('keydown', function(e) { if (e.key === 'Enter') addPart(); });
 
+document.getElementById('wantSearch').addEventListener('input', function(e) {
+  clearTimeout(_wantSearchTimer);
+  _wantSearchTimer = setTimeout(function() {
+    _wantSearchQuery = (e.target.value || '').toLowerCase().trim();
+    page = 1;
+    renderPage();
+  }, 150);
+});
+
 function load() {
   fetch('/restock-want-list/items?manual_only=true')
     .then(function(r) { return r.json(); })
@@ -183,10 +198,32 @@ function load() {
 }
 
 function renderPage() {
-  var start = (page - 1) * perPage;
-  var visible = allItems.slice(start, start + perPage);
-  var totalPages = Math.ceil(allItems.length / perPage);
+  var filtered = allItems;
+  if (_wantSearchQuery) {
+    var q = _wantSearchQuery;
+    filtered = allItems.filter(function(item) {
+      var parts = [item.title, item.notes, item.matchDebug];
+      if (item.matchedTitles) {
+        if (Array.isArray(item.matchedTitles)) parts.push(item.matchedTitles.join(' '));
+        else parts.push(item.matchedTitles);
+      }
+      var haystack = parts.filter(Boolean).join(' ').toLowerCase();
+      return haystack.indexOf(q) !== -1;
+    });
+    document.getElementById('wantSearchCount').textContent = 'Showing ' + filtered.length + ' of ' + allItems.length + ' items';
+  } else {
+    document.getElementById('wantSearchCount').textContent = '';
+  }
 
+  var start = (page - 1) * perPage;
+  var visible = filtered.slice(start, start + perPage);
+  var totalPages = Math.ceil(filtered.length / perPage);
+
+  if (filtered.length === 0 && _wantSearchQuery) {
+    document.getElementById('list').innerHTML = '<div class="empty">No want list items match \'' + esc(_wantSearchQuery) + '\'</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
   if (allItems.length === 0) {
     document.getElementById('list').innerHTML = '<div class="empty">No parts in want list. Add one above.</div>';
     document.getElementById('pagination').innerHTML = '';

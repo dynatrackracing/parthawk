@@ -4,6 +4,13 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scour Stream Want List Search — 2026-04-07
+- Added sticky search input to the Want List tab on /admin/restock-list
+- Client-side filter on title, notes, matched yard vehicle titles, and similar-PN debug info
+- 150ms debounce, "Showing X of Y" count, pagination resets on search. Frontend-only.
+
+---
+
 ## Mark Structured Vehicle Fields + Editable Mark List — 2026-04-07
 - Architectural fix for Scout Alert wrong-year matches
 - the_mark now stores year_start/year_end/make/model as columns, populated at insert time from title parsing
