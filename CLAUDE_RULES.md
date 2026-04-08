@@ -167,3 +167,4 @@ Any future feature that needs to write to eBay listings requires explicit owner 
 - StaleInventoryService has inline ReviseItem separate from TradingAPI.reviseItem()
 - CompetitorMonitor reads frozen SoldItem (degraded until Sunday scrape)
 - LifecycleService loads all YourSale into memory (fine at 22K, watch at 50K+)
+- TradingAPI.js write methods (reviseItem, endItem, relistItem) and StaleInventoryService.js inline ReviseItem call are dead code with no callers. Rediscovery risk. Delete or hard-throw when convenient. See LAST_SESSION.md 2026-04-08 entry for cleanup options.

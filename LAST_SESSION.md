@@ -161,6 +161,16 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Tech debt noted: TradingAPI write methods are dead code — 2026-04-08
+- TradingAPI.js still contains reviseItem, endItem, relistItem method definitions with no callers anywhere in the codebase (verified via grep in previous session same day).
+- Current state is safe: no triggers, no exposed routes, no crons. But the methods sitting in the file is a rediscovery risk — a future session could accidentally rewire them into a new feature thinking they are still wired.
+- Low-priority cleanup options (pick one when ready):
+  (a) Delete the method bodies outright
+  (b) Wrap each in: throw new Error('eBay writes permanently disabled — see CLAUDE_RULES rule 42')
+  Option (b) is preferred because it fails loud at line 1 of any accidental call instead of silently erroring downstream.
+- StaleInventoryService.js has the same issue — inline ReviseItem call lives in the file but no cron or route triggers it anymore. Same cleanup options apply.
+- Not today's work. Filed for future session.
+
 ## Disable eBay writes + read-only Carcass — 2026-04-08
 - Removed 5 POST routes (run/revise/end/relist/bulk-end) → 410 Gone stubs
 - Stripped action buttons (revise -10%/-20%, End, Relist, bulk end, Run Auto, checkboxes) from stale-inventory.html
