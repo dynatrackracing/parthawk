@@ -11,6 +11,29 @@
 - createdAt IS sent to frontend (AttackListService.js line 1623) — no missing field issue
 - VAG PN fix did NOT cause this — the fix only touches stripRevisionSuffix/normalizePartNumber, not date handling
 
+## Hybrid/PHEV/EV detection + badges — 2026-04-08
+- LocalVinDecoder: new classifyPowertrain() with layered detection (fuelType → model name → trim), returns {isHybrid, isPHEV, isElectric}
+- parseEngineType() now returns 'Plug-in Hybrid' distinct from 'Hybrid' and 'Electric'
+- Mild 48V hybrids (eTorque, EQ Boost) classified as Gas — parts share with gas variants
+- vin_cache: added is_hybrid/is_phev/is_electric/fuel_type columns (migration 20260408000001)
+- AttackListService.scoreVehicle(): ELECTRIC +25%, PHEV +20%, HYBRID +15% boosts (stacks multiplicatively with other attributes)
+- attack-list.html: EV badge (electric blue border), PHEV (bright cyan border), HYBRID (cyan border)
+- Badge render order reworked to strict priority sort: ELECTRIC→PHEV→PERFORMANCE→HYBRID→DIESEL→4WD+MT→PREMIUM→MANUAL→4WD→CHECK_MT→CVT→TRIM
+- 11 test cases passing (Prius=HYBRID, RAV4 Prime=PHEV, Tesla=EV, C-MAX=HYBRID, Volt=PHEV, eTorque=Gas)
+- Files: LocalVinDecoder.js, AttackListService.js, attack-list.html, migration, backfill-hybrid-flags.js (new)
+
+## Hybrid/EV detection audit — 2026-04-08
+- parseEngineType() in LocalVinDecoder returns Gas/Diesel/Hybrid/Electric/Flex Fuel but does NOT distinguish PHEV from Hybrid
+- vin_cache schema has NO fuel_type, engine_type, is_hybrid, is_phev, is_electric columns — fuelType is computed in memory, never persisted
+- yard_vehicle.engine_type distribution: Gas=8837, null=921, Diesel=52, Electric=9, Hybrid=0
+- ZERO vehicles tagged as Hybrid despite 11 Prius in active inventory — all show engine_type='Gas'. Root cause: scrape-local.js decode path (NHTSA API) doesn't call LocalVinDecoder's parseEngineType, and the old NHTSA decode logic doesn't parse hybrid correctly
+- The 9 Electric vehicles (Tesla, Leaf, Volt, C-MAX) ARE tagged because NHTSA fuel type string is "electric" (not "hybrid electric")
+- Chevy Volt tagged as Electric (correct — series hybrid is essentially EV)
+- Ford C-MAX tagged as Electric (WRONG — C-MAX Hybrid is a parallel hybrid, not EV; C-MAX Energi would be PHEV)
+- AttackListService.scoreVehicle() has NO hybrid/electric attribute boosts. Only diesel (+15%), performance (+20%), premium (+10%), 4WD, manual
+- Badge renderer (attack-list.html:701-718) has no hybrid/EV badges. Badges are unsorted — rendered in code order (trimBadge, CULT, DIESEL, 4WD/AWD, MANUAL/CHECK_MT/CVT)
+- Detection needs to be added to vin_cache schema, LocalVinDecoder, and AttackListService scoring + frontend badges
+
 ## Permanent fix: date_added doctrine — 2026-04-08
 - Doctrine: date_added (LKQ set date) is canonical for all display, filter, sort, score, rarity. createdAt is forensic-only.
 - New module: service/utils/dateHelpers.js — getSetDateET(), daysSinceSetET(), setDateLabel(), withinSetWindowET(), hoursSinceLastScrape(). All math runs in America/New_York.

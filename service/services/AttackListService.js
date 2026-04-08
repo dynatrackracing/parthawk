@@ -6,6 +6,7 @@ const { getPlatformMatches } = require('../lib/platformMatch');
 const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
 const { getPartScoreMultiplier } = require('../config/trim-tier-config');
 const { daysSinceSetET, setDateLabel, hoursSinceLastScrape } = require('../utils/dateHelpers');
+const { classifyPowertrain } = require('../lib/LocalVinDecoder');
 const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
@@ -1485,6 +1486,12 @@ class AttackListService {
     const vTrans = (vehicle.decoded_transmission || '').toUpperCase();
     const is4wd = /4WD|4X4|AWD/.test(vDrive);
     const isManual = /MANUAL|STANDARD/.test(vTrans) || vTrans === 'CHECK_MT';
+
+    // Hybrid/PHEV/EV detection — uses model name + engine_type + trim fallback
+    const _pwt = classifyPowertrain(vehicle.engine_type, vehicle.make, vehicle.model, vehicle.decoded_trim || vehicle.trim_level);
+    if (_pwt.isElectric) { attributeBoost += 25; boostReasons.push('ELECTRIC'); }
+    else if (_pwt.isPHEV) { attributeBoost += 20; boostReasons.push('PHEV'); }
+    else if (_pwt.isHybrid) { attributeBoost += 15; boostReasons.push('HYBRID'); }
 
     if (vTrimTier === 'PERFORMANCE') { attributeBoost += 20; boostReasons.push('PERFORMANCE'); }
     else if (vTrimTier === 'PREMIUM') { attributeBoost += 10; boostReasons.push('PREMIUM'); }

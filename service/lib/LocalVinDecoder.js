@@ -352,10 +352,68 @@ function parseEngineType(fuelType) {
   if (!fuelType) return 'Gas';
   var ft = fuelType.toLowerCase();
   if (ft.includes('diesel')) return 'Diesel';
-  if (ft.includes('hybrid')) return 'Hybrid';
-  if (ft.includes('electric') && !ft.includes('hybrid')) return 'Electric';
+  // Electric: pure battery electric (BEV), NOT "hybrid electric"
+  if ((ft.includes('electric') || ft.includes('bev')) && !ft.includes('hybrid') && !ft.includes('plug')) return 'Electric';
+  // Plug-in Hybrid: PHEV / Plug-in
+  if (ft.includes('plug') || ft.includes('phev')) return 'Plug-in Hybrid';
+  // Hybrid: HEV / Hybrid Electric (but not plug-in)
+  if (ft.includes('hybrid') || ft.includes('hev')) return 'Hybrid';
   if (ft.includes('flex')) return 'Flex Fuel';
   return 'Gas';
+}
+
+/**
+ * Classify powertrain for vin_cache hybrid flags.
+ * Returns { isHybrid, isPHEV, isElectric, engineType }.
+ * Mutually exclusive: Electric > PHEV > Hybrid.
+ *
+ * Detection priority:
+ *   1. fuelType string from corgi/vPIC
+ *   2. Model name (well-known EVs/hybrids)
+ *   3. Trim string (Hybrid/Prime/Energi keywords)
+ *
+ * Mild 48V hybrids (eTorque, EQ Boost, Audi 48V, Volvo B5/B6) are classified
+ * as Gas — mechanical parts share with pure gas variants.
+ */
+function classifyPowertrain(fuelType, make, model, trim) {
+  var engineType = parseEngineType(fuelType);
+
+  // If fuelType already gave us a clear answer, use it
+  if (engineType === 'Electric') return { isHybrid: false, isPHEV: false, isElectric: true, engineType: engineType };
+  if (engineType === 'Plug-in Hybrid') return { isHybrid: false, isPHEV: true, isElectric: false, engineType: engineType };
+  if (engineType === 'Hybrid') return { isHybrid: true, isPHEV: false, isElectric: false, engineType: engineType };
+
+  // Model name fallback — well-known EVs
+  var ml = ((make || '') + ' ' + (model || '')).toLowerCase();
+  var EV_MODELS = ['tesla', 'leaf', 'bolt ev', 'bolt euv', 'mach-e', 'mach e', 'model 3', 'model y', 'model s', 'model x',
+    'ioniq 5', 'ioniq 6', 'ev6', 'id.4', 'id 4', 'lightning', 'r1t', 'r1s', 'lyriq', 'i3', 'i4', 'ix', 'eqs', 'eqe', 'taycan',
+    'e-tron gt', 'hummer ev', 'equinox ev', 'blazer ev', 'silverado ev', 'f-150 lightning'];
+  for (var i = 0; i < EV_MODELS.length; i++) {
+    if (ml.includes(EV_MODELS[i])) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+  }
+
+  // Model name fallback — well-known PHEVs
+  var PHEV_MODELS = ['volt', 'rav4 prime', 'prius prime', 'outlander phev', 'wrangler 4xe', 'x5 xdrive45e',
+    'xc60 recharge', 'xc90 recharge', 'aviator grand touring', 'corsair grand touring', 'escape plug', 'tucson plug'];
+  for (var i = 0; i < PHEV_MODELS.length; i++) {
+    if (ml.includes(PHEV_MODELS[i])) return { isHybrid: false, isPHEV: true, isElectric: false, engineType: 'Plug-in Hybrid' };
+  }
+
+  // Model name fallback — well-known hybrids
+  var HYBRID_MODELS = ['prius', 'prius c', 'prius v', 'camry hybrid', 'highlander hybrid', 'rav4 hybrid',
+    'accord hybrid', 'cr-v hybrid', 'insight', 'civic hybrid', 'fusion hybrid', 'escape hybrid', 'explorer hybrid',
+    'maverick hybrid', 'tucson hybrid', 'sonata hybrid', 'ioniq hybrid', 'niro', 'c-max'];
+  for (var i = 0; i < HYBRID_MODELS.length; i++) {
+    if (ml.includes(HYBRID_MODELS[i])) return { isHybrid: true, isPHEV: false, isElectric: false, engineType: 'Hybrid' };
+  }
+
+  // Trim fallback
+  var tl = (trim || '').toLowerCase();
+  if (/\b(phev|prime|energi|plug.in)\b/.test(tl)) return { isHybrid: false, isPHEV: true, isElectric: false, engineType: 'Plug-in Hybrid' };
+  if (/\b(ev|electric|bev)\b/.test(tl) && !/evas|eva|ever|every|lever|level|even|event|seven/.test(tl)) return { isHybrid: false, isPHEV: false, isElectric: true, engineType: 'Electric' };
+  if (/\bhybrid\b/.test(tl) && !/\b(mild|48v|etorque|eq.boost)\b/.test(tl)) return { isHybrid: true, isPHEV: false, isElectric: false, engineType: 'Hybrid' };
+
+  return { isHybrid: false, isPHEV: false, isElectric: false, engineType: engineType };
 }
 
 /**
@@ -546,7 +604,8 @@ async function decode(vin) {
 
   var engine = formatEngineString(displacement, cylinders, corgiEngine);
   var drivetrain = parseDrivetrain(driveType);
-  var engineType = parseEngineType(fuelType);
+  var pwt = classifyPowertrain(fuelType, make, model, trim);
+  var engineType = pwt.engineType;
   var transSpeeds = null;
   var transSubType = null;
   var transSource = null;
@@ -584,6 +643,10 @@ async function decode(vin) {
       transmission_speeds: transSpeeds || null,
       trans_sub_type: transSubType || null,
       trans_source: transSource || null,
+      fuel_type: fuelType || null,
+      is_hybrid: pwt.isHybrid,
+      is_phev: pwt.isPHEV,
+      is_electric: pwt.isElectric,
       raw_nhtsa: JSON.stringify({ corgi: corgiResult.components, engineCode: engineCode, source: source }),
       decoded_at: new Date(),
       createdAt: new Date(),
@@ -611,6 +674,9 @@ async function decode(vin) {
     transSpeeds: transSpeeds,
     transSubType: transSubType,
     transSource: transSource,
+    isHybrid: pwt.isHybrid,
+    isPHEV: pwt.isPHEV,
+    isElectric: pwt.isElectric,
     source: source,
     cached: false,
     ms: Date.now() - startTime,
@@ -664,4 +730,4 @@ async function close() {
   }
 }
 
-module.exports = { decode, decodeBatchLocal, getDecoder, close };
+module.exports = { decode, decodeBatchLocal, getDecoder, close, classifyPowertrain };

@@ -698,24 +698,36 @@
     const scoreColor = getScoreColor(v.score || 0);
     const scorePulse = (v.score || 0) >= 120 ? 'animation:pulse-gold 2s ease-in-out infinite;' : '';
 
-    // LINE 2 — attribute badges
-    const attrBadges = [];
+    // LINE 2 — attribute badges, priority-sorted (leftmost = biggest score driver)
+    const BADGE_PRIORITY = { ELECTRIC:1, PHEV:2, PERFORMANCE:3, HYBRID:4, DIESEL:5, '4WD+MT':6, PREMIUM:7, MANUAL:8, '4WD':9, AWD:9, CHECK_MT:10, CVT:11, TRIM:12, CULT:13 };
+    const attrBadgeData = [];
+    // Powertrain badges from boostReasons (server-computed)
+    const br = v.boostReasons || [];
+    if (br.includes('ELECTRIC')) attrBadgeData.push({ key:'ELECTRIC', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;border:1px solid #2979ff;color:#2979ff;background:transparent">EV</span>' });
+    if (br.includes('PHEV')) attrBadgeData.push({ key:'PHEV', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;border:1px solid #1de9b6;color:#1de9b6;background:transparent">PHEV</span>' });
+    if (br.includes('HYBRID')) attrBadgeData.push({ key:'HYBRID', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;border:1px solid #00bcd4;color:#00bcd4;background:transparent">HYBRID</span>' });
     if (v.trimBadge) {
       const tb = v.trimBadge;
       const tbBg = tb.color === 'green' ? '#22c55e' : tb.color === 'blue' ? '#3b82f6' : tb.color === 'gray' ? '#374151' : '#f59e0b';
       const tbTx = tb.color === 'gray' ? '#9ca3af' : '#000';
-      attrBadges.push(`<span class="chip" style="font-size:9px;font-weight:${tb.color === 'gray' ? '500' : '700'};padding:1px 6px;background:${tbBg};color:${tbTx}">${tb.decodedTrim || tb.label}</span>`);
+      const tbKey = tb.tier === 'PERFORMANCE' ? 'PERFORMANCE' : tb.tier === 'PREMIUM' ? 'PREMIUM' : 'TRIM';
+      attrBadgeData.push({ key:tbKey, html:`<span class="chip" style="font-size:9px;font-weight:${tb.color === 'gray' ? '500' : '700'};padding:1px 6px;background:${tbBg};color:${tbTx}">${tb.decodedTrim || tb.label}</span>` });
     }
-    if (v.cult) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>');
-    if (v.diesel) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>');
+    if (v.cult) attrBadgeData.push({ key:'CULT', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#d946ef;color:#000">CULT</span>' });
+    if (v.diesel) attrBadgeData.push({ key:'DIESEL', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#3b82f6;color:#000">DIESEL</span>' });
     const dt = (v.decoded_drivetrain || v.drivetrain || '').toUpperCase();
-    if (/4WD|4X4|AWD/i.test(dt)) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>');
-    if (v.decoded_transmission) {
-      if (/manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>');
-      else if (v.decoded_transmission === 'CHECK_MT') attrBadges.push('<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>');
-      else if (/cvt/i.test(v.decoded_transmission)) attrBadges.push('<span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>');
+    const is4wd = /4WD|4X4|AWD/i.test(dt);
+    const isManual = v.decoded_transmission && /manual/i.test(v.decoded_transmission) && v.decoded_transmission !== 'CHECK_MT';
+    if (is4wd && isManual) attrBadgeData.push({ key:'4WD+MT', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '+MT</span>' });
+    else {
+      if (is4wd) attrBadgeData.push({ key: /AWD/i.test(dt) ? 'AWD' : '4WD', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#16a34a;color:#000">' + (/AWD/i.test(dt) ? 'AWD' : '4WD') + '</span>' });
+      if (isManual) attrBadgeData.push({ key:'MANUAL', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000">MANUAL</span>' });
     }
-    const line2 = attrBadges.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${attrBadges.join('')}</div>` : '';
+    if (v.decoded_transmission === 'CHECK_MT') attrBadgeData.push({ key:'CHECK_MT', html:'<span class="chip" style="font-size:9px;font-weight:700;padding:1px 6px;background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>' });
+    if (v.decoded_transmission && /cvt/i.test(v.decoded_transmission)) attrBadgeData.push({ key:'CVT', html:'<span class="chip" style="font-size:9px;font-weight:500;padding:1px 6px;background:#374151;color:#9ca3af">CVT</span>' });
+    // Sort by priority
+    attrBadgeData.sort((a, b) => (BADGE_PRIORITY[a.key] || 99) - (BADGE_PRIORITY[b.key] || 99));
+    const line2 = attrBadgeData.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${attrBadgeData.map(b => b.html).join('')}</div>` : '';
 
     // LINE 1 — rarity badge (inline after engine)
     let rarityInline = '';

@@ -4,6 +4,18 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Hybrid / PHEV / EV Detection + Badges — 2026-04-08
+- VIN decoder distinguishes Gas / Hybrid / Plug-in Hybrid / Electric via layered detection
+- Detection: corgi fuelType → model-name fallback (Prius, Leaf, Volt, Tesla, etc.) → trim fallback
+- Mild 48V hybrids (eTorque, EQ Boost) classified as Gas — mechanical parts share with pure gas
+- vin_cache: is_hybrid/is_phev/is_electric columns + fuel_type
+- Score boosts: HYBRID +15%, PHEV +20%, ELECTRIC +25% — stacks multiplicatively
+- Line 2 badges: HYBRID (cyan border), PHEV (bright cyan), EV (electric blue bold)
+- Badge render order: strict score-priority sort — ELECTRIC→PHEV→PERFORMANCE→HYBRID→DIESEL→4WD+MT→PREMIUM→MANUAL→4WD→CHECK_MT→CVT→TRIM
+- Files: LocalVinDecoder.js, AttackListService.js, attack-list.html, migration, backfill-hybrid-flags.js
+
+---
+
 ## Date Doctrine: LKQ date_added is Canon — 2026-04-08
 - LKQ's published set date (date_added) is now the single source of truth for all display, filter, sort, scoring across DarkHawk
 - createdAt is forensic-only — never read by user-facing paths
