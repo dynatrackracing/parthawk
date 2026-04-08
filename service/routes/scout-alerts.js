@@ -86,23 +86,7 @@ router.get('/list', async (req, res) => {
   alertQuery = applyFilters(alertQuery);
   const alerts = await alertQuery
     .orderByRaw(`CASE WHEN claimed = true THEN 1 ELSE 0 END`)
-    .orderByRaw(`
-      CASE
-        WHEN source = 'PERCH' AND confidence = 'high' THEN 0
-        WHEN source = 'PERCH' AND confidence = 'medium' THEN 1
-        WHEN source = 'bone_pile' AND confidence = 'high' THEN 2
-        WHEN source = 'bone_pile' AND confidence = 'medium' THEN 3
-        WHEN source = 'bone_pile' AND confidence = 'low' THEN 4
-        WHEN source = 'restock' AND confidence = 'high' THEN 5
-        WHEN source = 'restock' AND confidence = 'medium' THEN 6
-        WHEN source = 'restock' AND confidence = 'low' THEN 7
-        WHEN source = 'hunters_perch' AND confidence = 'high' THEN 8
-        WHEN source = 'hunters_perch' AND confidence = 'medium' THEN 9
-        WHEN source = 'hunters_perch' AND confidence = 'low' THEN 10
-        WHEN source = 'OVERSTOCK' THEN 1
-        ELSE 11
-      END
-    `)
+    .orderByRaw(`COALESCE(match_score, 0) DESC`)
     .orderBy('part_value', 'desc')
     .offset((page - 1) * perPage)
     .limit(perPage);

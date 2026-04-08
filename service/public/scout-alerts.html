@@ -49,6 +49,14 @@ nav a.active{color:#DC2626;font-weight:700}
 .alert-vehicle{font-size:12px;color:#22c55e;font-weight:600;margin-top:3px}
 .alert-meta{font-size:10px;color:#9CA3AF;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .alert-notes{font-size:10px;color:#eab308;margin-top:2px;font-style:italic}
+.score-badge{font-weight:700;min-width:24px;text-align:center}
+.score-high{background:#FFD700;color:#000}
+.score-medhigh{background:#4CAF50;color:#fff}
+.score-medium{background:#FFC107;color:#000}
+.score-lowmed{background:#FF9800;color:#000}
+.score-low{background:#f44336;color:#fff}
+.reasons-list{font-size:10px;color:#6B7280;margin-top:3px;padding-left:4px;border-left:2px solid #2a2a2a}
+.reasons-list div{padding:1px 0}
 .btn-refresh{padding:8px 14px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:11px;font-weight:600;cursor:pointer}
 .btn-refresh:active{opacity:.5}
 .btn-refresh:disabled{opacity:.3}
@@ -383,7 +391,13 @@ async function load(page) {
           h += '<div class="alert-meta">';
           if (isClaimed) h += '<span class="badge" style="background:#064e3b;color:#22c55e">PULLED</span>';
           h += '<span class="badge ' + srcClass + '">' + srcLabel + '</span>';
-          if (a.source !== 'OVERSTOCK') h += '<span class="badge ' + bc + '">' + (a.confidence || '').toUpperCase() + '</span>';
+          if (a.match_score != null && a.source !== 'OVERSTOCK') {
+            var sc = a.match_score;
+            var scClass = sc >= 75 ? 'score-high' : sc >= 60 ? 'score-medhigh' : sc >= 50 ? 'score-medium' : sc >= 40 ? 'score-lowmed' : 'score-low';
+            h += '<span class="badge score-badge ' + scClass + '">' + sc + '</span>';
+          } else if (a.source !== 'OVERSTOCK') {
+            h += '<span class="badge ' + bc + '">' + (a.confidence || '').toUpperCase() + '</span>';
+          }
           if (soldTag) h += soldTag;
           if (a.part_value && a.part_value > 0) {
             h += renderPriceBadge(a.part_value, a.source === 'OVERSTOCK' ? '' : '');
@@ -392,6 +406,14 @@ async function load(page) {
           if (setStr) h += '<span>' + setStr + '</span>';
           h += '</div>';
           if (a.notes) h += '<div class="alert-notes">' + esc(a.notes) + '</div>';
+          if (a.match_reasons && a.match_reasons.length > 0) {
+            var mrs = typeof a.match_reasons === 'string' ? JSON.parse(a.match_reasons) : a.match_reasons;
+            if (mrs.length > 0) {
+              h += '<div class="reasons-list">';
+              mrs.forEach(function(r) { h += '<div>' + esc(r) + '</div>'; });
+              h += '</div>';
+            }
+          }
           h += '</div></div>';
         });
         h += '</div>';
