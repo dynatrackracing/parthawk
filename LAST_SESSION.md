@@ -1,5 +1,13 @@
 # LAST SESSION — 2026-04-07
 
+## Competitor drip bump: 4x→6x/day, 1→2 sellers/run — 2026-04-07
+- Cron: 4 separate scheduleJob calls → loop over 6 schedules (0,4,8,12,16,20 UTC)
+- CompetitorDripRunner.runDrip(): picks 2 sellers per run (LIMIT 2), sequential with 30-60s inter-seller delay
+- Cooldown reduced from 6h to 3h (matches 4h cron interval)
+- Each seller gets own try/catch + closeBrowser — one failure doesn't kill the other
+- Net: 12 seller scrapes/day, full 12-seller rotation in ~24h (was ~72h)
+- Rollback: revert cron array + LIMIT 1 in CompetitorDripRunner
+
 ## Fix manual competitor scrape categoryId 6030→0 — 2026-04-07
 - competitors.js line 893: manual scrape handler (POST /competitors/:name/scrape) still had categoryId '6030', missed in earlier drip runner fix
 

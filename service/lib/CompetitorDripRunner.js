@@ -7,12 +7,11 @@ const SoldItemsManager = require('../managers/SoldItemsManager');
 /**
  * CompetitorDripRunner — Randomized micro-scrape runner.
  *
- * Called 4x daily (6am, noon, 6pm, midnight UTC) from index.js crons.
- * Each run: random 0-45min startup delay, picks the least-recently-scraped
- * enabled seller, scrapes 1-2 random pages, cleans up the browser.
+ * Called 6x daily (every 4h) from index.js crons.
+ * Each run: random 0-45min startup delay, picks the 2 least-recently-scraped
+ * enabled sellers, scrapes 1-2 random pages each, cleans up the browser.
  *
- * Replaces the old Sunday 8pm "blast all sellers at once" cron that risked
- * eBay rate-limiting and Playwright OOM on Railway.
+ * 6 runs × 2 sellers = 12 seller scrapes/day → full 12-seller rotation in ~24h.
  */
 class CompetitorDripRunner {
   constructor() {
@@ -27,49 +26,65 @@ class CompetitorDripRunner {
 
     await new Promise(resolve => setTimeout(resolve, delayMs));
 
-    // Pick the seller least recently scraped
-    const seller = await database('SoldItemSeller')
+    // Pick the 2 sellers least recently scraped
+    const sellers = await database('SoldItemSeller')
       .where('enabled', true)
       .orderByRaw('"lastScrapedAt" ASC NULLS FIRST')
-      .first();
+      .limit(2);
 
-    if (!seller) {
+    if (!sellers || sellers.length === 0) {
       this.log.info('No enabled sellers found, skipping drip');
       return { skipped: true, reason: 'no enabled sellers' };
     }
 
-    // Skip if this seller was scraped within the last 6 hours
-    if (seller.lastScrapedAt && (Date.now() - new Date(seller.lastScrapedAt).getTime()) < 6 * 60 * 60 * 1000) {
-      this.log.info({ seller: seller.name, lastScraped: seller.lastScrapedAt }, 'All sellers recently scraped, skipping');
-      return { skipped: true, reason: 'all sellers fresh', seller: seller.name };
+    // Skip if the stalest seller was scraped within the last 3 hours
+    // (with 6 runs/day, 3h cooldown prevents re-scraping the same seller twice in a row)
+    const stalest = sellers[0];
+    if (stalest.lastScrapedAt && (Date.now() - new Date(stalest.lastScrapedAt).getTime()) < 3 * 60 * 60 * 1000) {
+      this.log.info({ seller: stalest.name, lastScraped: stalest.lastScrapedAt }, 'All sellers recently scraped, skipping');
+      return { skipped: true, reason: 'all sellers fresh', seller: stalest.name };
     }
 
-    const maxPages = 1 + Math.floor(Math.random() * 2); // 1 or 2 pages
-    this.log.info({ seller: seller.name, maxPages, delayMinutes: delayMin }, 'Starting drip scrape');
+    const results = [];
 
-    const manager = new SoldItemsManager();
-    try {
-      const result = await manager.scrapeCompetitor({
-        seller: seller.name,
-        categoryId: '0',
-        maxPages,
-      });
+    for (let i = 0; i < sellers.length; i++) {
+      const seller = sellers[i];
+      const maxPages = 1 + Math.floor(Math.random() * 2); // 1 or 2 pages
+      this.log.info({ seller: seller.name, maxPages, sellerIndex: i + 1, sellerCount: sellers.length }, 'Starting drip scrape');
 
-      // Update seller stats
-      await database('SoldItemSeller').where('name', seller.name).update({
-        lastScrapedAt: new Date(),
-        itemsScraped: (seller.itemsScraped || 0) + (result.stored || 0),
-        updatedAt: new Date(),
-      });
+      const manager = new SoldItemsManager();
+      try {
+        const result = await manager.scrapeCompetitor({
+          seller: seller.name,
+          categoryId: '0',
+          maxPages,
+        });
 
-      this.log.info({ seller: seller.name, maxPages, stored: result.stored, scraped: result.scraped }, 'Drip scrape complete');
-      return { seller: seller.name, maxPages, ...result };
-    } catch (err) {
-      this.log.error({ err: err.message, seller: seller.name }, 'Drip scrape failed');
-      return { seller: seller.name, error: err.message };
-    } finally {
-      try { await manager.scraper.closeBrowser(); } catch (e) {}
+        // Update seller stats
+        await database('SoldItemSeller').where('name', seller.name).update({
+          lastScrapedAt: new Date(),
+          itemsScraped: (seller.itemsScraped || 0) + (result.stored || 0),
+          updatedAt: new Date(),
+        });
+
+        this.log.info({ seller: seller.name, maxPages, stored: result.stored, scraped: result.scraped }, 'Drip scrape complete');
+        results.push({ seller: seller.name, maxPages, ...result });
+      } catch (err) {
+        this.log.error({ err: err.message, seller: seller.name }, 'Drip scrape failed');
+        results.push({ seller: seller.name, error: err.message });
+      } finally {
+        try { await manager.scraper.closeBrowser(); } catch (e) {}
+      }
+
+      // 30-60s delay between sellers (not after the last one)
+      if (i < sellers.length - 1) {
+        const interDelay = 30000 + Math.floor(Math.random() * 30000);
+        this.log.info({ delaySeconds: Math.round(interDelay / 1000) }, 'Inter-seller delay');
+        await new Promise(resolve => setTimeout(resolve, interDelay));
+      }
     }
+
+    return results;
   }
 }
 

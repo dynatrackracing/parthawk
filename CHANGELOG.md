@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Competitor Drip Bump: 4x→6x/day, 1→2 Sellers/Run — 2026-04-07
+- Cron every 4h (0,4,8,12,16,20 UTC), 2 sellers per run = 12 scrapes/day
+- Full 12-seller rotation drops from ~72h to ~24h
+- Sequential scraping with 30-60s inter-seller delay, independent error handling
+- Files: index.js, CompetitorDripRunner.js
+
+---
+
 ## Fix Manual Competitor Scrape categoryId 6030→0 — 2026-04-07
 - POST /competitors/:name/scrape still had '6030' — missed in earlier drip runner fix. Now '0'.
 

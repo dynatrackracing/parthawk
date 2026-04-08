@@ -1042,39 +1042,37 @@ async function start() {
       }
     });
 
-    // Competitor drip scraping — 4x daily with random 0-45min startup jitter
-    // Each run: picks 1 least-recently-scraped seller, scrapes 1-2 pages
-    // Replaces old Sunday 8pm blast-all-sellers cron (removed from competitors.js)
+    // Competitor drip scraping — 6x daily (every 4h) with random 0-45min startup jitter
+    // Each run: picks 2 least-recently-scraped sellers, scrapes 1-2 pages each
+    // 6 runs × 2 sellers = 12 seller scrapes/day → full 12-seller rotation in ~24h
     const CompetitorDripRunner = require('./lib/CompetitorDripRunner');
 
-    const dripJob5am = schedule.scheduleJob('0 5 * * *', async function () {
-      log.info('Competitor drip cron fired (5am UTC window)');
-      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip 5am failed'); }
-    });
+    const dripSchedules = [
+      { cron: '0 0 * * *',  label: 'midnight' },
+      { cron: '0 4 * * *',  label: '4am' },
+      { cron: '0 8 * * *',  label: '8am' },
+      { cron: '0 12 * * *', label: 'noon' },
+      { cron: '0 16 * * *', label: '4pm' },
+      { cron: '0 20 * * *', label: '8pm' },
+    ];
 
-    const dripJobNoon = schedule.scheduleJob('0 12 * * *', async function () {
-      log.info('Competitor drip cron fired (noon UTC window)');
-      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip noon failed'); }
-    });
+    for (const { cron, label } of dripSchedules) {
+      schedule.scheduleJob(cron, async function () {
+        log.info('Competitor drip cron fired (' + label + ' UTC window)');
+        try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip ' + label + ' failed'); }
 
-    const dripJob6pm = schedule.scheduleJob('0 18 * * *', async function () {
-      log.info('Competitor drip cron fired (6pm UTC window)');
-      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip 6pm failed'); }
-    });
-
-    const dripJobMidnight = schedule.scheduleJob('0 0 * * *', async function () {
-      log.info('Competitor drip cron fired (midnight UTC window)');
-      try { await CompetitorDripRunner.runDrip(); } catch (err) { log.error({ err: err.message }, 'Drip midnight failed'); }
-
-      // Graduate marks once daily (moved from old Sunday-only cron in competitors.js)
-      try {
-        const axios = require('axios');
-        await axios.post('http://localhost:' + (process.env.PORT || 9000) + '/competitors/mark/graduate');
-        log.info('Daily mark graduation complete');
-      } catch (err) {
-        log.error({ err: err.message }, 'Daily mark graduation failed');
-      }
-    });
+        // Graduate marks once daily at midnight
+        if (label === 'midnight') {
+          try {
+            const axios = require('axios');
+            await axios.post('http://localhost:' + (process.env.PORT || 9000) + '/competitors/mark/graduate');
+            log.info('Daily mark graduation complete');
+          } catch (err) {
+            log.error({ err: err.message }, 'Daily mark graduation failed');
+          }
+        }
+      });
+    }
 
     // eBay Messaging — poll for new orders every 15 minutes, process queue every 2 minutes
     const EbayMessagingService = require('./services/EbayMessagingService');
