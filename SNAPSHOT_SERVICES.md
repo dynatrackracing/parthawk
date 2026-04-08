@@ -1,5 +1,5 @@
 # SNAPSHOT_SERVICES.md
-Generated 2026-04-07
+Generated 2026-04-08
 
 ## Core Services
 
@@ -23,16 +23,16 @@ Generated 2026-04-07
   3. Score from value tiers: $1000+ → 90-100, $800 → 80+, $600 → 70+, $400 → 60+, $250 → 50+, $150 → 40+, >0 → 20+, 0 → 5
   4. Bonuses: extra parts (+3/part, max +15), 2+ sales (+5), on Mark (+15)
   5. Stock penalty: 1=-5%, 2=-15%, 3=-30%, 4=-50%, 5+=-70%
-  6. Fresh arrival: ≤3d +10%, ≤7d +5%, ≤14d +2%
+  6. Fresh arrival (via daysSinceSetET from dateHelpers, LKQ set date in ET): ≤3d +10%, ≤7d +5%, ≤14d +2%
   7. COGS yard factor: ±5%
-  8. Attribute boosts: PERFORMANCE +20%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%
+  8. Attribute boosts (stacks multiplicatively): ELECTRIC +25%, PHEV +20%, PERFORMANCE +20%, HYBRID +15%, DIESEL +15%, 4WD+MT +12%, PREMIUM +10%, MANUAL +8%, 4WD +5%. Hybrid/PHEV/EV detected via classifyPowertrain() from LocalVinDecoder.
   9. Rarity from vehicle_frequency: LEGENDARY (180+d or 1 sighting) +30%, RARE (90+d) +20%, UNCOMMON (45+d) +10%, NORMAL (15+d) 0%, COMMON (7+d) -5%, SATURATED (<7d) -15%
   10. **Score UNCAPPED** — can exceed 100 with boosts
 - **Intel index:** `buildIntelIndex()` loads 4 PN sets: quarryPNs (auto_generated want list), streamPNs (manual want list), overstockPNs (overstock_group_item), flagPNs (restock_flag). Mark targets from separate markIndex. Per-part `intelSources` array: ['mark', 'quarry', 'stream', 'restock', 'overstock', 'flag', 'sold']. Overstock parts get `overstockWarning: true`. `intel_match_count` on vehicle response.
 - **Intel scoring boosts:** MARK ×1.15 (+15%), QUARRY ×1.10 (+10%), STREAM/RESTOCK ×1.05 (+5%). Applied per matching part, multipliers compound. Overstock parts excluded from totalValue.
 - **Sort:** Vehicles by est_value DESC, max_part_value DESC tiebreaker. Parts by price DESC, noveltyTier ASC.
 - **No vehicle limit** — full yard inventory served. Frontend VEHICLE_CAPS raised to 5000.
-- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons, intel_match_count, est_value, max_part_value, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor
+- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons (includes HYBRID/PHEV/ELECTRIC), daysSinceSet (int, server-computed in ET), setDateLabel (string, e.g. "Set today"), intel_match_count, est_value, max_part_value, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor. Yard-level: lastScrapedHoursAgo, isStale (>18h).
 - **Blocked comps:** COMP filter in buildInventoryIndex() via compIds from BlockedCompsService.getBlockedSet(). SOLD filter in scoreVehicle() via soldKeys parameter (loaded once per request in async callers). scoreVehicle is SYNC — do NOT add await inside it.
 
 ### BlockedCompsService.js

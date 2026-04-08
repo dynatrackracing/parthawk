@@ -138,6 +138,14 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 37. **scoreVehicle() is SYNCHRONOUS. Do NOT add await inside it.** The sold filter loads soldKeys from its async callers (getAttackList, getAllYardsAttackList, scoreManualVehicles) and passes it as a parameter. Any inline `await` crashes Node at parse time with SyntaxError. This caused 6 hours of silent boot failures on 2026-04-07.
 
+38. **All vehicle age/recency/freshness math reads date_added via service/utils/dateHelpers.js.** createdAt is forensic-only and never appears in display, filter, sort, or scoring paths. All TZ math runs in America/New_York server-side. Frontend never parses dates — server ships pre-computed `daysSinceSet` (int) and `setDateLabel` (string). (2026-04-08 doctrine)
+
+39. **Hybrid, PHEV, and Electric are distinct powertrain classifications with distinct scoring boosts** (+15/+20/+25, stacking multiplicatively with other attribute boosts). Mild 48V hybrids (eTorque, EQ Boost) are classified as Gas because mechanical parts share with pure-gas variants. Badge render order on vehicle cards is strict score-priority sorted — leftmost badge = largest score contributor. Order: ELECTRIC→PHEV→PERFORMANCE→HYBRID→DIESEL→4WD+MT→PREMIUM→MANUAL→4WD→CHECK_MT→CVT→TRIM.
+
+40. **VAG (VW/Audi/Skoda/Seat/Porsche) part numbers matching `^[0-9][A-Z][0-9][0-9]{6}[A-Z]{0,3}$` must NEVER have their trailing letter suffix stripped.** Those letters are variant identity (different hydraulic units, different programming), not revision codes. Guard lives at the top of both `stripRevisionSuffix()` in partIntelligence.js and `normalizePartNumber()` in partMatcher.js.
+
+41. **Short model-name VIN matches (BMW i3/i4/iX, Tesla Model 3/Y/S/X, any ≤3-char model token) require exact word-boundary match — never substring match.** Prevents I30→i3, Matrix→ix, Grand Prix→i-series false positives. Enforced in `classifyPowertrain()` in LocalVinDecoder.js.
+
 ---
 
 ## KNOWN TECH DEBT (do not make worse)

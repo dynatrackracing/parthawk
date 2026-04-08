@@ -1,5 +1,7 @@
 # SNAPSHOT_SCRAPERS.md
-Generated 2026-04-05
+Generated 2026-04-08
+
+**Date doctrine (2026-04-08):** date_added (LKQ set date) is canonical for all display/filter/sort/scoring. createdAt is forensic-only. LKQ scraper (scrape-local.js) UPSERTs date_added on every run. Non-LKQ scrapers (Bessler's, Bluegrass, Raceway, Chesterfield, Foss) do NOT capture equivalent set dates — backfilled from createdAt::date 2026-04-08. first_seen/last_seen fields abandoned for display — forensic only.
 
 ## Scraper Overview Table
 

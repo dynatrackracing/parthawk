@@ -161,6 +161,14 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Session discipline regen — 2026-04-08
+- Regenerated SNAPSHOT_LIBS.md, SNAPSHOT_SERVICES.md, SNAPSHOT_FRONTEND.md, SNAPSHOT_ROUTES.md, SNAPSHOT_SCRAPERS.md
+- Updated CLAUDE_RULES.md with rules 38 (date doctrine), 39 (hybrid/EV boosts), 40 (VAG PN guard), 41 (short model-name match)
+- Session deploys covered: 51f7004 (VAG PN), 98aeb15 (date doctrine), 2ee3b54 (hybrid/EV), e5b7ae4 (BMW false positive)
+- Open followups:
+  * Bessler/Bluegrass/Raceway scrapers don't capture LKQ-equivalent set dates — future rows drift until fixed
+  * Generation-aware vehicle rarity (vehicle_frequency conflates gen boundaries — trim CSV needed)
+
 # LAST SESSION — 2026-04-07
 
 ## Quarry display fixes — per-tier cap + FOUND from Cache — 2026-04-07

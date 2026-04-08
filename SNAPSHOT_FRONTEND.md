@@ -1,5 +1,5 @@
 # SNAPSHOT_FRONTEND.md
-Generated 2026-04-07
+Generated 2026-04-08
 
 ## Shared Components
 
@@ -25,7 +25,9 @@ Generated 2026-04-07
 - **Nav key:** `feed`
 - **4-line collapsed vehicle card layout:**
   - **Line 1 — Headline:** Score badge (inline color, pulse at 120+) + Year Make Model + engine + rarity badge (inline after engine) + $value (right-aligned, color-coded). Rarity: only UNCOMMON (blue), RARE (purple pulse), LEGENDARY (gold pulse ★) shown. SATURATED/COMMON/NORMAL hidden.
-  - **Line 2 — Attributes:** Trim/CULT/DIESEL/4WD/MANUAL/CHECK MT/CVT badges. Collapses when none apply.
+  - **Line 2 — Attributes:** Priority-sorted badges (leftmost = biggest score driver): EV (electric blue #2979ff border, bold) → PHEV (bright cyan #1de9b6 border) → PERFORMANCE → HYBRID (cyan #00bcd4 border) → DIESEL → 4WD+MT → PREMIUM → MANUAL → 4WD → CHECK MT → CVT → TRIM. Collapses when none apply. Badges read from server-computed `boostReasons[]` for powertrain; client-side detection for drivetrain/transmission. Sorted via `BADGE_PRIORITY` map before render.
+  - **Stale scrape banner (2026-04-08):** Yellow ⚠ bar when `yard.isStale` (>18h since last scrape). Shows hours since last scrape. Not dismissible.
+  - **Date handling (2026-04-08 doctrine):** `getNewestDate()`, `getDaysFromNewest()`, `parseLocalDate()` DELETED. Pill filters read `v.daysSinceSet` (server-computed int in ET). "Set Xd ago" label reads `v.setDateLabel` (server string). Frontend never parses dates.
   - **Line 3 — Location:** Row · Color · Xd ago + NEW badge (green #4CAF50, for ≤0d). Gone label for inactive.
   - **Line 4 — Parts:** Up to 6 type chips colored by price tier. Novelty dots: cyan ● = NOVEL, green ● = RESTOCK. Intel chips: ★gold MARK, ★green RESTOCK, ★blue WANT, ✕red OVER. ★N indicator for intel match count.
 - **Score display:** Uncapped (can show 127, 145, etc.). Color tiers: 120+ gold, 100+ bright green, 80+ green, 60+ yellow, 40+ orange, <40 red. Gold pulses at 120+.
