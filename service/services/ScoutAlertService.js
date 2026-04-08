@@ -4,6 +4,7 @@ const { database } = require('../database/database');
 const { log } = require('../lib/logger');
 const { parseTitle, matchPartToSales, loadModelsFromDB } = require('../utils/partMatcher');
 const { modelMatches: piModelMatches, parseYearRange: piParseYear, extractPartNumbers: piExtractPNs, detectPartType } = require('../utils/partIntelligence');
+const { isReliable, detectNamedEngine, NAMED_ENGINES, getCeiling } = require('../lib/decoderCapability');
 
 // Concurrency guard — only one generateAlerts() at a time
 let _running = false;
@@ -282,6 +283,8 @@ async function _generateAlertsInner() {
           row: v.row_number || null,
           confidence: match.confidence,
           notes: match.notes || null,
+          match_score: match.match_score || null,
+          match_reasons: match.match_reasons ? JSON.stringify(match.match_reasons) : '[]',
           vehicle_set_date: v.date_added,
         });
       }
@@ -395,6 +398,8 @@ function matchMarksAgainstVehicles(marks, vehicles) {
           row: v.row_number || null,
           confidence: match.confidence,
           notes: match.notes || null,
+          match_score: match.match_score || null,
+          match_reasons: match.match_reasons ? JSON.stringify(match.match_reasons) : '[]',
           vehicle_set_date: v.date_added,
         },
       });
@@ -471,52 +476,15 @@ function scoreMarkMatch(parsed, vehicle, mark) {
   if (vYear <= 0) return {};
   if (vYear < parsed.yearStart || vYear > parsed.yearEnd) return {};
 
-  // RULE 4: Engine matching
-  const vEngine = (vehicle.decoded_engine || vehicle.engine || '').toLowerCase();
-  const hasVehicleEngine = vEngine && vEngine !== 'n/a' && vEngine.length > 1;
-  const hasMarkEngine = parsed.engine || parsed.engineName;
+  // RULE 4: Numeric scoring via computeMatchScore (same as non-mark path)
+  const partType = mark.partType || detectPartType(mark.originalTitle) || null;
+  const result = computeMatchScore(mark.originalTitle, vehicle, partType);
+  const confidence = result.score >= 75 ? 'high' : result.score >= 55 ? 'medium' : 'low';
 
-  let engineMatch = false;
-  if (hasMarkEngine && hasVehicleEngine) {
-    if (parsed.engine) {
-      // Displacement match: "3.5L" in "3.5L V6"
-      engineMatch = vEngine.includes(parsed.engine.toLowerCase());
-    }
-    if (!engineMatch && parsed.engineName) {
-      engineMatch = vEngine.includes(parsed.engineName.toLowerCase());
-    }
-  }
+  if (vehicle.decoded_trim) result.reasons.push('Trim: ' + vehicle.decoded_trim);
+  if (mark.partType) result.reasons.push('Part: ' + mark.partType);
 
-  // Score confidence
-  const notes = [];
-  let confidence;
-
-  if (hasMarkEngine && hasVehicleEngine && engineMatch) {
-    confidence = 'high';
-  } else if (hasMarkEngine && hasVehicleEngine && !engineMatch) {
-    // Engine mismatch — still MEDIUM because the part might fit
-    confidence = 'medium';
-    notes.push('Engine mismatch — verify fitment');
-  } else if (hasMarkEngine && !hasVehicleEngine) {
-    // Vehicle engine unknown — include but note
-    confidence = 'medium';
-    notes.push('Verify engine at yard');
-  } else {
-    // Mark has no engine spec — year+make+model is enough for HIGH
-    confidence = 'high';
-  }
-
-  // Trim bonus: if yard vehicle has decoded_trim, note it
-  if (vehicle.decoded_trim) {
-    notes.push('Trim: ' + vehicle.decoded_trim);
-  }
-
-  // Add part info from mark
-  if (mark.partType) {
-    notes.push('Part: ' + mark.partType);
-  }
-
-  return { confidence, notes: notes.length > 0 ? notes.join('; ') : null };
+  return { confidence, notes: result.reasons.join('; '), match_score: result.score, match_reasons: result.reasons };
 }
 
 // Extract engine displacement from a string like "3.6L V6" → "3.6"
@@ -557,6 +525,155 @@ function hasModelConflict(partModels, vehicleModel) {
   return false;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// NUMERIC MATCH SCORING (0-100) — Deploy A, 2026-04-08
+// ═══════════════════════════════════════════════════════════════
+
+function _extractCylFromTitle(title) {
+  if (!title) return null;
+  const m = title.match(/\bV(\d{1,2})\b/i) || title.match(/\bI(\d)\b/) || title.match(/\b(\d)-?cyl/i) || title.match(/\b(\d)\s*cylinder/i);
+  return m ? parseInt(m[1]) : null;
+}
+
+function _extractDriveFromTitle(title) {
+  if (!title) return null;
+  const t = title.toUpperCase();
+  if (/\b4WD\b|\b4X4\b|\bFOUR WHEEL DRIVE\b/.test(t)) return '4WD';
+  if (/\bAWD\b|\bALL WHEEL DRIVE\b/.test(t)) return 'AWD';
+  if (/\b2WD\b|\b4X2\b/.test(t)) return '2WD';
+  if (/\bFWD\b|\bFRONT WHEEL DRIVE\b/.test(t)) return 'FWD';
+  if (/\bRWD\b|\bREAR WHEEL DRIVE\b/.test(t)) return 'RWD';
+  return null;
+}
+
+function _extractPremiumAudio(title) {
+  if (!title) return null;
+  const m = title.match(/\b(Bose|B&O|Bang\s*&?\s*Olufsen|Alpine|JBL|Harman\s*Kardon|Mark\s*Levinson|Burmester|Meridian|Infinity|Beats)\b/i);
+  return m ? m[1] : null;
+}
+
+function _extractDieselMarker(title) {
+  if (!title) return false;
+  return /\b(Diesel|TDI|Duramax|Cummins|Power\s*Stroke|PowerStroke|EcoDiesel)\b/i.test(title);
+}
+
+const PN_EXACT_YEAR_TYPES = new Set(['ECM','PCM','ECU','BCM','TIPM','ABS','TCM','TCU','AMP','RADIO','CLUSTER','THROTTLE','FUSE','JUNCTION']);
+
+function computeMatchScore(wantTitle, vehicleData, partType) {
+  const reasons = [];
+  let score = 50;
+  reasons.push('Year/make/model match: +50');
+
+  const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || []) : [];
+  const vMake = (vehicleData.make || '').toUpperCase();
+
+  // --- PHASE 3: YEAR PROXIMITY ---
+  if (PN_EXACT_YEAR_TYPES.has(partType)) {
+    const yr = piParseYear(wantTitle);
+    const vYear = parseInt(vehicleData.year) || 0;
+    if (yr && vYear) {
+      const span = yr.end - yr.start;
+      if (span === 0 && vYear === yr.start) { score += 10; reasons.push('Year exact: +10'); }
+      else if (span <= 1) { score += 5; reasons.push('Year range tight: +5'); }
+      else if (span >= 4) { score -= 5; reasons.push('Year range broad (' + (span+1) + 'yr): -5'); }
+    }
+  }
+
+  // --- PHASE 4: ENGINE PATH ---
+  if (sensitivity.includes('engine')) {
+    const titleCyl = _extractCylFromTitle(wantTitle);
+    const namedEng = detectNamedEngine(wantTitle);
+    const titleDisp = extractDisplacement(wantTitle);
+
+    const vCyl = vehicleData.decoded_cylinders ? parseInt(vehicleData.decoded_cylinders) : null;
+    const vEngStr = (vehicleData.decoded_engine || vehicleData.engine || '');
+    const vDisp = extractDisplacement(vEngStr);
+
+    // Cylinder check
+    if (titleCyl && vCyl) {
+      if (titleCyl === vCyl) { score += 25; reasons.push('Cylinders match (V' + vCyl + '): +25'); }
+      else { score -= 50; reasons.push('Cylinder mismatch (part V' + titleCyl + ', vehicle V' + vCyl + '): -50'); }
+    } else if (titleCyl && !vCyl) {
+      reasons.push('Cylinders unknown on vehicle: 0');
+    }
+
+    // Named engine check
+    if (namedEng) {
+      const eng = NAMED_ENGINES[namedEng] || NAMED_ENGINES[namedEng.replace(/\s+/g, '')];
+      if (eng) {
+        const makeMatch = eng.makes.includes(vMake);
+        if (makeMatch && vDisp) {
+          const vDispNum = parseFloat(vDisp);
+          const dispMatch = eng.displacements.some(d => Math.abs(d - vDispNum) < 0.25);
+          if (dispMatch) { score += 30; reasons.push('Named engine match (' + namedEng + '): +30'); }
+          else { score -= 30; reasons.push('Named engine displacement mismatch (' + namedEng + '): -30'); }
+        } else if (!makeMatch) {
+          score -= 60; reasons.push('Named engine make mismatch (' + namedEng + ' not on ' + vMake + '): -60');
+        }
+      }
+    }
+
+    // Displacement check (only if no named engine and no cylinder match already applied large delta)
+    if (!namedEng && titleDisp && vDisp) {
+      const td = parseFloat(titleDisp), vd = parseFloat(vDisp);
+      if (Math.abs(td - vd) < 0.25) { score += 25; reasons.push('Displacement match (' + vDisp + 'L): +25'); }
+      else { score -= 50; reasons.push('Displacement mismatch (part ' + titleDisp + 'L, vehicle ' + vDisp + 'L): -50'); }
+    } else if (!namedEng && titleDisp && !vDisp) {
+      score -= 10; reasons.push('Engine unknown on vehicle: -10');
+    }
+  }
+
+  // --- PHASE 5: DIESEL PATH ---
+  if (_extractDieselMarker(wantTitle)) {
+    if (vehicleData.diesel === true) { score += 35; reasons.push('Diesel match: +35'); }
+    else if (vehicleData.diesel === false) { score -= 80; reasons.push('Gas vehicle, diesel part: -80'); }
+    else { score -= 20; reasons.push('Vehicle diesel flag unknown: -20'); }
+  }
+
+  // --- PHASE 6: DRIVETRAIN PATH ---
+  if (sensitivity.includes('drivetrain')) {
+    score += 10; reasons.push('ABS drivetrain-sensitive: +10');
+    const titleDrive = _extractDriveFromTitle(wantTitle);
+    if (titleDrive) {
+      const vDrive = (vehicleData.decoded_drivetrain || vehicleData.drivetrain || '').toUpperCase();
+      if (vDrive) {
+        const v4wd = /4WD|4X4|AWD/.test(vDrive);
+        const p4wd = titleDrive === '4WD' || titleDrive === 'AWD';
+        if ((p4wd && v4wd) || (!p4wd && !v4wd)) { score += 25; reasons.push('Drivetrain match: +25'); }
+        else { score -= 50; reasons.push('Drivetrain mismatch (part ' + titleDrive + ', vehicle ' + vDrive + '): -50'); }
+      } else {
+        if (isReliable(vMake, 'drivetrain')) { score -= 15; reasons.push('Drivetrain unknown: -15'); }
+        else { reasons.push('Drivetrain not encoded for ' + vMake + ': 0'); }
+      }
+    }
+  }
+
+  // --- PHASE 7: TRIM PATH ---
+  if (sensitivity.includes('trim')) {
+    const brand = _extractPremiumAudio(wantTitle);
+    if (brand) {
+      const vTier = (vehicleData.trim_tier || '').toUpperCase();
+      if (vTier === 'PREMIUM') { score += 30; reasons.push('Premium trim match (' + brand + '): +30'); }
+      else if (vTier === 'PERFORMANCE') { score += 25; reasons.push('Performance trim (' + brand + '): +25'); }
+      else if (vTier === 'BASE') { score -= 40; reasons.push('Premium audio on base trim: -40'); }
+      else {
+        if (isReliable(vMake, 'trim')) { score -= 10; reasons.push('Trim unknown: -10'); }
+        else { reasons.push('Trim not encoded for ' + vMake + ': 0'); }
+      }
+    }
+  }
+
+  // --- PHASE 8: CLAMP TO CEILING ---
+  const hasPremiumBrand = !!_extractPremiumAudio(wantTitle);
+  const ceiling = getCeiling(partType, hasPremiumBrand);
+  if (score > ceiling) { score = ceiling; reasons.push('Capped at ' + partType + ' ceiling: ' + ceiling); }
+  if (score < 0) score = 0;
+  if (score > 100) score = 100;
+
+  return { score, reasons, ceiling, hardGated: false, gateReason: null };
+}
+
+// Legacy wrapper — maintains backward compat return shape
 function scoreMatch(part, vehicle) {
   const vMake = (vehicle.make || '').toLowerCase();
   const vModel = (vehicle.model || '').toLowerCase();
@@ -582,109 +699,23 @@ function scoreMatch(part, vehicle) {
   // RULE 2b: Model conflict check — Cherokee ≠ Grand Cherokee, etc.
   if (hasModelConflict(part.models, vehicle.model)) return {};
 
-  // RULE 3: Year must be within range
+  // RULE 3: Year hard gate
   const hasYearRange = part.yearStart && part.yearEnd;
-  if (hasYearRange && vYear > 0) {
-    if (vYear < part.yearStart || vYear > part.yearEnd) return {};
-  }
+  if (!hasYearRange) return {}; // Year hard gate: no year = no match
+  if (vYear > 0 && (vYear < part.yearStart || vYear > part.yearEnd)) return {};
 
-  // RULE 4: Part-type-sensitive attribute verification
-  const titleLower = (part.title || '').toLowerCase();
+  // RULE 4: Numeric scoring via computeMatchScore
   const partType = detectPartType(part.title) || null;
-  // Default to [] (universal, no sensitivity check) for unrecognized part types.
-  // Previous default of ['engine'] caused 92% false HIGH because unrecognized body/interior
-  // parts vacuously passed the engine check (no displacement in title to compare against).
-  const sensitivity = partType ? (PART_TYPE_SENSITIVITY[partType] || []) : [];
-  const notes = [];
-  let worstConfidence = 'high';
+  const result = computeMatchScore(part.title, vehicle, partType);
 
-  function downgrade(level, reason) {
-    notes.push(reason);
-    if (level === 'low' || (level === 'medium' && worstConfidence === 'high')) {
-      worstConfidence = level;
-    }
-  }
-
-  // ENGINE CHECK — for engine-sensitive parts
-  if (sensitivity.includes('engine')) {
-    const partDisp = extractDisplacement(part.title);
-    const partCyl = extractCylinders(part.title);
-    const partEngine = extractEngineName(part.title);
-    const hasPartEngine = partDisp || partCyl || partEngine;
-
-    if (hasPartEngine) {
-      const vEngine = (vehicle.decoded_engine || vehicle.engine || '').toLowerCase();
-      const hasVehicleEngine = vEngine && vEngine !== 'n/a' && vEngine.length > 1;
-
-      if (hasVehicleEngine) {
-        const vDisp = extractDisplacement(vEngine);
-        const vCyl = extractCylinders(vEngine);
-        const vEngineName = extractEngineName(vEngine);
-
-        let mismatch = false;
-        // Displacement mismatch
-        if (partDisp && vDisp && partDisp !== vDisp) mismatch = true;
-        // Cylinder count mismatch (V8 vs V6)
-        if (!mismatch && partCyl && vCyl && partCyl !== vCyl) mismatch = true;
-        // Named engine mismatch (HEMI vs Pentastar)
-        if (!mismatch && partEngine && vEngineName && partEngine !== vEngineName) mismatch = true;
-
-        if (mismatch) {
-          downgrade('low', 'Engine mismatch: part requires ' + (partDisp ? partDisp + 'L' : '') + (partEngine ? ' ' + partEngine : '') + ', vehicle has ' + vEngine);
-        } else {
-          notes.push('Engine verified: ' + vEngine);
-        }
-      } else {
-        downgrade('medium', 'Engine not decoded — verify at yard');
-      }
-    }
-  }
-
-  // DRIVETRAIN CHECK — for drivetrain-sensitive parts
-  if (sensitivity.includes('drivetrain')) {
-    const part4wd = /\b(4wd|4x4|awd)\b/i.test(titleLower);
-    const part2wd = /\b(2wd|fwd|rwd)\b/i.test(titleLower);
-    const hasPartDrive = part4wd || part2wd;
-
-    if (hasPartDrive) {
-      const vDrive = (vehicle.decoded_drivetrain || vehicle.drivetrain || '').toLowerCase();
-      const hasVehicleDrive = vDrive && vDrive.length > 1;
-
-      if (hasVehicleDrive) {
-        const v4wd = /4wd|4x4|awd/i.test(vDrive);
-        if ((part4wd && !v4wd) || (part2wd && v4wd)) {
-          downgrade('low', 'Drivetrain mismatch: part is ' + (part4wd ? '4WD/AWD' : '2WD') + ', vehicle is ' + vDrive);
-        }
-      } else {
-        downgrade('medium', 'Drivetrain not decoded — verify at yard');
-      }
-    }
-  }
-
-  // TRIM CHECK — for trim-sensitive parts (premium audio, etc.)
-  if (sensitivity.includes('trim')) {
-    const premiumAudio = /\b(bose|alpine|harman|kardon|b&o|bang|olufsen|jbl|beats|infinity|burmester|meridian|mark levinson)\b/i;
-    const hasPremiumInTitle = premiumAudio.test(titleLower);
-
-    if (hasPremiumInTitle) {
-      const vTrim = (vehicle.decoded_trim || vehicle.trim_level || '').toLowerCase();
-      const vTier = (vehicle.trim_tier || '').toUpperCase();
-      const hasVehicleTrim = vTrim && vTrim.length > 1;
-
-      if (hasVehicleTrim || vTier) {
-        const isBaseTrim = vTier === 'BASE' || /\b(work|fleet|tradesman|ls\b|w\/t|wt\b)/i.test(vTrim);
-        if (isBaseTrim) {
-          downgrade('low', 'Premium audio part on base trim vehicle');
-        }
-      } else {
-        downgrade('medium', 'Trim not decoded — verify audio package at yard');
-      }
-    }
-  }
-
-  if (!hasYearRange) notes.push('No year range — verify fitment');
-
-  return { confidence: worstConfidence, notes: notes.length > 0 ? notes.join('; ') : null };
+  // Convert to legacy shape + new fields
+  const confidence = result.score >= 75 ? 'high' : result.score >= 55 ? 'medium' : 'low';
+  return {
+    confidence,
+    notes: result.reasons.join('; '),
+    match_score: result.score,
+    match_reasons: result.reasons,
+  };
 }
 
 async function saveMeta() {
