@@ -1,5 +1,8 @@
 # LAST SESSION — 2026-04-07
 
+## Fix manual competitor scrape categoryId 6030→0 — 2026-04-07
+- competitors.js line 893: manual scrape handler (POST /competitors/:name/scrape) still had categoryId '6030', missed in earlier drip runner fix
+
 ## 2-Digit Year Parser Platform Fix — 2026-04-07
 - Created service/utils/yearParser.js — canonical year parser for all title-to-year extraction
 - parseYearRange() handles 8 patterns in priority order:

@@ -890,7 +890,7 @@ router.post('/:sellerId/scrape', async (req, res) => {
   try {
     const result = await manager.scrapeCompetitor({
       seller: sellerName,
-      categoryId: '6030',
+      categoryId: '0',
       maxPages: parseInt(pages),
     });
     log.info({ seller: sellerName, result }, 'Manual competitor scrape complete');

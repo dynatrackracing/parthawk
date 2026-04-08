@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Fix Manual Competitor Scrape categoryId 6030→0 — 2026-04-07
+- POST /competitors/:name/scrape still had '6030' — missed in earlier drip runner fix. Now '0'.
+
+---
+
 ## 2-Digit Year Parser Platform Fix — 2026-04-07
 - Created service/utils/yearParser.js — canonical year parser with 8 pattern tiers
 - Enhanced 2-digit year support: space-separated pairs/triples, slash ranges, standalone mid-title with contextual make-following rule
