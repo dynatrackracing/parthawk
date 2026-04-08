@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Disable All eBay Write Code Paths — Read-Only Carcass — 2026-04-08
+- 5 POST routes under /stale-inventory return 410 Gone (revise-price, end-item, relist-item, bulk-end, run)
+- Action buttons and handlers removed from stale-inventory.html
+- StaleInventoryService Wed 3am cron commented out in index.js
+- Read-only banner added to Carcass page
+- CLAUDE_RULES rule 42 (eBay write policy) added
+- Files: stale-inventory.js, stale-inventory.html, index.js, CLAUDE_RULES.md
+
+---
+
 ## Hybrid / PHEV / EV Detection + Badges — 2026-04-08
 - VIN decoder distinguishes Gas / Hybrid / Plug-in Hybrid / Electric via layered detection
 - Detection: corgi fuelType → model-name fallback (Prius, Leaf, Volt, Tesla, etc.) → trim fallback

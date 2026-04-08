@@ -161,6 +161,15 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Disable eBay writes + read-only Carcass — 2026-04-08
+- Removed 5 POST routes (run/revise/end/relist/bulk-end) → 410 Gone stubs
+- Stripped action buttons (revise -10%/-20%, End, Relist, bulk end, Run Auto, checkboxes) from stale-inventory.html
+- Disabled StaleInventoryService Wed 3am cron in index.js (commented out)
+- Added read-only banner on Carcass page: "⚠ Read-only view. Inventory management happens outside this tool."
+- Added CLAUDE_RULES rule 42 (eBay write policy)
+- Grep classification: stale-inventory.js routes (a-modified), StaleInventoryService.js methods (b-internal, no callers), TradingAPI.js definitions (c-flagged, no callers)
+- Unexpected callers found: NONE
+
 ## Session discipline regen — 2026-04-08
 - Regenerated SNAPSHOT_LIBS.md, SNAPSHOT_SERVICES.md, SNAPSHOT_FRONTEND.md, SNAPSHOT_ROUTES.md, SNAPSHOT_SCRAPERS.md
 - Updated CLAUDE_RULES.md with rules 38 (date doctrine), 39 (hybrid/EV boosts), 40 (VAG PN guard), 41 (short model-name match)

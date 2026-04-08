@@ -11,17 +11,9 @@ const RestockService = require('../services/RestockService');
  * Trigger stale inventory automation scan.
  * Applies scheduled price reductions via TradingAPI.
  */
-router.post('/run', async (req, res) => {
-  try {
-    const service = new StaleInventoryService();
-    // Run in background
-    service.runAutomation().catch(err => {
-      log.error({ err }, 'Stale inventory automation failed');
-    });
-    res.json({ success: true, message: 'Stale inventory automation started' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+// DISABLED 2026-04-08 by owner directive. DarkHawk is read-only for inventory management.
+router.post('/run', (req, res) => {
+  res.status(410).json({ error: 'gone', message: 'eBay write endpoints permanently disabled 2026-04-08. DarkHawk is read-only for inventory management.' });
 });
 
 /**
@@ -218,10 +210,14 @@ router.get('/candidates', async (req, res) => {
   }
 });
 
-/**
- * POST /stale-inventory/revise-price
- * Manually change a listing's price.
- */
+// DISABLED 2026-04-08 — eBay write endpoints permanently disabled
+const GONE_MSG = { error: 'gone', message: 'eBay write endpoints permanently disabled 2026-04-08. DarkHawk is read-only for inventory management.' };
+router.post('/revise-price', (req, res) => res.status(410).json(GONE_MSG));
+router.post('/end-item', (req, res) => res.status(410).json(GONE_MSG));
+router.post('/relist-item', (req, res) => res.status(410).json(GONE_MSG));
+router.post('/bulk-end', (req, res) => res.status(410).json(GONE_MSG));
+
+/* ORIGINAL WRITE HANDLERS REMOVED 2026-04-08 — preserved in git history
 router.post('/revise-price', async (req, res) => {
   const { ebayItemId, newPrice } = req.body;
   if (!ebayItemId || !newPrice) return res.status(400).json({ error: 'ebayItemId and newPrice required' });
@@ -354,5 +350,6 @@ router.post('/bulk-end', async (req, res) => {
     totalFailed: results.filter(r => !r.success).length,
   });
 });
+// END OF REMOVED HANDLERS */
 
 module.exports = router;

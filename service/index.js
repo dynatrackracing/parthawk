@@ -863,18 +863,20 @@ async function start() {
     //   await runner.work();
     // });
 
-    // Stale inventory automation - runs weekly Wednesday at 3:00 AM
-    const StaleInventoryService = require('./services/StaleInventoryService');
-    const staleInventoryJob = schedule.scheduleJob('0 3 * * 3', async function (scheduledTime) {
-      log.info({ scheduledTime }, 'Starting weekly stale inventory automation');
-      try {
-        const service = new StaleInventoryService();
-        const result = await service.runAutomation();
-        log.info({ result }, 'Stale inventory automation complete');
-      } catch (err) {
-        log.error({ err }, 'Stale inventory automation failed');
-      }
-    });
+    // DISABLED 2026-04-08 by owner directive.
+    // No automated eBay writes. DarkHawk is pull/intel only.
+    // Active inventory management happens outside this tool.
+    // const StaleInventoryService = require('./services/StaleInventoryService');
+    // const staleInventoryJob = schedule.scheduleJob('0 3 * * 3', async function (scheduledTime) {
+    //   log.info({ scheduledTime }, 'Starting weekly stale inventory automation');
+    //   try {
+    //     const service = new StaleInventoryService();
+    //     const result = await service.runAutomation();
+    //     log.info({ result }, 'Stale inventory automation complete');
+    //   } catch (err) {
+    //     log.error({ err }, 'Stale inventory automation failed');
+    //   }
+    // });
 
     // Dead inventory scan - runs weekly Monday at 4:00 AM
     const DeadInventoryService = require('./services/DeadInventoryService');

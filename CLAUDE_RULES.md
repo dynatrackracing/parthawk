@@ -148,6 +148,19 @@ These are non-negotiable constraints for DarkHawk development. Violating any of 
 
 ---
 
+## EBAY WRITE POLICY
+
+42. **No automated or exposed writes to eBay listings.** DarkHawk is a pulling optimization and intel tool. The listing tool draws from its data. Active inventory management (price revisions, ending, relisting) happens OUTSIDE this app. The following are permanently disabled as of 2026-04-08 by owner directive:
+- POST /stale-inventory/revise-price (returns 410 Gone)
+- POST /stale-inventory/end-item (returns 410 Gone)
+- POST /stale-inventory/relist-item (returns 410 Gone)
+- POST /stale-inventory/bulk-end (returns 410 Gone)
+- POST /stale-inventory/run (returns 410 Gone)
+- StaleInventoryService Wed 3am cron (commented out in index.js)
+Any future feature that needs to write to eBay listings requires explicit owner approval and re-authorization of this rule. Carcass page (/admin/carcass) remains as read-only diagnostic.
+
+---
+
 ## KNOWN TECH DEBT (do not make worse)
 
 - Unauthenticated write endpoints (end-item/relist/revise/bulk-end)
