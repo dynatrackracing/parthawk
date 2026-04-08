@@ -1,5 +1,131 @@
 # LAST SESSION — 2026-04-08
 
+## Newest pill renders zero cards diagnosis — 2026-04-08
+- NOT A BUG — expected behavior when no new vehicles arrived today
+- Scraper ran at 2:00 AM ET (06:00 UTC) on April 8, found 0 new vehicles across all 4 core yards (all dupes of existing inventory)
+- Latest createdAt in Raleigh is 2026-04-07T13:10:23 — yesterday
+- getDaysFromNewest() correctly computes: today (April 8) - createdAt (April 7) = 1 day
+- Newest pill filters for getDaysFromNewest(v) === 0 (line 577/585) — no vehicle has createdAt from today → 0 results
+- The 3d pill DOES show these vehicles (1 day old ≤ 3) — not a code regression, just no fresh inventory
+- Header shows "1093 vehicles · 380 flagged" because that counts ALL active Raleigh vehicles regardless of pill
+- createdAt IS sent to frontend (AttackListService.js line 1623) — no missing field issue
+- VAG PN fix did NOT cause this — the fix only touches stripRevisionSuffix/normalizePartNumber, not date handling
+
+## Permanent fix: date_added doctrine — 2026-04-08
+- Doctrine: date_added (LKQ set date) is canonical for all display, filter, sort, score, rarity. createdAt is forensic-only.
+- New module: service/utils/dateHelpers.js — getSetDateET(), daysSinceSetET(), setDateLabel(), withinSetWindowET(), hoursSinceLastScrape(). All math runs in America/New_York.
+- Fixed DATE type TZ trap: date_added is a Postgres DATE (no TZ), parsed as-is without UTC→ET drift.
+- Pill windows are LKQ-set-date relative ("Newest" = set today ET, not "scraped today").
+- Server ships daysSinceSet + setDateLabel per vehicle — frontend never parses dates.
+- Stale-scrape banner: yellow ⚠ when yard's MAX(createdAt) > 18h ago. Flags: Bessler's 227h, Bluegrass 228h, Raceway 226h, Huntsville never.
+- AttackListService.scoreVehicle() fresh-arrival boost uses daysSinceSetET.
+- FlywayService.calculateDaysInYard() replaced with daysSinceSetET.
+- Frontend: getDaysFromNewest()/getNewestDate()/parseLocalDate() deleted → getDaysSinceSet() reads server field.
+- Backfill: 1791 rows with NULL date_added filled from createdAt::date (Bessler's 745, Raceway 430, Bluegrass 350, Bessler's Louisville 266).
+- Files: dateHelpers.js (new), AttackListService.js, FlywayService.js, attack-list.html, backfill-date-added-from-createdat.js (new)
+
+## Scraper date architecture audit — 2026-04-08
+
+### 1. Scraper Inventory
+
+| Scraper | File | date_added source | first_seen | last_seen | INSERT or UPSERT |
+|---|---|---|---|---|---|
+| scrape-local.js (LKQ core) | repo root | `<time datetime>` from LKQ HTML | SET (now) | SET (now) | INSERT only (dupes filtered during scrape) |
+| LKQScraper.js | service/scrapers/ | `<time datetime>` from LKQ HTML | SET (now) | SET (now) | UPSERT (match by YMM) |
+| PullAPartScraper.js | service/scrapers/ | API `dateYardOn` (date portion) | SET (now) | SET (now) | UPSERT |
+| CarolinaPickNPullScraper.js | service/scrapers/ | MM/DD/YYYY HTML table | NOT SET | NOT SET | UPSERT |
+| FossScraper.js | service/scrapers/ | NULL (not in HTML) | NOT SET | NOT SET | UPSERT |
+| PickAPartVAScraper.js | service/scrapers/ | HTML table "date"/"arrival" col or NULL | NOT SET | NOT SET | UPSERT |
+| UPullAndSaveScraper.js | service/scrapers/ | NULL (API missing) | NOT SET | NOT SET | UPSERT |
+| ChesterfieldScraper.js | service/scrapers/ | NOT SET (field omitted) | NOT SET | NOT SET | UPSERT |
+
+**Key finding:** Only LKQ and PullAPart scrapers set first_seen/last_seen. 5 of 7 scrapers leave first_seen/last_seen null.
+
+### 2. Date Column Inventory (yard_vehicle)
+
+| Column | Type | Who writes | Who reads |
+|---|---|---|---|
+| date_added | date | LKQ scrapers (from HTML), PullAPart (from API) | Display label "set Xd ago" (attack-list.html:761), scoring fresh-arrival boost (AttackListService:1467), FlywayService daysInYard (line 203) |
+| first_seen | timestamptz | scrape-local.js, LKQScraper, PullAPart (all set to now on INSERT) | Not read anywhere in scoring/display. Only exists for forensics. |
+| last_seen | timestamptz | All scrapers (on UPDATE), retention filter (AttackListService:1868) | Retention cutoff (7d, line 1854), lazy-load time range filter (line 1874) |
+| createdAt | timestamptz (DEFAULT now) | Auto-set on INSERT by Knex/Postgres | Filter/age calc in attack-list.html (lines 383, 391 — getDaysFromNewest), scoring not used |
+| updatedAt | timestamptz | All scrapers on INSERT and UPDATE | Not read in scoring/display |
+| scraped_at | timestamptz (DEFAULT now) | All scrapers | Not read in scoring/display |
+| vin_decoded_at | timestamptz | VIN decode process | Not read in scoring/display |
+
+### 3. Consumer Table
+
+| File:Line | Field | Classification | What it does |
+|---|---|---|---|
+| attack-list.html:383 | createdAt \|\| date_added | FILTER | getNewestDate() — finds most recent vehicle for age tier reference |
+| attack-list.html:391 | createdAt \|\| date_added | FILTER | getDaysFromNewest() — days since vehicle first appeared (powers pill filter) |
+| attack-list.html:577 | getDaysFromNewest(v) === 0 | FILTER | Newest pill — only vehicles created TODAY |
+| attack-list.html:585 | getDaysFromNewest(v) <= pillDays | FILTER | 3d/7d/30d/60d pills — strict window |
+| attack-list.html:761 | date_added \|\| createdAt | DISPLAY | "set Xd ago" label on vehicle card line 3 |
+| attack-list.html:757 | getDaysFromNewest(v) === 0 | DISPLAY | NEW badge (green) |
+| AttackListService.js:1467 | date_added \|\| createdAt | SCORING | Fresh arrival boost: ≤3d +10%, ≤7d +5%, ≤14d +2% |
+| AttackListService.js:443 | date_added | FILTER | ORDER BY date_added DESC (single-yard query) |
+| AttackListService.js:1861 | date_added | FILTER | ORDER BY date_added DESC (all-yards query) |
+| AttackListService.js:1868 | last_seen | FILTER | 7-day retention cutoff |
+| AttackListService.js:1874 | last_seen | FILTER | Lazy-load time range |
+| FlywayService.js:203 | date_added | SCORING | calculateDaysInYard() for Flyway feed |
+| FlywayService.js:129,237 | date_added | FILTER | ORDER BY date_added DESC, sort tiebreaker |
+| ScoutAlertService.js (via generateAlerts) | date_added | DISPLAY | vehicle_set_date in scout_alert row |
+
+### 4. Timezone Findings
+
+- **Postgres:** `Etc/UTC`. `NOW()` = `2026-04-08T12:34:51Z`, `CURRENT_DATE` = `2026-04-08` (UTC)
+- **LKQ scraper (scrape-local.js):** Extracts `<time datetime="...">` which is typically ISO date like `2026-04-07`. Converted via `new Date(v.dateAdded)` — JavaScript parses date-only strings as UTC midnight, so `date_added = 2026-04-07T00:00:00Z` → stored as `2026-04-07` (DATE type, no time component).
+- **Browser:** `getDaysFromNewest()` uses `new Date()` which is local timezone. `parseLocalDate()` (line 371-377) handles date-only strings by constructing local-timezone Date objects: `new Date(year, month-1, day)`. Timestamps (with T/Z) parsed via `new Date(isoString)` which honors the timezone.
+- **Mismatch found:** `createdAt` is a TIMESTAMPTZ in UTC (e.g., `2026-04-07T13:10:23Z`). When parsed in browser via `new Date("2026-04-07T13:10:23Z")`, it becomes `2026-04-07T09:10:23-0400` in ET. `date_added` is a DATE (`2026-04-07`) parsed via `parseLocalDate()` as `2026-04-07 00:00 local`. These can differ by up to 1 day depending on timezone.
+
+### 5. Divergence Report (Raleigh, last 14 days)
+
+| LKQ set date | Vehicles | First scraped | Last scraped |
+|---|---|---|---|
+| 2026-04-08 | 1 | 2026-04-08 12:30 | 2026-04-08 12:30 |
+| 2026-04-07 | 62 | 2026-04-07 13:10 | 2026-04-07 13:10 |
+| 2026-04-03 | 34 | 2026-04-03 18:49 | 2026-04-03 18:49 |
+| 2026-04-02 | 30 | 2026-04-03 18:49 | 2026-04-03 18:49 |
+| 2026-04-01 | 30 | 2026-04-01 13:31 | 2026-04-01 13:31 |
+| 2026-03-31 | 38 | 2026-04-01 02:50 | 2026-04-01 02:50 |
+| 2026-03-30 | 39 | 2026-03-31 06:00 | 2026-03-31 06:00 |
+
+**Pattern:** date_added (LKQ set date) typically leads createdAt (when we scraped) by ~12-24 hours. LKQ sets vehicles overnight; our scraper picks them up the next day. This 1-day lag is why Newest (createdAt-based) shows fewer results than date_added would — a vehicle "set today" by LKQ is "scraped tomorrow" by us.
+
+### 6. Date Priority Conflict
+
+**The frontend and backend use OPPOSITE date priority:**
+- **Frontend filter** (getDaysFromNewest): `v.createdAt || v.date_added` — createdAt FIRST (from commit 27ba6d2)
+- **Frontend display** (timeAgo label): `v.date_added || v.createdAt` — date_added FIRST (for puller-facing "set Xd ago")
+- **Backend scoring** (fresh arrival boost): `vehicle.date_added || vehicle.createdAt` — date_added FIRST
+- **Backend sort**: `ORDER BY date_added DESC`
+
+This means:
+- A vehicle set by LKQ on April 7, scraped by us on April 8 at noon:
+  - **Filter says:** 0 days old (createdAt = today) → shows under Newest ✓
+  - **Display says:** "set 1d ago" (date_added = April 7)
+  - **Score says:** 1 day old (date_added = April 7) → gets +5% boost instead of +10%
+
+The filter/display split is intentional. The scoring discrepancy (using date_added not createdAt) may cause slightly lower fresh-arrival boosts for vehicles we scraped late.
+
+### 7. History
+
+| Commit | Date | Change |
+|---|---|---|
+| a2dda78 | ~Apr 4 | Daily Feed: data-driven Newest filter, relative age tiers |
+| 6dacc58 | ~Apr 4 | attack list date grouping uses createdAt instead of date_added |
+| c4230b0 | Apr 7 | Fix: age relative to today, not relative to newest vehicle |
+| 88a3461 | Apr 7 | Fix: strict pill window, drop rest fallback |
+| 27ba6d2 | Apr 7 | Fix: use createdAt for getDaysFromNewest, display still uses date_added |
+
+### 8. Open Questions
+
+1. **Should scoring use createdAt too?** Currently scoring fresh-arrival boost (AttackListService:1467) uses `date_added || createdAt`. If we want consistency with the filter, it should be `createdAt || date_added`. But date_added may be more "correct" for how long the part has been available to pull.
+2. **5 of 7 non-LKQ scrapers don't set first_seen/last_seen.** This means retention cutoff (7d last_seen filter) may not work correctly for those yards — vehicles that were never confirmed as "still there" would have null last_seen.
+3. **FlywayService uses date_added exclusively** for daysInYard and sorting. If a Flyway yard has null date_added (Foss, Chesterfield, UPullAndSave), `calculateDaysInYard()` returns 0 and sort falls through.
+4. **Timezone edge case:** A vehicle set by LKQ at 11 PM ET on April 7 (UTC April 8 03:00) would have `date_added = 2026-04-07` (DATE type, no time). If scraped at 2 AM ET on April 8, `createdAt = 2026-04-08T06:00Z`. The browser in ET would see createdAt as April 8 local → Newest shows it. But if user is in PT, createdAt in PT is April 7 23:00 → Newest does NOT show it. This timezone sensitivity is inherent in the `new Date()` comparison.
+
 ## VAG PN collision diagnosis — 2026-04-08
 - BUG: Attack list shows "28 in stock" for VW Passat ABS 1K0 614 517 DT. We don't have 28 — we have ~17 DIFFERENT VW ABS pumps with distinct suffix codes (DT, EB, BD, AE, DJ, CT, CD, BJ, EJ, DL, ED, DB, BG) all collapsed to base `1K0614517`.
 - ROOT CAUSE CONFIRMED: `stripRevisionSuffix()` in partIntelligence.js line 87-90 catches VAG PNs via the generic catch-all: `if (pn.length >= 10 && /[A-Z]{1,2}$/.test(pn))` → strips trailing 1-2 alpha. This treats VW/Audi suffix codes (DT, EB, AE — which identify hydraulic/programming variants) as revision suffixes (like Chrysler AA/AB).

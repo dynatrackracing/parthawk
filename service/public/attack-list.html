@@ -297,7 +297,7 @@
   let dateFilter = 'newest';
   const VEHICLE_CAPS = { newest: 50, '3d': 150, '7d': 300, '30d': 500, '60d': 1000, '90d': 2000, all: 5000 };
   const activeSessions = {};
-  let _currentNewestDate = null; // set per-yard during render
+  // _currentNewestDate removed — daysSinceSet is server-computed (doctrine 2026-04-08)
 
   // Cache state: two maps for two-key matching
   let claimedPNs = {};     // normalizedPN → cacheId
@@ -367,34 +367,9 @@
     return 'red';
   }
 
-  // Parse date-only strings as local time, timestamps normally
-  function parseLocalDate(d) {
-    if (!d) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-      return new Date(parseInt(d.slice(0,4)), parseInt(d.slice(5,7)) - 1, parseInt(d.slice(8,10)));
-    }
-    return new Date(d);
-  }
-
-  // Find the newest date_added across vehicles (date-only, stripped of time)
-  function getNewestDate(vehicles) {
-    let newest = null;
-    for (const v of vehicles) {
-      const d = parseLocalDate(v.createdAt || v.date_added);
-      if (d && (!newest || d > newest)) newest = d;
-    }
-    return newest;
-  }
-
-  // Days between a vehicle's date and TODAY
-  function getDaysFromNewest(v) {
-    const d = parseLocalDate(v.createdAt || v.date_added);
-    if (!d) return 999;
-    const vDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diff = Math.round((today - vDay) / 86400000);
-    return Math.max(0, diff);
+  // daysSinceSet is now server-computed in ET via dateHelpers.js (doctrine 2026-04-08)
+  function getDaysSinceSet(v) {
+    return (v.daysSinceSet != null) ? v.daysSinceSet : 999;
   }
 
   async function setDateFilter(mode) {
@@ -409,7 +384,7 @@
   }
 
   function ageBadge(v) {
-    const days = getDaysFromNewest(v);
+    const days = getDaysSinceSet(v);
     if (days === 0) return '<span class="chip chip-age age-today">NEW</span>';
     if (days <= 2) return '<span class="chip chip-age age-recent">' + days + 'D AGO</span>';
     if (days <= 7) return '<span class="chip chip-age age-old">' + days + 'D AGO</span>';
@@ -419,7 +394,7 @@
 
   function vehicleRowClass(v) {
     if (!v.is_active) return 'vehicle-stale vehicle-gone';
-    const days = getDaysFromNewest(v);
+    const days = getDaysSinceSet(v);
     if (days > 30) return 'vehicle-stale';
     return '';
   }
@@ -558,9 +533,12 @@
       const scrapedAgo = yd.yard.last_scraped ? timeAgo(yd.yard.last_scraped) : 'unknown';
       html += `<div style="padding:4px 14px;font-size:10px;color:#6B7280;">Last scraped: ${scrapedAgo}</div>`;
 
-      // Compute newest date_added for this yard's vehicles
-      const newestDate = getNewestDate(filtered);
-      _currentNewestDate = newestDate;
+      // Stale scrape banner — yellow warning if last scrape >18h ago
+      if (yd.yard.isStale) {
+        html += `<div style="padding:8px 14px;background:#3a2f00;border:1px solid #ffc107;border-radius:6px;margin:4px 14px;font-size:11px;font-weight:600;color:#ffc107;">⚠ Last scraped ${Math.round(yd.yard.lastScrapedHoursAgo)}h ago — data may be stale</div>`;
+      }
+
+      // daysSinceSet is server-computed — no client-side date math needed
 
       // How many days back does the active pill look?
       const pillDays = dateFilter === 'newest' ? 0
@@ -572,17 +550,17 @@
 
       let sections;
       if (pillDays >= 999) {
-        // "All" — group by age relative to newest date, skip empty
+        // "All" — group by LKQ set date age (server-computed daysSinceSet), skip empty
         sections = [
-          { label: 'NEWEST', vehicles: filtered.filter(v => getDaysFromNewest(v) === 0), isFresh: true },
-          { label: '1-3 DAYS', vehicles: filtered.filter(v => { const d = getDaysFromNewest(v); return d >= 1 && d <= 3; }) },
-          { label: '4-7 DAYS', vehicles: filtered.filter(v => { const d = getDaysFromNewest(v); return d >= 4 && d <= 7; }) },
-          { label: '8-30 DAYS', vehicles: filtered.filter(v => { const d = getDaysFromNewest(v); return d >= 8 && d <= 30; }) },
-          { label: '30+ DAYS', vehicles: filtered.filter(v => getDaysFromNewest(v) > 30) },
+          { label: 'NEWEST', vehicles: filtered.filter(v => getDaysSinceSet(v) === 0), isFresh: true },
+          { label: '1-3 DAYS', vehicles: filtered.filter(v => { const d = getDaysSinceSet(v); return d >= 1 && d <= 3; }) },
+          { label: '4-7 DAYS', vehicles: filtered.filter(v => { const d = getDaysSinceSet(v); return d >= 4 && d <= 7; }) },
+          { label: '8-30 DAYS', vehicles: filtered.filter(v => { const d = getDaysSinceSet(v); return d >= 8 && d <= 30; }) },
+          { label: '30+ DAYS', vehicles: filtered.filter(v => getDaysSinceSet(v) > 30) },
         ].filter(s => s.vehicles.length > 0);
       } else {
-        // Strict pill filter: only show vehicles within the pill window. No "rest" fallback.
-        const highlighted = filtered.filter(v => getDaysFromNewest(v) <= pillDays);
+        // Strict pill filter: only show vehicles within LKQ set date window
+        const highlighted = filtered.filter(v => getDaysSinceSet(v) <= pillDays);
         const pillLabel = pillDays === 0 ? 'NEWEST ARRIVALS' : 'LAST ' + pillDays + ' DAYS';
         sections = highlighted.length > 0
           ? [{ label: pillLabel, vehicles: highlighted, isFresh: true }]
@@ -753,12 +731,12 @@
     const valColor = (v.est_value || 0) >= 800 ? '#2ECC40' : (v.est_value || 0) >= 500 ? '#F1C40F' : (v.est_value || 0) >= 250 ? '#FF8C00' : '#FF4136';
 
     // LINE 3 — location + freshness
-    const daysOld = getDaysFromNewest(v);
+    const daysOld = getDaysSinceSet(v);
     const newBadge = daysOld === 0 ? ' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:#4CAF50;color:#000">NEW</span>' : '';
     const metaParts = [];
     if (v.row_number) metaParts.push('Row ' + v.row_number);
     if (v.color) metaParts.push(v.color);
-    if (v.date_added || v.createdAt) metaParts.push(timeAgo(parseLocalDate(v.date_added || v.createdAt)));
+    if (v.setDateLabel) metaParts.push(v.setDateLabel);
     const line3 = `<div style="font-size:11px;color:#6B7280;margin-top:3px">${metaParts.join(' · ')}${newBadge}${goneLabel}</div>`;
 
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">

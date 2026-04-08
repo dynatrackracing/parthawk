@@ -2,6 +2,7 @@
 
 const { database } = require('../database/database');
 const AttackListService = require('./AttackListService');
+const { daysSinceSetET } = require('../utils/dateHelpers');
 
 class FlywayService {
 
@@ -200,7 +201,7 @@ class FlywayService {
           vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _flywaySoldKeys
         );
 
-        const daysInYard = this.calculateDaysInYard(vehicle.date_added);
+        const daysInYard = daysSinceSetET(vehicle) || 0;
         const premiumFlags = this.getPremiumFlags(vehicle);
 
         allScored.push({

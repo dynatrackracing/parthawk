@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Date Doctrine: LKQ date_added is Canon — 2026-04-08
+- LKQ's published set date (date_added) is now the single source of truth for all display, filter, sort, scoring across DarkHawk
+- createdAt is forensic-only — never read by user-facing paths
+- New module: service/utils/dateHelpers.js — all date math in America/New_York
+- Pill semantics: "Newest" = LKQ set today ET. Server ships daysSinceSet + setDateLabel per vehicle.
+- Stale-scrape banner: yellow ⚠ when yard last scraped >18h ago
+- Backfill: 1791 NULL date_added rows filled from createdAt::date
+- Files: dateHelpers.js (new), AttackListService.js, FlywayService.js, attack-list.html, backfill script
+
+---
+
 ## VAG Part Number Suffix Preservation — 2026-04-08
 - VAG (VW/Audi/Skoda/Seat/Porsche) PNs match `[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}` — suffix letters are variant identity, not revisions
 - VAG guard added to stripRevisionSuffix() and normalizePartNumber() — returns unchanged before any stripper runs

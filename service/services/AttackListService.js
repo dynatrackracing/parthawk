@@ -5,6 +5,7 @@ const { database } = require('../database/database');
 const { getPlatformMatches } = require('../lib/platformMatch');
 const { extractPartNumbers: piExtractPNs, vehicleYearMatchesPart: piYearMatch, modelMatches: piModelMatches, parseYearRange: piParseYearRange, stripRevisionSuffix: piStripSuffix } = require('../utils/partIntelligence');
 const { getPartScoreMultiplier } = require('../config/trim-tier-config');
+const { daysSinceSetET, setDateLabel, hoursSinceLastScrape } = require('../utils/dateHelpers');
 const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
@@ -1463,13 +1464,12 @@ class AttackListService {
     else if (maxStock === 4) score = Math.round(score * 0.50);  // -50%
     else if (maxStock >= 5) score = Math.round(score * 0.30);   // -70%
 
-    // === FRESH ARRIVAL BONUS — newer arrivals score higher ===
-    const arrivalDate = vehicle.date_added || vehicle.createdAt;
-    if (arrivalDate) {
-      const daysSinceAdded = Math.floor((Date.now() - new Date(arrivalDate).getTime()) / 86400000);
-      if (daysSinceAdded <= 3) score = Math.round(score * 1.10);       // +10%
-      else if (daysSinceAdded <= 7) score = Math.round(score * 1.05);  // +5%
-      else if (daysSinceAdded <= 14) score = Math.round(score * 1.02); // +2%
+    // === FRESH ARRIVAL BONUS — LKQ set date in ET (doctrine: date_added is canon) ===
+    const _daysSinceSet = daysSinceSetET(vehicle);
+    if (_daysSinceSet !== null) {
+      if (_daysSinceSet <= 3) score = Math.round(score * 1.10);       // +10%
+      else if (_daysSinceSet <= 7) score = Math.round(score * 1.05);  // +5%
+      else if (_daysSinceSet <= 14) score = Math.round(score * 1.02); // +2%
     }
 
     // === COGS YARD FACTOR — cheaper yards get slight boost ===
@@ -1620,7 +1620,8 @@ class AttackListService {
     return {
       id: vehicle.id, year: vehicle.year, make: vehicle.make, model: vehicle.model,
       trim: vehicle.trim, row_number: vehicle.row_number, color: vehicle.color,
-      date_added: vehicle.date_added, createdAt: vehicle.createdAt, last_seen: vehicle.last_seen, is_active: vehicle.active,
+      date_added: vehicle.date_added, last_seen: vehicle.last_seen, is_active: vehicle.active,
+      daysSinceSet: _daysSinceSet, setDateLabel: setDateLabel(vehicle),
       vin: vehicle.vin || null,
       engine: formatEngineDisplay(vehicle.engine),
       engine_type: vehicle.engine_type || null,
@@ -1902,6 +1903,7 @@ class AttackListService {
         return (b.max_part_value || 0) - (a.max_part_value || 0);
       });
 
+      const _staleHours = await hoursSinceLastScrape(database, yard.id);
       results.push({
         yard: {
           id: yard.id,
@@ -1910,6 +1912,8 @@ class AttackListService {
           distance_from_base: yard.distance_from_base,
           visit_frequency: yard.visit_frequency,
           last_scraped: yard.last_scraped,
+          lastScrapedHoursAgo: Math.round(_staleHours * 10) / 10,
+          isStale: _staleHours > 18,
         },
         total_vehicles: vehicles.length,
         hot_vehicles: scored.filter(v => v.color_code === 'green' || v.color_code === 'yellow').length,
