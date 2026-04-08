@@ -152,6 +152,7 @@ async function enrichYard(yardId) {
 
         const decodedTrim = cleanDecodedTrim(r.Trim || null);
         const decodedEngine = r.DisplacementL ? `${r.DisplacementL}L` : null;
+        const decodedCylinders = r.Cylinders ? parseInt(r.Cylinders) : null;
         const decodedDrivetrain = r.DriveType || null;
         let decodedTransmission = r.TransmissionStyle || null;
         const transmissionSpeeds = r.TransmissionSpeeds || null;
@@ -183,6 +184,7 @@ async function enrichYard(yardId) {
         const updateData = {
           decoded_trim: decodedTrim,
           decoded_engine: decodedEngine,
+          decoded_cylinders: decodedCylinders,
           decoded_drivetrain: decodedDrivetrain,
           decoded_transmission: decodedTransmission,
           transmission_speeds: transmissionSpeeds,
