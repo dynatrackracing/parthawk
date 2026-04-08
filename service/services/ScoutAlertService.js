@@ -220,7 +220,11 @@ async function _generateAlertsInner() {
   // THE MARK — active marks from Hunters Perch (highest priority)
   let markAlerts = [];
   try {
-    const activeMarks = await database('the_mark').where('active', true);
+    const activeMarks = await database('the_mark')
+      .where('active', true)
+      .where(function() {
+        this.where('needs_review', false).orWhereNull('needs_review');
+      });
     if (activeMarks.length > 0) {
       markAlerts = matchMarksAgainstVehicles(activeMarks, vehicles);
       log.info({ markCount: activeMarks.length, alertsGenerated: markAlerts.length }, 'Mark matching complete');
@@ -358,7 +362,7 @@ function matchMarksAgainstVehicles(marks, vehicles) {
   const seen = new Set(); // dedup: markId + yardVehicleId
 
   for (const mark of marks) {
-    const parsed = parseMarkTitle(mark.originalTitle);
+    const parsed = getMarkVehicle(mark);
     if (!parsed.make || parsed.models.length === 0) continue;
 
     for (const v of vehicles) {
@@ -397,23 +401,16 @@ function matchMarksAgainstVehicles(marks, vehicles) {
 }
 
 /**
- * Parse a mark's original title to extract year, make, model, engine, part type.
- * Mark titles come from competitor eBay sold items, e.g.:
- *   "2019 Jeep Grand Cherokee OEM Body Control Module BCM 68366989AC"
- *   "2017-2020 Ford F-150 3.5L EcoBoost Engine Control Module ECM"
+ * Get structured vehicle data from a mark row.
+ * Reads from the structured columns (year_start, year_end, make, model)
+ * populated at insert time. Engine is still extracted from title since
+ * we don't store it structured.
  */
-function parseMarkTitle(title) {
-  if (!title) return { make: null, models: [], yearStart: null, yearEnd: null, engine: null };
-
-  // Use existing parseTitle from partMatcher for year/make/model extraction
-  const parsed = parseTitle(title);
-  if (!parsed) return { make: null, models: [], yearStart: null, yearEnd: null, engine: null };
-
-  // Extract engine pattern from title
+function getMarkVehicle(mark) {
+  const title = mark.originalTitle || '';
   const engineMatch = title.match(/\b(\d\.\d)[\s-]?[lL]?\b/);
   const engineStr = engineMatch ? engineMatch[1] + 'L' : null;
 
-  // Also check for named engines
   const titleLower = title.toLowerCase();
   let engineName = null;
   if (/hemi/.test(titleLower)) engineName = 'HEMI';
@@ -421,11 +418,14 @@ function parseMarkTitle(title) {
   else if (/coyote/.test(titleLower)) engineName = 'Coyote';
   else if (/pentastar/.test(titleLower)) engineName = 'Pentastar';
 
+  // Model: structured column is a single string, but scoreMarkMatch expects an array
+  const models = mark.model ? [mark.model] : [];
+
   return {
-    make: parsed.make,
-    models: parsed.models,
-    yearStart: parsed.yearStart,
-    yearEnd: parsed.yearEnd,
+    make: mark.make || null,
+    models: models,
+    yearStart: mark.year_start || null,
+    yearEnd: mark.year_end || null,
     engine: engineStr,
     engineName: engineName,
   };
@@ -460,10 +460,10 @@ function scoreMarkMatch(parsed, vehicle, mark) {
   }
   if (!modelMatch) return {};
 
-  // RULE 3: Year must be within range
-  if (parsed.yearStart && parsed.yearEnd && vYear > 0) {
-    if (vYear < parsed.yearStart || vYear > parsed.yearEnd) return {};
-  }
+  // RULE 3: Year is a HARD GATE — no year on mark or vehicle = no match
+  if (!parsed.yearStart || !parsed.yearEnd) return {};
+  if (vYear <= 0) return {};
+  if (vYear < parsed.yearStart || vYear > parsed.yearEnd) return {};
 
   // RULE 4: Engine matching
   const vEngine = (vehicle.decoded_engine || vehicle.engine || '').toLowerCase();

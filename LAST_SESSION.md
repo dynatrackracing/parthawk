@@ -1,5 +1,18 @@
 # LAST SESSION — 2026-04-07
 
+## Mark structured vehicle fields + editable Mark list — 2026-04-07
+- Added year_start/year_end/make/model/needs_review columns to the_mark (migration 20260407000001)
+- Created service/lib/markVehicleExtractor.js — best-effort extraction from title via yearParser + parseTitle
+- Wired extractor into all 3 mark creation paths (Hunters Perch, Sky Watch single, Sky Watch bulk)
+- Rewrote ScoutAlertService.parseMarkTitle → getMarkVehicle (reads structured columns, no title parsing at match time)
+- Year is now a HARD GATE in scoreMarkMatch — no structured year = no match (no more silent fallthrough)
+- needs_review marks excluded from alert generation entirely (filtered in the_mark query)
+- Backfilled all 20 existing marks via migration — 3 flagged needs_review (titles with model-not-make after 2-digit year)
+- PATCH /competitors/mark/:id extended to accept year_start, year_end, make, model, partType, partNumber
+- the-mark.html: inline-editable year/make/model fields on every card, needs_review badge sorts to top with yellow highlight
+- GET /competitors/mark/check-vehicle: now uses structured columns instead of title.includes(year)
+- GET /competitors/marks: needs_review marks sort first
+
 ## Competitor drip bump: 4x→6x/day, 1→2 sellers/run — 2026-04-07
 - Cron: 4 separate scheduleJob calls → loop over 6 schedules (0,4,8,12,16,20 UTC)
 - CompetitorDripRunner.runDrip(): picks 2 sellers per run (LIMIT 2), sequential with 30-60s inter-seller delay

@@ -4,6 +4,16 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Mark Structured Vehicle Fields + Editable Mark List — 2026-04-07
+- Architectural fix for Scout Alert wrong-year matches
+- the_mark now stores year_start/year_end/make/model as columns, populated at insert time from title parsing
+- Marks with no determinable year flagged needs_review and excluded from alerts until manually corrected
+- Matcher rewritten to read from columns; year is now a hard gate, not a conditional skip
+- Mark list UI has inline-editable vehicle fields; needs_review marks sort to top with yellow badge
+- Files: migration, markVehicleExtractor.js (new), ScoutAlertService.js, competitors.js, opportunities.js, the-mark.html
+
+---
+
 ## Competitor Drip Bump: 4x→6x/day, 1→2 Sellers/Run — 2026-04-07
 - Cron every 4h (0,4,8,12,16,20 UTC), 2 sellers per run = 12 scrapes/day
 - Full 12-seller rotation drops from ~72h to ~24h

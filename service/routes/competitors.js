@@ -5,6 +5,7 @@ const { log } = require('../lib/logger');
 const { database } = require('../database/database');
 const CompetitorMonitorService = require('../services/CompetitorMonitorService');
 const SoldItemsManager = require('../managers/SoldItemsManager');
+const { extractMarkVehicle } = require('../lib/markVehicleExtractor');
 
 // Load hidden parts set for filtering intel results
 async function loadHiddenSet() {
@@ -665,6 +666,7 @@ router.post('/mark', async (req, res) => {
       return res.json({ success: true, exists: true, id: exists.id });
     }
 
+    const vehicle = extractMarkVehicle(title);
     const inserted = await database('the_mark').insert({
       normalizedTitle: key,
       originalTitle: title,
@@ -676,6 +678,11 @@ router.post('/mark', async (req, res) => {
       scoreAtMark: score || null,
       source: 'PERCH',
       active: true,
+      year_start: vehicle.year_start,
+      year_end: vehicle.year_end,
+      make: vehicle.make,
+      model: vehicle.model,
+      needs_review: vehicle.needs_review,
       markedAt: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -694,7 +701,7 @@ router.post('/mark', async (req, res) => {
 router.get('/marks', async (req, res) => {
   try {
     const showAll = req.query.all === 'true';
-    let query = database('the_mark').orderBy('markedAt', 'desc');
+    let query = database('the_mark').orderByRaw('needs_review DESC NULLS LAST, "markedAt" DESC');
     if (!showAll) {
       query = query.where('active', true);
     }
@@ -754,8 +761,20 @@ router.delete('/mark/:id', async (req, res) => {
  */
 router.patch('/mark/:id', async (req, res) => {
   try {
-    const { notes } = req.body;
-    await database('the_mark').where('id', req.params.id).update({ notes, updatedAt: new Date() });
+    const { notes, year_start, year_end, make, model, partType, partNumber } = req.body;
+    const update = { updatedAt: new Date() };
+    if (notes !== undefined) update.notes = notes;
+    if (year_start !== undefined) update.year_start = year_start ? parseInt(year_start) : null;
+    if (year_end !== undefined) update.year_end = year_end ? parseInt(year_end) : null;
+    if (make !== undefined) update.make = make || null;
+    if (model !== undefined) update.model = model || null;
+    if (partType !== undefined) update.partType = partType || null;
+    if (partNumber !== undefined) update.partNumber = partNumber || null;
+    // Auto-clear needs_review if year is now present
+    if (update.year_start && update.year_end) {
+      update.needs_review = false;
+    }
+    await database('the_mark').where('id', req.params.id).update(update);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -785,17 +804,23 @@ router.get('/mark/check-vehicle', async (req, res) => {
   if (!make) return res.json({ success: true, matches: [] });
 
   try {
-    const activeMarks = await database('the_mark').where('active', true);
-    const makeUpper = make.toUpperCase();
-    const modelUpper = model ? model.toUpperCase() : null;
+    let q = database('the_mark').where('active', true);
+    q = q.where('make', 'ilike', make);
+    if (model) {
+      q = q.where(function() {
+        this.where('model', 'ilike', model)
+            .orWhere('model', 'ilike', '%' + model + '%');
+      });
+    }
+    if (year) {
+      const yr = parseInt(year);
+      if (yr > 0) {
+        q = q.where('year_start', '<=', yr).where('year_end', '>=', yr);
+      }
+    }
+    const activeMarks = await q;
 
-    const matches = activeMarks.filter(function(m) {
-      var title = m.originalTitle.toUpperCase();
-      if (!title.includes(makeUpper)) return false;
-      if (modelUpper && !title.includes(modelUpper)) return false;
-      if (year && !title.includes(String(year))) return false;
-      return true;
-    }).map(function(m) {
+    const matches = activeMarks.map(function(m) {
       return {
         id: m.id,
         title: m.originalTitle,

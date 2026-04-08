@@ -3,6 +3,7 @@
 const router = require('express-promise-router')();
 const { findOpportunities, normalizeOppTitle } = require('../services/OpportunityService');
 const { database } = require('../database/database');
+const { extractMarkVehicleWithFallback } = require('../lib/markVehicleExtractor');
 
 /**
  * GET /opportunities
@@ -232,6 +233,12 @@ router.post('/research/:id/mark', async (req, res) => {
     const normalizedTitle = normalizeTitle(`${research.vehicle_year} ${research.vehicle_make} ${research.vehicle_model} ${partType}`);
     const originalTitle = `${research.vehicle_year} ${research.vehicle_make} ${research.vehicle_model} ${partType} — avg $${avgPrice || 0}`;
 
+    const vehicle = extractMarkVehicleWithFallback(title || originalTitle, {
+      year: research.vehicle_year,
+      make: research.vehicle_make,
+      model: research.vehicle_model,
+    });
+
     await database('the_mark')
       .insert({
         normalizedTitle,
@@ -240,6 +247,11 @@ router.post('/research/:id/mark', async (req, res) => {
         medianPrice: Math.round(parseFloat(avgPrice) || 0),
         sourceSignal: 'sky_watch',
         source: 'SKY',
+        year_start: vehicle.year_start,
+        year_end: vehicle.year_end,
+        make: vehicle.make,
+        model: vehicle.model,
+        needs_review: vehicle.needs_review,
         markedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -247,6 +259,11 @@ router.post('/research/:id/mark', async (req, res) => {
       .onConflict('normalizedTitle')
       .merge({
         medianPrice: Math.round(parseFloat(avgPrice) || 0),
+        year_start: vehicle.year_start,
+        year_end: vehicle.year_end,
+        make: vehicle.make,
+        model: vehicle.model,
+        needs_review: vehicle.needs_review,
         updatedAt: new Date(),
       });
 
@@ -289,6 +306,12 @@ router.post('/research/:id/mark-all-high', async (req, res) => {
       const normalizedTitle = normalizeTitle(`${research.vehicle_year} ${research.vehicle_make} ${research.vehicle_model} ${partType}`);
       const originalTitle = `${research.vehicle_year} ${research.vehicle_make} ${research.vehicle_model} ${partType} — avg $${avgPrice}`;
 
+      const vehicle = extractMarkVehicleWithFallback(originalTitle, {
+        year: research.vehicle_year,
+        make: research.vehicle_make,
+        model: research.vehicle_model,
+      });
+
       await database('the_mark')
         .insert({
           normalizedTitle,
@@ -297,6 +320,11 @@ router.post('/research/:id/mark-all-high', async (req, res) => {
           medianPrice: Math.round(avgPrice),
           sourceSignal: 'sky_watch',
           source: 'SKY',
+          year_start: vehicle.year_start,
+          year_end: vehicle.year_end,
+          make: vehicle.make,
+          model: vehicle.model,
+          needs_review: vehicle.needs_review,
           markedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -304,6 +332,11 @@ router.post('/research/:id/mark-all-high', async (req, res) => {
         .onConflict('normalizedTitle')
         .merge({
           medianPrice: Math.round(avgPrice),
+          year_start: vehicle.year_start,
+          year_end: vehicle.year_end,
+          make: vehicle.make,
+          model: vehicle.model,
+          needs_review: vehicle.needs_review,
           updatedAt: new Date(),
         });
 

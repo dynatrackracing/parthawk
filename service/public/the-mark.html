@@ -32,6 +32,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
 .btn-red{background:var(--r);color:#fff;border-color:var(--r)}
 .btn-green{border-color:#065f46;color:var(--g)}
 .btn-purple{border-color:#6d28d9;color:#a78bfa}
+.b-review{background:#78350f;color:#fbbf24;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.mark-card.needs-review{border-color:#78350f}
+.edit-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.edit-field{padding:4px 6px;border:1px solid var(--b);border-radius:4px;background:var(--s);color:var(--t);font-size:11px;outline:none;width:auto}
+.edit-field:focus{border-color:var(--y)}
+.edit-field.yr{width:56px}
+.edit-field.med{width:100px}
+.edit-label{font-size:9px;color:var(--tf);font-weight:600}
+.saved-indicator{font-size:9px;color:var(--g);font-weight:700;opacity:0;transition:opacity .3s}
 input,textarea{padding:8px 10px;border:1px solid var(--b);border-radius:6px;background:var(--s2);color:var(--t);font-size:13px;width:100%;outline:none}
 input:focus,textarea:focus{border-color:var(--r)}
 .empty{text-align:center;color:var(--tf);padding:30px;font-size:13px}
@@ -174,19 +184,32 @@ function renderMarks(marks) {
                       m.status === 'listed' ? '<span class="badge b-listed">LISTED</span>' :
                       m.status === 'sold' ? '<span class="badge b-sold">SOLD</span>' :
                       '<span class="badge b-hunting">HUNTING</span>';
+    var reviewBadge = m.needs_review ? ' <span class="badge b-review" title="Year could not be determined automatically — fill in year_start and year_end">NEEDS REVIEW</span>' : '';
 
     var wlKey = (m.originalTitle||'').substring(0,40).toLowerCase();
     var inWantList = _wantListTitles.has(wlKey);
 
-    h += '<div class="mark-card" id="mark-' + m.id + '">';
+    h += '<div class="mark-card' + (m.needs_review ? ' needs-review' : '') + '" id="mark-' + m.id + '">';
     h += '<div class="mark-title">' + esc(m.originalTitle) + '</div>';
     h += '<div class="mark-meta">';
-    h += srcBadge + ' ' + statusBadge;
+    h += srcBadge + ' ' + statusBadge + reviewBadge;
     if (m.partType) h += ' <span>' + esc(m.partType) + '</span>';
     if (m.medianPrice) h += ' <span style="color:#22c55e;font-weight:700">$' + m.medianPrice + '</span>';
     if (m.partNumber) h += ' <span style="font-family:monospace">' + esc(m.partNumber) + '</span>';
     h += ' <span>' + timeAgo(m.markedAt) + '</span>';
     if (inWantList) h += ' <span class="badge b-wl">IN WANT LIST</span>';
+    h += '</div>';
+    // Editable vehicle fields
+    h += '<div class="edit-row">';
+    h += '<span class="edit-label">Year:</span>';
+    h += '<input class="edit-field yr" type="number" min="1980" max="2035" placeholder="Start" value="' + (m.year_start||'') + '" onchange="saveField(\'' + m.id + '\',\'year_start\',this.value,this)">';
+    h += '<span style="color:#6B7280">–</span>';
+    h += '<input class="edit-field yr" type="number" min="1980" max="2035" placeholder="End" value="' + (m.year_end||'') + '" onchange="saveField(\'' + m.id + '\',\'year_end\',this.value,this)">';
+    h += '<span class="edit-label" style="margin-left:6px">Make:</span>';
+    h += '<input class="edit-field med" type="text" placeholder="Make" value="' + esc(m.make||'') + '" onchange="saveField(\'' + m.id + '\',\'make\',this.value,this)">';
+    h += '<span class="edit-label">Model:</span>';
+    h += '<input class="edit-field med" type="text" placeholder="Model" value="' + esc(m.model||'') + '" onchange="saveField(\'' + m.id + '\',\'model\',this.value,this)">';
+    h += '<span class="saved-indicator" id="saved-' + m.id + '">Saved</span>';
     h += '</div>';
     h += '<div class="mark-actions">';
     h += '<button class="find-btn" onclick="findInYard(\'' + m.id + '\',this)" title="Find in yard"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></button>';
@@ -355,6 +378,36 @@ function findInYard(markId, btn) {
     .catch(function(err) {
       el.innerHTML = '<div class="yard-results" style="color:#dc2626">Error: ' + err.message + '</div>';
     });
+}
+
+async function saveField(markId, field, value, inputEl) {
+  try {
+    var body = {};
+    body[field] = value || null;
+    // If saving year_end together with year_start, send both
+    if (field === 'year_start' || field === 'year_end') {
+      var card = document.getElementById('mark-' + markId);
+      if (card) {
+        var inputs = card.querySelectorAll('.edit-field.yr');
+        body.year_start = inputs[0] ? (inputs[0].value || null) : null;
+        body.year_end = inputs[1] ? (inputs[1].value || null) : null;
+      }
+    }
+    var resp = await fetch('/competitors/mark/' + markId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var d = await resp.json();
+    if (d.success) {
+      var indicator = document.getElementById('saved-' + markId);
+      if (indicator) { indicator.style.opacity = '1'; setTimeout(function(){ indicator.style.opacity = '0'; }, 1500); }
+      // Reload after saving year fields to update needs_review status
+      if (field === 'year_start' || field === 'year_end') {
+        setTimeout(loadMarks, 800);
+      }
+    }
+  } catch (e) { console.error('saveField error:', e); }
 }
 
 loadMarks();
