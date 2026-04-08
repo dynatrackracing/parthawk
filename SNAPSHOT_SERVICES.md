@@ -1,5 +1,5 @@
 # SNAPSHOT_SERVICES.md
-Generated 2026-04-06
+Generated 2026-04-07
 
 ## Core Services
 
@@ -72,7 +72,9 @@ Generated 2026-04-06
 
 ### ScoutAlertService.js
 - Purpose: Generates yard-vehicle alerts by matching want-list parts, sold history, and marks against active yard inventory
-- Key methods: `generateAlerts()` (concurrency-guarded), `scoreMatch()`, `scoreMarkMatch()`, `hasModelConflict()`
+- Key methods: `generateAlerts()` (concurrency-guarded), `scoreMatch()`, `scoreMarkMatch()`, `getMarkVehicle()`, `hasModelConflict()`
+- **Mark matching (2026-04-07 rewrite):** `getMarkVehicle(mark)` reads structured columns (year_start, year_end, make, model) from the_mark row instead of parsing title at match time. Engine still extracted from title. `needs_review` marks excluded from alert generation (filtered in the_mark query).
+- **Year is a HARD GATE in scoreMarkMatch():** No structured year on mark → no match. No vehicle year → no match. Out of range → no match. No more silent fallthrough when year is null.
 - **Yard filtering:** Only is_core yards + yards on active Flyway trips
 - **Part-type-sensitive confidence:** PART_TYPE_SENSITIVITY map — ECM/PCM/THROTTLE=engine, ABS=drivetrain, AMP/RADIO/NAV=trim, BCM/TIPM/CLUSTER=universal
 - **Confidence:** HIGH=verified match, MEDIUM=unknown attribute, LOW=mismatch. Engine displacement + named engine + cylinder comparison. Drivetrain 4WD/2WD check. Trim premium audio vs base.

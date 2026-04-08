@@ -1,12 +1,12 @@
 # SNAPSHOT_LIBS.md
-Generated 2026-04-06
+Generated 2026-04-07
 
 ## service/utils/
 
 ### partIntelligence.js
 **Purpose:** Unified matching engine for DarkHawk. Single source for PN extraction, stock counting, model matching, year parsing. Used by DAILY FEED, HAWK EYE, THE QUARRY, SCOUR STREAM, SCOUT ALERTS.
 **Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
-**Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`).
+**Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`), `./yearParser` (for `parseYearRange` — re-exported).
 **Key behavior:**
 - `extractPartNumbers(text)` — Ford 3-segment dash patterns (`/\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}-[A-Z]{1,3}\b/`) + dashless Ford + 2-segment Ford + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/`).
 - `computeBase(raw)` — Internal (not exported). Uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs.
@@ -24,12 +24,22 @@ Generated 2026-04-06
 ### partMatcher.js
 **Purpose:** Shared part number recognition and matching. Canonical source for `normalizePartNumber()`.
 **Exports:** `extractPartNumbers`, `extractYearsFromTitle`, `normalizePartNumber`, `parseTitle`, `findSimilarPartNumbers`, `matchPartToListings`, `matchPartToSales`, `matchPartToYardVehicles`, `loadModelsFromDB`, `MAKES`, `MODELS`, `PART_PHRASES`
-**Dependencies:** `../database/database`, `../lib/logger`
+**Dependencies:** `../database/database`, `../lib/logger`, `./yearParser` (for `parseYearRange` used by `parseTitle` and `extractYearsFromTitle`)
 **Key behavior:**
 - `normalizePartNumber(pn)` — Canonical OEM revision suffix stripper. Ford dash-style with 1-3 char suffix (AL3T-15604-BD → AL3T-15604, 7L3A-12A650-GJH → 7L3A-12A650), Chrysler/GM trailing alpha (68269652AA → 68269652), Honda sub-revision, Toyota revision, generic 2-alpha tail. **Used by CacheService for dedup, computeBase() in partIntelligence.js, and frontend normalizePN() for matching.**
 - `extractPartNumbers(title)` — OEM-specific regex patterns (chrysler, ford, honda, toyota, nissan, gm, bosch, bmw). Returns `{raw, base, format}`. Deduplicates by base, keeps longer raw match.
 - `parseTitle(title)` — Extracts year range, make, models from any eBay/listing title. Used by ScoutAlertService for want-list matching.
 - `loadModelsFromDB()` — Loads Auto table models into cache organized by make. Sorted longest-first. Falls back to FALLBACK_MODELS (~120 entries).
+
+### yearParser.js
+**Purpose:** Canonical 2-digit and 4-digit year parser for DarkHawk. Single source of truth for parsing years from eBay listing titles. Created 2026-04-07 (commit 56774b6).
+**Exports:** `parseYearRange`, `twoDigitToFour`, `MAKE_NAMES`
+**Dependencies:** None (pure logic, no DB).
+**Key behavior:**
+- `parseYearRange(title)` — Returns `{start, end}` or null. 8 pattern tiers in priority order: (1) 4-digit dash range "2007-2011", (2) 2-digit dash range "07-11", (3) 4-digit space-separated "2005 2006", (4) 2-digit space-separated "97 98" with 80-99/00-35 wrap, (5) 2-digit slash range "07/11", (6) single 4-digit year "2014", (7) 2-digit at start of string + make following "94 Lexus", (8) standalone 2-digit mid-title before known make "REBUILT PROGRAMMED 94 LEXUS". Contextual safety: standalone 2-digit years only parse if followed by a known make within 3 words. False-positive guards for part numbers, model numbers, dimensions.
+- `twoDigitToFour(d)` — 80-99→1900+n, 00-35→2000+n, else null.
+- `MAKE_NAMES` — Set of ~50 lowercase make names for contextual validation.
+- **Consumers:** partIntelligence.js (re-exports parseYearRange), partMatcher.js (parseTitle year block + extractYearsFromTitle), AttackListService.js (extractYearRange), restock-want-list.js (extractYearsFromListingTitle), routes/attack-list.js (inline parser), markVehicleExtractor.js.
 
 ### partNumberExtractor.js
 **Purpose:** DEPRECATED. Original OEM part number extractor. Kept for backward compatibility; use partIntelligence.js.
@@ -103,6 +113,15 @@ Generated 2026-04-06
 ### partNumberUtils.js
 **Purpose:** Backward-compatibility re-export. Proxies `normalizePartNumber` and `extractPartNumbers` from `../utils/partMatcher`.
 **Exports:** `normalizePartNumber`, `extractPartNumbers`
+
+### markVehicleExtractor.js
+**Purpose:** Extract structured vehicle fields (year_start, year_end, make, model) from Mark title strings at insert time. Created 2026-04-07 (commit aadc310).
+**Exports:** `extractMarkVehicle`, `extractMarkVehicleWithFallback`
+**Dependencies:** `../utils/yearParser`, `../utils/partMatcher`
+**Key behavior:**
+- `extractMarkVehicle(title)` — Best-effort extraction from title. Uses `parseYearRange()` for year, `parseTitle()` for make/model. Sets `needs_review: true` if year cannot be determined. Returns `{year_start, year_end, make, model, needs_review}`.
+- `extractMarkVehicleWithFallback(title, known)` — Accepts pre-known structured values (e.g. from sky_watch_research.vehicle_year). Uses known values first, falls back to title parsing for gaps.
+- **Consumers:** competitors.js (POST /competitors/mark), opportunities.js (POST /mark, POST /mark-all-high), migration 20260407000001 (backfill).
 
 ### platformMatch.js
 **Purpose:** Platform cross-reference engine. Resolves shared-platform vehicles (e.g., Chrysler 300 matches Dodge Charger ECM sales).

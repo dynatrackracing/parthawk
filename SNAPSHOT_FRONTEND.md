@@ -1,5 +1,5 @@
 # SNAPSHOT_FRONTEND.md
-Generated 2026-04-06
+Generated 2026-04-07
 
 ## Shared Components
 
@@ -92,24 +92,28 @@ Generated 2026-04-06
 - **URL:** `/admin/the-mark`
 - **Nav key:** `mark`
 - **Search bar:** Sticky at top, 150ms debounce, client-side filter across partNumber/originalTitle/partType/source/notes. "Showing X of Y marks" count.
-- **Mark cards:** Source badges (SKY/PERCH), status badges (HUNTING/IN-YARD/LISTED/SOLD), IN WANT LIST badge, median price, part number, time ago.
+- **Mark cards:** Source badges (SKY/PERCH), status badges (HUNTING/IN-YARD/LISTED/SOLD), NEEDS REVIEW badge (yellow pulsing, for marks missing structured year), IN WANT LIST badge, median price, part number, time ago.
+- **Inline-editable fields (2026-04-07):** Year Start, Year End, Make, Model per card. onChange → PATCH /competitors/mark/:id. "Saved" indicator on success. Year save auto-clears needs_review. needs_review marks sort to top with yellow border.
 - **Buttons per card:** Find in Yard (pin-drop icon, inline yard results), Send to want list (if not already), Remove, Hide (✕ red).
 - **Find in Yard:** Hits POST /restock-want-list/find-in-yard with mark title. Shows matching yard vehicles inline (YMM/color/yard/row/set date). Toggle on/off.
 - **Hide flow:** hideMark() awaits POST /hidden/add, checks response, only deletes from the_mark on success. Reverts card on failure.
 - **Hidden parts:** Collapsible section at bottom. Lazy-loads /hidden/list, unhide per item.
-- **API:** `/competitors/marks`, `/restock-want-list/titles` (lightweight, no stock check), `/restock-want-list/find-in-yard`, `/competitors/mark/:id` (DELETE), `/restock-want-list/add`, `/hidden/add`, `/hidden/list`, `/hidden/:id` (DELETE)
+- **API:** `/competitors/marks`, `/restock-want-list/titles`, `/restock-want-list/find-in-yard`, `/competitors/mark/:id` (PATCH for edits, DELETE for removal), `/restock-want-list/add`, `/hidden/add`, `/hidden/list`, `/hidden/:id` (DELETE)
 
 ### restock-list.html (Scour Stream)
 - **URL:** `/admin/restock-list`
 - **Nav key:** `scour`
 - **Features:** Two tabs: WANT LIST (default) + OVERSTOCK. Add form: PN + Description + Make + Model + Notes. Inline edit (title/notes), pull/found-in-yard actions. Overstock: compact row layout, scan duplicates (scoped to overstock list), scan high-qty new. Auto-transition: overstock stock=0 creates want list entry.
-- **API:** `/restock-want-list/watchlist`, `/restock-want-list/items`, `/restock-want-list/add`, `/restock-want-list/delete`, `/restock-want-list/just-sold`, etc.
+- **Search (2026-04-07):** Sticky search input on Want List tab, 150ms debounce, client-side filter on title/notes/matchedTitles/matchDebug. "Showing X of Y items" count. Overstock tab unchanged.
+- **API:** `/restock-want-list/items`, `/restock-want-list/add`, `/restock-want-list/delete`, `/restock-want-list/pull`, `/restock-want-list/find-in-yard`, etc.
 
 ### restock.html (The Quarry)
 - **URL:** `/admin/restock`
 - **Nav key:** `quarry`
-- **Features:** Restock report with CRITICAL/LOW/WATCH tiers, period pills (7d/30d/60d/90d), found items tracking, hide-found toggle
-- **API:** `/restock/report`, `/restock/found-items`
+- **Features:** Restock report with RESTOCK NOW/STRONG BUY/CONSIDER tiers, period pills (7d/30d/60d/90d), found items tracking, hide-found toggle.
+- **Per-tier cap (2026-04-07):** Each tier independently sorted and capped at 100 rows (was global pageSize=100 that cut off lower tiers). Summary tiles show full unpaginated counts.
+- **FOUND from the_cache (2026-04-07):** FOUND tile reads from the_cache (Attack List claims) instead of bone_pile scout_alerts. Period-aware. Matches by part_number.
+- **API:** `/restock/report` (includes foundCount + foundMap inline)
 
 ### blocked-comps.html (Hidden / Blocked Comps)
 - **URL:** `/admin/blocked-comps`

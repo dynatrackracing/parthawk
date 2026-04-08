@@ -1,4 +1,4 @@
-Generated 2026-04-06
+Generated 2026-04-07
 
 # PartHawk Route Map
 
@@ -27,7 +27,7 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/cogs` | cogs.js | POST `/gate` `/session`, GET `/yard-profile/:yardId` `/yards` `/check-stock` |
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
-| `/restock` | restockReport.js | GET `/report` (paginated: page/pageSize, timeframe sort, CRITICAL upgrade) `/found-items`, POST `/quarry-sync` |
+| `/restock` | restockReport.js | GET `/report` (per-tier 100-row cap, FOUND from the_cache, timeframe sort) `/found-items` (legacy), POST `/quarry-sync` |
 | `/restock-want-list` | restock-want-list.js | GET `/items` `/titles` (lightweight, no stock check) `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
 | `/blocked-comps` | blocked-comps.js | POST `/block` (comp by itemId) `/block-sold` (by partType+year+make+model), DELETE `/by-id/:id` (unified restore) `/:itemId` (comp compat), GET `/` (list with ?search&type&limit&offset) |
 | `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
