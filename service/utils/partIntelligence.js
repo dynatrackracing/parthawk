@@ -71,6 +71,11 @@ function isSkipWord(s) {
 
 function stripRevisionSuffix(pn) {
   if (!pn) return pn;
+  // VAG (VW/Audi/Skoda/Seat/Porsche): suffix letters are variant identity, NOT revisions.
+  // Pattern: [digit][A-Z][digit] + 6 digits + optional 1-3 letter variant suffix.
+  // Examples: 1K0614517DT, 5C6035456A, 4F0907379, 8K0907379P
+  // NEVER strip — they distinguish non-interchangeable variants.
+  if (/^[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}$/.test(pn)) return pn;
   // Chrysler/Mopar: 56044691AA → 56044691, 68269652AD → 68269652
   if (/^\d{7,10}[A-Z]{2}$/.test(pn)) return pn.slice(0, -2);
   // GM with letter prefix: A12345678AA → A12345678

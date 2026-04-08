@@ -1,3 +1,17 @@
+# LAST SESSION — 2026-04-08
+
+## VAG PN collision diagnosis — 2026-04-08
+- BUG: Attack list shows "28 in stock" for VW Passat ABS 1K0 614 517 DT. We don't have 28 — we have ~17 DIFFERENT VW ABS pumps with distinct suffix codes (DT, EB, BD, AE, DJ, CT, CD, BJ, EJ, DL, ED, DB, BG) all collapsed to base `1K0614517`.
+- ROOT CAUSE CONFIRMED: `stripRevisionSuffix()` in partIntelligence.js line 87-90 catches VAG PNs via the generic catch-all: `if (pn.length >= 10 && /[A-Z]{1,2}$/.test(pn))` → strips trailing 1-2 alpha. This treats VW/Audi suffix codes (DT, EB, AE — which identify hydraulic/programming variants) as revision suffixes (like Chrysler AA/AB).
+- The comment on line 86 even says "Also catches: 5C6035456A (VW) where last A is a revision" — but VW suffixes are NOT revisions, they're variant identifiers.
+- `normalizePartNumber()` in partMatcher.js does NOT strip VW suffixes when they have dashes (1K0-614-517-DT → kept as-is). But Clean Pipe stores dashless `1K0614517DT`, which hits `stripRevisionSuffix()` → `1K0614517`.
+- Production data: 17 active listings, 41 YourSale records, 3 SoldItem records all collapsed to `partNumberBase = '1K0614517'`.
+- Q4 scope: 19 distinct VAG base PNs with multiple distinct titles — this is a catalog-wide issue, not just the one ABS pump.
+- Files involved: partIntelligence.js (stripRevisionSuffix, computeBase), partMatcher.js (normalizePartNumber, GENERIC_SUFFIX), AttackListService.js (buildStockIndex uses both).
+- FIX APPLIED: VAG pattern guard `^[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}$` added to top of stripRevisionSuffix() and normalizePartNumber(). Returns input unchanged for VAG PNs.
+- Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
+- Ford/Chrysler regression clean — assertions passed.
+
 # LAST SESSION — 2026-04-07
 
 ## Quarry display fixes — per-tier cap + FOUND from Cache — 2026-04-07

@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## VAG Part Number Suffix Preservation — 2026-04-08
+- VAG (VW/Audi/Skoda/Seat/Porsche) PNs match `[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}` — suffix letters are variant identity, not revisions
+- VAG guard added to stripRevisionSuffix() and normalizePartNumber() — returns unchanged before any stripper runs
+- Backfilled 453 rows across YourListing/YourSale/SoldItem with corrected partNumberBase
+- Fixes 1K0 614 517 DT showing 28 in stock when actual is 1-3 (11 distinct variants now split)
+- Files: partIntelligence.js, partMatcher.js, backfill-vag-pn-base.js (new)
+
+---
+
 ## Quarry Display Fixes — Per-Tier Cap + FOUND from Cache — 2026-04-07
 - Per-tier 100-row cap replaces global pageSize=100 pagination (all 3 tiers now render at 30d+)
 - FOUND tile wired to the_cache instead of bone_pile scout_alerts; period-aware, PN-keyed

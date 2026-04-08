@@ -106,6 +106,11 @@ function normalizePartNumber(pn) {
   pn = pn.trim().toUpperCase().replace(/\s+/g, '');
   if (pn.length < 4) return pn;
 
+  // VAG (VW/Audi/Skoda/Seat/Porsche): suffix letters are variant identity, NOT revisions.
+  // Normalize dashed/spaced form first (1K0-614-517-DT → 1K0614517DT), then preserve full PN.
+  const vagDashless = pn.replace(/[-]/g, '');
+  if (/^[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}$/.test(vagDashless)) return vagDashless;
+
   // Ford: AL3T-15604-BD → AL3T-15604
   if (pn.includes('-')) {
     const ford = pn.match(FORD_SUFFIX);
