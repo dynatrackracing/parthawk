@@ -587,8 +587,21 @@
         html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;${sectionStyle}">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
         const BATCH = 30;
+        let lastTier = null;
         for (let i = 0; i < Math.min(BATCH, vehiclesToRender.length); i++) {
-          html += renderVehicle(vehiclesToRender[i]);
+          const veh = vehiclesToRender[i];
+          if (veh.tier && veh.tier !== lastTier) {
+            const tierCfg = veh.tier === 'SCOUT_ALERTS' ? { icon:'\uD83C\uDFAF', title:'SCOUT ALERTS', sub:'Want list matches at this yard. Pull these first.', color:'#FFD700' }
+              : veh.tier === 'SOLD' ? { icon:'\uD83D\uDCE6', title:'SOLD', sub:'Proven demand from your sales history.', color:'#4CAF50' }
+              : { icon:'\uD83D\uDD01', title:'COMPETITOR INTEL', sub:'Competitors stock these parts. Restock opportunity.', color:'#2979ff' };
+            const tierCount = vehiclesToRender.filter(x => x.tier === veh.tier).length;
+            html += `<div style="padding:10px 14px;margin:4px 0;border-top:2px solid ${tierCfg.color};border-bottom:1px solid #2a2a2a;background:#0d0d0d">
+              <div style="font-size:13px;font-weight:800;color:${tierCfg.color};letter-spacing:0.05em">${tierCfg.icon} ${tierCfg.title} <span style="font-weight:400;font-size:11px;color:#6B7280">${tierCount} vehicle${tierCount !== 1 ? 's' : ''}</span></div>
+              <div style="font-size:10px;color:#6B7280;margin-top:2px">${tierCfg.sub}</div>
+            </div>`;
+            lastTier = veh.tier;
+          }
+          html += renderVehicle(veh);
         }
         if (vehiclesToRender.length > BATCH) {
           const sectionId = 'lazy-' + yd.yard.id + '-' + sec.label.replace(/\s+/g, '');
@@ -741,13 +754,19 @@
     if (v.setDateLabel) metaParts.push(v.setDateLabel);
     const line3 = `<div style="font-size:11px;color:#6B7280;margin-top:3px">${metaParts.join(' · ')}${newBadge}${goneLabel}</div>`;
 
+    // Tier badge
+    const tierBadge = v.tier === 'SCOUT_ALERTS' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#FFD700;color:#000;margin-left:4px">\uD83C\uDFAF SA</span>'
+      : v.tier === 'SOLD' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#4CAF50;color:#fff;margin-left:4px">\uD83D\uDCE6 SOLD</span>'
+      : '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#2979ff;color:#fff;margin-left:4px">\uD83D\uDD01 INTEL</span>';
+    const scoreDisplay = v.tier === 'SCOUT_ALERTS' && v.tierScore ? `${v.score} <span style="opacity:0.6;font-size:10px">/ SA ${v.tierScore}</span>` : String(v.score || 0);
+
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
-        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${v.score}</div>
+        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${scoreDisplay}</div>
         <div class="v-info" style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
             <div style="min-width:0">
-              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}${rarityInline}</div>
+              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${tierBadge}${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}${rarityInline}</div>
             </div>
             ${v.est_value > 0 ? `<div style="font-size:14px;font-weight:700;color:${valColor};flex-shrink:0">$${v.est_value}</div>` : ''}
           </div>

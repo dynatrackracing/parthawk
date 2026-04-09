@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Deploy B Part 2: Daily Feed Visual Sectioning — 2026-04-09
+- Section headers (SCOUT ALERTS/SOLD/COMPETITOR INTEL) + per-card tier badges on attack-list.html. Deploy B complete.
+
+---
+
 ## Deploy B Part 1: Attack List Tier Assignment — 2026-04-09
 - Vehicles get tier field (SCOUT_ALERTS/SOLD/COMPETITOR_INTEL). Scout alerts hard bucket at score >= 60. Sort by tier then score.
 

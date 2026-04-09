@@ -40,6 +40,14 @@
 - Sort: active first, then tier rank, then score within tier
 - Frontend Part 2 next for visual tier headers + badges
 
+## Deploy B Part 2: Daily Feed visual sectioning -- 2026-04-09
+- attack-list.html renders SCOUT ALERTS / SOLD / COMPETITOR INTEL section headers inline
+- Tier badge on Line 1 of every vehicle card (gold SA / green SOLD / blue INTEL)
+- SCOUT_ALERTS cards show secondary tierScore next to main score ("155 / SA 90")
+- Section headers inject where tier changes in the sorted vehicle list
+- Empty tiers silently skipped
+- Deploy B complete: Deploy A scoring visible to pullers on Daily Feed
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
