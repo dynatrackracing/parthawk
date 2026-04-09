@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Session Close 2026-04-08 -- 20+ commits across Scout Alerts
+- Security lockdown (rule 42), intel source icons (rule 43), Deploy A scoring rewrite (rule 44), two UI cleanup passes, reasons render fix
+- Scout Alerts now produces numeric 0-100 match scores with full reasons, calibrated against real fleet data via two dry-run HALT cycles
+- Known gaps: transmission matching not yet in computeMatchScore, vehicle-centric page refactor still needed, Deploy B (attack list wiring) still needed
+- Full details in LAST_SESSION.md 2026-04-08 section
+
+---
+
 ## Intel Source Icons: Fire / Target / Repeat — 2026-04-08
 - renderIntelIcon() helper in dh-parts.js, fire pulse CSS in dh-parts.css
 - attack-list.html chip rendering uses emoji icons: Target=Mark, Fire=Quarry, Repeat=Stream, X=Over

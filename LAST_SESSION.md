@@ -248,6 +248,65 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
   * Bessler/Bluegrass/Raceway scrapers don't capture LKQ-equivalent set dates — future rows drift until fixed
   * Generation-aware vehicle rarity (vehicle_frequency conflates gen boundaries — trim CSV needed)
 
+## 2026-04-08 -- Full day session close
+
+### What shipped today (chronological)
+
+1. **Security lockdown (rule 42)** -- 5 eBay write POST endpoints return 410 Gone (/run, /revise-price, /end-item, /relist-item, /bulk-end). StaleInventoryService Wed 3am cron commented out. Carcass page read-only diagnostic. TradingAPI + StaleInventory dead code flagged as rediscovery risk.
+
+2. **Intel source icons (rule 43)** -- renderIntelIcon() in dh-parts.js. Priority Mark > Quarry > Stream > Over. Wired into both Scout Alerts and Attack List.
+
+3. **Deploy A -- Scout Alert scoring rewrite (rule 44)** -- 12 commits:
+   - Commit 1 bug fix: PART_TYPE_SENSITIVITY default ['engine'] to [] (single highest-leverage fix, resolved 92% false HIGH cluster)
+   - Migration: decoded_cylinders on yard_vehicle, match_score + match_reasons jsonb on scout_alerts
+   - LocalVinDecoder persists cylinder count from vPIC
+   - vPIC backfill: 8,664/9,803 vehicles (88%), 5 min, 0 errors
+   - decoderCapability.js: per-make profile + named engines + ceilings
+   - computeMatchScore(): numeric 0-100 with reasons array, year hard gate, cylinder/named/displacement engine matching, diesel hard signal, per-make graceful unknowns, part-type ceilings
+   - Dry-run V1 caught join bug, HALT
+   - Dry-run V2 validated distribution after fix
+   - Tuned: engine-sensitive baseline to 55, attack list threshold to 50
+   - Rescored 5,948 alerts, 2 hard-gated deleted
+   - scout-alerts.html: numeric score badges + reasons toggle
+
+4. **Scout Alerts UI cleanup pass 1** -- Backend post-query vehicle attribute lookup (no row multiplication). Frontend shows decoded engine, trans, drivetrain (color) + trim badge inline on vehicle line. match_reasons collapsed behind toggle.
+
+5. **Scout Alerts quick fixes pass** -- Engine display rounds "2.480000L" to "2.5L" on render (frontend only, DB untouched). YMM baseline reason stripped from display (zero information value, appeared on every alert).
+
+6. **Scout Alerts reasons render fix** -- Diagnosed and fixed real root cause: scoreMatch() and scoreMarkMatch() were writing reasons.join('; ') to the notes column, causing reasons to render twice (inline yellow italic AND behind toggle). Both now write notes: null. Cleared 5,955 polluted rows in production. The notes column is now clean and available for real diagnostic strings if a future code path wants to write them.
+
+### Deploy A calibration results (final)
+
+- 5,948 alerts rescored
+- Distribution: 3,380 in 50-59 (baseline band), 943 in 60-69 (MED-HIGH with positive signal), 404 in 80-89 (verified multi-signal hot leads), rest spread across other bands
+- Engine match fired 496 times, mismatch 293, diesel rejection working (-80 kills a diesel-part-on-gas-vehicle)
+- PERCH (Mark) alerts average 60, other sources average 45-48 (Marks score higher because they have better year/make/model precision)
+
+### Known open items -- in order of priority
+
+1. **Vehicle-centric Scout Alerts refactor** -- highest priority tomorrow. Page is currently part-centric: one physical vehicle with N matching parts renders as N cards. Needs to become one card per vehicle with part list inside.
+
+2. **Transmission matching in computeMatchScore** -- Deploy A gap. Owner observed MT to AT mismatches in the wild. decoded_transmission exists at 85-98% per make. ~30 line add: new extractTransmission helper, transmission PHASE in computeMatchScore with +25/-60 weights mirroring the engine path.
+
+3. **Deploy B -- Attack List tier restructure** -- reads from scout_alerts for Tier 1 INTENT placement (score >= 50). Tier 2 HISTORY from sold history. Tier 3 COMP from market prices only. Deploy B is the payoff -- pullers finally SEE the benefit of Deploy A on their daily feed.
+
+### Known gaps and side quests (logged, not blocking)
+
+- restock_want_list source table dedup (Layer 3). Same partNumberBase appears as multiple rows in the Stream and sometimes as both Stream and Quarry. Separate thread.
+- restock_want_list make/model/part_number columns are 100% NULL across all active rows. Non-blocking (title parsing works).
+- Cache-aware stock counting. Every code path that checks "how many do I have" should union YourListing + The Cache. Priority: medium, after Deploy B.
+- Raw engine column NHTSA garbage on yard_vehicle ("174cyl", "312cyl" type values). decoded_engine is clean; cosmetic tech debt.
+- decoded_engine float precision in DB. 9.5% of rows store raw values like "2.480000L". Frontend rounds on render. DB cleanup migration deferred.
+- TradingAPI.js + StaleInventoryService.js dead write methods remain on disk. Rule 42 forbids re-enabling.
+
+### Status at session close
+
+- DarkHawk Scout Alerts: substantially smarter than 18 hours ago. Numeric scoring, year-gated, engine-aware, diesel-aware, per-make capability-aware, calibrated via two dry-run cycles, reasons render cleanly, decoded vehicle attributes visible.
+- Attack List: unchanged. Deploy B tomorrow wires it to the new scoring.
+- Security posture: no code path writes to eBay listings. Rule 42.
+- Railway health: good.
+- Commits today: 20+ across security, icons, Deploy A scoring (12), and three UI cleanup passes.
+
 # LAST SESSION — 2026-04-07
 
 ## Quarry display fixes — per-tier cap + FOUND from Cache — 2026-04-07
