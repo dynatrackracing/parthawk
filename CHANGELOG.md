@@ -4,6 +4,12 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Vehicle-Centric Scout Alerts Frontend Rebuild — 2026-04-09
+- One card per vehicle, collapsed by default, expand to see part groups
+- Hard/soft dedup, per-row claim, summary tiles, pagination at vehicle level
+
+---
+
 ## Vehicle-Centric Scout Alerts Backend Reshape — 2026-04-09
 - /scout-alerts/list returns one entry per vehicle with nested parts array, hard/soft dedup, soldLifetime from SoldItem
 

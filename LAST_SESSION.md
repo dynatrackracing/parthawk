@@ -9,6 +9,16 @@
 - Pagination at vehicle level (50 per page)
 - Frontend not touched yet -- Part 2 prompt next
 
+## Vehicle-centric Scout Alerts refactor -- frontend rebuild -- 2026-04-09
+- /admin/scout-alerts now renders one card per vehicle, collapsed by default
+- Expand reveals part groups: hard rows per partNumberBase, soft rows per partType with PN breakdown
+- Per-row claim hits /cache/claim with first alertId
+- Vehicle header: score badge + YMM + engine + trans + drivetrain + source icon + expand count
+- Line 2: trim badge + color + row + set date + NEW badge
+- Collapse note shows "N raw alerts collapsed to M part groups" when alert_count > row count
+- Hide-pulled hides vehicles where every row is claimed
+- Tech debt: BCM_nopn bucket name + soldLifetime semantic mismatch between hard and no-PN rows
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
