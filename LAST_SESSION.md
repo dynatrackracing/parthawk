@@ -79,6 +79,12 @@
 - Vehicle sort now correctly counts sold-path parts toward maxYourSalePart
 - item_reference parts contribute $0 to sort value (frozen data, decorative only)
 
+## Bug A fix: junk PN tokens in SKIP_WORDS -- 2026-04-09
+- ANTILOCK, REARMOUNTED, BRAKE, PUMP, HYDRAULIC added to extractPartNumbers SKIP_WORDS
+- Root cause: "ANTILOCK" extracted as PN from ABS listing titles, creating a cross-make stock bucket of 28 listings
+- Cleared 260 junk PNB rows across YourListing (30), YourSale (185), SoldItem (45)
+- Stock counts on ABS parts now reflect real per-variant stock
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

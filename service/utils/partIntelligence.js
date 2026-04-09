@@ -25,6 +25,8 @@ const SKIP_WORDS = new Set([
   'WORKING', 'PULLED', 'REMOVED', 'CLEANED', 'ORIGINAL',
   'FACTORY', 'CONDITION', 'PLAY', 'PLUG', 'COMPATIBLE',
   'DIRECT', 'REMAN', 'REFURBISHED', 'REBUILT',
+  // Junk tokens extracted as PNs from ABS/brake/body part titles (Bug A fix 2026-04-09)
+  'ANTILOCK', 'REARMOUNTED', 'BRAKE', 'PUMP', 'HYDRAULIC',
 ]);
 
 const MAKES_MODELS = new Set([

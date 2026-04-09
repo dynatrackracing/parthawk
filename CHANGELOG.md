@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Bug A Fix: Junk PN Tokens in SKIP_WORDS — 2026-04-09
+- ANTILOCK/REARMOUNTED/BRAKE/PUMP/HYDRAULIC added to extractPartNumbers SKIP_WORDS. Cleared 260 junk PNB rows. Fixes "28 in stock" on ABS parts.
+
+---
+
 ## Commit 1 Fix #2: Trust priceSource=sold for ValueSource — 2026-04-09
 - Sales-path parts are partNumber:null by design. Trust legacy priceSource='sold' instead of parallel YourSale lookup.
 
