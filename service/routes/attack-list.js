@@ -144,11 +144,18 @@ router.get('/vehicle/:id/parts', async (req, res) => {
     const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
 
     // Enrich parts with YourSale 90d data + value source fields
-    const partPNBs = (scored.parts || []).filter(p => p.partNumber).map(p => p.partNumber);
+    // Normalize PNs to match YourSale.partNumberBase (Clean Pipe: normalizePartNumber + strip dashes)
+    const { normalizePartNumber: _normPN } = require('../lib/partNumberUtils');
+    function toYSKey(pn) {
+      if (!pn) return null;
+      const n = _normPN(pn);
+      return n ? n.replace(/[-\s.]/g, '').toUpperCase() : pn.replace(/[-\s.]/g, '').toUpperCase();
+    }
+    const partPNBs = (scored.parts || []).filter(p => p.partNumber).map(p => toYSKey(p.partNumber)).filter(Boolean);
     const ysMap = await service.getYourSalePriceMap(partPNBs);
     for (const p of (scored.parts || [])) {
-      const pnUp = (p.partNumber || '').toUpperCase();
-      const ys = pnUp ? ysMap.get(pnUp) : null;
+      const pnNorm = toYSKey(p.partNumber);
+      const ys = pnNorm ? ysMap.get(pnNorm) : null;
       p.isExcluded = isExcludedPart(p.title || '');
       p.yourSalePrice = ys ? ys.avg : null;
       p.yourSaleCount = ys ? ys.count : 0;

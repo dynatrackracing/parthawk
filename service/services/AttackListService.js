@@ -1943,10 +1943,18 @@ class AttackListService {
       );
 
       // Collect all partNumberBases across scored vehicles for YourSale batch lookup
+      // Normalize via normalizePartNumber + strip dashes to match Clean Pipe partNumberBase
+      const { normalizePartNumber: _normForYS } = require('../lib/partNumberUtils');
+      function toYSKey(pn) {
+        if (!pn) return null;
+        const normed = _normForYS(pn);
+        return normed ? normed.replace(/[-\s.]/g, '').toUpperCase() : pn.replace(/[-\s.]/g, '').toUpperCase();
+      }
       const allPNBs = new Set();
       for (const sv of scored) {
         for (const p of (sv.parts || [])) {
-          if (p.partNumber) allPNBs.add(p.partNumber.toUpperCase());
+          const k = toYSKey(p.partNumber);
+          if (k && k.length >= 4) allPNBs.add(k);
         }
       }
       const yourSaleMap = await this.getYourSalePriceMap(Array.from(allPNBs));
@@ -1956,8 +1964,8 @@ class AttackListService {
         let maxYS = 0, ysEstValue = 0;
         for (const p of (sv.parts || [])) {
           if (isExcludedPart(p.title || '')) { p._ysValue = 0; continue; }
-          const pnUp = (p.partNumber || '').toUpperCase();
-          const ys = pnUp ? yourSaleMap.get(pnUp) : null;
+          const pnNorm = toYSKey(p.partNumber);
+          const ys = pnNorm ? yourSaleMap.get(pnNorm) : null;
           const ysPrice = ys ? ys.avg : 0;
           p._ysValue = ysPrice;
           p.yourSalePrice = ys ? ys.avg : null;

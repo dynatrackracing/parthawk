@@ -66,6 +66,12 @@
 - Frontend: expanded view shows "(market est)" on market-only prices, dual display when both yoursale + market exist
 - 813 distinct PNBs in YourSale 90d, 40% of vehicles have sold history
 
+## Commit 1 fix: PN normalization in YourSale lookup -- 2026-04-09
+- Root cause: scoreVehicle() parts carried raw manufacturerPartNumber with spaces/dashes ("1K0 614 517 DT"); YourSale.partNumberBase is Clean Pipe normalized ("1K0614517DT")
+- Fix: normalize via normalizePartNumber() + strip dashes at all caller sites before passing to getYourSalePriceMap
+- getYourSalePriceMap stays dumb; caller normalizes
+- valueSource = 'yoursale' now fires correctly, dual display "$avg mkt $median" now visible
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

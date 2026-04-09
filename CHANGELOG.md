@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Commit 1 Fix: YourSale PN Normalization — 2026-04-09
+- Raw manufacturerPartNumber had spaces/dashes; YourSale.partNumberBase is Clean Pipe normalized. Lookup now normalizes first.
+
+---
+
 ## Attack List Redesign Commit 1: YourSale-Driven Value + Sort — 2026-04-09
 - Vehicle sort by max YourSale 90d price (non-excluded parts only). market_demand_cache decorative. Excluded parts $0.
 
