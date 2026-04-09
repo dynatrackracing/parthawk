@@ -60,12 +60,16 @@ class CompetitorDripRunner {
           maxPages,
         });
 
-        // Update seller stats
-        await database('SoldItemSeller').where('name', seller.name).update({
-          lastScrapedAt: new Date(),
-          itemsScraped: (seller.itemsScraped || 0) + (result.stored || 0),
-          updatedAt: new Date(),
-        });
+        // Update seller stats — only advance lastScrapedAt on successful scrapes
+        if ((result.stored || 0) > 0) {
+          await database('SoldItemSeller').where('name', seller.name).update({
+            lastScrapedAt: new Date(),
+            itemsScraped: (seller.itemsScraped || 0) + result.stored,
+            updatedAt: new Date(),
+          });
+        } else {
+          this.log.warn({ seller: seller.name, scraped: result.scraped }, 'Scraper returned 0 stored items, lastScrapedAt NOT advanced');
+        }
 
         this.log.info({ seller: seller.name, maxPages, stored: result.stored, scraped: result.scraped }, 'Drip scrape complete');
         results.push({ seller: seller.name, maxPages, ...result });

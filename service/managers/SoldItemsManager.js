@@ -67,13 +67,17 @@ class SoldItemsManager {
           results.stored += sellerResult.stored;
           results.errors += sellerResult.errors;
 
-          // Update seller stats
-          await SoldItemSeller.query()
-            .findById(seller.name)
-            .patch({
-              itemsScraped: seller.itemsScraped + sellerResult.stored,
-              lastScrapedAt: new Date(),
-            });
+          // Update seller stats — only advance lastScrapedAt on successful scrapes
+          if (sellerResult.stored > 0) {
+            await SoldItemSeller.query()
+              .findById(seller.name)
+              .patch({
+                itemsScraped: seller.itemsScraped + sellerResult.stored,
+                lastScrapedAt: new Date(),
+              });
+          } else {
+            this.log.warn({ seller: seller.name, scraped: sellerResult.scraped }, 'Scraper returned 0 stored items, lastScrapedAt NOT advanced');
+          }
         } catch (err) {
           this.log.error({ err, seller: seller.name }, 'Error scraping seller');
           results.byCompetitor[seller.name] = { scraped: 0, stored: 0, errors: 1 };

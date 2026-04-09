@@ -920,14 +920,18 @@ router.post('/:sellerId/scrape', async (req, res) => {
     });
     log.info({ seller: sellerName, result }, 'Manual competitor scrape complete');
 
-    // Update seller stats (was missing — #7)
-    try {
-      await database('SoldItemSeller').where('name', sellerName).update({
-        lastScrapedAt: new Date(),
-        itemsScraped: database.raw('"itemsScraped" + ?', [result.stored]),
-        updatedAt: new Date(),
-      });
-    } catch (e) { log.warn({ err: e.message, seller: sellerName }, 'Could not update seller stats'); }
+    // Update seller stats — only advance lastScrapedAt on successful scrapes
+    if (result.stored > 0) {
+      try {
+        await database('SoldItemSeller').where('name', sellerName).update({
+          lastScrapedAt: new Date(),
+          itemsScraped: database.raw('"itemsScraped" + ?', [result.stored]),
+          updatedAt: new Date(),
+        });
+      } catch (e) { log.warn({ err: e.message, seller: sellerName }, 'Could not update seller stats'); }
+    } else {
+      log.warn({ seller: sellerName, scraped: result.scraped }, 'Scraper returned 0 stored items, lastScrapedAt NOT advanced');
+    }
   } catch (err) {
     log.error({ err: err.message, seller: sellerName }, 'Manual competitor scrape failed');
   } finally {
