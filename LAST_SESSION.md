@@ -1,4 +1,15 @@
-# LAST SESSION — 2026-04-08
+# LAST SESSION -- 2026-04-09
+
+## Vehicle-centric Scout Alerts refactor -- backend reshape -- 2026-04-09
+- /scout-alerts/list now returns one entry per vehicle (composite key: year+make+model+yard) with nested parts array
+- Hard dedup: ECM/PCM/ECU/BCM/TCM/TIPM/ABS/AIRBAG/SRS -- one row per partNumberBase
+- Soft dedup: all other types -- one row per partType with partNumberBreakdown
+- soldHere from scout_alerts count, soldLifetime from SoldItem (batched)
+- Headline source = highest priority, headline score = max match_score
+- Pagination at vehicle level (50 per page)
+- Frontend not touched yet -- Part 2 prompt next
+
+# LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
 - NOT A BUG — expected behavior when no new vehicles arrived today

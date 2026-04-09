@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Vehicle-Centric Scout Alerts Backend Reshape — 2026-04-09
+- /scout-alerts/list returns one entry per vehicle with nested parts array, hard/soft dedup, soldLifetime from SoldItem
+
+---
+
 ## Competitor Scraper Repair — Data Fix + lastScrapedAt Discipline — 2026-04-08
 - Two SoldItemSeller rows had bad names (typo + store slug instead of seller username);
   replaced via DELETE+INSERT with correct _ssn values.

@@ -3,6 +3,10 @@
 const router = require('express-promise-router')();
 const { database } = require('../database/database');
 const { generateAlerts } = require('../services/ScoutAlertService');
+const { detectPartType, extractPartNumbers } = require('../utils/partIntelligence');
+
+const HARD_PART_TYPES = new Set(['ECM','PCM','ECU','BCM','TCM','TIPM','ABS','AIRBAG MODULE','SRS MODULE']);
+const SOURCE_PRIORITY = { PERCH: 4, bone_pile: 3, hunters_perch: 2, restock: 2, OVERSTOCK: 1 };
 
 // Hard age ceilings
 const BONE_MAX_DAYS = 90;
@@ -81,127 +85,198 @@ router.get('/list', async (req, res) => {
     return q;
   }
 
-  // Get paginated alerts
+  // Load ALL filtered alerts (pagination at vehicle level, not row level)
   let alertQuery = knex('scout_alerts');
   alertQuery = applyFilters(alertQuery);
-  const alerts = await alertQuery
-    .orderByRaw(`CASE WHEN claimed = true THEN 1 ELSE 0 END`)
-    .orderByRaw(`COALESCE(match_score, 0) DESC`)
-    .orderBy('part_value', 'desc')
-    .offset((page - 1) * perPage)
-    .limit(perPage);
+  const allAlerts = await alertQuery;
 
-  // Get total count with same filters
-  let countQuery = knex('scout_alerts');
-  countQuery = applyFilters(countQuery);
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count) || 0;
-
-  // Get last generated timestamp
   const meta = await knex('scout_alerts_meta').where('key', 'last_generated').first();
   const lastGenerated = meta ? meta.value : null;
 
-  // Enrich alerts with decoded vehicle attributes (one lookup per unique vehicle key)
-  const vehicleKeys = new Set();
-  for (const a of alerts) {
-    if (a.vehicle_year && a.vehicle_make && a.vehicle_model && a.yard_name) {
-      vehicleKeys.add([a.vehicle_year, a.vehicle_make, a.vehicle_model, a.yard_name].join('|'));
-    }
+  // --- Build yard lookup for vehicle resolution ---
+  const yardRows = await knex('yard').select('id', 'name');
+  const yardIdByName = {};
+  for (const y of yardRows) yardIdByName[y.name.toLowerCase()] = y.id;
+
+  // --- Group alerts by vehicle composite key ---
+  const vehicleGroups = {};
+  for (const a of allAlerts) {
+    const vKey = [a.vehicle_year, a.vehicle_make, a.vehicle_model, a.yard_name].join('|');
+    if (!vehicleGroups[vKey]) vehicleGroups[vKey] = { alerts: [], key: vKey };
+    vehicleGroups[vKey].alerts.push(a);
   }
-  const vehicleMap = {};
-  if (vehicleKeys.size > 0) {
+
+  // --- Resolve yard_vehicle attributes per group ---
+  const vehicleAttrMap = {};
+  for (const vKey of Object.keys(vehicleGroups)) {
+    const [yr, mk, md, yn] = vKey.split('|');
+    const yardId = yardIdByName[(yn || '').toLowerCase()];
+    if (!yardId) continue;
     try {
-      const yardRows = await knex('yard').select('id', 'name');
-      const yardIdByName = {};
-      for (const y of yardRows) yardIdByName[y.name.toLowerCase()] = y.id;
-
-      for (const key of vehicleKeys) {
-        const [yr, mk, md, yn] = key.split('|');
-        const yardId = yardIdByName[(yn || '').toLowerCase()];
-        if (!yardId) continue;
-        const v = await knex('yard_vehicle')
-          .where({ yard_id: yardId, active: true })
-          .whereRaw("year::text = ?", [yr])
-          .whereRaw("UPPER(make) = UPPER(?)", [mk])
-          .whereRaw("UPPER(model) = UPPER(?)", [md])
-          .select('decoded_engine', 'decoded_transmission', 'decoded_drivetrain', 'trim_tier')
-          .first();
-        if (v) vehicleMap[key] = v;
-      }
-    } catch (e) { /* yard_vehicle join failed — non-fatal, attributes just won't show */ }
-  }
-  for (const a of alerts) {
-    const key = [a.vehicle_year, a.vehicle_make, a.vehicle_model, a.yard_name].join('|');
-    const v = vehicleMap[key];
-    if (v) {
-      a.vehicle_engine = v.decoded_engine || null;
-      a.vehicle_transmission = v.decoded_transmission || null;
-      a.vehicle_drivetrain = v.decoded_drivetrain || null;
-      a.vehicle_trim_tier = v.trim_tier || null;
-    }
+      const v = await knex('yard_vehicle')
+        .where({ yard_id: yardId, active: true })
+        .whereRaw("year::text = ?", [yr])
+        .whereRaw("UPPER(make) = UPPER(?)", [mk])
+        .whereRaw("UPPER(model) = UPPER(?)", [md])
+        .select('id', 'decoded_engine', 'decoded_transmission', 'decoded_drivetrain', 'trim_tier', 'row_number', 'color', 'date_added')
+        .first();
+      if (v) vehicleAttrMap[vKey] = v;
+    } catch (e) { /* skip */ }
   }
 
-  // Group by yard
-  const byYard = {};
-  for (const a of alerts) {
-    const y = a.yard_name || 'Unknown';
-    if (!byYard[y]) byYard[y] = [];
-    byYard[y].push(a);
+  // --- Extract partType + partNumberBase from each alert title ---
+  for (const a of allAlerts) {
+    a._partType = detectPartType(a.source_title) || 'OTHER';
+    const pns = extractPartNumbers(a.source_title);
+    a._pnBase = (pns[0] && pns[0].base) ? pns[0].base.toUpperCase() : null;
   }
 
-  // Yard counts with same filters
-  let yardCountQuery = knex('scout_alerts');
-  yardCountQuery = applyFilters(yardCountQuery);
-  const yardCounts = await yardCountQuery
-    .select('yard_name').count('* as count').groupBy('yard_name').orderBy('count', 'desc');
-
-  // Source counts with same filters — show unique parts, not raw alert rows
-  let srcQuery = knex('scout_alerts');
-  srcQuery = applyFilters(srcQuery);
-  const sourceCounts = await srcQuery
-    .select('source')
-    .count('* as count')
-    .countDistinct('source_title as unique_parts')
-    .groupBy('source');
-  const boneCount = parseInt((sourceCounts.find(s => s.source === 'bone_pile') || {}).unique_parts) || 0;
-  const perchCount = parseInt((sourceCounts.find(s => s.source === 'hunters_perch') || {}).unique_parts) || 0;
-  const markCount = parseInt((sourceCounts.find(s => s.source === 'PERCH') || {}).unique_parts) || 0;
-  const overstockCount = parseInt((sourceCounts.find(s => s.source === 'OVERSTOCK') || {}).unique_parts) || 0;
-  const restockCount = parseInt((sourceCounts.find(s => s.source === 'restock') || {}).unique_parts) || 0;
-
-  // Tag perch alerts with recent sales
-  let justSoldCount = 0;
+  // --- Batch soldLifetime lookup from SoldItem ---
+  const allPNBases = new Set();
+  const allPartTypes = new Set();
+  for (const a of allAlerts) {
+    if (a._pnBase) allPNBases.add(a._pnBase);
+    allPartTypes.add(a._partType);
+  }
+  const soldByPN = {};
+  const soldByType = {};
   try {
-    const recentSales = await knex('YourSale')
-      .where('soldDate', '>=', knex.raw("NOW() - INTERVAL '3 days'"))
-      .whereNotNull('title').select('title', 'soldDate');
-    const saleTitles = recentSales.map(s => ({ lower: (s.title || '').toLowerCase(), soldDate: s.soldDate }));
-    for (const yardName in byYard) {
-      for (const alert of byYard[yardName]) {
-        if (alert.source !== 'hunters_perch') continue;
-        const alertWords = (alert.source_title || '').toLowerCase()
-          .replace(/\([^)]*\)/g, '').replace(/\b\d+\b/g, '').replace(/[^a-z\s]/g, ' ')
-          .split(/\s+/).filter(w => w.length >= 3);
-        for (const sale of saleTitles) {
-          const matches = alertWords.filter(w => sale.lower.includes(w));
-          if (matches.length >= 3) {
-            const daysAgo = Math.floor((Date.now() - new Date(sale.soldDate).getTime()) / 86400000);
-            alert.justSold = daysAgo <= 0 ? 'today' : daysAgo + 'd ago';
-            justSoldCount++;
-            break;
-          }
-        }
+    if (allPNBases.size > 0) {
+      const pnArr = Array.from(allPNBases);
+      for (let i = 0; i < pnArr.length; i += 200) {
+        const batch = pnArr.slice(i, i + 200);
+        const rows = await knex('SoldItem').whereIn('partNumberBase', batch).select('partNumberBase').count('* as c').groupBy('partNumberBase');
+        for (const r of rows) soldByPN[r.partNumberBase.toUpperCase()] = parseInt(r.c);
       }
     }
-  } catch (e) { /* ignore */ }
+    for (const pt of allPartTypes) {
+      const r = await knex('SoldItem').where('partType', pt).count('* as c').first();
+      soldByType[pt] = parseInt(r?.c || 0);
+    }
+  } catch (e) { /* SoldItem may not have these columns */ }
+
+  // --- Build vehicle entries with hard/soft dedup ---
+  const vehicles = [];
+  for (const [vKey, group] of Object.entries(vehicleGroups)) {
+    const [yr, mk, md, yn] = vKey.split('|');
+    const attr = vehicleAttrMap[vKey] || {};
+    const alerts = group.alerts;
+
+    // Group alerts by partType
+    const byType = {};
+    for (const a of alerts) {
+      if (!byType[a._partType]) byType[a._partType] = [];
+      byType[a._partType].push(a);
+    }
+
+    const parts = [];
+    for (const [partType, typeAlerts] of Object.entries(byType)) {
+      const isHard = HARD_PART_TYPES.has(partType);
+      const dedupGroups = {};
+
+      for (const a of typeAlerts) {
+        const dedupKey = isHard ? (a._pnBase || partType + '_nopn') : partType;
+        if (!dedupGroups[dedupKey]) dedupGroups[dedupKey] = { alerts: [], pnCounts: {} };
+        dedupGroups[dedupKey].alerts.push(a);
+        if (a._pnBase) dedupGroups[dedupKey].pnCounts[a._pnBase] = (dedupGroups[dedupKey].pnCounts[a._pnBase] || 0) + 1;
+      }
+
+      const rows = [];
+      for (const [dedupKey, dg] of Object.entries(dedupGroups)) {
+        const prices = dg.alerts.map(a => parseFloat(a.part_value) || 0).filter(p => p > 0);
+        const topScore = Math.max(...dg.alerts.map(a => a.match_score || 0));
+        const topSource = dg.alerts.reduce((best, a) => {
+          const p = SOURCE_PRIORITY[a.source] || 0;
+          return p > (SOURCE_PRIORITY[best] || 0) ? a.source : best;
+        }, dg.alerts[0].source);
+
+        const pnBreakdown = isHard ? [] : Object.entries(dg.pnCounts).map(([pn, c]) => ({ pn, count: c })).sort((a, b) => b.count - a.count);
+        const lifetime = isHard && dedupKey !== partType + '_nopn'
+          ? (soldByPN[dedupKey] || 0)
+          : (soldByType[partType] || 0);
+
+        rows.push({
+          dedupKey,
+          partNumberBreakdown: pnBreakdown,
+          soldHere: dg.alerts.length,
+          soldLifetime: lifetime,
+          priceMin: prices.length > 0 ? Math.min(...prices) : null,
+          priceMax: prices.length > 0 ? Math.max(...prices) : null,
+          topScore,
+          topSource,
+          alertIds: dg.alerts.map(a => a.id),
+          claimed: dg.alerts.some(a => a.claimed),
+        });
+      }
+
+      rows.sort((a, b) => b.topScore - a.topScore || b.soldHere - a.soldHere);
+      parts.push({ partType, isHardType: isHard, rows });
+    }
+
+    // Headline = highest priority source + highest score across all alerts
+    const headlineSource = alerts.reduce((best, a) => {
+      const p = SOURCE_PRIORITY[a.source] || 0;
+      return p > (SOURCE_PRIORITY[best] || 0) ? a.source : best;
+    }, alerts[0].source);
+    const headlineScore = Math.max(...alerts.map(a => a.match_score || 0));
+
+    // Days since set
+    const setDate = attr.date_added || null;
+    let daysSinceSet = null;
+    if (setDate) {
+      const sd = new Date(setDate);
+      daysSinceSet = Math.max(0, Math.floor((Date.now() - sd.getTime()) / 86400000));
+    }
+
+    vehicles.push({
+      vehicleKey: vKey,
+      yard_name: yn,
+      year: yr, make: mk, model: md,
+      color: attr.color || alerts[0]?.vehicle_color || null,
+      row: attr.row_number || alerts[0]?.row || null,
+      decoded_engine: attr.decoded_engine || null,
+      decoded_transmission: attr.decoded_transmission || null,
+      decoded_drivetrain: attr.decoded_drivetrain || null,
+      trim_tier: attr.trim_tier || null,
+      set_date: setDate,
+      days_since_set: daysSinceSet,
+      headline_source: headlineSource,
+      headline_score: headlineScore,
+      alert_count: alerts.length,
+      parts,
+    });
+  }
+
+  // Sort vehicles: headline_score DESC, alert_count DESC
+  vehicles.sort((a, b) => b.headline_score - a.headline_score || b.alert_count - a.alert_count);
+
+  // Paginate at vehicle level
+  const totalVehicles = vehicles.length;
+  const pagedVehicles = vehicles.slice((page - 1) * perPage, page * perPage);
+
+  // Group paged vehicles by yard for response
+  const byYard = {};
+  for (const v of pagedVehicles) {
+    const y = v.yard_name || 'Unknown';
+    if (!byYard[y]) byYard[y] = [];
+    byYard[y].push(v);
+  }
+
+  // Source counts (from all alerts, not just paged)
+  const srcCounts = {};
+  for (const a of allAlerts) { srcCounts[a.source] = (srcCounts[a.source] || 0) + 1; }
 
   res.json({
     success: true,
-    alerts: byYard,
-    yardCounts: yardCounts.map(y => ({ yard: y.yard_name, count: parseInt(y.count) })),
-    boneCount, perchCount, markCount, overstockCount, restockCount, justSoldCount,
-    total, page, totalPages: Math.ceil(total / perPage),
-    lastGenerated
+    vehicles: byYard,
+    yardCounts: Object.entries(byYard).map(([yard, vs]) => ({ yard, count: vs.length })),
+    boneCount: srcCounts['bone_pile'] || 0,
+    perchCount: srcCounts['hunters_perch'] || 0,
+    markCount: srcCounts['PERCH'] || 0,
+    overstockCount: srcCounts['OVERSTOCK'] || 0,
+    restockCount: srcCounts['restock'] || 0,
+    total: totalVehicles, page, totalPages: Math.ceil(totalVehicles / perPage),
+    lastGenerated,
   });
 });
 
