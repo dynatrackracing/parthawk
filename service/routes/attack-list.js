@@ -3,6 +3,7 @@
 const { log } = require('../lib/logger');
 const router = require('express-promise-router')();
 const AttackListService = require('../services/AttackListService');
+const isExcludedPart = AttackListService.isExcludedPart;
 const DeadInventoryService = require('../services/DeadInventoryService');
 const { database } = require('../database/database');
 const { v4: uuidv4 } = require('uuid');
@@ -141,6 +142,23 @@ router.get('/vehicle/:id/parts', async (req, res) => {
     }
 
     const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
+
+    // Enrich parts with YourSale 90d data + value source fields
+    const partPNBs = (scored.parts || []).filter(p => p.partNumber).map(p => p.partNumber);
+    const ysMap = await service.getYourSalePriceMap(partPNBs);
+    for (const p of (scored.parts || [])) {
+      const pnUp = (p.partNumber || '').toUpperCase();
+      const ys = pnUp ? ysMap.get(pnUp) : null;
+      p.isExcluded = isExcludedPart(p.title || '');
+      p.yourSalePrice = ys ? ys.avg : null;
+      p.yourSaleCount = ys ? ys.count : 0;
+      p.yourSaleLatest = ys ? ys.latestDate : null;
+      // valueSource + displayPrice for frontend
+      if (p.yourSalePrice) { p.valueSource = 'yoursale'; p.displayPrice = p.yourSalePrice; }
+      else if (p.marketMedian > 0) { p.valueSource = 'market_estimate'; p.displayPrice = p.marketMedian; }
+      else if (p.price > 0) { p.valueSource = 'market_estimate'; p.displayPrice = p.price; }
+      else { p.valueSource = 'none'; p.displayPrice = null; }
+    }
 
     // Enrich with dead inventory warnings
     const deadService = new DeadInventoryService();

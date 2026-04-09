@@ -434,21 +434,39 @@ class AttackListService {
    * Batch load scout alert signals for a set of yard vehicles.
    * Returns Map: "year|make|model|yardName" → maxMatchScore.
    */
-  async loadScoutAlertSignals(yardName) {
-    const signals = new Map();
+  /**
+   * Batch load YourSale 90-day price data for a set of partNumberBase values.
+   * Returns Map<partNumberBase(upper), { avg, max, count, latestDate }>
+   */
+  async getYourSalePriceMap(partNumberBases) {
+    const map = new Map();
+    if (!partNumberBases || partNumberBases.length === 0) return map;
     try {
-      const rows = await database('scout_alerts')
-        .where('match_score', '>=', SCOUT_ALERT_TIER_THRESHOLD)
-        .where('yard_name', yardName)
-        .select('vehicle_year', 'vehicle_make', 'vehicle_model')
-        .max('match_score as max_score')
-        .groupBy('vehicle_year', 'vehicle_make', 'vehicle_model');
-      for (const r of rows) {
-        const key = [r.vehicle_year, (r.vehicle_make || '').toUpperCase(), (r.vehicle_model || '').toUpperCase()].join('|');
-        signals.set(key, parseInt(r.max_score) || 0);
+      const unique = [...new Set(partNumberBases.filter(Boolean).map(p => p.toUpperCase()))];
+      for (let i = 0; i < unique.length; i += 500) {
+        const batch = unique.slice(i, i + 500);
+        const rows = await database.raw(`
+          SELECT "partNumberBase",
+            ROUND(AVG("salePrice"::numeric), 2) as avg_price,
+            MAX("salePrice"::numeric) as max_price,
+            COUNT(*)::int as cnt,
+            MAX("soldDate") as latest_date
+          FROM "YourSale"
+          WHERE "soldDate" >= NOW() - INTERVAL '90 days'
+            AND "partNumberBase" IN (${batch.map(() => '?').join(',')})
+          GROUP BY "partNumberBase"
+        `, batch);
+        for (const r of rows.rows) {
+          map.set(r.partNumberBase.toUpperCase(), {
+            avg: parseFloat(r.avg_price) || 0,
+            max: parseFloat(r.max_price) || 0,
+            count: parseInt(r.cnt) || 0,
+            latestDate: r.latest_date,
+          });
+        }
       }
-    } catch (e) { /* scout_alerts may not exist */ }
-    return signals;
+    } catch (e) { this.log.warn({ err: e.message }, 'getYourSalePriceMap failed'); }
+    return map;
   }
 
   /**
@@ -1923,12 +1941,43 @@ class AttackListService {
       const scored = vehicles.map(v =>
         this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3)
       );
-      // Sort: active first, then highest total value, then max single part tiebreaker
+
+      // Collect all partNumberBases across scored vehicles for YourSale batch lookup
+      const allPNBs = new Set();
+      for (const sv of scored) {
+        for (const p of (sv.parts || [])) {
+          if (p.partNumber) allPNBs.add(p.partNumber.toUpperCase());
+        }
+      }
+      const yourSaleMap = await this.getYourSalePriceMap(Array.from(allPNBs));
+
+      // Compute YourSale-driven value per vehicle
+      for (const sv of scored) {
+        let maxYS = 0, ysEstValue = 0;
+        for (const p of (sv.parts || [])) {
+          if (isExcludedPart(p.title || '')) { p._ysValue = 0; continue; }
+          const pnUp = (p.partNumber || '').toUpperCase();
+          const ys = pnUp ? yourSaleMap.get(pnUp) : null;
+          const ysPrice = ys ? ys.avg : 0;
+          p._ysValue = ysPrice;
+          p.yourSalePrice = ys ? ys.avg : null;
+          p.yourSaleCount = ys ? ys.count : 0;
+          p.yourSaleLatest = ys ? ys.latestDate : null;
+          if (ysPrice > maxYS) maxYS = ysPrice;
+          ysEstValue += ysPrice;
+        }
+        sv.maxYourSalePart = maxYS;
+        sv.yourSaleEstValue = Math.round(ysEstValue);
+      }
+
+      // Sort: active first, then maxYourSalePart DESC, then yourSaleEstValue DESC
       scored.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-        const valDiff = (b.est_value || 0) - (a.est_value || 0);
-        if (valDiff !== 0) return valDiff;
-        return (b.max_part_value || 0) - (a.max_part_value || 0);
+        const ysDiff = (b.maxYourSalePart || 0) - (a.maxYourSalePart || 0);
+        if (ysDiff !== 0) return ysDiff;
+        const ysEstDiff = (b.yourSaleEstValue || 0) - (a.yourSaleEstValue || 0);
+        if (ysEstDiff !== 0) return ysEstDiff;
+        return (b.est_value || 0) - (a.est_value || 0);
       });
 
       const _staleHours = await hoursSinceLastScrape(database, yard.id);
@@ -2097,4 +2146,5 @@ AttackListService.invalidateInventoryCache = function() {
   _stockIndexCacheTime = 0;
 };
 
+AttackListService.isExcludedPart = isExcludedPart;
 module.exports = AttackListService;

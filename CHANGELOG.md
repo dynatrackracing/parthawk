@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Attack List Redesign Commit 1: YourSale-Driven Value + Sort — 2026-04-09
+- Vehicle sort by max YourSale 90d price (non-excluded parts only). market_demand_cache decorative. Excluded parts $0.
+
+---
+
 ## Deploy B REDO: Scout-Alert-First Sort Inside Expanded Parts — 2026-04-09
 - Rolled back page-level tier sections. Parts in expanded view now sorted scout-alert-first with signal badges.
 

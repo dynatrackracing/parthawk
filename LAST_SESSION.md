@@ -57,6 +57,15 @@
 - Expanded view shows signal badges: gold SA badge with score, green SOLD badge, existing intel icons
 - Collapsed card headlines unchanged
 
+## Attack List redesign Commit 1: YourSale-driven value + sort -- 2026-04-09
+- Vehicle sort now driven by maxYourSalePart (90d avg) on non-excluded parts only
+- market_demand_cache/Item.price becomes decorative -- displayed but does not affect sort
+- Excluded parts (engine/trans/body panel/airbag) contribute $0 to value
+- New per-part response fields: yourSalePrice, yourSaleCount, valueSource, displayPrice
+- getYourSalePriceMap() batch loader in AttackListService
+- Frontend: expanded view shows "(market est)" on market-only prices, dual display when both yoursale + market exist
+- 813 distinct PNBs in YourSale 90d, 40% of vehicles have sold history
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
