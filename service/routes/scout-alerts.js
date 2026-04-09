@@ -101,6 +101,46 @@ router.get('/list', async (req, res) => {
   const meta = await knex('scout_alerts_meta').where('key', 'last_generated').first();
   const lastGenerated = meta ? meta.value : null;
 
+  // Enrich alerts with decoded vehicle attributes (one lookup per unique vehicle key)
+  const vehicleKeys = new Set();
+  for (const a of alerts) {
+    if (a.vehicle_year && a.vehicle_make && a.vehicle_model && a.yard_name) {
+      vehicleKeys.add([a.vehicle_year, a.vehicle_make, a.vehicle_model, a.yard_name].join('|'));
+    }
+  }
+  const vehicleMap = {};
+  if (vehicleKeys.size > 0) {
+    try {
+      const yardRows = await knex('yard').select('id', 'name');
+      const yardIdByName = {};
+      for (const y of yardRows) yardIdByName[y.name.toLowerCase()] = y.id;
+
+      for (const key of vehicleKeys) {
+        const [yr, mk, md, yn] = key.split('|');
+        const yardId = yardIdByName[(yn || '').toLowerCase()];
+        if (!yardId) continue;
+        const v = await knex('yard_vehicle')
+          .where({ yard_id: yardId, active: true })
+          .whereRaw("year::text = ?", [yr])
+          .whereRaw("UPPER(make) = UPPER(?)", [mk])
+          .whereRaw("UPPER(model) = UPPER(?)", [md])
+          .select('decoded_engine', 'decoded_transmission', 'decoded_drivetrain', 'trim_tier')
+          .first();
+        if (v) vehicleMap[key] = v;
+      }
+    } catch (e) { /* yard_vehicle join failed — non-fatal, attributes just won't show */ }
+  }
+  for (const a of alerts) {
+    const key = [a.vehicle_year, a.vehicle_make, a.vehicle_model, a.yard_name].join('|');
+    const v = vehicleMap[key];
+    if (v) {
+      a.vehicle_engine = v.decoded_engine || null;
+      a.vehicle_transmission = v.decoded_transmission || null;
+      a.vehicle_drivetrain = v.decoded_drivetrain || null;
+      a.vehicle_trim_tier = v.trim_tier || null;
+    }
+  }
+
   // Group by yard
   const byYard = {};
   for (const a of alerts) {
