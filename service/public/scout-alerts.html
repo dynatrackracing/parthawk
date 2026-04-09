@@ -388,7 +388,7 @@ async function load(page) {
               h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
             }
             var vParts = [a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' ');
-            if (a.vehicle_engine) vParts += ' \u00B7 ' + esc(a.vehicle_engine);
+            if (a.vehicle_engine) { var em = String(a.vehicle_engine).match(/^([0-9]+\.?[0-9]*)/); vParts += ' \u00B7 ' + (em ? parseFloat(em[1]).toFixed(1) + 'L' : esc(a.vehicle_engine)); }
             if (a.vehicle_transmission && a.vehicle_transmission !== 'CHECK_MT') {
               var tmap = {'Automatic':'AT','Manual':'MT','CVT':'CVT'};
               vParts += ' \u00B7 ' + (tmap[a.vehicle_transmission] || a.vehicle_transmission);
@@ -420,10 +420,11 @@ async function load(page) {
           if (a.notes) h += '<div class="alert-notes">' + esc(a.notes) + '</div>';
           if (a.match_reasons && a.match_reasons.length > 0) {
             var mrs = typeof a.match_reasons === 'string' ? JSON.parse(a.match_reasons) : a.match_reasons;
-            if (mrs.length > 0) {
+            var displayReasons = mrs.filter(function(r) { return typeof r !== 'string' || !r.startsWith('YMM match'); });
+            if (displayReasons.length > 0) {
               h += '<span class="reasons-toggle" id="tog-' + a.id + '" onclick="toggleReasons(' + a.id + ')">&#x25B8; why?</span>';
               h += '<div class="reasons-list" id="reasons-' + a.id + '">';
-              mrs.forEach(function(r) { h += '<div>' + esc(r) + '</div>'; });
+              displayReasons.forEach(function(r) { h += '<div>' + esc(r) + '</div>'; });
               h += '</div>';
             }
           }

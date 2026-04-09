@@ -161,6 +161,12 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Scout Alerts quick fixes — 2026-04-08
+- Frontend rounds decoded_engine display to 1 decimal (fixes "2.480000L" rendering, does not touch DB)
+- Filters "YMM match" baseline reason from displayed reasons array (zero information value, was on every alert)
+- Hides toggle when filtered reasons list is empty
+- No scoring logic touched, no backend touched
+
 ## Scout Alerts UI cleanup (pre-refactor) — 2026-04-08
 - Added decoded vehicle attributes via post-query lookup (one per unique vehicle key, no row multiplication)
 - Vehicle line now shows engine, trans (AT/MT/CVT), drivetrain inline with dot separators
