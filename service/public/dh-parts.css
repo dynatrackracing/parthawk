@@ -26,6 +26,21 @@
   50% { opacity: 0.6; }
 }
 
+/* Archives badge — frozen Item-table reference data */
+.archives-badge {
+  display: inline-block;
+  background: #FFC107;
+  color: #000;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
 /* Part badge base */
 .part-badge {
   font-size: 10px; font-weight: 700; padding: 2px 7px;

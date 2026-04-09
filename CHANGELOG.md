@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## ARCHIVES Badge + Sort on Daily Feed — 2026-04-09
+- Frozen Item-table parts (priceSource=item_reference) now show yellow ARCHIVES badge and sort to bottom of expanded parts list.
+
+---
+
 ## Bug B Fix: Gate Platform Expansion by Per-Group Whitelist + Remove VW MQB — 2026-04-09
 - Platform expansion now gated by per-group partTypes from platform_shared_part. VW MQB group deleted. Jetta parts no longer bleed onto Passat cards.
 

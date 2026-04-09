@@ -879,12 +879,16 @@
       const vc = noPrice ? 'verdict-nodata' : 'verdict-' + badgeVerdict.toLowerCase();
       const price = displayPrice;
       // Value source label — show where the price came from
+      const isArchives = (p.priceSource === 'item_reference');
       let pricePrefix, priceSuffix = '';
       if (noPrice) { pricePrefix = ''; }
-      else if (p.valueSource === 'yoursale') {
+      else if (isArchives) {
+        pricePrefix = '$';
+        priceSuffix = ' <span class="archives-badge">ARCHIVES</span>';
+      } else if (p.valueSource === 'yoursale') {
         pricePrefix = '$';
         if (p.marketMedian > 0) priceSuffix = ' <span style="color:#6B7280;font-size:9px">mkt $' + Math.round(p.marketMedian) + '</span>';
-      } else if (p.valueSource === 'market_estimate' || isRef) {
+      } else if (p.valueSource === 'market_estimate') {
         pricePrefix = '$';
         priceSuffix = ' <span style="color:#6B7280;font-size:9px">(market est)</span>';
       } else { pricePrefix = '$'; }
@@ -916,7 +920,6 @@
           <span>${inStock} in stock${p.stockMatchType === 'base' ? ' <span style="color:#FF8C00;font-size:9px" title="Stock matched by base PN — verify exact part number">⚠ verify PN</span>' : ''}</span>
           <span>${sold90d} sold/90d</span>
           ${p.partNumber ? `<span>${p.partNumber}</span>` : ''}
-          ${isRef ? '<span style="color:#6B7280;font-size:9px" title="Reference price from listing data — not current market">ref</span>' : ''}
         </div>
         ${p.alertMatch && p.alertMatch.value ? `<div style="font-size:10px;color:#6B7280;margin-top:2px">Alert value: $${p.alertMatch.value}</div>` : ''}
         <div class="pd-reason">${p.reason || ''}${p.trimMultiplier !== undefined && p.trimMultiplier < 1.0 ? (p.trimMultiplier === 0 ? ' <span style="color:#ef4444;font-weight:600">· Not expected on this trim</span>' : ' <span style="color:#f59e0b;font-weight:600">· ⚠️ Verify on vehicle</span>') : ''}</div>

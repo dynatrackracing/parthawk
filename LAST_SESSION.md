@@ -99,6 +99,13 @@
 - Owner directive: VW Passat/Jetta/Golf don't share parts at puller-relevant level
 - 24 other groups unaffected, still expand for whitelisted drivetrain part types only
 
+## ARCHIVES badge + bottom-sort on Daily Feed -- 2026-04-09
+- priceSource='item_reference' parts now render with yellow ARCHIVES badge in expanded view
+- Replaces the "ref" text on item_reference parts
+- ARCHIVES rows sort to bottom of expanded parts list (price DESC within archives bucket)
+- Stable partition: non-archives preserve scout-alert-first / sold sort; archives re-sorted by price
+- market_demand_cache parts still labeled "(market est)"; YourSale parts still show dual price
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

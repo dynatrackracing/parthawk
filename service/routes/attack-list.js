@@ -282,6 +282,12 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       return (b.price || 0) - (a.price || 0);
     });
 
+    // ARCHIVES sort: item_reference parts always at bottom, price DESC within archives
+    const nonArchives = (scored.parts || []).filter(p => p.priceSource !== 'item_reference');
+    const archives = (scored.parts || []).filter(p => p.priceSource === 'item_reference')
+      .sort((a, b) => (b.price || 0) - (a.price || 0));
+    scored.parts = [...nonArchives, ...archives];
+
     res.json({
       success: true,
       id,
