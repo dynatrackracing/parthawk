@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## FIELD Nav: Remove Flyway + Fix Mobile Overflow — 2026-04-09
+- FIELD row: 6 links to 5 (Flyway removed, still on /admin/home). justify-content: center to flex-start. Cache buster v=4.
+
+---
+
 ## Vehicle-Centric Scout Alerts Frontend Rebuild — 2026-04-09
 - One card per vehicle, collapsed by default, expand to see part groups
 - Hard/soft dedup, per-row claim, summary tiles, pagination at vehicle level

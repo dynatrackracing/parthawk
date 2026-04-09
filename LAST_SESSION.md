@@ -19,6 +19,11 @@
 - Hide-pulled hides vehicles where every row is claimed
 - Tech debt: BCM_nopn bucket name + soldLifetime semantic mismatch between hard and no-PN rows
 
+## FIELD nav fixes -- 2026-04-09
+- Fixed FIELD row justify-content:center to flex-start (Daily Feed was scrolled off-screen on mobile)
+- Removed Flyway from FIELD row (6 to 5 links) to prevent mobile overflow. Flyway still on /admin/home + direct URL
+- Bumped dh-nav.js cache buster to v=4 across all 20 HTML files
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
