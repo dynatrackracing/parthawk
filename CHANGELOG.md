@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Deploy B Part 1: Attack List Tier Assignment — 2026-04-09
+- Vehicles get tier field (SCOUT_ALERTS/SOLD/COMPETITOR_INTEL). Scout alerts hard bucket at score >= 60. Sort by tier then score.
+
+---
+
 ## FIELD Nav: Centered + Flyway Desktop-Only — 2026-04-09
 - FIELD row centered with 6 links on desktop, 5 on mobile (Flyway hidden via CSS at 768px breakpoint). Cache buster v=5.
 

@@ -31,6 +31,15 @@
 - Desktop: 6 links centered. Mobile: 5 links centered (Flyway hidden). No overflow either way.
 - Cache buster v=5
 
+## Deploy B Part 1: Attack List tier assignment -- 2026-04-09
+- AttackListService assigns SCOUT_ALERTS / SOLD / COMPETITOR_INTEL tier per vehicle
+- SCOUT_ALERTS hard bucket at scout_alerts.match_score >= 60, top placement
+- SOLD + COMPETITOR_INTEL intermix by vehicle score below SCOUT_ALERTS block
+- Best-part-wins: vehicle tier from its strongest single signal
+- loadScoutAlertSignals() batch loader per yard, single query, no N+1
+- Sort: active first, then tier rank, then score within tier
+- Frontend Part 2 next for visual tier headers + badges
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
