@@ -161,6 +161,14 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Scout Alerts reasons render: second fix pass — 2026-04-08
+- Root cause: scoreMatch()/scoreMarkMatch() wrote reasons.join('; ') to the notes column, duplicating the machine-generated reasons array into the human-diagnostic notes field
+- notes column rendered as yellow italic inline text (always visible), AND match_reasons rendered behind toggle (hidden by default) -- same data shown twice
+- Fix: scoreMatch/scoreMarkMatch now write notes: null (reasons go only to match_reasons jsonb column)
+- Cleaned 5,955 existing polluted notes rows (all started with "YMM match")
+- Zero legitimate diagnostic notes existed (all were reasons dumps)
+- Page now shows reasons only behind toggle, notes field empty
+
 ## Scout Alerts quick fixes — 2026-04-08
 - Frontend rounds decoded_engine display to 1 decimal (fixes "2.480000L" rendering, does not touch DB)
 - Filters "YMM match" baseline reason from displayed reasons array (zero information value, was on every alert)

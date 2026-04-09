@@ -484,7 +484,7 @@ function scoreMarkMatch(parsed, vehicle, mark) {
   if (vehicle.decoded_trim) result.reasons.push('Trim: ' + vehicle.decoded_trim);
   if (mark.partType) result.reasons.push('Part: ' + mark.partType);
 
-  return { confidence, notes: result.reasons.join('; '), match_score: result.score, match_reasons: result.reasons };
+  return { confidence, notes: null, match_score: result.score, match_reasons: result.reasons };
 }
 
 // Extract engine displacement from a string like "3.6L V6" → "3.6"
@@ -715,7 +715,7 @@ function scoreMatch(part, vehicle) {
   const confidence = result.score >= 75 ? 'high' : result.score >= 55 ? 'medium' : 'low';
   return {
     confidence,
-    notes: result.reasons.join('; '),
+    notes: null,
     match_score: result.score,
     match_reasons: result.reasons,
   };
