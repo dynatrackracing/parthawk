@@ -106,6 +106,11 @@
 - Stable partition: non-archives preserve scout-alert-first / sold sort; archives re-sorted by price
 - market_demand_cache parts still labeled "(market est)"; YourSale parts still show dual price
 
+## ARCHIVES followup: kill blue NEW badge on item_reference rows -- 2026-04-09
+- ea96acc Guard C only caught the price-area noveltyTier badge
+- The left-side title NEW/RESTOCK badges in pd-title were unguarded
+- Patched: both noveltyTier badge sites now guarded on priceSource !== 'item_reference'
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

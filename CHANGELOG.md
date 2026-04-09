@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## ARCHIVES Followup: Kill Blue NEW Badge on item_reference Rows — 2026-04-09
+- Both NEW/RESTOCK badge sites now guarded on priceSource !== 'item_reference'. ARCHIVES rows no longer show conflicting blue NEW badges.
+
+---
+
 ## ARCHIVES Badge + Sort on Daily Feed — 2026-04-09
 - Frozen Item-table parts (priceSource=item_reference) now show yellow ARCHIVES badge and sort to bottom of expanded parts list.
 
