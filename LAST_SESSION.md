@@ -161,6 +161,14 @@ The filter/display split is intentional. The scoring discrepancy (using date_add
 - Backfill: 453 rows updated (124 YourListing, 322 YourSale, 7 SoldItem). 1K0614517 now splits into 11 distinct variant bases.
 - Ford/Chrysler regression clean — assertions passed.
 
+## Scout Alerts UI cleanup (pre-refactor) — 2026-04-08
+- Added decoded vehicle attributes via post-query lookup (one per unique vehicle key, no row multiplication)
+- Vehicle line now shows engine, trans (AT/MT/CVT), drivetrain inline with dot separators
+- PREMIUM/PERFORMANCE trim badge on qualifying vehicles
+- match_reasons collapsed behind click toggle (default hidden, "why?" link)
+- Notes field unchanged
+- This is a de-risking cleanup before tomorrow's vehicle-centric Scout Alerts refactor
+
 ## Deploy A complete: scoring rescored — 2026-04-08
 - V3 dry-run: engine-sensitive ECM avg 55 (up from 51), ABS 59, AMP 38, BCM 50. Survival at threshold 50: ~61%
 - Tuning applied: engine-sensitive baseline 55, threshold 50
