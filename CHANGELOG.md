@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## FIELD Nav: Centered + Flyway Desktop-Only — 2026-04-09
+- FIELD row centered with 6 links on desktop, 5 on mobile (Flyway hidden via CSS at 768px breakpoint). Cache buster v=5.
+
+---
+
 ## FIELD Nav: Remove Flyway + Fix Mobile Overflow — 2026-04-09
 - FIELD row: 6 links to 5 (Flyway removed, still on /admin/home). justify-content: center to flex-start. Cache buster v=4.
 

@@ -24,6 +24,13 @@
 - Removed Flyway from FIELD row (6 to 5 links) to prevent mobile overflow. Flyway still on /admin/home + direct URL
 - Bumped dh-nav.js cache buster to v=4 across all 20 HTML files
 
+## FIELD nav: centered + Flyway desktop-only -- 2026-04-09
+- Restored center alignment (reverts 299a206 flex-start)
+- Restored Flyway in FIELD array (reverts 14b70ad removal)
+- Mobile hides Flyway via .field-link-mobile-hide CSS at 768px breakpoint (same as INTEL hide)
+- Desktop: 6 links centered. Mobile: 5 links centered (Flyway hidden). No overflow either way.
+- Cache buster v=5
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

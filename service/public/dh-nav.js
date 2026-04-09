@@ -10,6 +10,7 @@ function dhNav(activePage) {
     { key: 'cache',  label: 'THE CACHE',        href: '/admin/the-cache' },
     { key: 'vin',    label: 'HAWK EYE',         href: '/admin/vin' },
     { key: 'gate',   label: 'NEST PROTECTOR',   href: '/admin/gate' },
+    { key: 'flyway', label: 'THE FLYWAY',       href: '/admin/flyway', mobileHide: true },
   ];
   const intel = [
     { key: 'scour',  label: 'SCOUR STREAM',     href: '/admin/restock-list' },
@@ -29,12 +30,13 @@ function dhNav(activePage) {
     const active = item.key === activePage;
     const color = active ? (isField ? '#DC2626' : '#eab308') : '#6b7280';
     const weight = active ? '700' : '500';
-    return `<a href="${item.href}" style="color:${color};text-decoration:none;padding:5px 10px;border-radius:4px;white-space:nowrap;font-weight:${weight};font-size:11px;letter-spacing:.02em">${item.label}</a>`;
+    const cls = item.mobileHide ? ' class="field-link-mobile-hide"' : '';
+    return `<a href="${item.href}"${cls} style="color:${color};text-decoration:none;padding:5px 10px;border-radius:4px;white-space:nowrap;font-weight:${weight};font-size:11px;letter-spacing:.02em">${item.label}</a>`;
   }
 
   const html = `
 <style>
-  @media (max-width: 768px) { #dh-intel-row { display: none !important; } }
+  @media (max-width: 768px) { #dh-intel-row { display: none !important; } .field-link-mobile-hide { display: none !important; } }
   #dh-intel-row a[href="/admin/carcass"] { display: none !important; }
 </style>
 <div style="background:#0a0a0a;position:sticky;top:0;z-index:100">
@@ -44,7 +46,7 @@ function dhNav(activePage) {
       <span style="font-size:22px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
     </a>
   </div>
-  <div id="dh-field-row" style="display:flex;justify-content:flex-start;gap:4px;padding:6px 10px;background:#0a0a0a;border-bottom:1px solid #1a1a1a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+  <div id="dh-field-row" style="display:flex;justify-content:center;gap:4px;padding:6px 10px;background:#0a0a0a;border-bottom:1px solid #1a1a1a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch">
     <span style="font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.1em;padding:5px 4px;white-space:nowrap">FIELD</span>
     ${field.map(f => linkHTML(f, true)).join('')}
   </div>
