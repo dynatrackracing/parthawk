@@ -85,6 +85,12 @@
 - Cleared 260 junk PNB rows across YourListing (30), YourSale (185), SoldItem (45)
 - Stock counts on ABS parts now reflect real per-variant stock
 
+## Bug A real fix: normalize dashes in isSkipWord() -- 2026-04-09
+- Root cause: isSkipWord() uppercased but did not strip non-alphanumerics before SKIP_WORDS Set lookup
+- "Anti-Lock" became "ANTI-LOCK" which did not match SKIP_WORDS entry "ANTILOCK"
+- Fix: one-line normalization `s.toUpperCase().replace(/[^A-Z0-9]/g, '')` in isSkipWord
+- Passat ABS in_stock now reflects real per-variant count instead of 28 cross-make junk bucket
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

@@ -62,7 +62,7 @@ const MAKES_MODELS = new Set([
 
 function isSkipWord(s) {
   if (!s) return true;
-  const u = s.toUpperCase();
+  const u = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (/^(19[89]\d|20[0-3]\d)$/.test(u)) return true;
   if (/^\d{1,5}$/.test(u)) return true;
   if (SKIP_WORDS.has(u)) return true;

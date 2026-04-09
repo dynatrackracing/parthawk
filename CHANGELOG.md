@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Bug A Real Fix: Normalize Dashes in isSkipWord — 2026-04-09
+- isSkipWord() now strips non-alphanumerics before SKIP_WORDS lookup. "Anti-Lock" correctly matches "ANTILOCK". Fixes 28-in-stock junk bucket.
+
+---
+
 ## Bug A Fix: Junk PN Tokens in SKIP_WORDS — 2026-04-09
 - ANTILOCK/REARMOUNTED/BRAKE/PUMP/HYDRAULIC added to extractPartNumbers SKIP_WORDS. Cleared 260 junk PNB rows. Fixes "28 in stock" on ABS parts.
 
