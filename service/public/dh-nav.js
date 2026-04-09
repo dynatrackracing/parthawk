@@ -45,7 +45,7 @@ function dhNav(activePage) {
       <span style="font-size:22px;font-weight:900;letter-spacing:3px;color:#F0F0F0">DARK<span style="color:#DC2626">HAWK</span></span>
     </a>
   </div>
-  <div id="dh-field-row" style="display:flex;justify-content:center;gap:4px;padding:6px 10px;background:#0a0a0a;border-bottom:1px solid #1a1a1a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+  <div id="dh-field-row" style="display:flex;justify-content:flex-start;gap:4px;padding:6px 10px;background:#0a0a0a;border-bottom:1px solid #1a1a1a;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch">
     <span style="font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.1em;padding:5px 4px;white-space:nowrap">FIELD</span>
     ${field.map(f => linkHTML(f, true)).join('')}
   </div>
