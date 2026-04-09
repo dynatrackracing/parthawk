@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## ARCHIVES Badge Moved to Left + SOLD Triple Pill Consolidation — 2026-04-09
+- ARCHIVES badge renders on left (where NEW used to be), right-side price clean. Killed redundant SOLD pills, kept RESTOCK.
+
+---
+
 ## ARCHIVES Followup: Kill Blue NEW Badge on item_reference Rows — 2026-04-09
 - Both NEW/RESTOCK badge sites now guarded on priceSource !== 'item_reference'. ARCHIVES rows no longer show conflicting blue NEW badges.
 

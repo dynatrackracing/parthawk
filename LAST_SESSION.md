@@ -111,6 +111,13 @@
 - The left-side title NEW/RESTOCK badges in pd-title were unguarded
 - Patched: both noveltyTier badge sites now guarded on priceSource !== 'item_reference'
 
+## ARCHIVES badge moved to left + SOLD triple pill consolidation -- 2026-04-09
+- ARCHIVES badge now renders on the LEFT where the NEW badge used to live (item_reference rows)
+- Right-side price area returns to clean for item_reference rows
+- Killed intelSources "SOLD" pill and hasSoldHistory "SOLD" pill
+- Kept RESTOCK pill (noveltyTier) -- the actionable one
+- Row body text "Sold Nx @ $X avg" still carries sold-history info directly
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
