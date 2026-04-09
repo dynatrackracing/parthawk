@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Platform Audit Cleanup — 2026-04-09
+- Challenger removed from LX group, redundant LX/LD group deleted, Ford Explorer group restructured to U152/U251 with Mountaineer + Sport Trac. 23 groups remain.
+
+---
+
 ## ARCHIVES Badge Moved to Left + SOLD Triple Pill Consolidation — 2026-04-09
 - ARCHIVES badge renders on left (where NEW used to be), right-side price clean. Killed redundant SOLD pills, kept RESTOCK.
 

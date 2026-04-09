@@ -118,6 +118,12 @@
 - Kept RESTOCK pill (noveltyTier) -- the actionable one
 - Row body text "Sold Nx @ $X avg" still carries sold-history info directly
 
+## Platform audit cleanup -- 2026-04-09
+- Group 1 (Chrysler LX): removed Dodge Challenger. Members now: Chrysler 300, Dodge Charger, Dodge Magnum.
+- Group 2 (Chrysler LX/LD): deleted entirely (6 shared_part + 3 vehicle + 1 group rows). Was redundant with Group 1.
+- Group 13 (Ford D4 -> Ford U152/U251): restructured. Removed Flex/MKT/Taurus, added Mountaineer + Explorer Sport Trac. Renamed.
+- 23 active platform groups remain.
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
