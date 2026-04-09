@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Commit 1 Fix #2: Trust priceSource=sold for ValueSource — 2026-04-09
+- Sales-path parts are partNumber:null by design. Trust legacy priceSource='sold' instead of parallel YourSale lookup.
+
+---
+
 ## Commit 1 Fix: YourSale PN Normalization — 2026-04-09
 - Raw manufacturerPartNumber had spaces/dashes; YourSale.partNumberBase is Clean Pipe normalized. Lookup now normalizes first.
 

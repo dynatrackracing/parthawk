@@ -72,6 +72,13 @@
 - getYourSalePriceMap stays dumb; caller normalizes
 - valueSource = 'yoursale' now fires correctly, dual display "$avg mkt $median" now visible
 
+## Commit 1 followup #2: trust priceSource=sold from legacy resolver -- 2026-04-09
+- Root cause: parts from sales path are partNumber:null by design (grouped by partType, not PN)
+- Followup #1 (1fb9efa) keyed off p.partNumber which is always null on these parts
+- Real fix: trust priceSource='sold' as the YourSale signal directly. Legacy resolver already did the work.
+- Vehicle sort now correctly counts sold-path parts toward maxYourSalePart
+- item_reference parts contribute $0 to sort value (frozen data, decorative only)
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

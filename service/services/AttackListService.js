@@ -1959,18 +1959,23 @@ class AttackListService {
       }
       const yourSaleMap = await this.getYourSalePriceMap(Array.from(allPNBs));
 
-      // Compute YourSale-driven value per vehicle
+      // Compute YourSale-driven value per vehicle.
+      // Trust priceSource='sold' from legacy resolver (parts from salesDemand path).
+      // For item-based parts with partNumber, use direct YourSale map.
       for (const sv of scored) {
         let maxYS = 0, ysEstValue = 0;
         for (const p of (sv.parts || [])) {
           if (isExcludedPart(p.title || '')) { p._ysValue = 0; continue; }
-          const pnNorm = toYSKey(p.partNumber);
-          const ys = pnNorm ? yourSaleMap.get(pnNorm) : null;
-          const ysPrice = ys ? ys.avg : 0;
+          let ysPrice = 0;
+          if (p.priceSource === 'sold' && p.price > 0) {
+            // Legacy resolver already found YourSale data for this partType
+            ysPrice = p.price;
+          } else {
+            const pnNorm = toYSKey(p.partNumber);
+            const ys = pnNorm ? yourSaleMap.get(pnNorm) : null;
+            if (ys) ysPrice = ys.avg;
+          }
           p._ysValue = ysPrice;
-          p.yourSalePrice = ys ? ys.avg : null;
-          p.yourSaleCount = ys ? ys.count : 0;
-          p.yourSaleLatest = ys ? ys.latestDate : null;
           if (ysPrice > maxYS) maxYS = ysPrice;
           ysEstValue += ysPrice;
         }

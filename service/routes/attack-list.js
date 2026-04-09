@@ -143,8 +143,9 @@ router.get('/vehicle/:id/parts', async (req, res) => {
 
     const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
 
-    // Enrich parts with YourSale 90d data + value source fields
-    // Normalize PNs to match YourSale.partNumberBase (Clean Pipe: normalizePartNumber + strip dashes)
+    // Enrich parts with value source fields.
+    // Trust priceSource='sold' from legacy resolver (it already proved YourSale data exists).
+    // For item-based parts with partNumber, also try direct YourSale map lookup.
     const { normalizePartNumber: _normPN } = require('../lib/partNumberUtils');
     function toYSKey(pn) {
       if (!pn) return null;
@@ -152,19 +153,36 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       return n ? n.replace(/[-\s.]/g, '').toUpperCase() : pn.replace(/[-\s.]/g, '').toUpperCase();
     }
     const partPNBs = (scored.parts || []).filter(p => p.partNumber).map(p => toYSKey(p.partNumber)).filter(Boolean);
-    const ysMap = await service.getYourSalePriceMap(partPNBs);
+    const ysMap = partPNBs.length > 0 ? await service.getYourSalePriceMap(partPNBs) : new Map();
     for (const p of (scored.parts || [])) {
-      const pnNorm = toYSKey(p.partNumber);
-      const ys = pnNorm ? ysMap.get(pnNorm) : null;
       p.isExcluded = isExcludedPart(p.title || '');
-      p.yourSalePrice = ys ? ys.avg : null;
-      p.yourSaleCount = ys ? ys.count : 0;
-      p.yourSaleLatest = ys ? ys.latestDate : null;
-      // valueSource + displayPrice for frontend
-      if (p.yourSalePrice) { p.valueSource = 'yoursale'; p.displayPrice = p.yourSalePrice; }
-      else if (p.marketMedian > 0) { p.valueSource = 'market_estimate'; p.displayPrice = p.marketMedian; }
-      else if (p.price > 0) { p.valueSource = 'market_estimate'; p.displayPrice = p.price; }
-      else { p.valueSource = 'none'; p.displayPrice = null; }
+      const pnNorm = toYSKey(p.partNumber);
+      const ysHit = pnNorm ? ysMap.get(pnNorm) : null;
+
+      if (p.priceSource === 'sold') {
+        // Legacy resolver already proved YourSale data exists. Trust it.
+        p.valueSource = 'yoursale';
+        p.displayPrice = p.price;
+      } else if (ysHit) {
+        // Auto+AIC item-based part with direct YourSale map hit
+        p.valueSource = 'yoursale';
+        p.yourSalePrice = ysHit.avg;
+        p.yourSaleCount = ysHit.count;
+        p.yourSaleLatest = ysHit.latestDate;
+        p.displayPrice = ysHit.avg;
+      } else if (p.priceSource === 'item_reference') {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.price;
+      } else if (p.marketMedian > 0) {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.marketMedian;
+      } else if (p.price > 0) {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.price;
+      } else {
+        p.valueSource = 'none';
+        p.displayPrice = null;
+      }
     }
 
     // Enrich with dead inventory warnings
