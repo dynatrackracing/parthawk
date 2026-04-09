@@ -55,7 +55,10 @@ nav a.active{color:#DC2626;font-weight:700}
 .score-medium{background:#FFC107;color:#000}
 .score-lowmed{background:#FF9800;color:#000}
 .score-low{background:#f44336;color:#fff}
-.reasons-list{font-size:10px;color:#6B7280;margin-top:3px;padding-left:4px;border-left:2px solid #2a2a2a}
+.reasons-toggle{font-size:10px;color:#6B7280;cursor:pointer;margin-left:6px;user-select:none}
+.reasons-toggle:hover{color:#ccc}
+.reasons-list{display:none;font-size:10px;color:#6B7280;margin-top:3px;padding-left:4px;border-left:2px solid #2a2a2a}
+.reasons-list.expanded{display:block}
 .reasons-list div{padding:1px 0}
 .btn-refresh{padding:8px 14px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#d1d5db;font-size:11px;font-weight:600;cursor:pointer}
 .btn-refresh:active{opacity:.5}
@@ -384,8 +387,17 @@ async function load(page) {
             } else {
               h += '<div class="alert-part">' + esc(a.source_title) + '</div>';
             }
-            h += '<div class="alert-vehicle">' + esc([a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' '));
+            var vParts = [a.vehicle_year, a.vehicle_make, a.vehicle_model].filter(Boolean).join(' ');
+            if (a.vehicle_engine) vParts += ' \u00B7 ' + esc(a.vehicle_engine);
+            if (a.vehicle_transmission && a.vehicle_transmission !== 'CHECK_MT') {
+              var tmap = {'Automatic':'AT','Manual':'MT','CVT':'CVT'};
+              vParts += ' \u00B7 ' + (tmap[a.vehicle_transmission] || a.vehicle_transmission);
+            }
+            if (a.vehicle_drivetrain) vParts += ' \u00B7 ' + esc(a.vehicle_drivetrain.split('/')[0]);
+            h += '<div class="alert-vehicle">' + vParts;
             if (a.vehicle_color) h += ' <span style="color:#6B7280;font-weight:400">(' + esc(a.vehicle_color) + ')</span>';
+            if (a.vehicle_trim_tier === 'PREMIUM') h += ' <span style="font-size:9px;background:#22c55e;color:#000;padding:1px 4px;border-radius:3px;font-weight:700">PREMIUM</span>';
+            else if (a.vehicle_trim_tier === 'PERFORMANCE') h += ' <span style="font-size:9px;background:#3b82f6;color:#000;padding:1px 4px;border-radius:3px;font-weight:700">PERF</span>';
             h += '</div>';
           }
           h += '<div class="alert-meta">';
@@ -409,7 +421,8 @@ async function load(page) {
           if (a.match_reasons && a.match_reasons.length > 0) {
             var mrs = typeof a.match_reasons === 'string' ? JSON.parse(a.match_reasons) : a.match_reasons;
             if (mrs.length > 0) {
-              h += '<div class="reasons-list">';
+              h += '<span class="reasons-toggle" id="tog-' + a.id + '" onclick="toggleReasons(' + a.id + ')">&#x25B8; why?</span>';
+              h += '<div class="reasons-list" id="reasons-' + a.id + '">';
               mrs.forEach(function(r) { h += '<div>' + esc(r) + '</div>'; });
               h += '</div>';
             }
@@ -497,6 +510,19 @@ function inlineEditStream(el, alertId) {
     if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
     if (e.key === 'Escape') { inp.removeEventListener('blur', save); restore(); }
   });
+}
+
+function toggleReasons(id) {
+  var el = document.getElementById('reasons-' + id);
+  var tog = document.getElementById('tog-' + id);
+  if (!el || !tog) return;
+  if (el.classList.contains('expanded')) {
+    el.classList.remove('expanded');
+    tog.innerHTML = '&#x25B8; why?';
+  } else {
+    el.classList.add('expanded');
+    tog.innerHTML = '&#x25BE; why?';
+  }
 }
 
 load(1);
