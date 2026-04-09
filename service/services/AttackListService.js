@@ -968,23 +968,26 @@ class AttackListService {
     }
 
     // Platform cross-reference: add sibling make+model keys
-    // e.g., Chrysler 300 → also match Dodge Charger, Dodge Challenger, Dodge Magnum
+    // GATED by per-group partTypes whitelist from platform_shared_part table (Bug B fix 2026-04-09)
     const platformKey = `${make}|${model}`.toUpperCase();
     const siblings = platformIndex[platformKey] || [];
     let platformSiblingNames = [];
+    const siblingKeyPartTypes = {}; // sibKey -> Set of allowed partTypes
     for (const sib of siblings) {
-      // Only include siblings whose year range covers this vehicle
       if (year >= sib.yearStart && year <= sib.yearEnd) {
+        // Only expand if the group has defined shared part types
+        if (!sib.partTypes || sib.partTypes.length === 0) continue;
+        const allowedTypes = new Set(sib.partTypes.map(t => t.toUpperCase()));
         const sibModelLower = sib.model.toLowerCase();
         const sibKey = `${sib.make.toLowerCase()}|${sibModelLower}`;
-        if (salesIndex[sibKey]) candidateKeys.add(sibKey);
-        // Also word-boundary match siblings
+        if (salesIndex[sibKey]) { candidateKeys.add(sibKey); siblingKeyPartTypes[sibKey] = allowedTypes; }
         const sibRe = new RegExp('\\b' + sibModelLower.replace(/[-]/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
         for (const sKey of Object.keys(salesIndex)) {
           if (!sKey.startsWith(sib.make.toLowerCase() + '|')) continue;
           const sModel = sKey.split('|')[1];
           if (sModel && sibRe.test(sModel.replace(/[-]/g, ' '))) {
             candidateKeys.add(sKey);
+            siblingKeyPartTypes[sKey] = allowedTypes;
           }
         }
         platformSiblingNames.push(`${sib.make} ${sib.model}`);
@@ -993,10 +996,14 @@ class AttackListService {
 
     // Filter each candidate's individual sales by year range
     // PN-specific parts: strict year match. Generational parts: ±1 tolerance.
+    // Platform siblings are gated by per-group partTypes whitelist (Bug B fix)
     const allMatchedSales = [];
     for (const cKey of candidateKeys) {
       const entry = salesIndex[cKey];
+      const sibAllowed = siblingKeyPartTypes[cKey]; // Set of allowed partTypes, or undefined if own vehicle
       for (const sale of entry.sales) {
+        // Platform gate: if this key came from a sibling, only allow whitelisted part types
+        if (sibAllowed && !sibAllowed.has((sale.partType || '').toUpperCase())) continue;
         const saleHasPn = piExtractPNs(sale.title || '').length > 0;
         const saleNeedsExactYear = saleHasPn || partRequiresExactYear(sale.title || '');
 

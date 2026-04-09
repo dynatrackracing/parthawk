@@ -91,6 +91,14 @@
 - Fix: one-line normalization `s.toUpperCase().replace(/[^A-Z0-9]/g, '')` in isSkipWord
 - Passat ABS in_stock now reflects real per-variant count instead of 28 cross-make junk bucket
 
+## Bug B fix: gate platform expansion by per-group whitelist + remove VW MQB -- 2026-04-09
+- Root cause: buildPlatformIndex() loaded sib.partTypes correctly but expansion code ignored it, pulled ALL sibling sales
+- Fix: gate at sales matching loop -- siblingKeyPartTypes tracks which candidateKeys came from siblings and only allows whitelisted partTypes
+- Default when sib.partTypes is null/empty: skip expansion entirely (safer than allowing all)
+- Removed VW MQB platform_group (id 22): 3 shared_part + 3 vehicle + 1 group rows
+- Owner directive: VW Passat/Jetta/Golf don't share parts at puller-relevant level
+- 24 other groups unaffected, still expand for whitelisted drivetrain part types only
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

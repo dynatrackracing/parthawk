@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Bug B Fix: Gate Platform Expansion by Per-Group Whitelist + Remove VW MQB — 2026-04-09
+- Platform expansion now gated by per-group partTypes from platform_shared_part. VW MQB group deleted. Jetta parts no longer bleed onto Passat cards.
+
+---
+
 ## Bug A Real Fix: Normalize Dashes in isSkipWord — 2026-04-09
 - isSkipWord() now strips non-alphanumerics before SKIP_WORDS lookup. "Anti-Lock" correctly matches "ANTILOCK". Fixes 28-in-stock junk bucket.
 
