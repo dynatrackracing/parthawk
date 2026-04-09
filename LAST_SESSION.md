@@ -584,3 +584,27 @@ FOLLOW-UP (next session):
 - import-all-data.js data dir → C:\DarkHawk\parthawk-deploy\data
 - All .bat files now use cd /d for cross-drive safety
 - Verified: zero remaining references to "atenr" or "parthawk-complete" in the repo
+
+## Competitor scraper repair — data fix + lastScrapedAt discipline — 2026-04-08 22:30
+- Diagnosed over multi-turn architect session: scraper is working, problem was
+  (a) two bad names in SoldItemSeller and (b) lastScrapedAt advancing on 0-item
+  returns created false "already scraped" signal
+- Data fix: DELETE+INSERT in SoldItemSeller. repairaboratorycom → repairlaboratorycom.
+  vladscarparts → speeedyservice. Both reset to itemsScraped=0, lastScrapedAt=NULL.
+- lastScrapedAt guard: three one-line conditionals added around lastScrapedAt writes
+  in SoldItemsManager.scrapeCompetitor(), competitors.js POST /:sellerId/scrape,
+  and CompetitorDripRunner.runDrip(). WARN log on each zero-item path. No other
+  logic changes.
+- Silent-0 alerting is now live via the three WARN logs. Future stuck sellers
+  will surface in Railway logs instead of sitting invisible.
+- scripts/scrape-one-competitor.js added as manual backfill tool (parallel to
+  scrape-local.js, does NOT replace it).
+- Backfills run locally against production DB:
+    - repairlaboratorycom: +120 rows
+    - speeedyservice: +83 rows
+    - instrumentclusterstore (sanity check): +38 rows (healthy — dupes expected from prior 450 rows)
+- Autocircuitsolutions already backfilled in prior diagnostic step: 55 rows.
+- Files touched: SoldItemsManager.js, competitors.js, CompetitorDripRunner.js,
+  scripts/scrape-one-competitor.js (new), SoldItemSeller data.
+- NOT touched: SoldItemsScraper.js, scrape-local.js, OAuth/getToken, any Deploy A
+  or date architecture files.

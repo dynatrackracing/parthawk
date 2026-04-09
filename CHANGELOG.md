@@ -4,6 +4,17 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Competitor Scraper Repair — Data Fix + lastScrapedAt Discipline — 2026-04-08
+- Two SoldItemSeller rows had bad names (typo + store slug instead of seller username);
+  replaced via DELETE+INSERT with correct _ssn values.
+- lastScrapedAt now only advances on successful (non-zero) scrapes across all three
+  call paths; WARN log on zero-item returns provides silent-0 alerting.
+- Added scripts/scrape-one-competitor.js for manual single-seller backfills.
+- Files: SoldItemsManager.js, competitors.js, CompetitorDripRunner.js,
+  scripts/scrape-one-competitor.js.
+
+---
+
 ## Session Close 2026-04-08 -- 20+ commits across Scout Alerts
 - Security lockdown (rule 42), intel source icons (rule 43), Deploy A scoring rewrite (rule 44), two UI cleanup passes, reasons render fix
 - Scout Alerts now produces numeric 0-100 match scores with full reasons, calibrated against real fleet data via two dry-run HALT cycles
