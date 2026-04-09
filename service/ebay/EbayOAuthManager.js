@@ -23,14 +23,15 @@ const axios = require('axios').default;
 const TOKEN_ENDPOINT = 'https://api.ebay.com/identity/v1/oauth2/token';
 
 // Scopes granted during consent flow (must match exactly).
-// The Post-Order API (returns) is a "traditional" API that uses the base api_scope,
-// but we also request sell.return scopes for future RESTful return endpoints.
+// IMPORTANT: Only request scopes the refresh token was originally minted with.
+// Adding scopes here that weren't in the original consent flow will cause
+// "scope is invalid or exceeds the scope granted" errors on every refresh.
+// The Post-Order API (returns) is a "traditional" API that works with the
+// base api_scope — no special return scope needed.
 const SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
-  'https://api.ebay.com/oauth/api_scope/sell.return',
-  'https://api.ebay.com/oauth/api_scope/sell.return.readonly',
 ].join(' ');
 
 class EbayOAuthManager {
@@ -54,7 +55,7 @@ class EbayOAuthManager {
 
   /**
    * Get a valid access token. Refreshes automatically if expired or expiring soon.
-   * Returns null if not configured (caller should fall back to legacy token).
+   * Returns null if not configured or if refresh fails (caller should fall back to legacy token).
    */
   async getToken() {
     if (!this.isConfigured()) {
@@ -69,13 +70,21 @@ class EbayOAuthManager {
 
     // Deduplicate concurrent refresh calls
     if (this._refreshing) {
-      return this._refreshing;
+      try {
+        return await this._refreshing;
+      } catch (err) {
+        return null;
+      }
     }
 
     this._refreshing = this._refresh();
     try {
       const token = await this._refreshing;
       return token;
+    } catch (err) {
+      // Refresh failed — return null so callers fall back to legacy token
+      this.log.warn({ err: err.message }, 'getToken: refresh failed, returning null for fallback');
+      return null;
     } finally {
       this._refreshing = null;
     }
