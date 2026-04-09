@@ -587,21 +587,8 @@
         html += `<div style="padding:6px 14px;background:#1a1a1a;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;display:flex;justify-content:space-between;${sectionStyle}">`
           + `<span>${sec.label}</span><span>${sec.vehicles.length}</span></div>`;
         const BATCH = 30;
-        let lastTier = null;
         for (let i = 0; i < Math.min(BATCH, vehiclesToRender.length); i++) {
-          const veh = vehiclesToRender[i];
-          if (veh.tier && veh.tier !== lastTier) {
-            const tierCfg = veh.tier === 'SCOUT_ALERTS' ? { icon:'\uD83C\uDFAF', title:'SCOUT ALERTS', sub:'Want list matches at this yard. Pull these first.', color:'#FFD700' }
-              : veh.tier === 'SOLD' ? { icon:'\uD83D\uDCE6', title:'SOLD', sub:'Proven demand from your sales history.', color:'#4CAF50' }
-              : { icon:'\uD83D\uDD01', title:'COMPETITOR INTEL', sub:'Competitors stock these parts. Restock opportunity.', color:'#2979ff' };
-            const tierCount = vehiclesToRender.filter(x => x.tier === veh.tier).length;
-            html += `<div style="padding:10px 14px;margin:4px 0;border-top:2px solid ${tierCfg.color};border-bottom:1px solid #2a2a2a;background:#0d0d0d">
-              <div style="font-size:13px;font-weight:800;color:${tierCfg.color};letter-spacing:0.05em">${tierCfg.icon} ${tierCfg.title} <span style="font-weight:400;font-size:11px;color:#6B7280">${tierCount} vehicle${tierCount !== 1 ? 's' : ''}</span></div>
-              <div style="font-size:10px;color:#6B7280;margin-top:2px">${tierCfg.sub}</div>
-            </div>`;
-            lastTier = veh.tier;
-          }
-          html += renderVehicle(veh);
+          html += renderVehicle(vehiclesToRender[i]);
         }
         if (vehiclesToRender.length > BATCH) {
           const sectionId = 'lazy-' + yd.yard.id + '-' + sec.label.replace(/\s+/g, '');
@@ -754,19 +741,13 @@
     if (v.setDateLabel) metaParts.push(v.setDateLabel);
     const line3 = `<div style="font-size:11px;color:#6B7280;margin-top:3px">${metaParts.join(' · ')}${newBadge}${goneLabel}</div>`;
 
-    // Tier badge
-    const tierBadge = v.tier === 'SCOUT_ALERTS' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#FFD700;color:#000;margin-left:4px">\uD83C\uDFAF SA</span>'
-      : v.tier === 'SOLD' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#4CAF50;color:#fff;margin-left:4px">\uD83D\uDCE6 SOLD</span>'
-      : '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#2979ff;color:#fff;margin-left:4px">\uD83D\uDD01 INTEL</span>';
-    const scoreDisplay = v.tier === 'SCOUT_ALERTS' && v.tierScore ? `${v.score} <span style="opacity:0.6;font-size:10px">/ SA ${v.tierScore}</span>` : String(v.score || 0);
-
     return `<div class="vehicle-row ${rowClass}" id="vrow-${v.id}">
       <div class="v-collapsed" onclick="toggleV('${v.id}')">
-        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${scoreDisplay}</div>
+        <div class="v-score" style="background:${scoreColor}20;color:${scoreColor};${scorePulse}">${v.score}</div>
         <div class="v-info" style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
             <div style="min-width:0">
-              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${tierBadge}${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}${rarityInline}</div>
+              <div class="v-title"><strong style="color:#fff">${v.year} ${cleanModel(v.make, '')} ${cleanModel(v.model, v.make)}</strong>${v.engine ? ` <span style="font-size:12px;color:#9CA3AF;font-weight:600">${v.engine}</span>` : ''}${rarityInline}</div>
             </div>
             ${v.est_value > 0 ? `<div style="font-size:14px;font-weight:700;color:${valColor};flex-shrink:0">$${v.est_value}</div>` : ''}
           </div>
@@ -919,7 +900,7 @@
       const isCached = !!getCachedId(p);
       html += `<div class="part-detail${isCached ? ' cached-part' : ''}" id="pd-${v.id}-${pid}">
         <div class="pd-header">
-          <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 QUARRY' : '\u26A0 OVER'}</span>` : ''}${(p.intelSources || []).map(s => s === 'mark' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">&#x1F3AF; MARK</span>' : s === 'quarry' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7c2d12;color:#f97316;margin-right:3px">&#x1F525; QUARRY</span>' : s === 'stream' || s === 'restock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">&#x1F501; STREAM</span>' : s === 'overstock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">&#x2715; OVER</span>' : s === 'sold' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#27AE60;color:#fff;margin-right:3px">SOLD</span>' : s === 'flag' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#F39C12;color:#fff;margin-right:3px">&#x26A1; FLAG</span>' : '').join('')}${p.noveltyTier === 'NOVEL' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>' : p.noveltyTier === 'RESTOCK' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
+          <div class="pd-title">${p.alertMatch ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${p.alertMatch.source === 'PERCH' ? '#422006' : p.alertMatch.source === 'bone_pile' ? '#7c2d12' : p.alertMatch.source === 'hunters_perch' ? '#1e3a5f' : '#7f1d1d'};color:${p.alertMatch.source === 'PERCH' ? '#f59e0b' : p.alertMatch.source === 'bone_pile' ? '#f97316' : p.alertMatch.source === 'hunters_perch' ? '#3b82f6' : '#ef4444'};margin-right:6px;display:inline-block">${p.alertMatch.source === 'PERCH' ? '\uD83C\uDFAF MARK' : p.alertMatch.source === 'bone_pile' ? '\u26A1 QUARRY' : p.alertMatch.source === 'hunters_perch' ? '\u26A1 QUARRY' : '\u26A0 OVER'}</span>` : ''}${(p.intelSources || []).map(s => s === 'mark' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">&#x1F3AF; MARK</span>' : s === 'quarry' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7c2d12;color:#f97316;margin-right:3px">&#x1F525; QUARRY</span>' : s === 'stream' || s === 'restock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">&#x1F501; STREAM</span>' : s === 'overstock' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">&#x2715; OVER</span>' : s === 'sold' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#27AE60;color:#fff;margin-right:3px">SOLD</span>' : s === 'flag' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#F39C12;color:#fff;margin-right:3px">&#x26A1; FLAG</span>' : '').join('')}${p.noveltyTier === 'NOVEL' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>' : p.noveltyTier === 'RESTOCK' ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>' : ''}${p.scoutAlertMatch ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#FFD700;color:#000;margin-right:3px">&#x1F3AF; SA' + (p.scoutAlertScore ? ' ' + p.scoutAlertScore : '') + '</span>' : ''}${p.hasSoldHistory && !p.scoutAlertMatch ? '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#4CAF50;color:#fff;margin-right:3px">&#x1F4E6; SOLD</span>' : ''}${p.partType ? `[${p.partType}] ` : ''}${p.title || p.category || 'Part'}</div>
           <div class="pd-verdict ${vc}">${noPrice ? 'NO DATA' : badgeVerdict + ' ' + pricePrefix + price + ' ' + freshness}</div>
         </div>
         <div class="pd-stats">

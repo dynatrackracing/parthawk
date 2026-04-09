@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Deploy B REDO: Scout-Alert-First Sort Inside Expanded Parts — 2026-04-09
+- Rolled back page-level tier sections. Parts in expanded view now sorted scout-alert-first with signal badges.
+
+---
+
 ## Deploy B Part 2: Daily Feed Visual Sectioning — 2026-04-09
 - Section headers (SCOUT ALERTS/SOLD/COMPETITOR INTEL) + per-card tier badges on attack-list.html. Deploy B complete.
 

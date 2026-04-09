@@ -188,20 +188,20 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       vehicle.make, vehicle.expected_parts, vehicle.audio_brand, validations
     );
 
-    // Tag parts that match scout alerts for this vehicle
+    // Tag parts with scout alert match + signal flags, then sort scout-alert-first
     try {
       const yard = await database('yard').where('id', vehicle.yard_id).first();
       if (yard) {
         const alerts = await database('scout_alerts')
-          .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
           .where('vehicle_year', vehicle.year)
           .whereRaw('LOWER(vehicle_make) = ?', [(vehicle.make || '').toLowerCase()])
           .whereRaw('LOWER(vehicle_model) = ?', [(vehicle.model || '').toLowerCase()])
           .whereRaw('LOWER(yard_name) LIKE ?', ['%' + (yard.name || '').toLowerCase() + '%'])
-          .select('source', 'source_title', 'part_value', 'confidence');
+          .select('source', 'source_title', 'part_value', 'confidence', 'match_score');
 
         if (alerts.length > 0) {
           for (const part of (scored.parts || [])) {
+            let bestAlertScore = 0;
             for (const alert of alerts) {
               const alertTitle = (alert.source_title || '').toLowerCase();
               const partType = (part.partType || '').toLowerCase();
@@ -209,14 +209,35 @@ router.get('/vehicle/:id/parts', async (req, res) => {
               const typeMatch = partType.length >= 3 && alertTitle.includes(partType);
               const pnMatch = partNumber.length >= 5 && alertTitle.toUpperCase().includes(partNumber);
               if (typeMatch || pnMatch) {
-                part.alertMatch = { source: alert.source, title: alert.source_title, value: alert.part_value, confidence: alert.confidence };
-                break;
+                const s = parseInt(alert.match_score) || 0;
+                if (s > bestAlertScore) bestAlertScore = s;
+                if (!part.alertMatch) {
+                  part.alertMatch = { source: alert.source, title: alert.source_title, value: alert.part_value, confidence: alert.confidence };
+                }
               }
             }
+            part.scoutAlertMatch = bestAlertScore >= 50;
+            part.scoutAlertScore = bestAlertScore > 0 ? bestAlertScore : null;
           }
         }
       }
     } catch (e) { /* alert matching is non-fatal */ }
+
+    // Set signal flags on each part
+    for (const part of (scored.parts || [])) {
+      if (!part.scoutAlertMatch) part.scoutAlertMatch = false;
+      part.hasSoldHistory = !!(part.intelSources && part.intelSources.includes('sold'));
+      part.hasCompetitorIntel = !!(part.intelSources && (part.intelSources.includes('quarry') || part.intelSources.includes('stream') || part.intelSources.includes('restock') || part.intelSources.includes('mark')));
+    }
+
+    // Sort: scout alert matches first, then sold history, then competitor intel, then rest
+    (scored.parts || []).sort((a, b) => {
+      const sa = a.scoutAlertMatch ? 0 : a.hasSoldHistory ? 1 : a.hasCompetitorIntel ? 2 : 3;
+      const sb = b.scoutAlertMatch ? 0 : b.hasSoldHistory ? 1 : b.hasCompetitorIntel ? 2 : 3;
+      if (sa !== sb) return sa - sb;
+      if (a.scoutAlertMatch && b.scoutAlertMatch) return (b.scoutAlertScore || 0) - (a.scoutAlertScore || 0);
+      return (b.price || 0) - (a.price || 0);
+    });
 
     res.json({
       success: true,

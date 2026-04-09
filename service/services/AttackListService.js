@@ -10,11 +10,6 @@ const { classifyPowertrain } = require('../lib/LocalVinDecoder');
 const TrimTierService = require('./TrimTierService');
 const { resolvePricesBatch } = require('../lib/priceResolver');
 
-// Deploy B tier constants
-const SCOUT_ALERT_TIER_THRESHOLD = 60;
-const TIERS = { SCOUT_ALERTS: 'SCOUT_ALERTS', SOLD: 'SOLD', COMPETITOR_INTEL: 'COMPETITOR_INTEL' };
-const TIER_RANK = { SCOUT_ALERTS: 0, SOLD: 1, COMPETITOR_INTEL: 2 };
-
 let _inventoryIndexCache = null;
 let _inventoryIndexCacheTime = 0;
 let _validationCache = null;
@@ -1925,49 +1920,15 @@ class AttackListService {
       // Attach yard cost factor to vehicles before scoring
       for (const v of vehicles) v._yardCostFactor = yardCostFactor;
 
-      // Load scout alert signals for this yard
-      const scoutSignals = await this.loadScoutAlertSignals(yard.name);
-
-      const scored = vehicles.map(v => {
-        const result = this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3);
-
-        // Deploy B: Assign tier based on best signal
-        const scoutKey = [v.year, (v.make || '').toUpperCase(), (v.model || '').toUpperCase()].join('|');
-        const scoutScore = scoutSignals.get(scoutKey);
-        if (scoutScore && scoutScore >= SCOUT_ALERT_TIER_THRESHOLD) {
-          result.tier = TIERS.SCOUT_ALERTS;
-          result.tierScore = scoutScore;
-        } else {
-          // Check parts for SOLD vs COMPETITOR_INTEL signal
-          const parts = result.parts || [];
-          let hasSold = false, hasIntel = false;
-          for (const p of parts) {
-            if (p.intelSources) {
-              if (p.intelSources.includes('sold')) hasSold = true;
-              if (p.intelSources.includes('mark') || p.intelSources.includes('quarry') || p.intelSources.includes('stream') || p.intelSources.includes('restock')) hasIntel = true;
-            }
-          }
-          if (hasSold) {
-            result.tier = TIERS.SOLD;
-            result.tierScore = result.score;
-          } else {
-            result.tier = TIERS.COMPETITOR_INTEL;
-            result.tierScore = result.score;
-          }
-        }
-        return result;
-      });
-
-      // Sort: active first, then by tier rank, then by score within tier
+      const scored = vehicles.map(v =>
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3)
+      );
+      // Sort: active first, then highest total value, then max single part tiebreaker
       scored.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-        const tierDiff = (TIER_RANK[a.tier] || 2) - (TIER_RANK[b.tier] || 2);
-        if (tierDiff !== 0) return tierDiff;
-        // SCOUT_ALERTS sorts by tierScore; SOLD+INTEL intermix by vehicle score
-        if (a.tier === TIERS.SCOUT_ALERTS) return (b.tierScore || 0) - (a.tierScore || 0);
-        const scoreDiff = (b.score || 0) - (a.score || 0);
-        if (scoreDiff !== 0) return scoreDiff;
-        return (b.est_value || 0) - (a.est_value || 0);
+        const valDiff = (b.est_value || 0) - (a.est_value || 0);
+        if (valDiff !== 0) return valDiff;
+        return (b.max_part_value || 0) - (a.max_part_value || 0);
       });
 
       const _staleHours = await hoursSinceLastScrape(database, yard.id);

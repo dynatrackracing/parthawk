@@ -48,6 +48,15 @@
 - Empty tiers silently skipped
 - Deploy B complete: Deploy A scoring visible to pullers on Daily Feed
 
+## Deploy B REDO: scout-alert-first sort inside expanded parts -- 2026-04-09
+- Rolled back commits 55a7087 (tier assignment) + dd4f52a (section headers + tier badges)
+- Daily Feed card visual restored to pre-Deploy B state (no section headers, no tier badges)
+- Reimplemented: /attack-list/vehicle/:id/parts now sorts parts scout-alert-first
+- Each part gets signal flags: scoutAlertMatch, scoutAlertScore, hasSoldHistory, hasCompetitorIntel
+- Sort: scout alert matches first (by scoutAlertScore DESC), then sold history, then competitor intel, then rest
+- Expanded view shows signal badges: gold SA badge with score, green SOLD badge, existing intel icons
+- Collapsed card headlines unchanged
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
