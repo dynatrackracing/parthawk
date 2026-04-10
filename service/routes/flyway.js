@@ -251,7 +251,12 @@ router.get('/vehicle/:vehicleId/parts', async (req, res) => {
       } catch (e) { /* reference lookup optional */ }
     }
 
-    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
+    // Build scout alert index and attach yard name for composite key lookup
+    const scoutAlertIdx = await service.buildScoutAlertIndex();
+    const yard = await database('yard').where('id', vehicle.yard_id).first();
+    if (yard) vehicle._yardName = yard.name;
+
+    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, undefined, undefined, undefined, undefined, scoutAlertIdx);
 
     // Enrich with dead inventory warnings
     const deadService = new DeadInventoryService();
@@ -288,35 +293,28 @@ router.get('/vehicle/:vehicleId/parts', async (req, res) => {
       log.warn({ err: e.message }, 'Flyway market enrichment failed');
     }
 
-    // Tag parts that match scout alerts for this vehicle
-    try {
-      const yard = await database('yard').where('id', vehicle.yard_id).first();
-      if (yard) {
-        const alerts = await database('scout_alerts')
-          .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
-          .where('vehicle_year', vehicle.year)
-          .whereRaw('LOWER(vehicle_make) = ?', [(vehicle.make || '').toLowerCase()])
-          .whereRaw('LOWER(vehicle_model) = ?', [(vehicle.model || '').toLowerCase()])
-          .whereRaw('LOWER(yard_name) LIKE ?', ['%' + (yard.name || '').toLowerCase() + '%'])
-          .select('source', 'source_title', 'part_value', 'confidence');
+    // Scout alert matching now handled by scoreVehicle() via scoutAlertIndex.
+    // Set signal flags on each part (Deploy B REDO parity with Daily Feed)
+    for (const part of (scored.parts || [])) {
+      if (!part.scoutAlertMatch) part.scoutAlertMatch = false;
+      part.hasSoldHistory = !!(part.intelSources && part.intelSources.includes('sold'));
+      part.hasCompetitorIntel = !!(part.intelSources && (part.intelSources.includes('quarry') || part.intelSources.includes('stream') || part.intelSources.includes('restock') || part.intelSources.includes('mark')));
+    }
 
-        if (alerts.length > 0) {
-          for (const part of (scored.parts || [])) {
-            for (const alert of alerts) {
-              const alertTitle = (alert.source_title || '').toLowerCase();
-              const partType = (part.partType || '').toLowerCase();
-              const partNumber = (part.partNumber || '').toUpperCase();
-              const typeMatch = partType.length >= 3 && alertTitle.includes(partType);
-              const pnMatch = partNumber.length >= 5 && alertTitle.toUpperCase().includes(partNumber);
-              if (typeMatch || pnMatch) {
-                part.alertMatch = { source: alert.source, title: alert.source_title, value: alert.part_value, confidence: alert.confidence };
-                break;
-              }
-            }
-          }
-        }
-      }
-    } catch (e) { /* alert matching is non-fatal */ }
+    // Sort: scout alert matches first, then sold history, then competitor intel, then rest
+    (scored.parts || []).sort((a, b) => {
+      const sa = a.scoutAlertMatch ? 0 : a.hasSoldHistory ? 1 : a.hasCompetitorIntel ? 2 : 3;
+      const sb = b.scoutAlertMatch ? 0 : b.hasSoldHistory ? 1 : b.hasCompetitorIntel ? 2 : 3;
+      if (sa !== sb) return sa - sb;
+      if (a.scoutAlertMatch && b.scoutAlertMatch) return (b.scoutAlertScore || 0) - (a.scoutAlertScore || 0);
+      return (b.price || 0) - (a.price || 0);
+    });
+
+    // ARCHIVES sort: item_reference parts always at bottom
+    const nonArchives = (scored.parts || []).filter(p => p.priceSource !== 'item_reference');
+    const archives = (scored.parts || []).filter(p => p.priceSource === 'item_reference')
+      .sort((a, b) => (b.price || 0) - (a.price || 0));
+    scored.parts = [...nonArchives, ...archives];
 
     res.json({
       success: true,

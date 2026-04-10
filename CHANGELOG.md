@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Flyway Road Trip: Price-Confirmed + Scout Signals — 2026-04-10
+- Road trip now requires YourSale price confirmation on LEGENDARY/RARE; MARKs always pass
+- Flyway parts endpoint now sorts scout-alert-first with signal flags (Deploy B REDO parity)
+- Day trip behavior unchanged
+- Files: FlywayService.js, flyway.js, flyway.html
+
+---
+
 ## 2026-04-10 — Scout alerts as Attack List value source + matching upgrades
 - buildScoutAlertIndex + scoreVehicle injection (synthetic parts + merge, MAX tiebreak)
 - Hybrid/EV powertrain + displacement matching in computeMatchScore. ~800 alerts pushed below threshold

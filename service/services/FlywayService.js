@@ -238,13 +238,22 @@ class FlywayService {
         return new Date(b.date_added || 0) - new Date(a.date_added || 0);
       });
 
-      // Road trip filter: LEGENDARY + RARE + MARK only
+      // Road trip filter: MARKs always pass, LEGENDARY/RARE require YourSale price confirmation
       const isRoadTrip = trip.trip_type === 'road_trip';
       const filteredForTrip = isRoadTrip
-        ? yardVehicles.filter(v =>
-            v.rarityTier === 'LEGENDARY' || v.rarityTier === 'RARE' ||
-            (v.intel_match_count && v.intel_match_count > 0 && v.parts && v.parts.some(p => p.intelSource === 'mark'))
-          )
+        ? yardVehicles.filter(v => {
+            // MARKs always pass — no price gate
+            if (v.intel_match_count > 0 && Array.isArray(v.parts) && v.parts.some(p => p.intelSources && p.intelSources.includes('mark'))) return true;
+            // LEGENDARY + RARE require price confirmation
+            const isLegOrRare = v.rarityTier === 'LEGENDARY' || v.rarityTier === 'RARE';
+            if (!isLegOrRare) return false;
+            // At least one non-excluded part with YourSale-confirmed price
+            return Array.isArray(v.parts) && v.parts.some(p =>
+              !p.belowFloor &&
+              p.priceSource === 'sold' &&
+              (p.price || 0) > 0
+            );
+          })
         : yardVehicles;
 
       // Pass 1: Top vehicles above score floor

@@ -1,5 +1,17 @@
 # LAST SESSION -- 2026-04-10
 
+## Flyway road trip: price-confirmed filter + scout alert signals — 2026-04-10
+- FlywayService.getFlywayAttackList road trip filter rewritten:
+  - MARKs always pass (no price gate) — fixed intelSources plural (was intelSource singular, never matched)
+  - LEGENDARY/RARE require >=1 non-excluded part with priceSource='sold' and price > 0
+  - Removes display of LEGENDARY/RARE vehicles backed only by decorative Item.price/market_demand_cache
+- Day trip path unchanged — still identical to Daily Feed
+- /flyway/vehicle/:vehicleId/parts now uses buildScoutAlertIndex + scoreVehicle injection (replaces old inline alert matching)
+  - Parts decorated with scoutAlertMatch, scoutAlertScore, hasSoldHistory, hasCompetitorIntel
+  - Sort: scout-alert-first, then sold, then intel, then rest. Archives at bottom.
+- flyway.html cache buster v5→v6
+- Files: FlywayService.js, flyway.js, flyway.html
+
 ## Nest Protector: Check Stock includes The Cache — 2026-04-10
 - Diagnosed: backend code existed (cogs.js line 218-223), frontend display existed (gate.html line 412-427), but cache entries from scout_alert claims have part_number=null — PN is embedded in part_description text only. CacheService.checkCacheStock() only searched part_number column, so it never found anything.
 - Fix in cogs.js: replaced CacheService.checkCacheStock() delegation with direct query that searches BOTH part_number column AND part_description LIKE for the PN (using raw PN and compressed forms)
