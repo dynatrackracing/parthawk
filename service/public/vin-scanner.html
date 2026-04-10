@@ -23,18 +23,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
 .btn-cam{background:#1a1a1a;border:1px solid #333;font-size:20px;color:#d1d5db;padding:12px 16px}
 .spinner{width:18px;height:18px;border:2px solid #333;border-top-color:#dc2626;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.b{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
-.b-gr{background:#064e3b;color:#16a34a}.b-yl{background:#713f12;color:#a16207}.b-or{background:#7c2d12;color:#c2410c}.b-rd{background:#7f1d1d;color:#dc2626}.b-gy{background:#1a1a1a;color:#9CA3AF}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;padding:5px 6px;color:#6B7280;font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid #2a2a2a}
-td{padding:6px;border-bottom:1px solid #1f1f1f}
-.pg{color:#16a34a;font-weight:700}.py{color:#ca8a04;font-weight:700}.po{color:#ea580c;font-weight:700}.pr{color:#dc2626;font-weight:700}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,0.3)}50%{box-shadow:0 0 8px 2px rgba(255,215,0,0.3)}}
+@keyframes pulse-purple{0%,100%{box-shadow:0 0 0 0 rgba(195,155,211,0.3)}50%{box-shadow:0 0 8px 2px rgba(195,155,211,0.3)}}
+@keyframes pulse-fire{0%,100%{filter:brightness(1)}50%{filter:brightness(1.5)}}
 .section-empty{color:#6B7280;font-size:12px;padding:10px 0;text-align:center}
 .hist-link{display:block;text-align:center;padding:10px;font-size:11px;color:#6B7280;cursor:pointer;text-decoration:underline}
 .h-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1f1f1f;cursor:pointer}
 .h-vin{font-family:monospace;font-size:11px;font-weight:700}
 .h-veh{font-size:10px;color:#9CA3AF}
 .h-time{font-size:10px;color:#6B7280}
+/* Chip styles matching Daily Feed */
+.chip{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;margin:1px 2px;white-space:nowrap}
+.chip-gold{background:#3d2e0a;color:#FFD700;animation:pulse-gold 2s infinite}
+.chip-purple{background:#2d1a3e;color:#C39BD3;animation:pulse-purple 2s infinite}
+.chip-blue{background:#1a2a3d;color:#3498DB}
+.chip-green{background:#0a2e0a;color:#2ECC40}
+.chip-yellow{background:#3d2200;color:#FF8C00}
+.chip-red{background:#3d0a0a;color:#FF4136}
+.chip-gray{background:#1f2937;color:#6B7280}
+/* Part detail */
+.part-detail{padding:10px 0;border-bottom:1px solid #1f1f1f}
+.part-detail.excluded{opacity:0.35}
+.part-detail.spec-mismatch{opacity:0.4}
+.pd-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.pd-title{font-size:12px;font-weight:600;color:#d1d5db;flex:1;min-width:0}
+.pd-verdict{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.pd-stats{display:flex;gap:10px;font-size:10px;color:#6B7280;margin-top:3px;flex-wrap:wrap}
+.pd-reason{font-size:10px;color:#6B7280;font-style:italic;margin-top:2px}
+.btn-pull{padding:6px 12px;border-radius:6px;border:1px solid #22c55e;background:transparent;color:#22c55e;font-size:10px;font-weight:700;cursor:pointer;margin-top:4px}
+.btn-pull:disabled{opacity:0.4;cursor:default}
+.btn-cached{border-color:#065f46;background:#064e3b;color:#22c55e}
+.intel-fire{animation:pulse-fire 1.5s infinite}
+/* Attribute badges */
+.attr-badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:3px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -45,27 +66,13 @@ td{padding:6px;border-bottom:1px solid #1f1f1f}
     <div class="card-title">Enter or Scan VIN</div>
     <input type="text" class="vin-input" id="vinInput" maxlength="17" placeholder="17-character VIN" autocomplete="off" spellcheck="false">
     <div class="btn-row">
-      <button class="btn btn-cam" id="camBtn">📷</button>
+      <button class="btn btn-cam" id="camBtn">&#x1F4F7;</button>
       <button class="btn btn-red" id="decBtn" onclick="doScan()">Decode</button>
     </div>
     <div style="font-size:10px;color:#6B7280;margin-top:6px">Tip: check door jamb sticker if dash has glare</div>
     <div id="status" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
   </div>
   <div id="results"></div>
-  <div id="instantResearch" style="display:none">
-    <div class="card" style="border-color:#dc2626;border-width:2px">
-      <button onclick="runInstantResearch()" id="researchBtn" class="btn btn-red" style="width:100%;padding:14px;font-size:15px">Instant Research — What to Pull</button>
-      <div id="researchResults"></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">Standalone Research</div>
-    <input type="text" class="vin-input" id="researchInput" placeholder="2011 Toyota Sequoia 5.7L" style="font-size:14px;letter-spacing:0">
-    <div class="btn-row">
-      <button class="btn btn-red" id="standaloneBtn" onclick="runStandaloneResearch()" style="flex:1">Research Vehicle</button>
-    </div>
-    <div id="standaloneResults"></div>
-  </div>
   <div id="histArea"><span class="hist-link" onclick="loadHistory(this)">Show Recent Scans</span></div>
 </div>
 <script>
@@ -73,14 +80,14 @@ function esc(s){if(!s)return '';var d=document.createElement('div');d.textConten
 var V=document.getElementById('vinInput');
 V.focus();
 V.addEventListener('keydown',function(e){if(e.key==='Enter')doScan()});
+var _scanSeq=0;
 
-// Camera photo processing — Image+canvas, resize aggressively for mobile memory
+// Camera photo processing
 async function processVinPhoto(file) {
   try {
     var url = URL.createObjectURL(file);
     var img = new Image();
     await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = function() { reject(new Error('Failed to load image')); }; img.src = url; });
-    // Resize to max 1280px on longest side — enough for VIN reading
     var MAX_DIM = 1280;
     var w = img.naturalWidth, h = img.naturalHeight;
     if (w > MAX_DIM || h > MAX_DIM) {
@@ -93,7 +100,6 @@ async function processVinPhoto(file) {
     ctx.drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(url); img.src = '';
     var b64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-    // If still too large (>1.5MB base64), reduce further
     if (b64.length > 1500000) {
       canvas.width = Math.round(w * 0.5); canvas.height = Math.round(h * 0.5);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -135,322 +141,338 @@ document.getElementById('camBtn').onclick=function(){
 function doScan(src){
   var vin=V.value.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');
   if(vin.length<11){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626;font-size:13px">Enter at least 11 characters</div>';return;}
+  var mySeq=++_scanSeq;
   var btn=document.getElementById('decBtn');btn.disabled=true;btn.innerHTML='<div class="spinner" style="margin:0 auto"></div>';
-  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Decoding...</div></div>';
-  fetch('/vin/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vin:vin,source:src||'manual'})})
+  document.getElementById('results').innerHTML='<div class="card" style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Decoding + scoring...</div></div>';
+  fetch('/vin/scan-scored',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vin:vin,source:src||'manual'})})
   .then(function(r){return r.json()})
-  .then(function(data){if(!data.success)throw new Error(data.error);render(data);})
-  .catch(function(err){document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';})
+  .then(function(data){if(mySeq!==_scanSeq)return;if(!data.success)throw new Error(data.error);render(data);})
+  .catch(function(err){if(mySeq!==_scanSeq)return;document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626">Error: '+err.message+'</div>';})
   .finally(function(){btn.disabled=false;btn.textContent='Decode';});
 }
 
-function vd(price){return getPartTier(price).label}
-function vc(label){var m={'ELITE':500,'PREMIUM':350,'HIGH':250,'SOLID':150,'BASE':100,'LOW':0};return getPartTier(m[label]||0).cssClass}
-function pc(v){return v>=250?'pg':v>=150?'py':v>=100?'po':'pr'}
 function ta(ds){if(!ds)return'-';var m=Math.floor((Date.now()-new Date(ds).getTime())/60000);if(m<1)return'now';if(m<60)return m+'m';var h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d'}
 
+function getScoreColor(s){
+  if(s>=120)return '#FFD700';
+  if(s>=100)return '#00FF00';
+  if(s>=80)return '#2ECC40';
+  if(s>=60)return '#F1C40F';
+  if(s>=40)return '#FF8C00';
+  return '#FF4136';
+}
+
+function tierColor(price,sources,overstock){
+  if(overstock)return 'chip-red';
+  if(sources&&sources.includes('mark'))return 'chip-gold';
+  if(price>=500)return 'chip-gold';
+  if(price>=350)return 'chip-purple';
+  if(price>=250)return 'chip-blue';
+  if(price>=150)return 'chip-green';
+  if(price>=100)return 'chip-yellow';
+  if(price>0)return 'chip-red';
+  return 'chip-gray';
+}
+
+function verdictBadge(price,priceSource){
+  if(!price||price<=0)return {label:'NO DATA',cls:'tier-nodata',text:'NO DATA'};
+  var tier=getPartTier(price);
+  var prefix='';var suffix='';
+  if(priceSource==='item_reference')prefix='';
+  else if(priceSource==='scout_alert')suffix=' (alert)';
+  return {label:tier.label,cls:tier.cssClass,text:tier.label+' '+prefix+'$'+Math.round(price)+suffix};
+}
+
+function freshIcon(dateStr){
+  if(!dateStr)return '';
+  var d=Math.floor((Date.now()-new Date(dateStr).getTime())/86400000);
+  if(d<=60)return ' &#x2705;';
+  if(d<=90)return ' &#x26A0;&#xFE0F;';
+  return ' &#x274C;';
+}
+
+function renderAttrBadges(v){
+  var badges=[];
+  var br=v.boostReasons||[];
+  // Strict order per CLAUDE_RULES 39
+  if(br.includes('ELECTRIC'))badges.push('<span class="attr-badge" style="border:1px solid #2979ff;color:#2979ff;background:transparent">EV</span>');
+  if(br.includes('PHEV'))badges.push('<span class="attr-badge" style="border:1px solid #1de9b6;color:#1de9b6;background:transparent">PHEV</span>');
+  if(v.trimBadge&&v.trimBadge.tier==='PERFORMANCE')badges.push('<span class="attr-badge" style="background:#3b82f6;color:#000">'+(v.trimBadge.decodedTrim?esc(v.trimBadge.decodedTrim):'PERFORMANCE')+'</span>');
+  if(br.includes('HYBRID'))badges.push('<span class="attr-badge" style="border:1px solid #00bcd4;color:#00bcd4;background:transparent">HYBRID</span>');
+  if(br.includes('DIESEL')||v.diesel)badges.push('<span class="attr-badge" style="background:#3b82f6;color:#000">DIESEL</span>');
+  if(br.includes('4WD+MT'))badges.push('<span class="attr-badge" style="background:#16a34a;color:#000">'+(v.decoded_drivetrain==='AWD'?'AWD':'4WD')+'+MT</span>');
+  else{
+    if(v.trimBadge&&v.trimBadge.tier==='PREMIUM'&&!br.includes('PERFORMANCE'))badges.push('<span class="attr-badge" style="background:#22c55e;color:#000">'+(v.trimBadge.decodedTrim?esc(v.trimBadge.decodedTrim):'PREMIUM')+'</span>');
+    var trans=(v.decoded_transmission||'').toUpperCase();
+    if(/MANUAL|STANDARD/.test(trans)&&!br.includes('4WD+MT'))badges.push('<span class="attr-badge" style="background:#06b6d4;color:#000">MANUAL</span>');
+    var dt=(v.decoded_drivetrain||v.drivetrain||'').toUpperCase();
+    if(/4WD|4X4|AWD/.test(dt)&&!br.includes('4WD+MT'))badges.push('<span class="attr-badge" style="background:#eab308;color:#000">'+(dt.includes('AWD')?'AWD':'4WD')+'</span>');
+    if(trans==='CHECK_MT')badges.push('<span class="attr-badge" style="background:#06b6d4;color:#000;opacity:0.6">CHECK MT</span>');
+    if(/CVT/.test(trans))badges.push('<span class="attr-badge" style="background:#374151;color:#9ca3af;font-weight:500">CVT</span>');
+  }
+  if(v.trimBadge&&v.trimBadge.tier==='CHECK')badges.push('<span class="attr-badge" style="background:#ca8a04;color:#000">CHECK TRIM</span>');
+  if(v.trimBadge&&v.trimBadge.tier==='BASE')badges.push('<span class="attr-badge" style="background:#374151;color:#9ca3af">BASE</span>');
+  if(v.cult)badges.push('<span class="attr-badge" style="background:#d946ef;color:#000">CULT</span>');
+  return badges.join('');
+}
+
+function renderChips(parts){
+  if(!parts||parts.length===0)return '<span class="chip chip-gray">No data</span>';
+  var seen={};var chips=[];
+  for(var i=0;i<parts.length;i++){
+    var p=parts[i];
+    var pt=p.partType||'OTHER';
+    if(seen[pt])continue;
+    seen[pt]=true;
+    if(p.isExcluded)continue;
+    var price=p.displayPrice||p.price||0;
+    var cls=tierColor(price,p.intelSources,p.overstockWarning);
+    var icon=renderIntelIcon(p.intelSources||[]);
+    if(!icon&&p.noveltyTier==='NOVEL')icon='<span style="color:#06b6d4;font-size:7px">&#x25CF;</span>';
+    else if(!icon&&p.noveltyTier==='RESTOCK')icon='<span style="color:#22c55e;font-size:7px">&#x25CF;</span>';
+    var priceStr=price>0?'$'+Math.round(price):'';
+    chips.push('<span class="chip '+cls+'">'+icon+(icon?' ':'')+esc(pt)+(priceStr?' '+priceStr:'')+'</span>');
+    if(chips.length>=6)break;
+  }
+  return chips.join('');
+}
+
+// Store last scan data for pull buttons
+var _lastVin=null;var _lastYear=null;var _lastMake=null;var _lastModel=null;
+
 function render(data){
-  var d=data.decoded||{},sh=data.salesHistory||[],cs=data.currentStock||[],mr=data.marketRef||[];
+  var v=data.vehicle;
+  var parts=data.parts||[];
+  if(!v){
+    document.getElementById('results').innerHTML='<div class="card" style="color:#dc2626;font-size:13px">Could not decode VIN</div>';
+    return;
+  }
+  _lastVin=data.vin;_lastYear=v.year;_lastMake=v.make;_lastModel=v.model;
+
   var h='';
-  // Vehicle header
-  var hl=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
-  var sp=[d.engine,d.engineType&&d.engineType!=='Gas'?d.engineType:null,d.drivetrain,d.trim].filter(Boolean).join(' · ');
-  h+='<div class="card"><div style="font-size:20px;font-weight:900;letter-spacing:-0.03em">'+hl+'</div>';
-  if(sp)h+='<div style="font-size:12px;font-weight:600;color:#d1d5db;margin-top:2px">'+sp+'</div>';
-  h+='<div style="font-family:monospace;font-size:13px;color:#16a34a;font-weight:700;margin-top:4px">'+data.vin+'</div></div>';
+  // === VEHICLE CARD (matches Daily Feed) ===
+  var sc=getScoreColor(v.score);
+  var scorePulse=v.score>=120?'animation:pulse-gold 2s infinite;':'';
+  var valColor=v.est_value>=800?'#2ECC40':v.est_value>=500?'#F1C40F':v.est_value>=250?'#FF8C00':'#FF4136';
 
-  // Build unified parts list
-  var pm={};
-  sh.forEach(function(s){if(s.partType)pm[s.partType]={pt:s.partType,sold:s.sold,avg:s.avgPrice,last:s.lastSoldDate,title:s.sampleTitle,stk:0,mprice:0};});
-  cs.forEach(function(c){if(!c.partType)return;if(pm[c.partType])pm[c.partType].stk=c.inStock;else pm[c.partType]={pt:c.partType,sold:0,avg:0,last:null,title:null,stk:c.inStock,mprice:c.avgPrice};});
-  mr.filter(function(m){return!m.isRebuild&&m.partType}).forEach(function(m){
-    if(pm[m.partType]){pm[m.partType].mprice=m.avgPrice;if(!pm[m.partType].stk)pm[m.partType].stk=m.inStock||0;}
-    else pm[m.partType]={pt:m.partType,sold:m.yourSold||0,avg:m.yourAvg||m.avgPrice,last:null,title:null,stk:m.inStock||0,mprice:m.avgPrice};
-  });
-
-  var parts=[];
-  for(var k in pm){var p=pm[k];if(p.pt&&p.pt!=='OTHER'&&p.pt!=='null'&&(p.avg>0||p.mprice>0||p.sold>0))parts.push(p);}
-  parts.sort(function(a,b){return(b.avg||b.mprice)-(a.avg||a.mprice)});
-  var tot=0;
-
-  h+='<div class="card"><div class="card-title">Parts Intelligence</div>';
-  if(parts.length>0){
-    parts.forEach(function(p){
-      var price=p.avg||p.mprice||0;var v=vd(price);tot+=price;
-      var badge='';
-      if(p.stk===0&&p.sold>=2)badge='<span class="b b-gr" style="font-size:9px">PULL THIS</span> ';
-      else if(p.stk===0&&p.sold>=1)badge='<span class="b b-yl" style="font-size:9px">NEED</span> ';
-      else if(p.stk>0)badge='<span class="b b-gy" style="font-size:9px">'+p.stk+' stk</span> ';
-      var fresh='';if(p.last){var da=Math.floor((Date.now()-new Date(p.last).getTime())/86400000);fresh=da<=60?'✅':da<=90?'⚠️':'❌';}
-      h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
-      h+='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+badge+'<span class="b '+vc(v)+'">'+v+' $'+price+'</span> '+fresh+' <span style="font-size:13px;font-weight:700">['+p.pt+']</span></div>';
-      if(p.title)h+='<div style="font-size:11px;color:#d1d5db;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.title||'').substring(0,65)+'</div>';
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-top:3px"><span style="font-size:10px;color:#9CA3AF">'+p.stk+' in stock · '+p.sold+'x sold · Last '+ta(p.last)+'</span>';
-      h+='<button onclick="pullFromHawkEye(\''+esc(p.pt)+'\',this)" style="padding:4px 10px;border-radius:6px;border:1px solid #2a2a2a;background:#1a1a1a;color:#d1d5db;font-size:10px;font-weight:700;cursor:pointer;min-height:28px">Pull</button></div>';
-      h+='</div>';
-    });
-  }else{h+='<div class="section-empty">No parts data for this vehicle yet</div>';}
+  h+='<div class="card">';
+  h+='<div style="display:flex;gap:10px;align-items:flex-start">';
+  // Score badge
+  h+='<div style="min-width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:'+sc+'20;color:'+sc+';flex-shrink:0;'+scorePulse+'">'+v.score+'</div>';
+  h+='<div style="flex:1;min-width:0">';
+  // Line 1: YMM + engine + rarity + value
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">';
+  h+='<div style="min-width:0">';
+  h+='<div style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:#fff">'+v.year+' '+esc(v.make)+' '+esc(v.model)+'</div>';
   h+='</div>';
+  if(v.est_value>0)h+='<div style="font-size:14px;font-weight:700;color:'+valColor+';flex-shrink:0">$'+v.est_value+'</div>';
+  h+='</div>';
+  // Engine + rarity inline
+  var specs=[];
+  if(v.engine)specs.push(v.engine);
+  var specStr=specs.length>0?'<span style="font-size:12px;color:#9CA3AF;font-weight:600">'+esc(specs.join(' '))+'</span>':'';
+  var rarityInline='';
+  if(v.rarityTier&&v.rarityTier!=='NORMAL'&&v.rarityTier!=='COMMON'&&v.rarityTier!=='SATURATED'){
+    var rtPulse=v.rarityPulses?(v.rarityTier==='LEGENDARY'?'animation:pulse-gold 2s infinite;':'animation:pulse-purple 2s infinite;'):'';
+    var rtText=v.rarityTier==='LEGENDARY'?'#000':'#fff';
+    var rtStar=v.rarityTier==='LEGENDARY'?'&#x2606; ':'';
+    rarityInline=' <span class="chip" style="font-size:8px;font-weight:700;padding:1px 5px;background:'+v.rarityColor+';color:'+rtText+';'+rtPulse+'">'+rtStar+v.rarityTier+'</span>';
+  }
+  if(specStr||rarityInline)h+='<div style="margin-top:1px">'+specStr+rarityInline+'</div>';
+  // Line 2: attribute badges
+  var attrHtml=renderAttrBadges(v);
+  if(attrHtml)h+='<div style="margin-top:3px">'+attrHtml+'</div>';
+  // VIN display
+  h+='<div style="font-family:monospace;font-size:11px;color:#16a34a;font-weight:700;margin-top:3px">'+data.vin+'</div>';
+  // Vehicle specs row
+  var specParts=[];
+  if(v.trim)specParts.push(esc(v.trim));
+  if(v.drivetrain)specParts.push(esc(v.drivetrain));
+  if(v.transmission)specParts.push(esc(v.transmission)+(v.transSpeeds?' '+esc(v.transSpeeds)+'-spd':''));
+  if(v.bodyStyle)specParts.push(esc(v.bodyStyle));
+  if(specParts.length>0)h+='<div style="font-size:10px;color:#6B7280;margin-top:2px">'+specParts.join(' &middot; ')+'</div>';
+  // Collapsed chips
+  h+='<div style="margin-top:5px">'+renderChips(parts)+'</div>';
+  h+='</div></div></div>';
 
-  // Est. Haul Value
-  if(tot>0){
-    var vc2=tot>=800?'#16a34a':tot>=500?'#ca8a04':tot>=250?'#ea580c':'#dc2626';
-    h+='<div class="card" style="text-align:center"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Est. Haul Value</div><div style="font-size:28px;font-weight:800;color:'+vc2+';margin-top:2px">$'+tot+'</div>';
-    var pc2=parts.filter(function(p){return p.stk===0&&p.sold>=2}).length;
-    if(pc2>0)h+='<div style="font-size:11px;color:#16a34a;margin-top:2px">'+pc2+' part'+(pc2>1?'s':'')+' we need</div>';
+  // === EXPANDED PARTS LIST ===
+  var aboveFloor=[];var specMismatch=[];var belowFloor=[];var archiveParts=[];
+  for(var i=0;i<parts.length;i++){
+    var p=parts[i];
+    if(p.isExcluded)continue;
+    if(p.priceSource==='item_reference'){archiveParts.push(p);continue;}
+    if(p.specMismatch){specMismatch.push(p);continue;}
+    if(p.belowFloor){belowFloor.push(p);continue;}
+    aboveFloor.push(p);
+  }
+
+  if(aboveFloor.length>0||archiveParts.length>0||specMismatch.length>0){
+    h+='<div class="card"><div class="card-title">Parts Intelligence ('+parts.filter(function(p){return !p.isExcluded}).length+' parts)</div>';
+
+    // Above-floor parts
+    for(var i=0;i<aboveFloor.length;i++){
+      h+=renderPartDetail(aboveFloor[i],data);
+    }
+
+    // Archives section
+    if(archiveParts.length>0){
+      h+='<div style="margin-top:8px"><details><summary style="cursor:pointer;font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Archives ('+archiveParts.length+')</summary>';
+      for(var i=0;i<archiveParts.length;i++){
+        h+=renderPartDetail(archiveParts[i],data);
+      }
+      h+='</details></div>';
+    }
+
+    // Spec mismatch section
+    if(specMismatch.length>0){
+      h+='<div style="margin-top:8px"><details><summary style="cursor:pointer;font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Spec Mismatch ('+specMismatch.length+')</summary>';
+      for(var i=0;i<specMismatch.length;i++){
+        h+='<div class="spec-mismatch">'+renderPartDetail(specMismatch[i],data)+'</div>';
+      }
+      h+='</details></div>';
+    }
+
+    // Below floor section
+    if(belowFloor.length>0){
+      h+='<div style="margin-top:8px"><details><summary style="cursor:pointer;font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Below Floor ('+belowFloor.length+')</summary>';
+      for(var i=0;i<belowFloor.length;i++){
+        h+='<div style="opacity:0.4">'+renderPartDetail(belowFloor[i],data)+'</div>';
+      }
+      h+='</details></div>';
+    }
+
     h+='</div>';
+  } else {
+    h+='<div class="card"><div class="section-empty">No scored parts for this vehicle</div></div>';
   }
 
   // Rebuild reference
-  var rb=mr.filter(function(m){return m.isRebuild&&m.partType});
-  if(rb.length>0){
+  if(data.rebuild_parts&&data.rebuild_parts.length>0){
     h+='<div class="card" style="opacity:0.5"><div class="card-title">Rebuild Reference</div>';
-    rb.forEach(function(p){h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#6B7280"><span>[REBUILD] '+(p.sellers||[]).join(', ')+' — '+p.partType+'</span><span>'+(p.priceRange||'$'+p.avgPrice)+'</span></div>';});
+    data.rebuild_parts.forEach(function(rb){
+      h+='<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#6B7280"><span>[REBUILD] '+esc(rb.seller||'pro-rebuild')+' &mdash; '+esc(rb.partType)+'</span><span>'+esc(rb.priceRange||'$'+rb.price)+'</span></div>';
+    });
     h+='</div>';
-  }
-
-  // Sales history — collapsed
-  var vsh=sh.filter(function(p){return p.partType&&p.partType!=='OTHER'});
-  if(vsh.length>0){
-    h+='<div class="card"><details><summary style="cursor:pointer;font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Sales History ('+vsh.reduce(function(s,p){return s+p.sold},0)+' sold)</summary>';
-    h+='<table style="margin-top:8px"><tr><th>Part</th><th>Sold</th><th>Avg $</th><th>Last</th></tr>';
-    vsh.forEach(function(p){h+='<tr><td style="font-weight:600">'+p.partType+'</td><td>'+p.sold+'x</td><td class="'+pc(p.avgPrice)+'">$'+p.avgPrice+'</td><td style="font-size:10px;color:#9CA3AF">'+ta(p.lastSoldDate)+'</td></tr>';});
-    h+='</table></details></div>';
   }
 
   // Cached parts notice
   if(data.cachedParts&&data.cachedParts.length>0){
     h+='<div class="card" style="background:#422006;border:1px solid #92400e">';
-    h+='<div style="color:#eab308;font-size:11px;font-weight:700;margin-bottom:4px">\u26A1 IN THE CACHE</div>';
+    h+='<div style="color:#eab308;font-size:11px;font-weight:700;margin-bottom:4px">&#x26A1; IN THE CACHE</div>';
     data.cachedParts.forEach(function(c){
       h+='<div style="font-size:12px;color:#d1d5db;margin-top:4px">';
-      h+=(c.partType||'Part')+' \u2014 claimed by '+(c.claimedBy||'?')+' via '+c.source+' \u00b7 '+ta(c.claimedAt);
-      if(c.yardName)h+=' \u00b7 '+c.yardName;
+      h+=(c.partType||'Part')+' &mdash; claimed by '+(c.claimedBy||'?')+' via '+c.source+' &middot; '+ta(c.claimedAt);
+      if(c.yardName)h+=' &middot; '+c.yardName;
       h+='</div>';
     });
     h+='</div>';
   }
 
-  // Scan Another
-  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';document.getElementById(\'instantResearch\').style.display=\'none\';">Scan Another</button></div>';
-  document.getElementById('results').innerHTML=h;
+  // Platform siblings
+  if(v.platform_siblings&&v.platform_siblings.length>0){
+    h+='<div class="card"><div class="card-title">Platform Siblings</div>';
+    h+='<div style="font-size:11px;color:#9CA3AF">'+v.platform_siblings.map(function(s){return esc(s)}).join(', ')+'</div>';
+    h+='</div>';
+  }
 
-  // Auto-run instant research — show our data immediately
-  var veh=[d.year,d.make,data.baseModel||d.model].filter(Boolean).join(' ');
-  window._lastVehicle=veh;
-  window._lastYear=d.year;window._lastMake=d.make;window._lastModel=data.baseModel||d.model;
-  window._lastEngine=d.engine||null;
-  window._lastDrivetrain=d.drivetrain||null;
-  window._lastVin=data.vin||null;
-  document.getElementById('instantResearch').style.display='block';
-  document.getElementById('researchResults').innerHTML='';
-  // Auto-trigger research
-  runInstantResearch();
+  // Scan another
+  h+='<div style="padding:0 0 12px"><button class="btn btn-red" style="width:100%;padding:12px;font-size:14px;" onclick="V.value=\'\';V.focus();document.getElementById(\'results\').innerHTML=\'\';">Scan Another</button></div>';
+
+  document.getElementById('results').innerHTML=h;
 }
 
-function pullFromHawkEye(partType,btn){
+function renderPartDetail(p,data){
+  var h='<div class="part-detail'+(p.isExcluded?' excluded':'')+(p.specMismatch?' spec-mismatch':'')+'">';
+  h+='<div class="pd-header">';
+  // Left: badges + title
+  h+='<div class="pd-title">';
+  // Intel source badges (expanded view — full label, not just icon)
+  if(p.intelSources&&p.intelSources.length>0){
+    if(p.intelSources.includes('mark'))h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">&#x1F3AF; MARK</span>';
+    else if(p.intelSources.includes('quarry'))h+='<span class="intel-fire" style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#7c2d12;color:#f97316;margin-right:3px">&#x1F525; QUARRY</span>';
+    else if(p.intelSources.includes('stream')||p.intelSources.includes('restock'))h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">&#x1F501; STREAM</span>';
+    if(p.overstockWarning)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">&#x2715; OVER</span>';
+  }
+  // Archives badge
+  if(p.priceSource==='item_reference')h+='<span class="archives-badge" style="display:inline-block;background:#FFC107;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:3px">ARCHIVES</span>';
+  // Novelty badge (if no intel/archives)
+  else if(!p.intelSources||p.intelSources.length===0){
+    if(p.noveltyTier==='NOVEL')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>';
+    else if(p.noveltyTier==='RESTOCK')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>';
+  }
+  // Synthetic scout alert badge
+  if(p.isSynthetic)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:3px;animation:pulse-gold 2s infinite">&#x1F4E2; ALERT '+(p.scoutAlertScore||'')+'</span>';
+  else if(p.scoutAlertMatch)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#FFD700;color:#000;margin-right:3px">&#x1F3AF; SA '+(p.scoutAlertScore||'')+'</span>';
+  // Part type + title
+  if(p.partType)h+='['+esc(p.partType)+'] ';
+  h+=esc((p.title||p.category||'Part').substring(0,80));
+  h+='</div>';
+  // Right: verdict badge
+  var dp=p.displayPrice||p.price||0;
+  var vb=verdictBadge(dp,p.priceSource);
+  var fresh=freshIcon(p.yourSaleLatest||p.marketCheckedAt||p.lastSoldDate);
+  h+='<div class="pd-verdict '+vb.cls+'">'+vb.text+fresh+'</div>';
+  h+='</div>';
+
+  // Stats row
+  h+='<div class="pd-stats">';
+  h+='<span>'+(p.in_stock||0)+' in stock'+(p.stockMatchType==='base'?' <span style="color:#FF8C00;font-size:9px" title="Stock matched by base PN, verify exact PN">&#x26A0; verify PN</span>':'')+'</span>';
+  h+='<span>'+(p.sold_90d||0)+' sold/90d</span>';
+  if(p.partNumber)h+='<span style="font-family:monospace;font-size:9px;color:#6B7280">'+esc(p.partNumber.substring(0,30))+'</span>';
+  h+='</div>';
+
+  // YourSale data
+  if(p.yourSalePrice>0&&p.priceSource!=='sold'){
+    h+='<div style="font-size:10px;color:#22c55e;margin-top:2px">YourSale: $'+Math.round(p.yourSalePrice)+' avg ('+p.yourSaleCount+'x sold)</div>';
+  }
+
+  // Market comparison
+  if(p.marketMedian>0){
+    var hasOurSales=p.priceSource==='sold'||p.yourSalePrice>0;
+    var mColor=hasOurSales?'#6B7280':'#10B981';
+    h+='<div style="font-size:10px;color:'+mColor+';margin-top:1px">Market ref $'+Math.round(p.marketMedian)+' med | '+(p.marketCount||0)+' sold'+(p.marketVelocity?' | '+p.marketVelocity+'/wk':'')+'</div>';
+  }
+
+  // Spec mismatch reason
+  if(p.specMismatch&&p.mismatchReason){
+    h+='<div style="font-size:10px;color:#ef4444;margin-top:2px">&#x26A0;&#xFE0F; '+esc(p.mismatchReason)+'</div>';
+  }
+
+  // Trim multiplier note
+  if(p.trimMultiplier!=null&&p.trimMultiplier<1){
+    var tmColor=p.trimMultiplier===0?'#ef4444':'#f59e0b';
+    var tmText=p.trimMultiplier===0?'Not expected on this trim':'&#x26A0;&#xFE0F; Verify on vehicle ('+Math.round(p.trimMultiplier*100)+'% confidence)';
+    h+='<div style="font-size:10px;color:'+tmColor+';margin-top:2px">'+tmText+'</div>';
+  }
+
+  // Dead warning
+  if(p.deadWarning){
+    h+='<div style="font-size:10px;color:#ef4444;margin-top:2px">&#x2620;&#xFE0F; '+esc(typeof p.deadWarning==='string'?p.deadWarning:p.deadWarning.message||'Dead inventory warning')+'</div>';
+  }
+
+  // Reason
+  if(p.reason&&!p.specMismatch)h+='<div class="pd-reason">'+esc(p.reason)+'</div>';
+
+  // Pull button
+  h+='<div style="margin-top:4px"><button class="btn-pull" onclick="pullPart(\''+esc(p.partType||'')+'\',\''+esc(p.partNumber||'')+'\',this)">Pull</button></div>';
+
+  h+='</div>';
+  return h;
+}
+
+function pullPart(partType,partNumber,btn){
   btn.disabled=true;btn.textContent='Caching...';
   fetch('/cache/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     partType:partType,
+    partNumber:partNumber||null,
     partDescription:partType+' \u2014 '+(_lastYear||'')+' '+(_lastMake||'')+' '+(_lastModel||''),
     vehicle:{year:_lastYear||null,make:_lastMake||null,model:_lastModel||null,vin:_lastVin||null},
     source:'hawk_eye',
     sourceId:_lastVin||null,
   })}).then(function(r){return r.json()}).then(function(d){
-    if(d.success){btn.textContent='Cached \u2713';btn.style.background='#064e3b';btn.style.color='#22c55e';btn.style.borderColor='#065f46';}
+    if(d.success){btn.textContent='Cached \u2713';btn.className='btn-pull btn-cached';btn.style.borderColor='#065f46';btn.style.background='#064e3b';}
     else{btn.disabled=false;btn.textContent='Pull';}
   }).catch(function(){btn.disabled=false;btn.textContent='Pull';});
-}
-
-var _lastVehicle=null;
-var _lastYear=null;var _lastMake=null;var _lastModel=null;
-var _lastEngine=null;
-var _lastDrivetrain=null;
-var _lastVin=null;
-async function runInstantResearch(){
-  if(!_lastVehicle)return;
-  var btn=document.getElementById('researchBtn');
-  var out=document.getElementById('researchResults');
-  btn.disabled=true;btn.textContent='Researching parts...';
-  out.innerHTML='<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Looking up parts for '+esc(_lastVehicle)+(_lastEngine?' '+esc(_lastEngine):'')+'...</div></div>';
-  try{
-    var url='/api/instant-research?vehicle='+encodeURIComponent(_lastVehicle+(_lastEngine?' '+_lastEngine:''));
-    if(_lastDrivetrain)url+='&drivetrain='+encodeURIComponent(_lastDrivetrain);
-    var r=await fetch(url).then(function(r){return r.json()});
-    if(!r.parts||r.parts.length===0){
-      out.innerHTML='<div style="color:#6B7280;font-size:12px;padding:10px;text-align:center">No parts data found for this vehicle</div>';
-    }else{
-      var h='<div style="margin-top:10px">';
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Parts Intelligence'+(r.cached?' (cached)':'')+'</div>';
-      if(r.totalEstimatedValue)h+='<div style="font-size:12px;font-weight:700;color:#22c55e">Est. $'+Math.round(r.totalEstimatedValue)+'</div>';
-      h+='</div>';
-      r.parts.forEach(function(p){
-        var bc=getPartTier(p.referencePrice||p.yourDemand&&p.yourDemand.avgPrice||0).cssClass;
-        var bestPrice=p.market&&p.market.source==='cache'?p.market.avgPrice:p.yourDemand&&p.yourDemand.avgPrice>0?p.yourDemand.avgPrice:p.referencePrice||0;
-        var yrLabel=p.yearRange?(p.yearRange.min===p.yearRange.max?p.yearRange.min:p.yearRange.min+'-'+p.yearRange.max):'';
-        h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
-        h+='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">';
-        if(p.isMarked)h+='<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:#f59e0b;color:#000">MARKED</span>';
-        h+='<span class="b '+bc+'">'+p.badge+(bestPrice>0?' $'+Math.round(bestPrice):'')+'</span>';
-        h+='<span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span>';
-        if(yrLabel)h+='<span style="font-size:10px;color:#6B7280">('+yrLabel+')</span>';
-        h+='</div>';
-        var demandStr=p.yourDemand&&p.yourDemand.salesCount>0?'Sold '+p.yourDemand.salesCount+'x @ avg $'+p.yourDemand.avgPrice+(p.yourDemand.lastSoldDate?' (last: '+ta(p.yourDemand.lastSoldDate)+')':''):'<span style="color:#6B7280">Never sold by us</span>';
-        h+='<div style="font-size:10px;margin-top:2px">'+demandStr+'</div>';
-        var stockStr=p.yourStock&&p.yourStock.count>0?p.yourStock.count+' in stock'+(p.yourStock.prices.length>0?' @ $'+p.yourStock.prices[0]:''):'<span style="color:#ef4444">Out of stock</span>';
-        h+='<div style="font-size:10px;margin-top:1px">'+stockStr+'</div>';
-        if(p.market&&p.market.source==='cache')h+='<div style="font-size:10px;margin-top:1px;color:#22c55e">Market avg $'+Math.round(p.market.avgPrice)+' ('+p.market.soldCount90d+' sold/90d)</div>';
-        else h+='<div style="font-size:10px;margin-top:1px;color:#6B7280;font-style:italic">No market data available</div>';
-        if(p.partNumberBase)h+='<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">'+esc(p.partNumberBase)+'</div>';
-        h+='</div>';
-      });
-      h+='</div>';
-      // Check if results are thin — show prominent "Research on eBay" button
-      var richParts=r.parts?r.parts.filter(function(p){return p.yourDemand&&p.yourDemand.salesCount>0}):[];
-      var isThin=!r.parts||r.parts.length<3||richParts.length===0;
-      h+='<div id="apifyResearchArea" style="margin-top:8px;text-align:center">';
-      if(isThin){
-        h+='<div style="color:#eab308;font-size:11px;font-weight:600;margin-bottom:6px">Our data is thin for this vehicle — '+(r.parts?r.parts.length:0)+' parts found</div>';
-        h+='<button onclick="runApifyResearch(\'VIN\')" id="apifyBtn" style="width:100%;padding:14px;border-radius:8px;border:2px solid #eab308;background:#422006;color:#eab308;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Research on eBay (Apify)</button>';
-      }else{
-        h+='<button onclick="runApifyResearch(\'VIN\')" id="apifyBtn" style="padding:10px 16px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Deeper eBay Research</button>';
-      }
-      h+='<div id="apifyResults"></div></div>';
-      out.innerHTML=h;
-    }
-  }catch(err){
-    out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Research failed: '+err.message+'</div>';
-  }
-  btn.disabled=false;btn.textContent='Instant Research — What to Pull';
-}
-
-async function runStandaloneResearch(){
-  var inp=document.getElementById('researchInput');
-  var v=inp.value.trim();if(!v)return;
-  // Parse year/make/model from input
-  var vm=v.match(/^(\d{4})\s+(\S+)\s+(.+?)(?:\s+(\d+\.\d+L?.*))?$/);
-  if(vm){_lastYear=parseInt(vm[1]);_lastMake=vm[2];_lastModel=vm[3].trim();_lastEngine=vm[4]||null;}
-  _lastVehicle=v;_lastVin=null;
-  var btn=document.getElementById('standaloneBtn');
-  var out=document.getElementById('standaloneResults');
-  btn.disabled=true;btn.textContent='Checking our data...';
-  out.innerHTML='<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#6B7280;font-size:12px">Looking up '+esc(v)+' in our database...</div></div>';
-  try{
-    var r=await fetch('/api/instant-research?vehicle='+encodeURIComponent(v)).then(function(r){return r.json()});
-    if(r.error){out.innerHTML='<div style="color:#dc2626;padding:10px;font-size:12px">'+esc(r.error)+'</div>';return;}
-    var h='';
-    var hasParts=r.parts&&r.parts.length>0;
-    var richParts=hasParts?r.parts.filter(function(p){return p.yourDemand&&p.yourDemand.salesCount>0}):[];
-    var isThin=!hasParts||r.parts.length<3||richParts.length===0;
-    if(hasParts){
-      h+='<div style="margin-top:10px">';
-      if(r.totalValue)h+='<div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap"><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Total Value</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalValue+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Est. Profit</div><div style="font-size:18px;font-weight:800;color:#22c55e">$'+r.totalProfit+'</div></div><div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;flex:1;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Parts to Pull</div><div style="font-size:18px;font-weight:800;color:#dc2626">'+(r.pullCount||0)+'</div></div></div>';
-      r.parts.forEach(function(p){
-        var bc=getPartTier(p.referencePrice||p.yourDemand&&p.yourDemand.avgPrice||0).cssClass;
-        h+='<div style="padding:8px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px">';
-        h+='<div style="font-size:16px;flex-shrink:0">'+(p.verdictIcon||'')+'</div>';
-        h+='<div style="flex:1"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span class="b '+bc+'">'+p.badge+' $'+p.avgPrice+'</span><span style="font-size:13px;font-weight:700">['+esc(p.partType)+']</span></div>';
-        h+='<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.soldCount+'x sold · $'+p.estProfit+' profit · ~$'+p.cogs+' cost · '+p.velocity+'</div>';
-        if(p.partNumbers&&p.partNumbers.length>0)h+='<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">'+p.partNumbers.slice(0,3).join(', ')+'</div>';
-        h+='</div><div style="font-weight:800;color:'+(p.verdict==='PULL'?'#22c55e':p.verdict==='RARE'?'#a855f7':'#9CA3AF')+';font-size:11px;white-space:nowrap">'+p.verdict+'</div></div>';
-      });
-      h+='</div>';
-    }else{
-      h+='<div style="color:#6B7280;padding:10px;font-size:12px;text-align:center">No parts data in our database for this vehicle'+(r.cached?' (cached)':'')+'</div>';
-    }
-    // Always show Apify button — prominent when thin, subtle when rich
-    h+='<div style="margin-top:10px;text-align:center">';
-    if(isThin){
-      h+='<div style="color:#eab308;font-size:11px;font-weight:600;margin-bottom:6px">'+(hasParts?'Our data is thin — only '+r.parts.length+' parts found':'No data in our database — try eBay')+'</div>';
-      h+='<button onclick="runApifyResearch(\'STANDALONE\')" style="width:100%;padding:14px;border-radius:8px;border:2px solid #eab308;background:#422006;color:#eab308;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Research on eBay (Apify)</button>';
-    }else{
-      h+='<button onclick="runApifyResearch(\'STANDALONE\')" style="padding:10px 16px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#9CA3AF;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔍 Deeper eBay Research (Apify)</button>';
-    }
-    h+='<div id="standaloneApifyResults"></div></div>';
-    out.innerHTML=h;
-  }catch(err){out.innerHTML='<div style="color:#dc2626;font-size:12px;padding:10px">Error: '+err.message+'</div>';}
-  btn.disabled=false;btn.textContent='Research Vehicle';
-}
-document.getElementById('researchInput').addEventListener('keydown',function(e){if(e.key==='Enter')runStandaloneResearch()});
-
-async function runApifyResearch(source) {
-  if (!_lastYear || !_lastMake || !_lastModel) {
-    alert('No vehicle data — decode a VIN or enter a vehicle first');
-    return;
-  }
-  var outId = source === 'VIN' ? 'apifyResults' : 'standaloneApifyResults';
-  var out = document.getElementById(outId);
-  if (!out) return;
-  out.innerHTML = '<div style="text-align:center;padding:16px"><div class="spinner"></div><div style="margin-top:6px;color:#eab308;font-size:12px;font-weight:600">Researching on eBay via Apify...</div><div style="color:#6B7280;font-size:10px;margin-top:2px">This takes 30-60 seconds</div></div>';
-
-  try {
-    var r = await fetch('/api/instant-research/apify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: _lastYear, make: _lastMake, model: _lastModel,
-        engine: _lastEngine || null, trim: null,
-        source: source, vin: _lastVin || null,
-      }),
-    }).then(function(r) { return r.json(); });
-
-    if (!r.success) {
-      out.innerHTML = '<div style="color:#dc2626;padding:10px;font-size:12px">' + esc(r.error || 'Research failed') + '</div>';
-      return;
-    }
-
-    if (r.cached) {
-      out.innerHTML = '<div style="color:#6B7280;font-size:10px;margin-bottom:6px">Cached results (researched within 7 days)</div>';
-    } else {
-      out.innerHTML = '';
-    }
-
-    var parts = r.parts || [];
-    if (parts.length === 0) {
-      out.innerHTML += '<div style="color:#6B7280;padding:10px;font-size:12px;text-align:center">No sellable parts found on eBay</div>';
-      return;
-    }
-
-    var h = '<div style="margin-top:6px">';
-    // Summary
-    var s = r.summary || {};
-    if (s.totalEstimatedValue) {
-      var vc2 = s.totalEstimatedValue >= 800 ? '#22c55e' : s.totalEstimatedValue >= 400 ? '#eab308' : '#9CA3AF';
-      h += '<div style="display:flex;gap:8px;margin-bottom:8px">';
-      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Est. Value</div><div style="font-size:16px;font-weight:800;color:' + vc2 + '">$' + Math.round(s.totalEstimatedValue) + '</div></div>';
-      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">Parts</div><div style="font-size:16px;font-weight:800">' + s.partsFoundCount + '</div></div>';
-      h += '<div style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:9px;color:#6B7280;text-transform:uppercase">High Value</div><div style="font-size:16px;font-weight:800;color:#22c55e">' + (s.highValueCount || 0) + '</div></div>';
-      h += '</div>';
-    }
-
-    // Parts list
-    parts.forEach(function(p) {
-      var tierColor = p.valueTier === 'HIGH' ? '#22c55e' : p.valueTier === 'MEDIUM' ? '#eab308' : '#6B7280';
-      var tierBg = p.valueTier === 'HIGH' ? '#064e3b' : p.valueTier === 'MEDIUM' ? '#422006' : '#1f2937';
-      h += '<div style="padding:8px 0;border-bottom:1px solid #1f1f1f">';
-      h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">';
-      h += '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:' + tierBg + ';color:' + tierColor + '">' + p.valueTier + ' $' + p.avgSoldPrice + '</span>';
-      h += '<span style="font-size:13px;font-weight:700">[' + esc(p.partType) + ']</span>';
-      h += '</div>';
-      h += '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' + p.soldCount + 'x sold · $' + p.minPrice + '-$' + p.maxPrice + ' range</div>';
-      if (p.partNumbers && p.partNumbers.length > 0) h += '<div style="font-size:9px;color:#6B7280;margin-top:1px;font-family:monospace">' + p.partNumbers.slice(0, 3).join(', ') + '</div>';
-      h += '</div>';
-    });
-
-    h += '</div>';
-    // Sky Watch save status
-    h += '<div style="text-align:center;padding:8px;font-size:11px;margin-top:4px">';
-    if (s.highValueCount >= 1 || s.partsFoundCount >= 3) {
-      h += '<span style="color:#22c55e;font-weight:600">✓ Saved to Sky Watch</span> · <a href="/admin/opportunities" style="color:#eab308;text-decoration:none">View →</a>';
-    } else {
-      h += '<span style="color:#6B7280">Results too thin to save (' + s.partsFoundCount + ' parts found)</span>';
-    }
-    h += ' · Enriched market_demand_cache with ' + parts.reduce(function(n, p) { return n + (p.partNumbers ? p.partNumbers.length : 0); }, 0) + ' PNs';
-    h += '</div>';
-    out.innerHTML += h;
-  } catch (err) {
-    out.innerHTML = '<div style="color:#dc2626;padding:10px;font-size:12px">Apify research failed: ' + esc(err.message) + '</div>';
-  }
 }
 
 function loadHistory(el){
@@ -460,8 +482,8 @@ function loadHistory(el){
     var h='<div class="card"><div class="card-title">Recent Scans</div>';
     d.scans.forEach(function(s){
       var v=[s.year,s.make,s.model].filter(Boolean).join(' ');
-      var eng=s.engine?' · '+s.engine:'';
-      var dt=s.drivetrain?' · '+s.drivetrain:'';
+      var eng=s.engine?' &middot; '+s.engine:'';
+      var dt=s.drivetrain?' &middot; '+s.drivetrain:'';
       h+='<div class="h-row" onclick="V.value=\''+s.vin+'\';doScan()"><div><div class="h-vin">'+s.vin+'</div><div class="h-veh">'+(v||'Unknown')+'<span style="color:#6B7280;font-weight:400">'+eng+dt+'</span></div></div><div><div class="h-time">'+ta(s.scanned_at)+'</div></div></div>';
     });
     h+='</div>';

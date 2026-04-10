@@ -562,6 +562,388 @@ function detectPartTypeForVin(title) {
 }
 
 /**
+ * POST /vin/scan-scored
+ * Full VIN decode + AttackListService scoring in one call.
+ * Returns the same intelligence the Daily Feed shows for this vehicle.
+ * Body: { vin: "...", source: "manual"|"camera" }
+ */
+router.post('/scan-scored', async (req, res) => {
+  try {
+    let { vin, source } = req.body || {};
+    if (!vin || vin.length < 11) return res.status(400).json({ error: 'Valid VIN required (11-17 chars)' });
+    vin = vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
+
+    // Step 1: Decode via LocalVinDecoder
+    const { decode: localDecode } = require('../lib/LocalVinDecoder');
+    const localResult = await localDecode(vin);
+    if (!localResult || !localResult.make || !localResult.model) {
+      return res.json({ success: true, vin, vehicle: null, parts: [], error: 'Could not decode VIN' });
+    }
+
+    // Step 2: Build a synthetic vehicle object that scoreVehicle expects
+    const syntheticVehicle = {
+      id: null,
+      year: localResult.year,
+      make: localResult.make,
+      model: localResult.model,
+      trim: localResult.trim || null,
+      vin: vin,
+      engine: localResult.engine || null,
+      decoded_engine: localResult.engine || null,
+      engine_type: localResult.engineType || 'Gas',
+      drivetrain: localResult.drivetrain || null,
+      decoded_drivetrain: localResult.drivetrain || null,
+      decoded_trim: localResult.trim || null,
+      decoded_transmission: localResult.transHint || null,
+      trim_level: localResult.trim || null,
+      trim_tier: null,
+      body_style: localResult.bodyStyle || null,
+      diesel: localResult.engineType === 'Diesel',
+      cult: false,
+      active: true,
+      date_added: null,
+      last_seen: null,
+      row_number: null,
+      color: null,
+      audio_brand: null,
+      expected_parts: null,
+      stock_number: null,
+      _yardName: '',
+      _yardCostFactor: 0,
+    };
+
+    // Step 2b: Try to enrich trim_tier from TrimTierService
+    try {
+      const TrimTierService = require('../services/TrimTierService');
+      const refResult = await TrimTierService.lookup(
+        parseInt(localResult.year) || 0,
+        localResult.make, localResult.model,
+        localResult.trim || null,
+        localResult.engine || null,
+        null,
+        localResult.drivetrain || null
+      );
+      if (refResult) {
+        if (refResult.tier) syntheticVehicle.trim_tier = refResult.tier;
+        if (refResult.transmission && !syntheticVehicle.decoded_transmission) {
+          syntheticVehicle.decoded_transmission = refResult.transmission;
+        }
+        if (refResult.cult) syntheticVehicle.cult = true;
+        if (refResult.audioBrand) syntheticVehicle.audio_brand = refResult.audioBrand;
+      }
+    } catch (e) { /* TrimTierService optional */ }
+
+    // Step 3: Build all indexes (same as getAllYardsAttackList for full scoring)
+    const AttackListService = require('../services/AttackListService');
+    const isExcludedPart = AttackListService.isExcludedPart;
+    const service = new AttackListService();
+
+    const inventoryIndex = await service.buildInventoryIndex();
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const salesIndex = await service.buildSalesIndex(cutoff);
+    const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await service.buildStockIndex();
+    const platformIndex = await service.buildPlatformIndex();
+    const BlockedCompsService = require('../services/BlockedCompsService');
+    const { soldKeys } = await BlockedCompsService.getBlockedSet();
+
+    // Build mark index
+    let markIndex = { byPN: new Map(), byTitle: new Set() };
+    try {
+      const marks = await database('the_mark').where('active', true).select('normalizedTitle', 'partNumber');
+      for (const m of marks) {
+        if (m.partNumber) markIndex.byPN.set(m.partNumber.toUpperCase(), true);
+        if (m.normalizedTitle) markIndex.byTitle.add(m.normalizedTitle);
+      }
+    } catch (e) { /* the_mark may not exist */ }
+
+    // Build intel index
+    const intelIndex = { wantPNs: new Set(), quarryPNs: new Set(), streamPNs: new Set(), overstockPNs: new Set(), flagPNs: new Set() };
+    try {
+      const wants = await database('restock_want_list').where('active', true).select('title', 'part_number', 'auto_generated');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      const { normalizePartNumber } = require('../lib/partNumberUtils');
+      for (const w of wants) {
+        const pns = [];
+        if (w.part_number) {
+          const norm = normalizePartNumber(w.part_number);
+          if (norm) pns.push(norm.toUpperCase());
+        }
+        const extracted = eiPNs(w.title || '');
+        for (const pn of extracted) {
+          const key = (pn.base || pn.normalized || '').toUpperCase();
+          if (key) pns.push(key);
+        }
+        const targetSet = w.auto_generated ? intelIndex.quarryPNs : intelIndex.streamPNs;
+        for (const pn of pns) {
+          targetSet.add(pn);
+          intelIndex.wantPNs.add(pn);
+        }
+      }
+    } catch (e) { /* table may not exist */ }
+    try {
+      const flags = await database('restock_flag').where('acknowledged', false).select('title');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const f of flags) {
+        const pns = eiPNs(f.title || '');
+        for (const pn of pns) intelIndex.flagPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+    try {
+      const overItems = await database('overstock_group_item')
+        .join('overstock_group', 'overstock_group.id', 'overstock_group_item.group_id')
+        .where('overstock_group.status', 'active')
+        .where('overstock_group_item.is_active', true)
+        .select('overstock_group_item.title');
+      const { extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const o of overItems) {
+        const pns = eiPNs(o.title || '');
+        for (const pn of pns) intelIndex.overstockPNs.add((pn.base || pn.normalized || '').toUpperCase());
+      }
+    } catch (e) { /* table may not exist */ }
+    // Remove hidden PNs
+    try {
+      const hiddenRows = await database('hidden_parts').select('part_number_base');
+      for (const h of hiddenRows) {
+        if (h.part_number_base) {
+          const pn = h.part_number_base.toUpperCase();
+          intelIndex.wantPNs.delete(pn);
+          intelIndex.quarryPNs.delete(pn);
+          intelIndex.streamPNs.delete(pn);
+          intelIndex.flagPNs.delete(pn);
+          markIndex.byPN.delete(pn);
+        }
+      }
+    } catch (e) { /* table may not exist */ }
+
+    // Build frequency map for rarity scoring
+    const frequencyMap = {};
+    try {
+      const freqRows = await database('vehicle_frequency').select('make', 'model', 'gen_start', 'gen_end', 'avg_days_between', 'total_seen', 'first_tracked_at', 'last_seen_at');
+      for (const row of freqRows) {
+        if (row.gen_start && row.gen_end) {
+          frequencyMap[`${row.make}|${row.model}|${row.gen_start}|${row.gen_end}`.toLowerCase()] = row;
+        }
+        const mmKey = `${row.make}|${row.model}`.toLowerCase();
+        if (!frequencyMap[mmKey]) frequencyMap[mmKey] = row;
+      }
+    } catch (e) { /* table may not exist */ }
+
+    // Step 4: Score the vehicle
+    const scored = service.scoreVehicle(
+      syntheticVehicle, inventoryIndex, salesIndex, stockIndex, platformIndex,
+      stockPartNumbers, markIndex, intelIndex, frequencyMap, soldKeys, {}
+    );
+
+    // Step 5: Enrich parts with value source (same as /vehicle/:id/parts route)
+    const { normalizePartNumber: _normPN } = require('../lib/partNumberUtils');
+    function toYSKey(pn) {
+      if (!pn) return null;
+      const n = _normPN(pn);
+      return n ? n.replace(/[-\s.]/g, '').toUpperCase() : pn.replace(/[-\s.]/g, '').toUpperCase();
+    }
+    const partPNBs = (scored.parts || []).filter(p => p.partNumber).map(p => toYSKey(p.partNumber)).filter(Boolean);
+    const ysMap = partPNBs.length > 0 ? await service.getYourSalePriceMap(partPNBs) : new Map();
+
+    for (const p of (scored.parts || [])) {
+      p.isExcluded = isExcludedPart(p.title || '');
+      const pnNorm = toYSKey(p.partNumber);
+      const ysHit = pnNorm ? ysMap.get(pnNorm) : null;
+
+      if (p.priceSource === 'scout_alert') {
+        p.valueSource = 'scout_alert';
+        p.displayPrice = p.price;
+      } else if (p.priceSource === 'sold') {
+        p.valueSource = 'yoursale';
+        p.displayPrice = p.price;
+      } else if (ysHit) {
+        p.valueSource = 'yoursale';
+        p.yourSalePrice = ysHit.avg;
+        p.yourSaleCount = ysHit.count;
+        p.yourSaleLatest = ysHit.latestDate;
+        p.displayPrice = ysHit.avg;
+      } else if (p.priceSource === 'item_reference') {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.price;
+      } else if (p.marketMedian > 0) {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.marketMedian;
+      } else if (p.price > 0) {
+        p.valueSource = 'market_estimate';
+        p.displayPrice = p.price;
+      } else {
+        p.valueSource = 'none';
+        p.displayPrice = null;
+      }
+    }
+
+    // Step 5b: Market data enrichment
+    try {
+      const { getCachedPrice, buildSearchQuery: buildMktQuery } = require('../services/MarketPricingService');
+      const vYear = parseInt(localResult.year) || 0;
+      for (const p of (scored.parts || [])) {
+        const sq = buildMktQuery({
+          title: p.title || '',
+          make: localResult.make,
+          model: localResult.model,
+          year: vYear,
+          partType: p.partType,
+        });
+        const cached = await getCachedPrice(sq.cacheKey);
+        if (cached) {
+          p.marketMedian = cached.median;
+          p.marketCount = cached.count;
+          p.marketVelocity = cached.velocity;
+          p.marketCheckedAt = cached.checkedAt;
+        }
+      }
+    } catch (e) { /* market enrichment optional */ }
+
+    // Step 5c: Dead inventory warnings
+    try {
+      const DeadInventoryService = require('../services/DeadInventoryService');
+      const deadService = new DeadInventoryService();
+      for (const part of (scored.parts || [])) {
+        if (part.partNumber) {
+          try {
+            const warning = await deadService.getWarning(part.partNumber);
+            if (warning) part.deadWarning = warning;
+          } catch (e) { /* ignore */ }
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    // Step 5d: Set signal flags and sort (identical to /vehicle/:id/parts)
+    for (const part of (scored.parts || [])) {
+      if (!part.scoutAlertMatch) part.scoutAlertMatch = false;
+      part.hasSoldHistory = !!(part.intelSources && part.intelSources.includes('sold'));
+      part.hasCompetitorIntel = !!(part.intelSources && (part.intelSources.includes('quarry') || part.intelSources.includes('stream') || part.intelSources.includes('restock') || part.intelSources.includes('mark')));
+    }
+
+    // Sort: scout alert first, then sold, then intel, then rest
+    (scored.parts || []).sort((a, b) => {
+      const sa = a.scoutAlertMatch ? 0 : a.hasSoldHistory ? 1 : a.hasCompetitorIntel ? 2 : 3;
+      const sb = b.scoutAlertMatch ? 0 : b.hasSoldHistory ? 1 : b.hasCompetitorIntel ? 2 : 3;
+      if (sa !== sb) return sa - sb;
+      if (a.scoutAlertMatch && b.scoutAlertMatch) return (b.scoutAlertScore || 0) - (a.scoutAlertScore || 0);
+      return (b.price || 0) - (a.price || 0);
+    });
+
+    // ARCHIVES sort: item_reference parts always at bottom
+    const nonArchives = (scored.parts || []).filter(p => p.priceSource !== 'item_reference');
+    const archives = (scored.parts || []).filter(p => p.priceSource === 'item_reference')
+      .sort((a, b) => (b.price || 0) - (a.price || 0));
+    scored.parts = [...nonArchives, ...archives];
+
+    // Step 5e: YourSale-driven value
+    let maxYS = 0, ysEstValue = 0;
+    for (const p of (scored.parts || [])) {
+      if (isExcludedPart(p.title || '')) { p._ysValue = 0; continue; }
+      let ysPrice = 0;
+      if (p.priceSource === 'sold' && p.price > 0) {
+        ysPrice = p.price;
+      } else {
+        const pnNorm = toYSKey(p.partNumber);
+        const ys = pnNorm ? ysMap.get(pnNorm) : null;
+        if (ys) ysPrice = ys.avg;
+      }
+      p._ysValue = ysPrice;
+      if (ysPrice > maxYS) maxYS = ysPrice;
+      ysEstValue += ysPrice;
+    }
+
+    // Step 6: Log the scan
+    try {
+      await database('vin_scan_log').insert({
+        vin, year: localResult.year, make: localResult.make, model: localResult.model,
+        trim: localResult.trim, engine: localResult.engine,
+        engine_type: localResult.engineType, drivetrain: localResult.drivetrain,
+        scanned_by: null, source: source || 'manual',
+        scanned_at: new Date(),
+      });
+    } catch (e) { /* table may not exist */ }
+
+    // Step 7: Check The Cache for parts already claimed for this vehicle
+    let cacheMatches = [];
+    try {
+      const vinMatches = await database('the_cache')
+        .where('status', 'claimed')
+        .where('vehicle_vin', vin)
+        .select('*');
+      if (vinMatches.length > 0) {
+        cacheMatches = vinMatches;
+      } else if (localResult.make && localResult.model) {
+        cacheMatches = await database('the_cache')
+          .where('status', 'claimed')
+          .whereRaw('UPPER(vehicle_make) = ?', [localResult.make.toUpperCase()])
+          .whereRaw('UPPER(vehicle_model) = ?', [localResult.model.toUpperCase()])
+          .where('vehicle_year', localResult.year)
+          .select('*');
+      }
+    } catch (e) { /* cache table may not exist */ }
+
+    // Step 8: Build response
+    res.json({
+      success: true,
+      vin,
+      vehicle: {
+        year: localResult.year,
+        make: localResult.make,
+        model: localResult.model,
+        trim: localResult.trim || null,
+        engine: localResult.engine || null,
+        engineType: localResult.engineType || 'Gas',
+        drivetrain: localResult.drivetrain || null,
+        transmission: localResult.transHint || syntheticVehicle.decoded_transmission || null,
+        transSpeeds: localResult.transSpeeds || null,
+        transSubType: localResult.transSubType || null,
+        bodyStyle: localResult.bodyStyle || null,
+        isHybrid: localResult.isHybrid || false,
+        isPHEV: localResult.isPHEV || false,
+        isElectric: localResult.isElectric || false,
+        score: scored.score,
+        color_code: scored.color_code,
+        vehicle_verdict: scored.vehicle_verdict,
+        est_value: scored.est_value,
+        max_part_value: scored.max_part_value,
+        matched_parts: scored.matched_parts,
+        sales_count: scored.sales_count,
+        avg_part_price: scored.avg_part_price,
+        rarityTier: scored.rarityTier,
+        rarityColor: scored.rarityColor,
+        rarityPulses: scored.rarityPulses,
+        rarityReason: scored.rarityReason,
+        rarityBoost: scored.rarityBoost,
+        attributeBoost: scored.attributeBoost,
+        boostReasons: scored.boostReasons,
+        trimBadge: scored.trimBadge,
+        trim_tier: scored.trim_tier || syntheticVehicle.trim_tier,
+        cult: scored.cult,
+        diesel: scored.diesel,
+        decoded_drivetrain: localResult.drivetrain || null,
+        decoded_transmission: syntheticVehicle.decoded_transmission || null,
+        platform_siblings: scored.platform_siblings,
+        maxYourSalePart: maxYS,
+        yourSaleEstValue: Math.round(ysEstValue),
+      },
+      parts: scored.parts || [],
+      rebuild_parts: scored.rebuild_parts || null,
+      cachedParts: cacheMatches.map(c => ({
+        partType: c.part_type,
+        partNumber: c.part_number,
+        description: c.part_description,
+        claimedBy: c.claimed_by,
+        claimedAt: c.claimed_at,
+        source: c.source,
+        yardName: c.yard_name,
+      })),
+    });
+  } catch (err) {
+    log.error({ err }, 'VIN scan-scored failed');
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /vin/test-local/:vin
  * Test the local VIN decoder. Returns full decode result with timing.
  */

@@ -1,5 +1,22 @@
 # LAST SESSION -- 2026-04-10
 
+## Hawk Eye → Attack List Pipeline — 2026-04-10
+- Rewired Hawk Eye VIN scanner to use AttackListService.scoreVehicle() instead of InstantResearchService
+- New endpoint: POST /vin/scan-scored — VIN decode + full attack list scoring in one call
+- Builds ALL indexes (inventory, sales, stock, platform, mark, intel, frequency, blocked comps) for identical scoring to Daily Feed
+- Enriches with TrimTierService, MarketPricingService, DeadInventoryService, YourSale price map
+- Parts sorted scout-alert-first, then sold, then intel, then rest. Archives at bottom.
+- Frontend rewritten: vin-scanner.html renders vehicle cards and part chips identical to Daily Feed
+  - Score badge with color tiers, rarity badge, attribute badges in correct order
+  - Part chips with tier colors, intel icons, novelty dots
+  - Expanded parts with full detail: price badge, freshness, stock, sold, market ref, spec mismatch, dead warning
+  - Async race guard via sequence number (_scanSeq)
+- Removed InstantResearch and Standalone Research sections from Hawk Eye (replaced by scored pipeline)
+- Old /vin/scan endpoint preserved for backward compatibility
+- Camera flow preserved: decode-photo → scan-scored pipeline
+- Pull/cache buttons preserved: POST /cache/claim with partType + vehicle context
+- Files touched: service/routes/vin.js, service/public/vin-scanner.html, LAST_SESSION.md
+
 ## Hybrid + displacement matching in ScoutAlertService — 2026-04-10
 - computeMatchScore() gains two new signal phases:
   1. Hybrid/EV powertrain (Phase 6b): extracts hybrid/phev/electric from source_title, compares against yard_vehicle engine_type + classifyPowertrain() fallback. Match +25, mismatch -60. Fires for ALL part types.

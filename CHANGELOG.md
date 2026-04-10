@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Hawk Eye → Attack List scoring pipeline — 2026-04-10
+- New endpoint: POST /vin/scan-scored — VIN decode + full AttackListService scoring
+- Hawk Eye frontend rewritten to match Daily Feed rendering (score, rarity, attributes, part chips, expanded details)
+- Full index pipeline: inventory, sales, stock, platform, mark, intel, frequency, blocked comps
+- Market enrichment, dead inventory warnings, YourSale price map, TrimTierService lookup
+- Old /vin/scan preserved for backward compat. Camera flow intact.
+- Files: service/routes/vin.js, service/public/vin-scanner.html
+
 ## Hybrid + displacement matching in scout alerts — 2026-04-10
 - computeMatchScore() hybrid/EV powertrain signal + displacement comparison
 - Hybrid ABS mismatch now -60, displacement mismatch -50
