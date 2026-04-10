@@ -1679,5 +1679,41 @@
     navigator.serviceWorker.register('/admin/sw.js').catch(() => {});
   }
 </script>
+<script>
+// DEBUG BUILD 2026-04-10T13:00 — REMOVE AFTER DIAGNOSIS
+console.warn('[DEBUG] attack-list.html BUILD: 2026-04-10T13:00 — if you do NOT see this, browser is cached');
+
+// MutationObserver: catch ANY old vehicle appearing in DOM regardless of render path
+const _dbgObserver = new MutationObserver(() => {
+  const cards = document.querySelectorAll('.vehicle-row');
+  const oldOnes = [];
+  cards.forEach(card => {
+    const text = card.textContent || '';
+    const m = text.match(/Set (\d+)d ago/);
+    if (m && parseInt(m[1]) > 7) {
+      const ymm = card.querySelector('.v-title');
+      const score = card.querySelector('.v-score');
+      oldOnes.push({
+        days: parseInt(m[1]),
+        ymm: ymm ? ymm.textContent.trim().substring(0, 40) : '?',
+        score: score ? score.textContent.trim() : '?',
+        id: card.id
+      });
+    }
+  });
+  if (oldOnes.length > 0) {
+    console.error('[DEBUG] OLD VEHICLES IN DOM (' + oldOnes.length + '):', JSON.stringify(oldOnes));
+    // Log active pill state at time of detection
+    console.error('[DEBUG] Active pill:', dateFilter, '| Active tab:', currentTab);
+  }
+});
+const _dbgTarget = document.getElementById('mainContent');
+if (_dbgTarget) {
+  _dbgObserver.observe(_dbgTarget, { childList: true, subtree: true });
+  console.warn('[DEBUG] MutationObserver attached to mainContent');
+} else {
+  console.error('[DEBUG] mainContent NOT FOUND — observer not attached');
+}
+</script>
 </body>
 </html>
