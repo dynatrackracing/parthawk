@@ -130,6 +130,15 @@
 - SNAPSHOT_SCRAPERS unchanged (no scraper work today)
 - LAST_SESSION and CHANGELOG were already current per hygiene audit
 
+## Scout alerts part-type headers tinted by max $ tier -- 2026-04-10
+- Section headers now carry a subtle background tint by max $ value
+  in the group, using existing getPartTier() from dh-parts.js (already
+  imported). Thresholds: ELITE $500+/gold, PREMIUM $350+/purple,
+  HIGH $250+/blue, SOLID $150+/green, BASE $100+/orange, LOW <$100/red.
+- Tint is rgba at 18% opacity (25% for green/orange/red to stay visible
+  on dark bg). White bold text unchanged and readable.
+- No new thresholds, no new colors — reuses canonical getPartTier().
+
 ## Scout alerts part-type header bold (real fix) -- 2026-04-10
 - Previous attempt changed color to #F0F0F0 at weight 700 — too subtle.
   This pass bumped .pt-header to font-weight:800, color:#FFFFFF, font-size:12px (was 10px).
