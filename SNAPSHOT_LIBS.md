@@ -1,5 +1,5 @@
 # SNAPSHOT_LIBS.md
-Generated 2026-04-09
+Generated 2026-04-10
 
 ## service/utils/
 
@@ -63,6 +63,19 @@ Generated 2026-04-09
 ---
 
 ## service/lib/
+
+### decoderCapability.js
+**Purpose:** Per-make decoder capability profile + named engine table + part type score ceilings. Built from SCORING_CALIBRATION_DATA.md Section 6 production data (2026-04-08).
+**Exports:** `MAKE_CAPABILITY`, `isReliable`, `NAMED_ENGINES`, `detectNamedEngine`, `PART_TYPE_CEILINGS`, `getCeiling`
+**Dependencies:** None (pure data/logic).
+**Key behavior:**
+- `MAKE_CAPABILITY` — Object keyed by uppercase make (29 makes: Ford, Chevrolet, Nissan, Honda, Toyota, Dodge, Hyundai, Kia, Jeep, Chrysler, GMC, Volkswagen, Buick, Mercedes-Benz, BMW, Mazda, Cadillac, Infiniti, Acura, Lexus, Lincoln, Pontiac, Mercury, Mitsubishi, Subaru, Ram, Saturn, Suzuki, Scion). Each entry has `{engine, trim, drivetrain, transmission}` booleans. Reliable = coverage >=60% for that signal on that make. Notable gaps: Chevrolet drivetrain=false, Nissan trim=false, Mercedes-Benz trim+drivetrain=false, Cadillac trim+drivetrain=false, Lincoln trim+drivetrain=false.
+- `isReliable(make, signal)` — Returns true if `MAKE_CAPABILITY[make.toUpperCase()][signal] !== false`. Unknown makes return true (assume reliable).
+- `NAMED_ENGINES` — Map of 13 named engine families to makes + displacement arrays. Diesel flag where applicable: HEMI (Dodge/Ram/Chrysler/Jeep, 5.7/6.1/6.2/6.4), ECOBOOST (Ford/Lincoln, 1.0–3.5), COYOTE (Ford, 5.0), PENTASTAR (Dodge/Ram/Chrysler/Jeep, 3.6), TRITON (Ford, 4.6/5.4/6.8), VORTEC (Chevy/GMC, 4.3–6.2), CUMMINS (Dodge/Ram, 5.9/6.7 diesel), DURAMAX (Chevy/GMC, 6.6 diesel), POWER STROKE/POWERSTROKE (Ford, 6.0/6.4/6.7/7.3 diesel), TDI (VW/Audi, 1.9/2.0/3.0 diesel), MAGNUM (Dodge/Ram/Chrysler, 3.9/5.2/5.9), MULTIAIR (Fiat/Jeep/Dodge/Chrysler, 1.4/2.4).
+- `NAMED_ENGINE_REGEX` — Single regex covering all 13 names including POWER STROKE with optional space.
+- `detectNamedEngine(title)` — Returns uppercase normalized named engine string or null.
+- `PART_TYPE_CEILINGS` — Score ceiling per part type. ECM/PCM/ECU/TCM/TCU: 85, ABS: 90, BCM/TIPM/CLUSTER/FUSE: 80, AMP/RADIO/NAV: 100. Default ceiling for other types: 65.
+- `getCeiling(partType, hasPremiumBrand)` — Returns ceiling. AMP/RADIO/NAV without premium brand capped at 75 (not 100).
 
 ### LocalVinDecoder.js
 **Purpose:** Offline VIN decoding via @cardog/corgi + VDS enrichment + vPIC fallback + EPA transmission. Replaces all NHTSA API calls. Singleton pattern.
@@ -145,3 +158,61 @@ Generated 2026-04-09
 **Key behavior:**
 - `getPlatformMatches(db, make, model, year)` — SQL join across platform tables. Returns sibling vehicles with shared part_types.
 - `applyPlatformBonus(baseScore, platformMatches, salesData)` — Up to 20% score boost based on sibling sales volume.
+- `MODEL_ALIASES` — ~50 models with title-variant arrays (e.g., 300 → ['300','300c','300s','300 touring','300 limited'], Ram 1500 ↔ 1500 cross-alias). Covers Chrysler/Dodge/Jeep/Ram, GM, Ford, Japanese, VW.
+- `MAKE_ALIASES` — 22 uppercase make keys → canonical title-case array (e.g., RAM → ['Ram','Dodge'] for pre-2010 Dodge Ram brand split).
+- `normalizeMake(yardMake)` — Returns first alias from MAKE_ALIASES for LKQ-to-sales-data make normalization.
+- `normalizeModel(model)` — Strips common trim suffixes (Base, SE, LE, XLE, SXT, etc.) from model string.
+
+### PriceCheckCronRunner.js
+**Purpose:** Weekly cron runner for eBay price checks on active listings.
+**Exports:** `PriceCheckCronRunner` (class)
+**Dependencies:** `./logger`, `../services/PriceCheckService`, `../models/PriceCheck`, `../models/YourListing`, `async-lock`
+**Key behavior:**
+- `work({ batchSize=35 })` — Async-lock guarded (key: `priceCheckCron`). Acquires lock then calls `doWork()`. Silently skips if already running.
+- `doWork(batchSize)` — Calls `getListingsNeedingPriceCheck(batchSize)`, iterates with 3-6s random delay between checks (5s after errors). Logs processed/errors/elapsed summary.
+- `getListingsNeedingPriceCheck(limit)` — SQL: joins YourListing + PriceCheck. Filters Active, non-omitted, quantityAvailable>0. Priority: never-checked first, then most stale. Cache window: 7 days (cron runs weekly). Orders by IS NULL DESC → currentPrice DESC → checkedAt ASC.
+- `buildQueue(limit=35)` — Preview-only alias for getListingsNeedingPriceCheck.
+
+### CronWorkRunner.js
+**Purpose:** eBay seller item processing cron. Fetches new items from all competitor sellers and processes unprocessed items.
+**Exports:** `CronWorkRunner` (class)
+**Dependencies:** `./logger`, `../managers/SellerItemManager`, `../models/Item`, `../managers/ItemDetailsManager`, `async-lock`, `../models/Cron`, `../middleware/CacheManager`, `../managers/CompetitorManager`
+**Key behavior:**
+- `work()` — Async-lock guarded (key: `cronRunGather`). Calls `doWork()`. Silently skips if already running.
+- `doWork()` — (1) `doPreWork()` (DB cleanup stub), (2) count total items, (3) if unprocessed items exist → skip eBay import and go straight to processing, (4) otherwise: fetch all competitors via CompetitorManager, call `SellerItemManager.getItemsForSellers(sellers)`, (5) process all items via `ItemDetailsManager.processItems()`, (6) insert Cron record with metrics (total, processed, unprocessed, elapsed, duplicate, apiCalls), (7) `doPostWork()` — flush all item-keyed CacheManager entries.
+- Logs metrics: total/processed/unprocessed/time/duplicateCount/apiCalls.
+
+---
+
+## service/config/
+
+### trim-tier-config.js
+**Purpose:** Trim tier configuration for scoring trim-dependent parts. Controls how premium/base trim vehicles affect score multipliers.
+**Exports:** `TRIM_TIERS`, `MAKE_TRIM_OVERRIDES`, `TRIM_DEPENDENT_PARTS`, `UNIVERSAL_PARTS`, `PREMIUM_BRANDS`, `TIER`, `getTrimTier`, `isTrimDependent`, `getPartScoreMultiplier`
+**Dependencies:** None (pure data/logic).
+**Key behavior:**
+- `TIER` — `{ PERFORMANCE: 1.3, PREMIUM: 1.0, CHECK: 0.5, BASE: 0.0 }`. Four multiplier levels.
+- `TRIM_TIERS` — ~70 lowercase trim strings mapped to TIER values. BASE: xl, s, work truck, express, tradesman, willys, le, ce, dx, lx, ls, wt, fleet, es, gls, etc. CHECK: xlt, se, sel, sxt, sport, titanium, slt, big horn, rt, gt, touring, xle, ex, ex-l, lt, z71, sv, n line, etc. PREMIUM: lariat, king ranch, platinum, limited, raptor, laramie, rebel, overland, summit, rubicon, srt, denali, ltz, high country, trd pro, f sport, sho, etc.
+- `MAKE_TRIM_OVERRIDES` — Per-make exceptions: ram (st→BASE, sport→CHECK, outdoorsman→CHECK), honda (touring→PREMIUM), acura (touring→PREMIUM), subaru (premium→CHECK, touring→PREMIUM, base→BASE), mazda (sport→BASE, gt→PREMIUM), nissan (sv/sr→CHECK), toyota (sr→BASE).
+- `PREMIUM_BRANDS` — Array of 14 luxury/premium brand names (lexus, acura, infiniti, cadillac, lincoln, bmw, mercedes, mercedes-benz, audi, volvo, buick, porsche, jaguar, land rover, mini).
+- `TRIM_DEPENDENT_PARTS` — 22 part keywords that only high trims have (amplifier, camera, blind spot, heated/cooled seat, power liftgate, HUD, lane departure, adaptive cruise, etc.).
+- `UNIVERSAL_PARTS` — 19 part keywords always present regardless of trim (ecm, ecu, bcm, abs, tipm, throttle, hvac, airbag, window regulator, door lock, seat belt, wiper, etc.).
+- `getTrimTier(make, trim)` — Returns `{tier, multiplier, badge, color}`. Resolution order: (1) MAKE_TRIM_OVERRIDES exact match, (2) TRIM_TIERS exact match, (3) word-boundary regex scan (longest key first). Default: CHECK (0.5x). Premium brand floor: BASE → CHECK (never fully suppress on luxury makes).
+- `isTrimDependent(partType)` — Returns false if partType matches UNIVERSAL_PARTS, true if matches TRIM_DEPENDENT_PARTS, false otherwise.
+- `getPartScoreMultiplier(make, trim, partType)` — Returns `{multiplier, reason, badge, color}`. Universal parts always 1.0x; trim-dependent parts use getTrimTier().
+
+---
+
+## service/middleware/
+
+### authGate.js
+**Purpose:** Cookie-based authentication gate for the PartHawk admin interface. Replaces Firebase auth for the internal-only deployment.
+**Exports:** `authGate`, `makeToken`, `verifyToken`, `COOKIE_NAME`, `COOKIE_MAX_AGE`
+**Dependencies:** `crypto` (Node built-in).
+**Key behavior:**
+- `COOKIE_NAME` — `'dh_session'`. `COOKIE_MAX_AGE` — 7 days in ms.
+- `PUBLIC_PATHS` — Bypassed routes: `/login`, `/auth/login`, `/auth/logout`, `/puller`, `/private/ebay-challenger-api`, `/test`, `/api/health-check`.
+- `makeToken()` — HMAC-SHA256 token: `${timestamp}.${hmac}`. Key from `DARKHAWK_PASSWORD` env var (default: `'changeme'`).
+- `verifyToken(token)` — Validates HMAC signature + checks token age < COOKIE_MAX_AGE (7 days).
+- `authGate(req, res, next)` — Express middleware. Checks PUBLIC_PATHS first, then `/admin/login.html`. Reads `dh_session` cookie via `parseCookie()`. Valid token → next(). Invalid: HTML requests → redirect to `/login`, API requests → 401 JSON.
+- `parseCookie(cookieHeader, name)` — Parses raw Cookie header string for named cookie value.

@@ -1,5 +1,13 @@
 # LAST SESSION -- 2026-04-10
 
+## Nest Protector: Check Stock includes The Cache — 2026-04-10
+- Diagnosed: backend code existed (cogs.js line 218-223), frontend display existed (gate.html line 412-427), but cache entries from scout_alert claims have part_number=null — PN is embedded in part_description text only. CacheService.checkCacheStock() only searched part_number column, so it never found anything.
+- Fix in cogs.js: replaced CacheService.checkCacheStock() delegation with direct query that searches BOTH part_number column AND part_description LIKE for the PN (using raw PN and compressed forms)
+- Added to response: partDescription, yardName, id fields alongside existing partType/vehicle/claimedBy/claimedAt/source
+- Frontend (gate.html): enhanced IN THE CACHE display with source badges (daily_feed=red, scout_alert=orange, hawk_eye=teal, flyway=blue, manual=gray), CLAIMED status badge, yard name, vehicle info, part description preview, relative time
+- Verified: searching "68461750AD" now returns 2 cache hits (Jeep Grand Cherokee Radio claims), "MEC31-511" returns 1 hit (Nissan 350Z PCM claim)
+- Files touched: service/routes/cogs.js, service/public/gate.html
+
 ## Scout alert injection: per-vehicle validation gates — 2026-04-10
 - buildScoutAlertIndex() keys by year|make|model|yard, collapsing same-YMM vehicles into one bucket. Hybrid Sonata's score-80 alert bled onto 1.6L non-hybrid Sonata at Durham.
 - Added 3 validation gates in scoreVehicle() BEFORE merge/inject loops:
@@ -72,6 +80,34 @@
 - Vehicle card chips include `isSynthetic` and `scoutAlertMatch` for collapsed view rendering
 - Proof case: 2007 Honda Pilot at LKQ Durham should now show ABS chip from HIGH scout alert instead of silently dropping it
 - Files: AttackListService.js, routes/attack-list.js, attack-list.html
+
+## Session Summary — 2026-04-10
+
+### Shipped (in order)
+1. **Scout alert promoted to Attack List value source** — buildScoutAlertIndex() + scoreVehicle() injection (merge + synthetic chips). Proof: 2007 Honda Pilot ABS chip surfaces.
+2. **Hotfix: null-guard make/model in scout alert key** — normalizeMake() null crash. One-line guard.
+3. **Hybrid + displacement matching in computeMatchScore()** — two new phases. ~800 alerts pushed below threshold.
+4. **Per-vehicle validation gates** — hybrid/electric/displacement gates filter same-YMM bleed. Fixes 1.6L Sonata.
+5. **Scout alerts date pill filter** — PERCH/OVERSTOCK bypass gated. .orderBy('date_added','desc') fixes stale display.
+6. **Hawk Eye → Attack List Pipeline** — VIN scanner uses scoreVehicle(). Full index pipeline.
+7. **Hawk Eye Frontend Parity** — badges, block, archives, score tooltip.
+8. **Debug logging cleaned up.**
+
+### Key architectural decisions
+- Scout alerts are first-class Attack List value source (match_score >= 50 gates index inclusion).
+- Per-vehicle validation gates solve year|make|model|yard key limitation without schema changes.
+- classifyPowertrain() trim fallback works when engine_type says "Gas" for hybrids (NHTSA gap).
+- is_hybrid/is_phev/is_electric only on vin_cache, NOT yard_vehicle — hybrid detection uses engine_type + trim fallback.
+
+### Known issues remaining
+- MARK-only scout filter on Attack List (Commit 3)
+- HOT signal from RestockService CRITICAL (Commit 4)
+- Generation-aware vehicle rarity
+
+### Files changed
+- AttackListService.js, ScoutAlertService.js, attack-list.js, scout-alerts.js, vin.js
+- attack-list.html, scout-alerts.html, vin-scanner.html
+- LAST_SESSION.md, CHANGELOG.md
 
 # LAST SESSION -- 2026-04-09
 

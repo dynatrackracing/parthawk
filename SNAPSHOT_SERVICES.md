@@ -1,22 +1,28 @@
 # SNAPSHOT_SERVICES.md
-Generated 2026-04-09
+Generated 2026-04-10
 
 ## Core Services
 
 ### AttackListService.js
 - Purpose: Scores yard vehicles by pull value — matches yard vehicles against Auto+Item inventory, YourSale history, and YourListing stock
-- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `buildPlatformIndex()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`, `scoreManualVehicles()`, `getModelVariants()`, `scoreVehicle()`
+- Key methods: `buildInventoryIndex()`, `buildSalesIndex()`, `buildStockIndex()`, `buildPlatformIndex()`, `buildScoutAlertIndex()`, `findMatchedParts()`, `getAttackList()`, `getAllYardsAttackList()`, `scoreManualVehicles()`, `getModelVariants()`, `scoreVehicle()`
 - **Constants:**
-  - `PART_PRICE_FLOORS`: ABS=$150, ECM/BCM/TCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/HVAC/NAV/CAMERA=$100. AIRBAG removed (now excluded).
+  - `PART_PRICE_FLOORS`: ABS=$150, ECU/ECM/TCM/BCM/TIPM/CLUSTER/RADIO/THROTTLE/AMP/AMPLIFIER/HVAC/NAV/CAMERA=$100. AIRBAG removed (now excluded).
   - `COMPOUND_MODEL_MAP`: F-250 Super Duty → [F-250, F250], Explorer Sport Trac → [Explorer], Grand Cherokee L → [Grand Cherokee], etc.
-  - `PN_EXACT_YEAR_TYPES`: ECM, PCM, ECU, BCM, TIPM, ABS, TCM, TCU, FUSE, JUNCTION, AMP, RADIO, CLUSTER, THROTTLE
+  - `PN_EXACT_YEAR_TYPES`: ECM, PCM, ECU, BCM, TIPM, ABS, TCM, TCU, FUSE, JUNCTION, AMP, RADIO, CLUSTER, THROTTLE, INSTRUMENT, SPEEDOMETER
   - `MAKE_ALSO_CHECK`: Ram ↔ Dodge
 - **isExcludedPart():** Engines/internals (assembly, block, head, piston, crankshaft, flywheel, etc.), transmissions (assembly, complete, reman), body panels (fender, bumper, hood, door shell, quarter/rocker panel, bed side, trunk lid, roof panel), airbags/SRS (AIRBAG, AIR BAG, SRS MODULE/SENSOR/UNIT, SUPPLEMENTAL RESTRAINT). Clock springs NOT excluded.
 - **extractPartSpecifics():** Detects performance trims (ST/RS/SS/SRT/Si/TRD/Nismo/Raptor/AMG/Shelby/Trail Boss/ZR2/S-Line/R-Line/GT), forced induction (EcoBoost/Twin Turbo/Turbocharged/Supercharged/TFSI/TSI/2.0T pattern), transmission (manual/automatic/DCT/CVT), diesel (Diesel/TDI/Duramax/Cummins/Power Stroke/EcoDiesel). Context-aware regex safety.
 - **buildInventoryIndex():** Auto+AIC+Item join. Price chain: market_demand_cache → Item.price (REF) → no price. Pro-rebuild ECM exception: ECM/ECU/PCM from pro-rebuild treated as normal (included in totalValue). Index keyed by `make|model|year`.
 - **buildSalesIndex():** YourSale keyed by `make|model` → `{ make, model, sales: [{ price, partType, yearStart, yearEnd, soldDate, title }] }`. 90-day window.
 - **buildStockIndex():** byMakeModel: `make|model` → qty sum. byPartNumber: `basePn` → `{ total, fullPNs: Set }`. Per-listing Set dedup. resolveStock() returns `{ count, matchType: 'exact'|'base'|'none' }`.
+- **buildScoutAlertIndex():** Batch loads unclaimed scout_alerts with match_score ≥ 50. Returns index keyed by `year|make|model|yardName` → `[{ id, source, title, value, partType, partNumber, matchScore, confidence }]`. Requires vehicle._yardName attached before scoreVehicle call.
 - **Model matching:** `getModelVariants()` generates compound+dash/no-dash variants. Bidirectional fuzzy regex in findMatchedParts(), sales index, stock index. Protected pairs: Grand Cherokee, Transit Connect, Grand Caravan.
+- **scoreVehicle() signature (11 params):** `scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex={}, stockPartNumbers={}, markIndex={byPN:Map,byTitle:Set}, intelIndex={wantPNs:Set,flagPNs:Set}, frequencyMap={}, soldKeys=new Set(), scoutAlertIndex={})`
+- **scoreVehicle() — SA injection phases (NEW 2026-04-10):**
+  - **Per-vehicle validation gates:** Before injection, _rawAlerts from scoutAlertIndex are filtered per vehicle: (1) Hybrid gate — title says `hybrid` → vehicle must have hybrid in trim/engine_type; (2) Electric gate — title says `electric`/`bev`/`ev` → vehicle must be EV; (3) Displacement gate — title has `N.NL` → vehicle decoded_engine must match within ±0.15L. Mismatched alerts are dropped silently.
+  - **Phase 1 — MERGE:** Attach surviving alerts to existing filteredParts that share partType or partNumber (best match_score wins). If alert.value > part.price (and priceSource !== 'sold'), price is upgraded to alert value. Sets `scoutAlertMatch`, `scoutAlertScore`, `alertMatch` on part.
+  - **Phase 2 — INJECT:** For alerts not merged in Phase 1, if partType not already covered in filteredParts, a synthetic chip is pushed with `isSynthetic:true`, `priceSource:'scout_alert'`, value from alert, `reason: 'Scout alert (score N) — source'`.
 - **Scoring pipeline (scoreVehicle):**
   1. Part novelty: NOVEL (0 stock + 0 sales) +20%, RESTOCK (0 stock + sold) +10%, STOCKED 0%. Applied to _scoringValue (not display price).
   2. totalValue = sum of _scoringValue for above-floor, non-mismatch parts
@@ -34,7 +40,7 @@ Generated 2026-04-09
 - **Platform expansion gate (2026-04-09):** `siblingKeyPartTypes` map tracks which candidateKeys came from platform siblings. Sales from siblings only contribute if their partType is in the sibling group's `partTypes` whitelist from `platform_shared_part` table. Default when no whitelist: skip expansion. VW MQB group deleted 2026-04-09.
 - **Sort (2026-04-09):** Vehicles by maxYourSalePart DESC, yourSaleEstValue DESC tiebreaker, est_value DESC final tiebreaker. Active first. Market_demand_cache and Item.price REF do NOT affect sort.
 - **No vehicle limit** — full yard inventory served. Frontend VEHICLE_CAPS raised to 5000.
-- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons (includes HYBRID/PHEV/ELECTRIC), daysSinceSet (int, server-computed in ET), setDateLabel (string), intel_match_count, est_value, max_part_value, maxYourSalePart, yourSaleEstValue, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor/yourSalePrice/yourSaleCount/valueSource/displayPrice/isExcluded. Yard-level: lastScrapedHoursAgo, isStale (>18h).
+- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons (includes HYBRID/PHEV/ELECTRIC), daysSinceSet (int, server-computed in ET), setDateLabel (string), intel_match_count, est_value, max_part_value, maxYourSalePart, yourSaleEstValue, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor/yourSalePrice/yourSaleCount/valueSource/displayPrice/isExcluded/scoutAlertMatch/scoutAlertScore/alertMatch/isSynthetic. Yard-level: lastScrapedHoursAgo, isStale (>18h).
 - **Blocked comps:** COMP filter in buildInventoryIndex() via compIds from BlockedCompsService.getBlockedSet(). SOLD filter in scoreVehicle() via soldKeys parameter (loaded once per request in async callers). scoreVehicle is SYNC — do NOT add await inside it.
 
 ### BlockedCompsService.js
@@ -74,12 +80,23 @@ Generated 2026-04-09
 
 ### ScoutAlertService.js
 - Purpose: Generates yard-vehicle alerts by matching want-list parts, sold history, and marks against active yard inventory
-- Key methods: `generateAlerts()` (concurrency-guarded), `scoreMatch()`, `scoreMarkMatch()`, `getMarkVehicle()`, `hasModelConflict()`
+- Key methods: `generateAlerts()` (concurrency-guarded), `scoreMatch()`, `scoreMarkMatch()`, `getMarkVehicle()`, `hasModelConflict()`, `computeMatchScore()`
+- **Vehicle query (2026-04-10):** Selects `decoded_cylinders` and `engine_type` in addition to existing decoded fields. These feed Phase 4 (cylinder check) and Phase 6b (hybrid/EV powertrain) of computeMatchScore().
 - **Mark matching (2026-04-07 rewrite):** `getMarkVehicle(mark)` reads structured columns (year_start, year_end, make, model) from the_mark row instead of parsing title at match time. Engine still extracted from title. `needs_review` marks excluded from alert generation (filtered in the_mark query).
 - **Year is a HARD GATE in scoreMarkMatch():** No structured year on mark → no match. No vehicle year → no match. Out of range → no match. No more silent fallthrough when year is null.
 - **Yard filtering:** Only is_core yards + yards on active Flyway trips
 - **Part-type-sensitive confidence:** PART_TYPE_SENSITIVITY map — ECM/PCM/THROTTLE=engine, ABS=drivetrain, AMP/RADIO/NAV=trim, BCM/TIPM/CLUSTER=universal
-- **Confidence:** HIGH=verified match, MEDIUM=unknown attribute, LOW=mismatch. Engine displacement + named engine + cylinder comparison. Drivetrain 4WD/2WD check. Trim premium audio vs base.
+- **computeMatchScore() — 8 phases (2026-04-10):**
+  - Baseline: ENGINE_SENSITIVE_TYPES (ECM/PCM/ECU/TCM/TCU/THROTTLE) start at 55, all others at 50
+  - Phase 3 (Year proximity): PN_EXACT_YEAR_TYPES only — exact year +10, tight range +5, broad range (4+yr) -5
+  - Phase 4 (Engine path): engine-sensitive types only — cylinder check (match +25/-50), named engine check (match +30/make mismatch -60/disp mismatch -30), displacement check (match +25/-50). Uses `decoded_cylinders` for vehicle cylinder count.
+  - Phase 5 (Diesel path): title diesel marker → diesel match +35, gas vehicle -80, unknown -20
+  - Phase 6 (Drivetrain path): ABS/drivetrain-sensitive types — base +10, drivetrain match +25/-50
+  - **Phase 6b (Hybrid/EV powertrain — NEW 2026-04-10):** Fires for ALL part types. Detects `electric/ev/bev`, `phev/plug-in hybrid`, or `hybrid` in want title. Reads `engine_type` field from vehicle (ELECTRIC/BEV/PLUG-IN HYBRID/PHEV/HYBRID). Falls back to classifyPowertrain(). Match +25, hybrid-on-gas -60, EV-on-non-EV -60, PHEV-on-gas -60.
+  - **Phase 6c (Displacement — all part types — NEW 2026-04-10):** Fires for non-engine-sensitive types only (engine types already ran displacement in Phase 4). If want title has a displacement and vehicle has decoded_engine displacement, match within ±0.15L → +15; mismatch → -50. Catches intake manifolds, valve covers, turbos, etc.
+  - Phase 7 (Trim path): trim-sensitive types only — premium audio brand vs vehicle trim_tier (PREMIUM +30, PERFORMANCE +25, BASE -40)
+  - Phase 8 (Ceiling): part-type ceiling clamp; score clamped to 0–100 at end
+- **Confidence:** HIGH ≥75, MEDIUM ≥55, LOW <55. Engine displacement + named engine + cylinder comparison. Drivetrain 4WD/2WD check. Trim premium audio vs base.
 - **Model conflicts:** Cherokee≠Grand Cherokee, Transit≠Transit Connect, Wrangler≠Gladiator
 - **Part exclusion:** isExcludedPart() filters before alert generation
 - Atomic refresh: delete + re-insert in transaction, preserves claimed status

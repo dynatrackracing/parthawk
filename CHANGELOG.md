@@ -4,43 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
-## Scout alert per-vehicle validation gates — 2026-04-10
-- Hybrid/electric/displacement gates filter same-YMM alert bleed in scoreVehicle()
-- Files: AttackListService.js
-
----
-
-## Hawk Eye frontend parity — badges, block, archives — 2026-04-10
-- Intel source badges (MARK/QUARRY/STREAM/OVER/FLAG) now render per-part on expanded rows
-- Novelty badges (NEW/RESTOCK) show alongside intel badges, not exclusively
-- Scout alert dots on collapsed chips, alert match badges on expanded rows
-- Block button per part (comp block for archives, sold block for sold-priced)
-- Archives parts render inline (no collapsible), with ARCHIVES badge + "(market est)" pricing + "Competitor listed" note
-- Score tooltip explains yard freshness boost exclusion
-- Files: service/public/vin-scanner.html
-
-## Hawk Eye → Attack List scoring pipeline — 2026-04-10
-- New endpoint: POST /vin/scan-scored — VIN decode + full AttackListService scoring
-- Hawk Eye frontend rewritten to match Daily Feed rendering (score, rarity, attributes, part chips, expanded details)
-- Full index pipeline: inventory, sales, stock, platform, mark, intel, frequency, blocked comps
-- Market enrichment, dead inventory warnings, YourSale price map, TrimTierService lookup
-- Old /vin/scan preserved for backward compat. Camera flow intact.
-- Files: service/routes/vin.js, service/public/vin-scanner.html
-
-## Hybrid + displacement matching in scout alerts — 2026-04-10
-- computeMatchScore() hybrid/EV powertrain signal + displacement comparison
-- Hybrid ABS mismatch now -60, displacement mismatch -50
-- Added decoded_cylinders/engine_type to vehicle query (were missing)
-- Files: ScoutAlertService.js
-
----
-
-## Scout Alert Injection — Attack List value source — 2026-04-10
-- buildScoutAlertIndex() batch loads active alerts keyed by vehicle composite key
-- scoreVehicle() merges alerts onto matching parts (MAX price wins) + injects synthetic chips for unattached alerts
-- Deleted redundant route-level scout alert merge loop
-- Frontend: ALERT badge for synthetic chips, (alert) price suffix
-- Files: AttackListService.js, routes/attack-list.js, attack-list.html
+## 2026-04-10 — Scout alerts as Attack List value source + matching upgrades
+- buildScoutAlertIndex + scoreVehicle injection (synthetic parts + merge, MAX tiebreak)
+- Hybrid/EV powertrain + displacement matching in computeMatchScore. ~800 alerts pushed below threshold
+- Per-vehicle validation gates (hybrid/electric/displacement) fix same-YMM bleed on shared index key
+- Scout alerts date pill filter (PERCH/OVERSTOCK bypass, attribute lookup .orderBy fix)
+- Hawk Eye → Attack List scoring pipeline (POST /vin/scan-scored, full index pipeline)
+- Hawk Eye frontend parity (badges, block, archives, score tooltip)
+- Nest Protector: check-stock includes The Cache (scout_alert claims via part_description LIKE)
+- Files: AttackListService.js, ScoutAlertService.js, attack-list.js, scout-alerts.js, vin.js, cogs.js, attack-list.html, scout-alerts.html, vin-scanner.html, gate.html
 
 ---
 

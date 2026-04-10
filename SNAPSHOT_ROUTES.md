@@ -1,4 +1,4 @@
-Generated 2026-04-09
+Generated 2026-04-10
 
 # PartHawk Route Map
 
@@ -23,20 +23,20 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/demand-analysis` | demand-analysis.js | GET `/sell-through` `/stale-inventory` `/velocity` `/top-performers` `/competition/:keywords` `/dashboard` `/health` |
 | `/price-check` | price-check.js | POST `/omit` `/bulk` `/title` `/:listingId` `/cron`, GET `/all` `/history/:listingId` `/stats` |
 | `/yards` | yards.js | GET `/ping` `/` `/:id/vehicles` `/scrape/status` `/status` `/scrape-health`, POST `/scrape/lkq` `/scrape/:id` `/:id/feedback` |
-| `/attack-list` | attack-list.js | GET `/` (vehicles carry maxYourSalePart, yourSaleEstValue, sorted by YourSale value) `/vehicle/:id/parts` (per-part: yourSalePrice, yourSaleCount, valueSource, displayPrice, isExcluded; sort: scout-alert-first then sold then intel then ARCHIVES bottom) `/yard/:yardId` `/summary` `/last-visit/:yardId`, POST `/log-pull` `/visit-feedback` `/manual` |
+| `/attack-list` | attack-list.js | GET `/` (vehicles carry alertBadges, slim part_chips by default; full=true loads all parts) `/vehicle/:id/parts` (per-part: valueSource, displayPrice, yourSalePrice/Count, isExcluded, scoutAlertMatch, hasSoldHistory, hasCompetitorIntel; sort: scout-alert-first then sold then intel then ARCHIVES bottom) `/yard/:yardId` `/summary` `/last-visit/:yardId`, POST `/log-pull` `/visit-feedback` `/manual` |
 | `/cogs` | cogs.js | POST `/gate` `/session`, GET `/yard-profile/:yardId` `/yards` `/check-stock` |
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
 | `/restock` | restockReport.js | GET `/report` (per-tier 100-row cap, FOUND from the_cache, timeframe sort) `/found-items` (legacy), POST `/quarry-sync` |
 | `/restock-want-list` | restock-want-list.js | GET `/items` `/titles` (lightweight, no stock check) `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
 | `/blocked-comps` | blocked-comps.js | POST `/block` (comp by itemId) `/block-sold` (by partType+year+make+model), DELETE `/by-id/:id` (unified restore) `/:itemId` (comp compat), GET `/` (list with ?search&type&limit&offset) |
-| `/scout-alerts` | scout-alerts.js | GET `/list` (vehicle-centric: one entry per yard_vehicle_id with nested parts[], hard/soft dedup, soldHere+soldLifetime, headline_source+headline_score, pagination at vehicle level), POST `/claim` `/refresh` |
+| `/scout-alerts` | scout-alerts.js | GET `/list` (vehicle-centric: one entry per yard_vehicle_id with nested parts[], hard/soft dedup, soldHere+soldLifetime, headline_source+headline_score, pagination at vehicle level; PERCH+OVERSTOCK respect date pill; vehicle attr lookup uses .orderBy('date_added','desc').first()), POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
 | `/api/fitment` | fitment.js | GET `/lookup` `/stats` |
 | `/api/listing-tool` | listing-tool.js | GET `/ebay-lookup` `/parts-lookup` `/intelligence`, POST `/save-fitment` `/save-listing-intel` |
 | `/part-location` | part-location.js | GET `/:partType/:make/:model/:year`, POST `/confirm` `/flag-wrong` |
 | `/vin` | vin.js | POST `/decode-photo` `/scan`, GET `/history` `/test-local/:vin` |
-| `/stale-inventory` | stale-inventory.js | POST `/run` `/returns` `/revise-price` `/end-item` `/relist-item` `/bulk-end`, GET `/actions` `/returns/pending` `/candidates` `/restock/flags` |
+| `/stale-inventory` | stale-inventory.js | POST `/run` (410 GONE — write disabled 2026-04-08) `/returns` `/restock/scan`, GET `/actions` `/returns/pending` `/candidates` `/restock/flags`, POST `/returns/:id/relisted` `/returns/:id/scrapped` `/restock/:id/acknowledge` |
 | `/competitors` | competitors.js | POST `/scan` `/auto-scrape` `/mark` `/mark/graduate` `/seed-defaults`, GET `/alerts` `/gap-intel` (Clean Pipe partNumberBase, year-range PN rejection) `/emerging` (3+ sales by 2+ sellers in 60d) `/sellers` `/marks` `/:sellerId/best-sellers` + CRUD |
 | `/hidden` | hidden.js | POST `/add` (raw INSERT, ON CONFLICT DO NOTHING), DELETE `/:id`, GET `/list` `/keys` |
 | `/autolumen` | autolumen.js | POST `/import/listings` `/import/sales` `/import/transactions`, GET `/stats` |
@@ -141,8 +141,9 @@ Parts staging system -- tracks parts claimed from yards before listing.
 - **Admin page:** `/admin/vin` serves vin-scanner.html
 
 ### /attack-list (Yard pull planning)
-- `GET /attack-list` -- all yards, slim payload by default. `?days=90&full=true&since=`
-- `GET /attack-list/vehicle/:id/parts` -- on-demand parts for a vehicle
+Key changes 2026-04-10: removed redundant post-score scout alert merge loop; `scoutAlertIndex` is now built via `service.buildScoutAlertIndex()` and passed directly into `scoreVehicle()`; `priceSource='scout_alert'` parts get `valueSource='scout_alert'` and `displayPrice=p.price`.
+- `GET /attack-list` -- all yards, slim payload by default. `?days=90&full=true&since=`. Vehicles carry `alertBadges` (PERCH-sorted). Slim mode strips parts/rebuild_parts/platform_siblings and returns `part_chips` (top 6, non-floor parts with partType/price/verdict/priceSource/isMarked/noveltyTier/isSynthetic/scoutAlertMatch). Full mode enriches parts with dead inventory warnings.
+- `GET /attack-list/vehicle/:id/parts` -- on-demand parts for a vehicle. Builds `scoutAlertIdx` via `buildScoutAlertIndex()`, passes to `scoreVehicle()`. Per-part fields: `valueSource` (scout_alert | yoursale | market_estimate | none), `displayPrice`, `yourSalePrice`, `yourSaleCount`, `yourSaleLatest`, `isExcluded`, `scoutAlertMatch`, `hasSoldHistory`, `hasCompetitorIntel`. Sort: scoutAlertMatch first → hasSoldHistory → hasCompetitorIntel → rest; ARCHIVES (item_reference) always at bottom, price DESC within archives.
 - `GET /attack-list/yard/:yardId` -- single yard attack list
 - `GET /attack-list/summary` -- cross-yard summary
 - `POST /attack-list/log-pull` -- log a pulled part
@@ -150,6 +151,12 @@ Parts staging system -- tracks parts claimed from yards before listing.
 - `GET /attack-list/last-visit/:yardId` -- last visit info
 - `POST /attack-list/manual` -- manual vehicle entry
 - **Admin page:** `/admin/pull` and `/puller` (public) both serve attack-list.html
+
+### /scout-alerts (Scout Alert List)
+Key changes 2026-04-10: PERCH and OVERSTOCK sources now respect the `days` pill filter (previously they passed through all dates); vehicle attribute lookup uses `.orderBy('date_added','desc').first()` to get the most-recently-added matching vehicle.
+- `GET /scout-alerts/list` -- vehicle-centric listing. One entry per yard+year+make+model composite key with nested `parts[]`. Hard/soft dedup by partType (soft) or partType+pnBase (hard HARD_PART_TYPES). Fields: soldHere, soldLifetime, priceMin, priceMax, topScore, topSource, alertIds, claimed. Vehicle attrs resolved from yard_vehicle ordered by date_added desc. Pagination at vehicle level (50/page). Response: `{ vehicles: {yardName: [...]} , boneCount, perchCount, markCount, overstockCount, restockCount, total, page, totalPages, lastGenerated }`.
+- `POST /scout-alerts/claim` -- claim / unclaim an alert. Body: `{ id, claimed }`
+- `POST /scout-alerts/refresh` -- regenerate alerts via ScoutAlertService
 
 ### /hidden (Global Part Blacklist)
 - `POST /hidden/add` -- hide a part globally. Body: `{ partNumberBase, partType, make, model, source, sourceDetail, hiddenBy }`. Raw INSERT with ON CONFLICT (part_number_base, COALESCE(make,''), COALESCE(model,'')) DO NOTHING. Returns `{ success, id, alreadyHidden }`.
@@ -179,6 +186,18 @@ Parts staging system -- tracks parts claimed from yards before listing.
 - `GET /cogs/yards` -- all yards with COGS data
 - `GET /cogs/check-stock` -- stock check against COGS
 - **Admin page:** `/admin/gate` serves gate.html
+
+### /stale-inventory (DarkHawk -- read-only since 2026-04-08)
+All eBay write endpoints (POST `/run`, POST `/revise-price`, POST `/end-item`, POST `/relist-item`, POST `/bulk-end`) return `410 Gone`. Read/log endpoints remain active.
+- `GET /stale-inventory/actions` -- history of stale inventory actions. `?tier=&limit=&page=`
+- `GET /stale-inventory/candidates` -- listings 60+ days old needing action (sorted by daysListed desc). Recommendation: monitor/reduce/deep_discount/end.
+- `POST /stale-inventory/returns` -- log a returned part, auto-queue relist
+- `GET /stale-inventory/returns/pending` -- pending relists
+- `POST /stale-inventory/returns/:id/relisted` -- mark return as relisted
+- `POST /stale-inventory/returns/:id/scrapped` -- mark return as scrapped
+- `POST /stale-inventory/restock/scan` -- run restock scan
+- `GET /stale-inventory/restock/flags` -- restock flags. `?acknowledged=&limit=`
+- `POST /stale-inventory/restock/:id/acknowledge` -- acknowledge restock flag
 
 ### Healthcheck
 - `GET /test` -- liveness probe, returns `"haribol"` (healthcheck is here, NOT `/`)

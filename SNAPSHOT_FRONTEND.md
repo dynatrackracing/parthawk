@@ -1,20 +1,24 @@
 # SNAPSHOT_FRONTEND.md
-Generated 2026-04-09
+Generated 2026-04-10
 
 ## Shared Components
 
 ### dh-nav.js
-- Two-bar sticky nav: FIELD row (6 links desktop / 5 mobile, red active) + INTEL row (10+ links, yellow active)
-- Logo + "DARKHAWK" links to /admin/home. INTEL row hidden on mobile. Flyway hidden on mobile via .field-link-mobile-hide at 768px.
+- Two-bar sticky nav: FIELD row (6 links desktop / 5 mobile, red active) + INTEL row (11 links, yellow active)
+- Logo + "DARKHAWK" links to /admin/home. INTEL row hidden on mobile. Flyway hidden on mobile via `.field-link-mobile-hide` at 768px.
 - **FIELD:** feed, alerts, cache, vin, gate, flyway (flyway desktop-only)
 - **INTEL:** scour, quarry, sky, perch, mark, velocity, instincts, prey-cycle, carcass, phoenix, blocked
+- Carcass link hidden in INTEL row via inline CSS override (`display:none !important`); accessed via FIELD → carcass page directly.
+- Splash background: random image 1–8 from `/admin/images/splash-N.jpg`, persisted per session. `body::before` overlay at rgba(0,0,0,0.7) injected via `<style>` element.
+- Logout link: absolute-positioned right side of INTEL row.
 
 ### dh-parts.js + dh-parts.css (Part Value Utilities)
-- **Loaded by:** all 6 field pages
+- **Loaded by:** all field pages (attack-list, scout-alerts, vin-scanner, flyway, gate, cache)
 - **getPartTier(price):** ELITE $500+ gold pulse, PREMIUM $350+ purple pulse, HIGH $250+ blue, SOLID $150+ green, BASE $100+ orange, LOW <$100 red
 - **renderPriceBadge(price, prefix):** HTML badge with tier color
 - **isExcludedPart(title):** Filters engines/internals, transmissions, body panels, airbags/SRS. Clock springs allowed. Same patterns as backend.
-- **CSS:** `.tier-elite` through `.tier-low`, `.tier-nodata`, `@keyframes pulse-gold`/`pulse-purple`, `.part-badge` base
+- **renderIntelIcon(sources):** Priority icon for chip prefix — mark > quarry > stream/restock > overstock. Quarry gets `.intel-fire` pulse animation.
+- **CSS:** `.tier-elite` through `.tier-low`, `.tier-nodata`, `@keyframes pulse-gold`/`pulse-purple`, `.intel-fire`, `.archives-badge`, `.part-badge` base
 
 ---
 
@@ -24,39 +28,51 @@ Generated 2026-04-09
 - **URL:** `/admin/pull`, `/puller`
 - **Nav key:** `feed`
 - **4-line collapsed vehicle card layout:**
-  - **Line 1 — Headline:** Score badge (inline color, pulse at 120+) + Year Make Model + engine + rarity badge (inline after engine) + $value (right-aligned, color-coded). Rarity: only UNCOMMON (blue), RARE (purple pulse), LEGENDARY (gold pulse ★) shown. SATURATED/COMMON/NORMAL hidden.
-  - **Line 2 — Attributes:** Priority-sorted badges (leftmost = biggest score driver): EV (electric blue #2979ff border, bold) → PHEV (bright cyan #1de9b6 border) → PERFORMANCE → HYBRID (cyan #00bcd4 border) → DIESEL → 4WD+MT → PREMIUM → MANUAL → 4WD → CHECK MT → CVT → TRIM. Collapses when none apply. Badges read from server-computed `boostReasons[]` for powertrain; client-side detection for drivetrain/transmission. Sorted via `BADGE_PRIORITY` map before render.
+  - **Line 1 — Headline:** Score badge (inline color, gold pulse at 120+) + Year Make Model + engine + rarity badge (inline after engine) + $value (right-aligned, color-coded). Rarity: only UNCOMMON (blue), RARE (purple pulse), LEGENDARY (gold pulse ★) shown. SATURATED/COMMON/NORMAL hidden.
+  - **Line 2 — Attributes:** Priority-sorted badges (leftmost = biggest score driver): EV (electric blue #2979ff border, bold) → PHEV (bright cyan #1de9b6 border) → PERFORMANCE → HYBRID (cyan #00bcd4 border) → DIESEL → 4WD+MT → PREMIUM → MANUAL → 4WD → CHECK MT → CVT → TRIM → CULT. Collapses when none apply. Badges read from server-computed `boostReasons[]` for powertrain; client-side detection for drivetrain/transmission. Sorted via `BADGE_PRIORITY` map before render.
   - **Stale scrape banner (2026-04-08):** Yellow ⚠ bar when `yard.isStale` (>18h since last scrape). Shows hours since last scrape. Not dismissible.
   - **Date handling (2026-04-08 doctrine):** `getNewestDate()`, `getDaysFromNewest()`, `parseLocalDate()` DELETED. Pill filters read `v.daysSinceSet` (server-computed int in ET). "Set Xd ago" label reads `v.setDateLabel` (server string). Frontend never parses dates.
   - **Line 3 — Location:** Row · Color · Xd ago + NEW badge (green #4CAF50, for ≤0d). Gone label for inactive.
-  - **Line 4 — Parts:** Up to 6 type chips colored by price tier. Novelty dots: cyan ● = NOVEL, green ● = RESTOCK. Intel chips: ★gold MARK, ★green RESTOCK, ★blue WANT, ✕red OVER. ★N indicator for intel match count.
+  - **Line 4 — Parts:** Up to 6 type chips colored by price tier. **alertDot priority (2026-04-10):** `p.isSynthetic` → 📢 amber icon on chip (takes priority over intel icon and novelty dot). `p.scoutAlertMatch` (non-synthetic) → 🎯 gold icon on chip. Then intel icons (mark/quarry/stream/over), then novelty dots: cyan ● = NOVEL, green ● = RESTOCK. ★N indicator for intel match count.
 - **Score display:** Uncapped (can show 127, 145, etc.). Color tiers: 120+ gold, 100+ bright green, 80+ green, 60+ yellow, 40+ orange, <40 red. Gold pulses at 120+.
 - **getScoreColor(score):** Returns hex color for score badge background.
 - **VEHICLE_CAPS:** `{ newest: 50, '3d': 150, '7d': 300, '30d': 500, '60d': 1000, '90d': 2000, all: 5000 }`
 - **Filters:** Newest / 3d / 7d / 30d / 60d / All. ALL uses pillDays=999, groups by age tiers, no date restriction.
 - **Cache sync:** Loads GET /cache/claimed-keys on init. Two-key matching: PN + itemId. Pull → checkmark, checkmark → unclaim.
-- **Expanded view (2026-04-09):** On-demand part loading (GET /attack-list/vehicle/:id/parts). Parts sorted: scout-alert-first (scoutAlertScore DESC), then sold history (price DESC), then competitor intel, then ARCHIVES bucket at bottom (price DESC within). ARCHIVES badge (yellow, left slot) on item_reference parts replaces NEW badge. Dual price display: "$avg mkt $median" for yoursale+market, "(market est)" for market-only, clean for archives. SOLD/SOLD pills killed, RESTOCK kept. Price badges (6-tier), cache claim buttons, below-floor section, spec mismatch section, trim intelligence, part location. **Block button** on chips with priceSource in (item_reference, sold). Optimistic UI with 5s undo.
-- **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claimed-keys`, `/cache/claim`, `/cache/:id/return`, `/part-location/...`, `/yards/scrape/...`, `/scout-alerts/claim`, `/attack-list/manual`, `/vin/decode-photo`, `/vin/scan`
+- **Lazy rendering:** First 30 vehicles per section rendered immediately; remaining vehicles behind IntersectionObserver lazy-load sentinel (200px margin). Click sentinel to force-load.
+- **Expanded view (2026-04-09):** On-demand part loading (GET /attack-list/vehicle/:id/parts). Parts sorted: scout-alert-first (scoutAlertScore DESC), then sold history (price DESC), then competitor intel, then ARCHIVES bucket at bottom (price DESC within). ARCHIVES badge (yellow, left slot) on item_reference parts replaces NEW badge. Dual price display: `valueSource=scout_alert` → `$price (alert)` amber suffix; `yoursale` → `$price mkt $median`; `market_estimate` → `$price (market est)`. SOLD/SOLD pills killed, RESTOCK kept. Price badges (6-tier), freshness icon (✅/⚠️/❌), cache claim buttons, below-floor section (collapsed), spec mismatch section (collapsed), trim intelligence (validated suggestions per trim), part location, rebuild reference. **Block button** on chips with priceSource in (item_reference, sold). Optimistic UI with undo on unclaim.
+- **isSynthetic badge in expanded parts (2026-04-10):** `p.isSynthetic` → `📢 ALERT {score}` amber pulsing badge (background #f59e0b, `animation:pulse 2s infinite`). `p.scoutAlertMatch` (non-synthetic) → `🎯 SA {score}` gold badge (#FFD700). Both show scoutAlertScore if present.
+- **Manual Set List modal:** Paste VINs/vehicles from any source, one per line, any format. POST /attack-list/manual. Renders results in MANUAL yard tab.
+- **Inline VIN scanner modal:** Lightweight camera capture → POST /vin/decode-photo → auto-fills VIN input → doScan flow.
+- **Model name cleaning:** `cleanModel()` strips LKQ platform codes (JK/JL/DS1/etc.), NHTSA trim suffixes stuffed into model names, deduplicates consecutive words. Mazda 3/6/5 rewritten to Mazda3/Mazda6/Mazda5.
+- **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claimed-keys`, `/cache/claim`, `/cache/:id/return`, `/part-location/...`, `/yards/scrape/...`, `/scout-alerts/claim`, `/attack-list/manual`, `/vin/decode-photo`, `/vin/scan`, `/blocked-comps/block`, `/blocked-comps/block-sold`
 
 ### scout-alerts.html (Scout Alerts)
 - **URL:** `/admin/scout-alerts`
 - **Nav key:** `alerts`
 - **Vehicle-centric rebuild (2026-04-09):** One card per yard_vehicle_id, collapsed by default. Expand reveals part groups: HARD_PART_TYPES (ECM/PCM/ECU/BCM/TCM/TIPM/ABS/AIRBAG/SRS) get one row per partNumberBase; soft types get one row per partType with partNumberBreakdown showing PN distribution. Per-row soldHere + soldLifetime. headline_source (highest priority) + headline_score (max match_score). Alert_count collapse note.
-- **Claim:** Per dedup row via first alertId. Cache sync via /cache/claimed-keys. Hide-pulled hides fully-claimed vehicles.
-- **Features:** Yard tabs, time filter pills, summary tiles (MARK/QUARRY/STREAM/OVERSTOCK/YARDS), pagination at vehicle level (50/page), inline edit for STREAM entries, numeric match_score badges.
+- **Part-type section headers (2026-04-10):** `.pt-header` styled `font-weight:800; color:#FFFFFF; text-transform:uppercase` — bold white headers with optional tier-color tint background (rgba from tier hex at 18–25% opacity for SOLID/LOW/BASE).
+- **Score badge coloring (2026-04-10):** `score-high` (≥75) = `background:#3B82F6` blue (previously green). Scale: ≥75 blue, ≥60 green, ≥50 yellow, ≥40 orange, <40 red. Numeric match_score badges inline per part row.
+- **Claim:** Per dedup row via first alertId. Cache sync via /cache/claimed-keys (three maps: claimedPNs, claimedItemIds, claimedAlertIds). Hide-pulled hides fully-claimed vehicles.
+- **Features:** Yard tabs (Raleigh/Durham/Greensboro/East NC/Tampa/Largo/Clearwater), time filter pills (Today/3d/7d/30d/60d/90d/All), summary tiles (MARK/QUARRY/STREAM/OVERSTOCK/YARDS), pagination at vehicle level (50/page), inline edit for STREAM entries (`.editable-stream` dashed underline, click to edit in-place), numeric match_score badges per row.
 - **API:** `/cache/claimed-keys`, `/scout-alerts/list` (vehicle-centric shape), `/cache/claim`, `/cache/:id/return`, `/scout-alerts/claim`, `/scout-alerts/refresh`, `/restock-want-list/by-title` (PATCH)
-
-### cache.html (The Cache)
-- **URL:** `/admin/the-cache`
-- **Nav key:** `cache`
-- **Features:** Active/History tabs, stats bar, source badges (daily_feed/scout_alert/hawk_eye/flyway/manual), return/listed/delete actions, price badges via renderPriceBadge(), inline edit on PN and description, check stock (cache + COGS), manual part add
-- **API:** `/cache/stats`, `/cache/active`, `/cache/:id` (PATCH/DELETE), `/cache/:id/return`, `/cache/:id/resolve`, `/cache/history`, `/cache/check-stock`, `/cogs/check-stock`, `/cache/claim`
 
 ### vin-scanner.html (Hawk Eye)
 - **URL:** `/admin/vin`
 - **Nav key:** `vin`
-- **Features:** VIN decode via camera photo or manual entry, parts research, claim to cache, scan history. Uses getPartTier() for 6-tier badges.
-- **API:** `/vin/decode-photo`, `/vin/scan`, `/cache/claim`, `/api/instant-research`, `/api/instant-research/apify`, `/vin/history`
+- **Full Hawk Eye rewrite (2026-04-10):** Uses AttackListService scoring pipeline via new `/vin/scan-scored` endpoint (POST). No longer calls `/api/instant-research` or `/api/instant-research/apify`.
+- **Vehicle card layout:** Matches Daily Feed exactly — score badge (with ℹ️ tooltip noting no yard freshness boost), YMM + engine + rarity inline, attribute badges via `renderAttrBadges()`, VIN in green monospace, spec row (trim/drivetrain/transmission/bodyStyle), collapsed part chips via `renderChips()`.
+- **renderChips(parts):** Dedupes by partType, up to 6 chips. `p.isSynthetic` → 📢 amber prefix. `p.scoutAlertMatch` (non-synthetic) → 🎯 gold prefix. Then intel icon, then novelty dot.
+- **Part buckets:** aboveFloor, specMismatch (collapsed `<details>`), belowFloor (collapsed `<details>`), archiveParts (item_reference, inline at bottom). `isExcluded` parts skipped entirely.
+- **verdictBadge(price, priceSource):** `priceSource=scout_alert` → ` (alert)` suffix on badge text. Archives: `~$N EST` suffix.
+- **freshIcon(dateStr):** ✅ ≤60d, ⚠️ ≤90d, ❌ >90d (based on yourSaleLatest/marketCheckedAt/lastSoldDate).
+- **renderPartDetail():** alertMatch badge (MARK/QUARRY/OVER source-colored), intel source badges (MARK/QUARRY/STREAM/OVER/FLAG), ARCHIVES badge, novelty badge (NEW/RESTOCK), isSynthetic badge (📢 ALERT pulsing amber), scoutAlertMatch badge (🎯 SA gold). Stats row (in_stock, sold_90d, PN). Market comparison row (median/count/velocity with deviation coloring). Dead warning box. Block button for comp (item_reference + itemId) or sold (partType + YMM) blocks.
+- **Camera flow:** processVinPhoto() resizes to max 1280px, JPEG 0.7 quality, further halves if b64 > 1.5MB. POST /vin/decode-photo → auto-fills VIN → doScan('camera').
+- **Scan history:** `loadHistory()` lazy-loads on link click. Shows last 10 scans, click to re-scan.
+- **Rebuilt reference:** Shows if `data.rebuild_parts.length > 0` at 50% opacity.
+- **cachedParts notice:** Amber card if parts already in cache for this vehicle/YMM.
+- **Platform siblings:** Shows `v.platform_siblings` if present.
+- **API:** `/vin/decode-photo`, `/vin/scan-scored` (new — replaces `/vin/scan`), `/cache/claim`, `/vin/history`, `/blocked-comps/block`, `/blocked-comps/block-sold`
 
 ### gate.html (Nest Protector)
 - **URL:** `/admin/gate`
@@ -68,8 +84,10 @@ Generated 2026-04-09
 - **URL:** `/admin/flyway`
 - **Nav key:** `flyway`
 - **Features:** Road trip planner. Vehicle cards match attack list layout (4-line: score+YMM+rarity+$value / attributes / location+NEW / part chips with novelty dots). Day trip = full feed, road trip = LEGENDARY+RARE+MARK only.
-- **Card layout:** getScoreColor() for score badge, rarity badges (UNCOMMON/RARE/LEGENDARY only), green NEW badge, novelty dots on part chips. Price right-aligned, attribute badges on Line 2.
-- **API:** `/cache/claim`, `/flyway/vehicle/:id/parts`, `/flyway/trips`, `/flyway/trips/:id/attack-list`, etc.
+- **Card layout:** getScoreColor() for score badge, rarity badges (UNCOMMON/RARE/LEGENDARY only), green NEW badge, novelty dots on part chips. Price right-aligned, attribute badges on Line 2. Trip type toggle (DAY teal / ROAD orange).
+- **Trip types:** Day trip uses all vehicles; Road trip filters LEGENDARY+RARE+MARK-matched only.
+- **Views:** Trip picker list → select trip → attack list for that trip. Yard selector for new trip creation.
+- **API:** `/cache/claim`, `/flyway/vehicle/:id/parts`, `/flyway/trips`, `/flyway/trips/:id/attack-list`, `/flyway/trips` (POST/PATCH/DELETE)
 
 ---
 
@@ -151,15 +169,18 @@ Generated 2026-04-09
 
 ### stale-inventory.html (Carcass)
 - **URL:** `/admin/carcass` | **Nav:** `carcass`
-- Stale inventory candidates, revise/end/relist actions, bulk end, automation
+- Stale listing diagnostics (read-only view). Two tabs: CANDIDATES + HISTORY.
+- CANDIDATES: fetches `/stale-inventory/candidates`, shows listings needing attention with item cards and action buttons (btn-danger/btn-warn/btn-green).
+- Warning banner: "Read-only view. Inventory management happens outside this tool."
+- API: `/stale-inventory/candidates`, `/stale-inventory/history`
 
 ---
 
 ## Tools
 
-### listing-tool-v2.html
+### listing-tool.html / listing-tool-v2.html
 - **URL:** `/admin/listing-tool-v2`
-- eBay listing generator using Claude API
+- eBay listing generator using Claude API. Light theme (white bg, red header). Standard form layout with Tailwind-style tokens.
 
 ### import.html
 - **URL:** `/admin/import`
@@ -167,7 +188,10 @@ Generated 2026-04-09
 
 ### home.html
 - **URL:** `/admin/home`
-- Section link grid (Field/Intel/Inventory/Tools), Autolumen sync panel
+- Section link grid: IN THE FIELD (6 red cards) / OFFICE INTEL (6 yellow cards) / INVENTORY (4 green cards) / TOOLS (2 cyan cards).
+- Random splash background (same mechanism as dh-nav.js — `body::before` dim overlay).
+- Autolumen Sync panel: collapsible section (▶ toggle), CSV upload for active listings + sales history (Orders Report or Transaction Report radio toggle). Safe to re-upload (duplicate handling).
+- **Sections:** DAILY FEED, SCOUT ALERTS, THE CACHE, HAWK EYE, NEST PROTECTOR, THE FLYWAY / HUNTERS PERCH, PHOENIX, SCOUR STREAM, THE QUARRY, SKY WATCH, THE MARK / VELOCITY, INSTINCTS, PREY-CYCLE, CARCASS / LISTING TOOL, CSV IMPORT
 
 ### login.html
 - **URL:** `/login`
