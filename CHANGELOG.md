@@ -4,6 +4,11 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## End-of-Day Hygiene: Snapshot Regen + Rules 45-49 — 2026-04-09
+- Regenerated 4 snapshots to 2026-04-09. Added CLAUDE_RULES 45-49 (YourSale value, excluded parts, platform gate, ARCHIVES, isSkipWord).
+
+---
+
 ## Platform Audit Cleanup — 2026-04-09
 - Challenger removed from LX group, redundant LX/LD group deleted, Ford Explorer group restructured to U152/U251 with Mountaineer + Sport Trac. 23 groups remain.
 

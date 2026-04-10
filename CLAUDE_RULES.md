@@ -182,3 +182,15 @@ Icons must render identically on /admin/scout-alerts and /admin/pull and any fut
 ## SCOUT ALERT SCORING
 
 44. **Scout Alert matching uses numeric match_score 0-100, not text confidence.** Year/make/model is a HARD GATE. Engine-sensitive part types (ECM/PCM/ECU/TCM/TCU/THROTTLE) start at baseline 55; all others at 50. Engine signals (cylinders/named/displacement) add or subtract based on PART_TYPE_SENSITIVITY map. Diesel flag is 100% reliable (+35 match, -80 mismatch). Drivetrain and trim signals consult decoderCapability.isReliable(make, signal). Per-part-type ceilings cap scores: ECM/PCM/ECU=85, TCM/TCU=85, ABS=90, BCM/TIPM/CLUSTER/FUSE=80, AMP/RADIO/NAV=100 with premium brand 75 without, THROTTLE=90, OTHER=65. Display tiers: 75+ HIGH gold, 60-74 MED-HIGH green, 50-59 MEDIUM yellow, 40-49 LOW-MEDIUM orange, <40 LOW red. Attack list inclusion threshold (Deploy B): score >= 50. All scoring constants live in service/lib/decoderCapability.js and ScoutAlertService.js computeMatchScore(). Default PART_TYPE_SENSITIVITY fallback is [] (universal), not ['engine'].
+
+## ATTACK LIST VALUE AND SORT
+
+45. **YourSale is sole source of truth for Attack List vehicle value and sort.** market_demand_cache and Item.price REF data are decorative -- they display for puller awareness but contribute $0 to maxYourSalePart and vehicle sort. A part with priceSource='sold' is treated as valueSource='yoursale' directly (trust the legacy resolver's output -- do not attempt parallel YourSale lookups by partNumber because sales-path parts are partType-grouped with partNumber=null).
+
+46. **Excluded parts contribute $0 to vehicle value.** Parts flagged by isExcludedPart() (engines, transmissions, body panels, airbags) contribute $0 to est_value, maxYourSalePart, and yourSaleEstValue regardless of which priceSource produced them. Excluded parts from competitor sources are filtered OUT of the response entirely. Excluded parts from your own data stay in the response for visibility but must not drive vehicle ranking.
+
+47. **Platform expansion must be gated by per-group partTypes whitelist** from platform_shared_part table. Sibling sales contribute only if their partType is in the whitelist. Default when no whitelist: skip expansion entirely. The siblingKeyPartTypes map in scoreVehicle tracks which candidateKeys came from siblings.
+
+48. **ARCHIVES badge renders on left badge slot** for priceSource='item_reference' rows. Replaces the NEW badge position. Right-side price area stays clean. Archives rows sort to the bottom of expanded parts list via stable partition regardless of individual price, re-sorted price DESC within their own bucket. Applies to Daily Feed only.
+
+49. **isSkipWord() normalizes non-alphanumerics** via .toUpperCase().replace(/[^A-Z0-9]/g, '') before SKIP_WORDS Set lookup. Catches hyphenated forms like "Anti-Lock" matching "ANTILOCK". When adding new tokens to SKIP_WORDS, store them in compact/normalized form (no dashes, no spaces, all caps).

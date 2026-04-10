@@ -1,12 +1,12 @@
 # SNAPSHOT_FRONTEND.md
-Generated 2026-04-08
+Generated 2026-04-09
 
 ## Shared Components
 
 ### dh-nav.js
-- Two-bar sticky nav: FIELD row (6 links, red active) + INTEL row (10 links, yellow active)
-- Logo + "DARKHAWK" links to /admin/home. INTEL row hidden on mobile.
-- **FIELD:** feed, alerts, cache, vin, gate, flyway
+- Two-bar sticky nav: FIELD row (6 links desktop / 5 mobile, red active) + INTEL row (10+ links, yellow active)
+- Logo + "DARKHAWK" links to /admin/home. INTEL row hidden on mobile. Flyway hidden on mobile via .field-link-mobile-hide at 768px.
+- **FIELD:** feed, alerts, cache, vin, gate, flyway (flyway desktop-only)
 - **INTEL:** scour, quarry, sky, perch, mark, velocity, instincts, prey-cycle, carcass, phoenix, blocked
 
 ### dh-parts.js + dh-parts.css (Part Value Utilities)
@@ -35,15 +35,16 @@ Generated 2026-04-08
 - **VEHICLE_CAPS:** `{ newest: 50, '3d': 150, '7d': 300, '30d': 500, '60d': 1000, '90d': 2000, all: 5000 }`
 - **Filters:** Newest / 3d / 7d / 30d / 60d / All. ALL uses pillDays=999, groups by age tiers, no date restriction.
 - **Cache sync:** Loads GET /cache/claimed-keys on init. Two-key matching: PN + itemId. Pull → checkmark, checkmark → unclaim.
-- **Expanded view:** On-demand part loading (GET /attack-list/vehicle/:id/parts). Price badges (6-tier), cache claim buttons, below-floor section, spec mismatch section, trim intelligence, part location. **Block button** on chips with priceSource in (item_reference, sold) — routes to /blocked-comps/block (COMP) or /blocked-comps/block-sold (SOLD) based on type. Optimistic UI with 5s undo.
+- **Expanded view (2026-04-09):** On-demand part loading (GET /attack-list/vehicle/:id/parts). Parts sorted: scout-alert-first (scoutAlertScore DESC), then sold history (price DESC), then competitor intel, then ARCHIVES bucket at bottom (price DESC within). ARCHIVES badge (yellow, left slot) on item_reference parts replaces NEW badge. Dual price display: "$avg mkt $median" for yoursale+market, "(market est)" for market-only, clean for archives. SOLD/SOLD pills killed, RESTOCK kept. Price badges (6-tier), cache claim buttons, below-floor section, spec mismatch section, trim intelligence, part location. **Block button** on chips with priceSource in (item_reference, sold). Optimistic UI with 5s undo.
 - **API:** `/attack-list`, `/attack-list/vehicle/:id/parts`, `/cache/claimed-keys`, `/cache/claim`, `/cache/:id/return`, `/part-location/...`, `/yards/scrape/...`, `/scout-alerts/claim`, `/attack-list/manual`, `/vin/decode-photo`, `/vin/scan`
 
 ### scout-alerts.html (Scout Alerts)
 - **URL:** `/admin/scout-alerts`
 - **Nav key:** `alerts`
-- **Features:** Parts matching want lists at yards, claim/unclaim with cache sync, yard tabs, time filter pills, hide-pulled toggle, summary cards, pagination, inline edit for STREAM entries
-- **Cache sync:** Loads /cache/claimed-keys. Three maps: claimedPNs, claimedItemIds, claimedAlertIds. extractPN() for cross-tool matching. Claim routes through /cache/claim, unclaim calls both /cache/:id/return + /scout-alerts/claim.
-- **API:** `/cache/claimed-keys`, `/scout-alerts/list`, `/cache/claim`, `/cache/:id/return`, `/scout-alerts/claim`, `/scout-alerts/refresh`, `/restock-want-list/by-title` (PATCH)
+- **Vehicle-centric rebuild (2026-04-09):** One card per yard_vehicle_id, collapsed by default. Expand reveals part groups: HARD_PART_TYPES (ECM/PCM/ECU/BCM/TCM/TIPM/ABS/AIRBAG/SRS) get one row per partNumberBase; soft types get one row per partType with partNumberBreakdown showing PN distribution. Per-row soldHere + soldLifetime. headline_source (highest priority) + headline_score (max match_score). Alert_count collapse note.
+- **Claim:** Per dedup row via first alertId. Cache sync via /cache/claimed-keys. Hide-pulled hides fully-claimed vehicles.
+- **Features:** Yard tabs, time filter pills, summary tiles (MARK/QUARRY/STREAM/OVERSTOCK/YARDS), pagination at vehicle level (50/page), inline edit for STREAM entries, numeric match_score badges.
+- **API:** `/cache/claimed-keys`, `/scout-alerts/list` (vehicle-centric shape), `/cache/claim`, `/cache/:id/return`, `/scout-alerts/claim`, `/scout-alerts/refresh`, `/restock-want-list/by-title` (PATCH)
 
 ### cache.html (The Cache)
 - **URL:** `/admin/the-cache`

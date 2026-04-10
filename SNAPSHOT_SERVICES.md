@@ -1,5 +1,5 @@
 # SNAPSHOT_SERVICES.md
-Generated 2026-04-08
+Generated 2026-04-09
 
 ## Core Services
 
@@ -30,9 +30,11 @@ Generated 2026-04-08
   10. **Score UNCAPPED** — can exceed 100 with boosts
 - **Intel index:** `buildIntelIndex()` loads 4 PN sets: quarryPNs (auto_generated want list), streamPNs (manual want list), overstockPNs (overstock_group_item), flagPNs (restock_flag). Mark targets from separate markIndex. Per-part `intelSources` array: ['mark', 'quarry', 'stream', 'restock', 'overstock', 'flag', 'sold']. Overstock parts get `overstockWarning: true`. `intel_match_count` on vehicle response.
 - **Intel scoring boosts:** MARK ×1.15 (+15%), QUARRY ×1.10 (+10%), STREAM/RESTOCK ×1.05 (+5%). Applied per matching part, multipliers compound. Overstock parts excluded from totalValue.
-- **Sort:** Vehicles by est_value DESC, max_part_value DESC tiebreaker. Parts by price DESC, noveltyTier ASC.
+- **YourSale-driven value (2026-04-09):** `getYourSalePriceMap(partNumberBases)` batch-loads 90-day avg/max/count per PN from YourSale. Vehicle value fields: `maxYourSalePart` (highest YourSale avg across non-excluded parts) and `yourSaleEstValue` (sum). Parts with `priceSource='sold'` are trusted directly (legacy resolver already resolved YourSale data); parts with `priceSource='item_reference'` contribute $0. market_demand_cache is decorative only. `isExcludedPart()` exported as static method.
+- **Platform expansion gate (2026-04-09):** `siblingKeyPartTypes` map tracks which candidateKeys came from platform siblings. Sales from siblings only contribute if their partType is in the sibling group's `partTypes` whitelist from `platform_shared_part` table. Default when no whitelist: skip expansion. VW MQB group deleted 2026-04-09.
+- **Sort (2026-04-09):** Vehicles by maxYourSalePart DESC, yourSaleEstValue DESC tiebreaker, est_value DESC final tiebreaker. Active first. Market_demand_cache and Item.price REF do NOT affect sort.
 - **No vehicle limit** — full yard inventory served. Frontend VEHICLE_CAPS raised to 5000.
-- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons (includes HYBRID/PHEV/ELECTRIC), daysSinceSet (int, server-computed in ET), setDateLabel (string, e.g. "Set today"), intel_match_count, est_value, max_part_value, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor. Yard-level: lastScrapedHoursAgo, isStale (>18h).
+- **Response fields:** score (uncapped), rarityTier/Color/Pulses/Reason/AvgDays/TotalSeen/Boost, attributeBoost/boostReasons (includes HYBRID/PHEV/ELECTRIC), daysSinceSet (int, server-computed in ET), setDateLabel (string), intel_match_count, est_value, max_part_value, maxYourSalePart, yourSaleEstValue, parts with noveltyTier/noveltyBoost/intelSources/overstockWarning/stockMatchType/specMismatch/mismatchReason/belowFloor/yourSalePrice/yourSaleCount/valueSource/displayPrice/isExcluded. Yard-level: lastScrapedHoursAgo, isStale (>18h).
 - **Blocked comps:** COMP filter in buildInventoryIndex() via compIds from BlockedCompsService.getBlockedSet(). SOLD filter in scoreVehicle() via soldKeys parameter (loaded once per request in async callers). scoreVehicle is SYNC — do NOT add await inside it.
 
 ### BlockedCompsService.js

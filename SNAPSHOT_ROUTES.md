@@ -1,4 +1,4 @@
-Generated 2026-04-08
+Generated 2026-04-09
 
 # PartHawk Route Map
 
@@ -23,14 +23,14 @@ Source: `service/index.js` -- all app.use mounts, inline routes, and admin pages
 | `/demand-analysis` | demand-analysis.js | GET `/sell-through` `/stale-inventory` `/velocity` `/top-performers` `/competition/:keywords` `/dashboard` `/health` |
 | `/price-check` | price-check.js | POST `/omit` `/bulk` `/title` `/:listingId` `/cron`, GET `/all` `/history/:listingId` `/stats` |
 | `/yards` | yards.js | GET `/ping` `/` `/:id/vehicles` `/scrape/status` `/status` `/scrape-health`, POST `/scrape/lkq` `/scrape/:id` `/:id/feedback` |
-| `/attack-list` | attack-list.js | GET `/` `/vehicle/:id/parts` `/yard/:yardId` `/summary` `/last-visit/:yardId`, POST `/log-pull` `/visit-feedback` `/manual` |
+| `/attack-list` | attack-list.js | GET `/` (vehicles carry maxYourSalePart, yourSaleEstValue, sorted by YourSale value) `/vehicle/:id/parts` (per-part: yourSalePrice, yourSaleCount, valueSource, displayPrice, isExcluded; sort: scout-alert-first then sold then intel then ARCHIVES bottom) `/yard/:yardId` `/summary` `/last-visit/:yardId`, POST `/log-pull` `/visit-feedback` `/manual` |
 | `/cogs` | cogs.js | POST `/gate` `/session`, GET `/yard-profile/:yardId` `/yards` `/check-stock` |
 | `/api/parts` | partsLookup.js (priority), parts.js (fallback) | GET `/lookup`, PATCH `/:partNumber/fitment` |
 | `/api/parts-lookup` | partsLookup.js | (alias mount) |
 | `/restock` | restockReport.js | GET `/report` (per-tier 100-row cap, FOUND from the_cache, timeframe sort) `/found-items` (legacy), POST `/quarry-sync` |
 | `/restock-want-list` | restock-want-list.js | GET `/items` `/titles` (lightweight, no stock check) `/just-sold` `/watchlist` `/overstock` `/overstock/suggestions` `/overstock/scan-duplicates` `/overstock/scan-high-qty`, POST `/pull` `/find-in-yard` `/add` (PN+desc+make+model) `/delete` + watchlist/overstock CRUD, PATCH `/:id` `/by-title` |
 | `/blocked-comps` | blocked-comps.js | POST `/block` (comp by itemId) `/block-sold` (by partType+year+make+model), DELETE `/by-id/:id` (unified restore) `/:itemId` (comp compat), GET `/` (list with ?search&type&limit&offset) |
-| `/scout-alerts` | scout-alerts.js | GET `/list`, POST `/claim` `/refresh` |
+| `/scout-alerts` | scout-alerts.js | GET `/list` (vehicle-centric: one entry per yard_vehicle_id with nested parts[], hard/soft dedup, soldHere+soldLifetime, headline_source+headline_score, pagination at vehicle level), POST `/claim` `/refresh` |
 | `/opportunities` | opportunities.js | GET `/` `/dismissed` `/research`, POST `/dismiss` `/undismiss` `/research` + research sub-routes |
 | `/api/fitment` | fitment.js | GET `/lookup` `/stats` |
 | `/api/listing-tool` | listing-tool.js | GET `/ebay-lookup` `/parts-lookup` `/intelligence`, POST `/save-fitment` `/save-listing-intel` |

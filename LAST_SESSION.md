@@ -124,6 +124,12 @@
 - Group 13 (Ford D4 -> Ford U152/U251): restructured. Removed Flex/MKT/Taurus, added Mountaineer + Explorer Sport Trac. Renamed.
 - 23 active platform groups remain.
 
+## End-of-day hygiene -- 2026-04-09
+- Regenerated SNAPSHOT_SERVICES, SNAPSHOT_FRONTEND, SNAPSHOT_ROUTES, SNAPSHOT_LIBS (all were 2026-04-08)
+- Added CLAUDE_RULES 45-49: YourSale sole source of truth, excluded parts $0, platform expansion whitelist gate, ARCHIVES left badge + sort-to-bottom, isSkipWord normalization
+- SNAPSHOT_SCRAPERS unchanged (no scraper work today)
+- LAST_SESSION and CHANGELOG were already current per hygiene audit
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08

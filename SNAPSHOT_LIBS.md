@@ -1,5 +1,5 @@
 # SNAPSHOT_LIBS.md
-Generated 2026-04-08
+Generated 2026-04-09
 
 ## service/utils/
 
@@ -8,7 +8,7 @@ Generated 2026-04-08
 **Exports:** `extractPartNumbers`, `stripRevisionSuffix`, `parseYearRange`, `vehicleYearMatchesPart`, `modelMatches`, `buildStockIndex`, `lookupStockFromIndex`, `extractStructuredFields`, `detectPartType`, `sanitizePartNumberForSearch`, `deduplicatePNQueue`
 **Dependencies:** `./partMatcher` (for `normalizePartNumber` used by `computeBase`), `./yearParser` (for `parseYearRange` — re-exported).
 **Key behavior:**
-- `extractPartNumbers(text)` — Ford 3-segment dash patterns (`/\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}-[A-Z]{1,3}\b/`) + dashless Ford + 2-segment Ford + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges (`/^(19|20)\d{2}(19|20)\d{2}$/`).
+- `extractPartNumbers(text)` — Ford 3-segment dash patterns (`/\b[A-Z0-9]{3,5}-[A-Z0-9]{4,7}-[A-Z]{1,3}\b/`) + dashless Ford + 2-segment Ford + Chrysler, GM, Toyota, Honda, Nissan, VW, BMW, Mercedes, Hyundai, generic. Returns `{raw, normalized, base}` where `base` is computed via internal `computeBase()`. Filters via SKIP_WORDS + MAKES_MODELS sets. Rejects concatenated year ranges. **isSkipWord() (2026-04-09):** normalizes via `.toUpperCase().replace(/[^A-Z0-9]/g, '')` before SKIP_WORDS lookup — catches hyphenated variants like "Anti-Lock" matching "ANTILOCK". SKIP_WORDS additions: ANTILOCK, REARMOUNTED, BRAKE, PUMP, HYDRAULIC (common junk tokens from listing titles that polluted stock index buckets).
 - `computeBase(raw)` — Internal (not exported). **VAG guard (2026-04-08):** PNs matching `^[0-9][A-Z][0-9]\d{6}[A-Z]{0,3}$` returned unchanged (suffix is variant identity, not revision). Then uses `normalizePartNumber()` from partMatcher.js for dashed PNs (Ford: 7L3A-12A650-GJH → 7L3A-12A650 → 7L3A12A650), falls back to `stripRevisionSuffix()` for dashless PNs.
 - `extractStructuredFields(title)` — Clean Pipe Phase A. Returns `{partNumberBase, partType, extractedMake, extractedModel}`. Uses `pns[0].base` for partNumberBase.
 - `sanitizePartNumberForSearch(pn)` — Clean Pipe Phase E1. Intentionally aggressive — for search queries, NOT for storage. Strips Ford ECU suffixes (12A650, 14A067).
