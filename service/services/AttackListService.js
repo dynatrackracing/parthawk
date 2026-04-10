@@ -1461,7 +1461,7 @@ class AttackListService {
 
     // === SCOUT ALERT INJECTION — merge onto matching parts + inject synthetic chips ===
     const _yardName = (vehicle._yardName || '').toLowerCase();
-    const saKey = [year, make.toLowerCase(), modelLower, _yardName].join('|');
+    const saKey = [year, (make || '').toLowerCase(), (modelLower || ''), (_yardName || '')].join('|');
     const vehicleAlerts = scoutAlertIndex[saKey] || [];
     if (vehicleAlerts.length > 0) {
       const attachedAlertIds = new Set();
