@@ -130,6 +130,12 @@
 - SNAPSHOT_SCRAPERS unchanged (no scraper work today)
 - LAST_SESSION and CHANGELOG were already current per hygiene audit
 
+## Scout alerts part-type header bold (real fix) -- 2026-04-10
+- Previous attempt changed color to #F0F0F0 at weight 700 — too subtle.
+  This pass bumped .pt-header to font-weight:800, color:#FFFFFF, font-size:12px (was 10px).
+- Confirmed pt-header is the actual class on line 422 rendering "AMP — 1 row" etc.
+- Class only used in scout-alerts.html, no shared usage.
+
 ## Scout Alerts visual polish -- 2026-04-10
 - Part type group headers (AMP/ABS/TCM/OTHER) color changed #6B7280 → #F0F0F0 (primary white). Already bold (700). Easier scanning of dedup groups.
 - HIGH confidence score badge recolored gold (#FFD700) → blue (#3B82F6) to stop colliding with NEW/MARK pills. MEDIUM and LOW unchanged.
