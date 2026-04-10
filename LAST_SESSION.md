@@ -1,5 +1,12 @@
 # LAST SESSION -- 2026-04-10
 
+## Date pill filter fix (scout-alerts.html) — 2026-04-10
+- Root cause: PERCH and OVERSTOCK alerts in scout-alerts.js route handler had blanket bypass of the date filter. `this.where('source', 'PERCH')` with no date condition meant these sources always returned regardless of pill setting.
+- Fix: PERCH and OVERSTOCK now respect date pill. When pill active (days > 0), filter by vehicle_set_date. When "All" (days = 0), no ceiling.
+- Proof vehicles: 1994 Lexus ES300 (45d, PERCH), 2014 VW Passat (56d, PERCH), 2014 Ford Explorer (29d, PERCH).
+- Removed debug logging from attack-list.html.
+- Files: scout-alerts.js, attack-list.html
+
 ## Hawk Eye → Attack List Pipeline — 2026-04-10
 - Rewired Hawk Eye VIN scanner to use AttackListService.scoreVehicle() instead of InstantResearchService
 - New endpoint: POST /vin/scan-scored — VIN decode + full attack list scoring in one call

@@ -63,11 +63,21 @@ router.get('/list', async (req, res) => {
             .orWhereNull('vehicle_set_date');
         });
       }).orWhere(function() {
-        // PERCH (The Mark) alerts — no hard age ceiling, always show active marks
-        this.where('source', 'PERCH');
+        // PERCH (The Mark) alerts — respect date pill, no hard ceiling when "All"
+        this.where('source', 'PERCH').andWhere(function() {
+          if (days > 0) {
+            this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days} days'`))
+              .orWhereNull('vehicle_set_date');
+          }
+        });
       }).orWhere(function() {
-        // OVERSTOCK alerts — always show, no date filtering
-        this.where('source', 'OVERSTOCK');
+        // OVERSTOCK alerts — respect date pill, no hard ceiling when "All"
+        this.where('source', 'OVERSTOCK').andWhere(function() {
+          if (days > 0) {
+            this.where('vehicle_set_date', '>=', knex.raw(`NOW() - INTERVAL '${days} days'`))
+              .orWhereNull('vehicle_set_date');
+          }
+        });
       }).orWhere(function() {
         // RESTOCK alerts — restocking flags, use bone_pile age ceiling
         this.where('source', 'restock').andWhere(function() {
