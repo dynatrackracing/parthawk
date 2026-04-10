@@ -1,5 +1,10 @@
 # LAST SESSION -- 2026-04-10
 
+## Scout alerts date pill showing wrong set date — 2026-04-10
+- Root cause: vehicle attribute lookup at line 126-132 used `.first()` without ORDER BY. When multiple instances of the same YMM exist at one yard (e.g. 5x 2013 Sonata at Raleigh with date_added 1d/3d/18d/22d/30d ago), `.first()` returned an arbitrary one. The 22d-old instance was selected, so the card showed "set 22d ago" even though the alert's vehicle_set_date (which passed the date filter) was from the 1d-old instance.
+- Fix: Added `.orderBy('date_added', 'desc')` before `.first()` — always picks the newest instance. Card now shows "set 1d ago" matching the date filter.
+- Files: scout-alerts.js
+
 ## Hawk Eye Frontend Parity — Badges, Block, Archives — 2026-04-10
 - Added intel source badges (QUARRY/STREAM/MARK/OVER/FLAG) on expanded part rows — now renders ALL sources per part, not exclusive if/else
 - Added novelty badges (NEW/RESTOCK) alongside intel badges — removed gating that hid novelty when intel existed

@@ -129,6 +129,7 @@ router.get('/list', async (req, res) => {
         .whereRaw("UPPER(make) = UPPER(?)", [mk])
         .whereRaw("UPPER(model) = UPPER(?)", [md])
         .select('id', 'decoded_engine', 'decoded_transmission', 'decoded_drivetrain', 'trim_tier', 'row_number', 'color', 'date_added')
+        .orderBy('date_added', 'desc')
         .first();
       if (v) vehicleAttrMap[vKey] = v;
     } catch (e) { /* skip */ }
