@@ -799,7 +799,8 @@ function renderVehicleCard(v) {
   h += '</div>';
   // Keep the v-right for expanded view compatibility
   h += '<div class="v-right" style="display:none">';
-  var allEst = chipSource.length > 0 && chipSource.every(function(p) { return p.priceSource === 'estimate'; });
+  if (v.est_value > 0) {
+    var allEst = chipSource.length > 0 && chipSource.every(function(p) { return p.priceSource === 'estimate'; });
     if (allEst) h += '<div class="v-value" style="color:#6B7280">~$' + v.est_value + ' <span style="font-size:9px">EST</span></div>';
     else h += '<div class="v-value">$' + v.est_value + '</div>';
   }
