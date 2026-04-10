@@ -215,11 +215,24 @@ router.get('/check-stock', async (req, res) => {
     } catch (e) { /* overstock tables may not exist */ }
 
     // Also check The Cache for parts already claimed but not yet listed
+    // Bug fix: many cache entries have part_number=null (e.g. scout_alert claims)
+    // but the PN is embedded in part_description. Search both columns.
     let cachedClaims = [];
     try {
-      const CacheService = require('../services/CacheService');
-      const cacheService = new CacheService();
-      cachedClaims = await cacheService.checkCacheStock({ partNumber: rawPN });
+      const cacheRows = await database('the_cache')
+        .where('status', 'claimed')
+        .where(function() {
+          // Match on part_number column (exact or normalized)
+          this.whereRaw('UPPER(part_number) = ?', [searchUpper])
+            .orWhereRaw('UPPER(REPLACE(REPLACE(part_number, \'-\', \'\'), \' \', \'\')) = ?', [searchCompressed]);
+          // Also match on part_description (PN embedded in description text)
+          this.orWhereRaw('UPPER(part_description) LIKE ?', [`%${searchUpper}%`]);
+          if (searchCompressed !== searchUpper) {
+            this.orWhereRaw('UPPER(part_description) LIKE ?', [`%${searchCompressed}%`]);
+          }
+        })
+        .select('*');
+      cachedClaims = cacheRows;
     } catch (e) { /* cache table may not exist yet */ }
 
     res.json({
@@ -230,12 +243,15 @@ router.get('/check-stock', async (req, res) => {
       totalVariants: variantResults.length,
       overstock,
       cachedClaims: cachedClaims.map(c => ({
+        id: c.id,
         partType: c.part_type,
         partNumber: c.part_number,
+        partDescription: c.part_description,
         vehicle: `${c.vehicle_year || ''} ${c.vehicle_make || ''} ${c.vehicle_model || ''}`.trim(),
         claimedBy: c.claimed_by,
         claimedAt: c.claimed_at,
         source: c.source,
+        yardName: c.yard_name,
       })),
       totalCached: cachedClaims.length,
     });

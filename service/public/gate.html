@@ -410,18 +410,28 @@ function checkStock() {
       }
 
       if (d.totalCached > 0) {
-        h += '<div class="stock-result" style="border-color:#92400e">';
-        h += '<div class="stock-result-header" style="color:#eab308">\u26A1 IN THE CACHE \u2014 ' + d.totalCached + ' claimed</div>';
+        h += '<div class="stock-result" style="border-left:3px solid #14b8a6;border-color:#92400e">';
+        h += '<div class="stock-result-header" style="color:#eab308">\u26A1 IN THE CACHE (' + d.totalCached + ')</div>';
         d.cachedClaims.forEach(function(c) {
+          var srcBg = c.source === 'daily_feed' ? '#7f1d1d' : c.source === 'scout_alert' ? '#7c2d12' : c.source === 'hawk_eye' ? '#134e4a' : c.source === 'flyway' ? '#1e3a5f' : '#1f2937';
+          var srcClr = c.source === 'daily_feed' ? '#ef4444' : c.source === 'scout_alert' ? '#f97316' : c.source === 'hawk_eye' ? '#14b8a6' : c.source === 'flyway' ? '#3b82f6' : '#9ca3af';
+          var srcLabel = (c.source || 'manual').replace(/_/g, ' ').toUpperCase();
+          var statusBadge = '<span style="background:#134e4a;color:#14b8a6;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700">CLAIMED</span>';
+          var sourceBadge = '<span style="background:' + srcBg + ';color:' + srcClr + ';padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;margin-left:4px">' + srcLabel + '</span>';
           h += '<div class="stock-item">';
-          h += '<div class="si-title" style="color:#fbbf24">' + esc(c.partType || 'Part');
-          if (c.vehicle) h += ' \u2014 ' + esc(c.vehicle);
+          h += '<div class="si-title" style="color:#fbbf24">';
+          h += statusBadge + sourceBadge + ' ';
+          if (c.partNumber) h += '<span style="font-family:monospace;font-size:11px">' + esc(c.partNumber) + '</span> ';
+          h += esc(c.partType || c.partDescription || 'Part');
           h += '</div>';
           h += '<div class="si-meta">';
-          h += '<span>Claimed by ' + esc(c.claimedBy || '?') + '</span>';
-          h += '<span>via ' + esc(c.source) + '</span>';
+          if (c.vehicle) h += '<span>' + esc(c.vehicle) + '</span>';
+          if (c.yardName) h += '<span>' + esc(c.yardName) + '</span>';
+          h += '<span>by ' + esc(c.claimedBy || '?') + '</span>';
           h += '<span>' + timeAgo(new Date(c.claimedAt)) + '</span>';
-          h += '</div></div>';
+          h += '</div>';
+          if (c.partDescription && c.partDescription !== c.partType) h += '<div style="font-size:10px;color:var(--tf);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.partDescription.substring(0, 80)) + '</div>';
+          h += '</div>';
         });
         h += '</div>';
       }
