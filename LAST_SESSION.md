@@ -1,5 +1,18 @@
 # LAST SESSION -- 2026-04-10
 
+## Hawk Eye Frontend Parity — Badges, Block, Archives — 2026-04-10
+- Added intel source badges (QUARRY/STREAM/MARK/OVER/FLAG) on expanded part rows — now renders ALL sources per part, not exclusive if/else
+- Added novelty badges (NEW/RESTOCK) alongside intel badges — removed gating that hid novelty when intel existed
+- Added alert match badges from scout alert source context (PERCH→MARK, bone_pile/hunters_perch→QUARRY)
+- Added scout alert dots on collapsed vehicle card chips (alert+SA take priority, then intel icon, then novelty dot)
+- Added Block button per part: comp block for item_reference parts (POST /blocked-comps/block), sold block for sold-priced parts (POST /blocked-comps/block-sold) — both with prompt for reason, fade on success
+- Archives parts now render inline in parts list (removed collapsible `<details>` wrapper) — ARCHIVES badge, "~$XXX EST" price format, "Competitor listed, check YourSale for demand" reason text
+- Added score tooltip (info icon ℹ) explaining yard freshness boost exclusion
+- Improved market comparison display to match Daily Feed (color-coded diff, structured flex layout)
+- Improved dead warning display to match Daily Feed (red background card with specific failure reason)
+- Integrated trim multiplier note into reason line (matches Daily Feed's inline approach)
+- Files touched: service/public/vin-scanner.html
+
 ## Date pill filter fix (scout-alerts.html) — 2026-04-10
 - Root cause: PERCH and OVERSTOCK alerts in scout-alerts.js route handler had blanket bypass of the date filter. `this.where('source', 'PERCH')` with no date condition meant these sources always returned regardless of pill setting.
 - Fix: PERCH and OVERSTOCK now respect date pill. When pill active (days > 0), filter by vehicle_set_date. When "All" (days = 0), no ceiling.

@@ -53,6 +53,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;
 .btn-pull{padding:6px 12px;border-radius:6px;border:1px solid #22c55e;background:transparent;color:#22c55e;font-size:10px;font-weight:700;cursor:pointer;margin-top:4px}
 .btn-pull:disabled{opacity:0.4;cursor:default}
 .btn-cached{border-color:#065f46;background:#064e3b;color:#22c55e}
+.btn-block{padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#6B7280;font-size:10px;cursor:pointer;margin-top:4px;margin-left:6px}
+.btn-block:disabled{opacity:0.4;cursor:default}
 .intel-fire{animation:pulse-fire 1.5s infinite}
 /* Attribute badges */
 .attr-badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:3px;white-space:nowrap}
@@ -226,12 +228,17 @@ function renderChips(parts){
     seen[pt]=true;
     if(p.isExcluded)continue;
     var price=p.displayPrice||p.price||0;
-    var cls=tierColor(price,p.intelSources,p.overstockWarning);
-    var icon=renderIntelIcon(p.intelSources||[]);
-    if(!icon&&p.noveltyTier==='NOVEL')icon='<span style="color:#06b6d4;font-size:7px">&#x25CF;</span>';
-    else if(!icon&&p.noveltyTier==='RESTOCK')icon='<span style="color:#22c55e;font-size:7px">&#x25CF;</span>';
+    var sources=p.intelSources||[];
+    var isOver=sources.includes('overstock');
+    var hasIntel=sources.some(function(s){return s==='mark'||s==='quarry'||s==='stream'||s==='restock'||s==='overstock'});
+    var cls=tierColor(price,sources,isOver);
+    // SA/alert dot takes priority, then intel icon, then novelty dot
+    var alertDot=p.isSynthetic?'<span style="color:#f59e0b">&#x1F4E2; </span>':(p.scoutAlertMatch?'<span style="color:#FFD700">&#x1F3AF; </span>':'');
+    var icon=alertDot||renderIntelIcon(sources);
+    var dot=!alertDot&&!hasIntel?(p.noveltyTier==='NOVEL'?'<span style="color:#06b6d4">&#x25CF; </span>':p.noveltyTier==='RESTOCK'?'<span style="color:#2ECC40">&#x25CF; </span>':''):'';
+    var prefix=icon||dot;
     var priceStr=price>0?'$'+Math.round(price):'';
-    chips.push('<span class="chip '+cls+'">'+icon+(icon?' ':'')+esc(pt)+(priceStr?' '+priceStr:'')+'</span>');
+    chips.push('<span class="chip '+cls+'">'+prefix+esc(pt)+(priceStr?' '+priceStr:'')+'</span>');
     if(chips.length>=6)break;
   }
   return chips.join('');
@@ -257,8 +264,8 @@ function render(data){
 
   h+='<div class="card">';
   h+='<div style="display:flex;gap:10px;align-items:flex-start">';
-  // Score badge
-  h+='<div style="min-width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:'+sc+'20;color:'+sc+';flex-shrink:0;'+scorePulse+'">'+v.score+'</div>';
+  // Score badge (with tooltip — no yard freshness boost in Hawk Eye)
+  h+='<div title="Score excludes yard freshness boost" style="min-width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:'+sc+'20;color:'+sc+';flex-shrink:0;position:relative;'+scorePulse+'">'+v.score+'<span style="position:absolute;top:-2px;right:-2px;font-size:7px;color:#6B7280">&#x2139;</span></div>';
   h+='<div style="flex:1;min-width:0">';
   // Line 1: YMM + engine + rarity + value
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">';
@@ -314,13 +321,9 @@ function render(data){
       h+=renderPartDetail(aboveFloor[i],data);
     }
 
-    // Archives section
-    if(archiveParts.length>0){
-      h+='<div style="margin-top:8px"><details><summary style="cursor:pointer;font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em">Archives ('+archiveParts.length+')</summary>';
-      for(var i=0;i<archiveParts.length;i++){
-        h+=renderPartDetail(archiveParts[i],data);
-      }
-      h+='</details></div>';
+    // Archives parts — inline, no collapsible, sorted to bottom
+    for(var i=0;i<archiveParts.length;i++){
+      h+=renderPartDetail(archiveParts[i],data);
     }
 
     // Spec mismatch section
@@ -382,27 +385,38 @@ function render(data){
 }
 
 function renderPartDetail(p,data){
+  var isArchive=p.priceSource==='item_reference';
   var h='<div class="part-detail'+(p.isExcluded?' excluded':'')+(p.specMismatch?' spec-mismatch':'')+'">';
   h+='<div class="pd-header">';
   // Left: badges + title
   h+='<div class="pd-title">';
-  // Intel source badges (expanded view — full label, not just icon)
-  if(p.intelSources&&p.intelSources.length>0){
-    if(p.intelSources.includes('mark'))h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">&#x1F3AF; MARK</span>';
-    else if(p.intelSources.includes('quarry'))h+='<span class="intel-fire" style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#7c2d12;color:#f97316;margin-right:3px">&#x1F525; QUARRY</span>';
-    else if(p.intelSources.includes('stream')||p.intelSources.includes('restock'))h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">&#x1F501; STREAM</span>';
-    if(p.overstockWarning)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">&#x2715; OVER</span>';
+  // Alert match badge (from scout alert source)
+  if(p.alertMatch){
+    var amSrc=p.alertMatch.source||'';
+    var amBg=amSrc==='PERCH'?'#422006':amSrc==='bone_pile'?'#7c2d12':amSrc==='hunters_perch'?'#1e3a5f':'#7f1d1d';
+    var amClr=amSrc==='PERCH'?'#f59e0b':amSrc==='bone_pile'?'#f97316':amSrc==='hunters_perch'?'#3b82f6':'#ef4444';
+    var amLabel=amSrc==='PERCH'?'&#x1F3AF; MARK':(amSrc==='bone_pile'||amSrc==='hunters_perch')?'&#x26A1; QUARRY':'&#x26A0; OVER';
+    h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+amBg+';color:'+amClr+';margin-right:4px;display:inline-block">'+amLabel+'</span>';
+  }
+  // Intel source badges — each source gets its own badge (not exclusive)
+  var sources=p.intelSources||[];
+  for(var si=0;si<sources.length;si++){
+    var s=sources[si];
+    if(s==='mark')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#8B6914;color:#FFD700;margin-right:3px">&#x1F3AF; MARK</span>';
+    else if(s==='quarry')h+='<span class="intel-fire" style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7c2d12;color:#f97316;margin-right:3px">&#x1F525; QUARRY</span>';
+    else if(s==='stream'||s==='restock')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#1e3a5f;color:#3b82f6;margin-right:3px">&#x1F501; STREAM</span>';
+    else if(s==='overstock')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#7f1d1d;color:#ef4444;margin-right:3px">&#x2715; OVER</span>';
+    else if(s==='flag')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#F39C12;color:#fff;margin-right:3px">&#x26A1; FLAG</span>';
+    // 'sold' — no badge (covered by price source)
   }
   // Archives badge
-  if(p.priceSource==='item_reference')h+='<span class="archives-badge" style="display:inline-block;background:#FFC107;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:3px">ARCHIVES</span>';
-  // Novelty badge (if no intel/archives)
-  else if(!p.intelSources||p.intelSources.length===0){
-    if(p.noveltyTier==='NOVEL')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>';
-    else if(p.noveltyTier==='RESTOCK')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>';
-  }
+  if(isArchive)h+='<span class="archives-badge" style="display:inline-block;background:#FFC107;color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:3px">ARCHIVES</span>';
+  // Novelty badge — shows alongside intel badges, not exclusively
+  else if(p.noveltyTier==='NOVEL')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#06b6d4;color:#000;margin-right:3px">NEW</span>';
+  else if(p.noveltyTier==='RESTOCK')h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#22c55e;color:#000;margin-right:3px">RESTOCK</span>';
   // Synthetic scout alert badge
-  if(p.isSynthetic)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:3px;animation:pulse-gold 2s infinite">&#x1F4E2; ALERT '+(p.scoutAlertScore||'')+'</span>';
-  else if(p.scoutAlertMatch)h+='<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#FFD700;color:#000;margin-right:3px">&#x1F3AF; SA '+(p.scoutAlertScore||'')+'</span>';
+  if(p.isSynthetic)h+='<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;background:#f59e0b;color:#000;margin-right:3px;animation:pulse-gold 2s infinite">&#x1F4E2; ALERT'+(p.scoutAlertScore?' '+p.scoutAlertScore:'')+'</span>';
+  else if(p.scoutAlertMatch)h+='<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#FFD700;color:#000;margin-right:3px">&#x1F3AF; SA'+(p.scoutAlertScore?' '+p.scoutAlertScore:'')+'</span>';
   // Part type + title
   if(p.partType)h+='['+esc(p.partType)+'] ';
   h+=esc((p.title||p.category||'Part').substring(0,80));
@@ -410,6 +424,8 @@ function renderPartDetail(p,data){
   // Right: verdict badge
   var dp=p.displayPrice||p.price||0;
   var vb=verdictBadge(dp,p.priceSource);
+  // Archives: add "(market est)" suffix
+  if(isArchive&&dp>0){vb.text=vb.label+' ~$'+Math.round(dp)+' EST';}
   var fresh=freshIcon(p.yourSaleLatest||p.marketCheckedAt||p.lastSoldDate);
   h+='<div class="pd-verdict '+vb.cls+'">'+vb.text+fresh+'</div>';
   h+='</div>';
@@ -421,43 +437,102 @@ function renderPartDetail(p,data){
   if(p.partNumber)h+='<span style="font-family:monospace;font-size:9px;color:#6B7280">'+esc(p.partNumber.substring(0,30))+'</span>';
   h+='</div>';
 
+  // Alert value
+  if(p.alertMatch&&p.alertMatch.value)h+='<div style="font-size:10px;color:#6B7280;margin-top:2px">Alert value: $'+p.alertMatch.value+'</div>';
+
   // YourSale data
   if(p.yourSalePrice>0&&p.priceSource!=='sold'){
     h+='<div style="font-size:10px;color:#22c55e;margin-top:2px">YourSale: $'+Math.round(p.yourSalePrice)+' avg ('+p.yourSaleCount+'x sold)</div>';
+  }
+
+  // Reason line — archives get "Competitor listed" note
+  if(isArchive){
+    h+='<div class="pd-reason">Competitor listed, check YourSale for demand</div>';
+  } else if(p.reason&&!p.specMismatch){
+    h+='<div class="pd-reason">'+esc(p.reason);
+    if(p.trimMultiplier!==undefined&&p.trimMultiplier<1){
+      if(p.trimMultiplier===0)h+=' <span style="color:#ef4444;font-weight:600">&middot; Not expected on this trim</span>';
+      else h+=' <span style="color:#f59e0b;font-weight:600">&middot; &#x26A0;&#xFE0F; Verify on vehicle</span>';
+    }
+    h+='</div>';
   }
 
   // Market comparison
   if(p.marketMedian>0){
     var hasOurSales=p.priceSource==='sold'||p.yourSalePrice>0;
     var mColor=hasOurSales?'#6B7280':'#10B981';
-    h+='<div style="font-size:10px;color:'+mColor+';margin-top:1px">Market ref $'+Math.round(p.marketMedian)+' med | '+(p.marketCount||0)+' sold'+(p.marketVelocity?' | '+p.marketVelocity+'/wk':'')+'</div>';
+    var mdp=dp||0;
+    if(!hasOurSales&&mdp>0&&p.marketMedian>0){
+      var diff=Math.abs(mdp-p.marketMedian)/p.marketMedian;
+      if(diff>0.2)mColor=mdp>p.marketMedian?'#ef4444':'#eab308';
+      else mColor='#10B981';
+    }
+    h+='<div style="font-size:10px;margin-top:1px;display:flex;gap:8px;align-items:center">';
+    h+='<span style="color:#9CA3AF">'+(hasOurSales?'Market ref':'Market')+'</span>';
+    h+='<span style="color:'+mColor+';font-weight:600">$'+Math.round(p.marketMedian)+' med</span>';
+    h+='<span style="color:#6B7280">'+(p.marketCount||0)+' sold</span>';
+    if(p.marketVelocity)h+='<span style="color:#6B7280">'+p.marketVelocity+'/wk</span>';
+    h+='</div>';
   }
 
-  // Spec mismatch reason
+  // Spec mismatch reason (only if not already handled in reason line)
   if(p.specMismatch&&p.mismatchReason){
     h+='<div style="font-size:10px;color:#ef4444;margin-top:2px">&#x26A0;&#xFE0F; '+esc(p.mismatchReason)+'</div>';
   }
 
-  // Trim multiplier note
-  if(p.trimMultiplier!=null&&p.trimMultiplier<1){
-    var tmColor=p.trimMultiplier===0?'#ef4444':'#f59e0b';
-    var tmText=p.trimMultiplier===0?'Not expected on this trim':'&#x26A0;&#xFE0F; Verify on vehicle ('+Math.round(p.trimMultiplier*100)+'% confidence)';
-    h+='<div style="font-size:10px;color:'+tmColor+';margin-top:2px">'+tmText+'</div>';
-  }
-
   // Dead warning
   if(p.deadWarning){
-    h+='<div style="font-size:10px;color:#ef4444;margin-top:2px">&#x2620;&#xFE0F; '+esc(typeof p.deadWarning==='string'?p.deadWarning:p.deadWarning.message||'Dead inventory warning')+'</div>';
+    var dwReason=p.deadWarning.failureReason;
+    var dwText=dwReason==='overpriced'?'Sat unsold \u2014 was overpriced vs market':dwReason==='low_demand'?'Sat unsold \u2014 low demand for this part':(typeof p.deadWarning==='string'?p.deadWarning:p.deadWarning.message||dwReason||'Dead inventory warning');
+    h+='<div style="margin-top:4px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:10px;color:#dc2626;font-weight:600">'+esc(dwText)+'</div>';
   }
 
-  // Reason
-  if(p.reason&&!p.specMismatch)h+='<div class="pd-reason">'+esc(p.reason)+'</div>';
-
-  // Pull button
-  h+='<div style="margin-top:4px"><button class="btn-pull" onclick="pullPart(\''+esc(p.partType||'')+'\',\''+esc(p.partNumber||'')+'\',this)">Pull</button></div>';
+  // Action buttons: Pull + Block
+  h+='<div style="margin-top:4px;display:flex;gap:6px;align-items:center">';
+  h+='<button class="btn-pull" onclick="pullPart(\''+esc(p.partType||'')+'\',\''+esc(p.partNumber||'')+'\',this)">Pull</button>';
+  // Block button — comp block for item_reference parts with itemId, sold block for sold parts
+  if(isArchive&&p.itemId){
+    h+='<button class="btn-block" data-block-type="comp" data-item-id="'+esc(p.itemId)+'" data-title="'+esc((p.title||'').substring(0,60))+'" onclick="blockPart(this)">&#x2715; Block</button>';
+  } else if(p.priceSource==='sold'&&p.partType){
+    h+='<button class="btn-block" data-block-type="sold" data-part-type="'+esc(p.partType||'')+'" data-year="'+(data.vehicle?data.vehicle.year:'')+'" data-make="'+esc(data.vehicle?data.vehicle.make:'')+'" data-model="'+esc(data.vehicle?data.vehicle.model:'')+'" data-title="'+esc((p.title||'').substring(0,60))+'" onclick="blockPart(this)">&#x2715; Block</button>';
+  }
+  h+='</div>';
 
   h+='</div>';
   return h;
+}
+
+function blockPart(btn){
+  var blockType=btn.dataset.blockType;
+  var title=btn.dataset.title||'';
+  var url,body,promptText;
+  if(blockType==='sold'){
+    var pt=btn.dataset.partType;
+    var yr=btn.dataset.year;
+    var mk=btn.dataset.make;
+    var md=btn.dataset.model;
+    promptText='Block ALL '+pt+' chips on '+yr+' '+mk+' '+md+'? (Only this exact year/make/model.)\n\nOptional reason:';
+    url='/blocked-comps/block-sold';
+    var reason=prompt(promptText);
+    if(reason===null)return;
+    body={partType:pt,year:parseInt(yr),make:mk,model:md,exampleTitle:title,reason:reason||null};
+  }else{
+    var itemId=btn.dataset.itemId;
+    promptText='Block this individual comp listing?\n"'+title+'"\n\nOptional reason:';
+    url='/blocked-comps/block';
+    var reason=prompt(promptText);
+    if(reason===null)return;
+    body={itemId:itemId,reason:reason||null};
+  }
+  btn.disabled=true;btn.textContent='...';
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  .then(function(r){
+    if(r.ok){
+      var el=btn.closest('.part-detail');
+      if(el){el.style.transition='opacity .3s';el.style.opacity='0.2';}
+      btn.textContent='Blocked';btn.style.color='#ef4444';
+    }else{btn.disabled=false;btn.textContent='\u2715 Block';alert('Block failed');}
+  }).catch(function(){btn.disabled=false;btn.textContent='\u2715 Block';});
 }
 
 function pullPart(partType,partNumber,btn){

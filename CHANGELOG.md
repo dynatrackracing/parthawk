@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Hawk Eye frontend parity — badges, block, archives — 2026-04-10
+- Intel source badges (MARK/QUARRY/STREAM/OVER/FLAG) now render per-part on expanded rows
+- Novelty badges (NEW/RESTOCK) show alongside intel badges, not exclusively
+- Scout alert dots on collapsed chips, alert match badges on expanded rows
+- Block button per part (comp block for archives, sold block for sold-priced)
+- Archives parts render inline (no collapsible), with ARCHIVES badge + "(market est)" pricing + "Competitor listed" note
+- Score tooltip explains yard freshness boost exclusion
+- Files: service/public/vin-scanner.html
+
 ## Hawk Eye → Attack List scoring pipeline — 2026-04-10
 - New endpoint: POST /vin/scan-scored — VIN decode + full AttackListService scoring
 - Hawk Eye frontend rewritten to match Daily Feed rendering (score, rarity, attributes, part chips, expanded details)
