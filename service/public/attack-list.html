@@ -549,6 +549,7 @@
         : 999;
 
       let sections;
+      console.log('[DATE-FILTER]', yd.yard.name, 'pill:', dateFilter, 'pillDays:', pillDays, 'totalVehicles:', filtered.length);
       if (pillDays >= 999) {
         // "All" — group by LKQ set date age (server-computed daysSinceSet), skip empty
         sections = [
@@ -561,6 +562,12 @@
       } else {
         // Strict pill filter: only show vehicles within LKQ set date window
         const highlighted = filtered.filter(v => getDaysSinceSet(v) <= pillDays);
+        const leakers = highlighted.filter(v => getDaysSinceSet(v) > pillDays);
+        console.log('[DATE-FILTER]', yd.yard.name, 'highlighted:', highlighted.length, 'of', filtered.length, 'LEAKERS:', leakers.length);
+        if (leakers.length > 0) console.error('[DATE-FILTER] LEAKERS:', leakers.map(v => v.year+' '+v.make+' '+v.model+' days:'+getDaysSinceSet(v)+' score:'+v.score+' id:'+v.id));
+        // Also log vehicles with daysSinceSet > pillDays that have high scores (potential bypass candidates)
+        const suspects = filtered.filter(v => getDaysSinceSet(v) > pillDays && v.score >= 80);
+        if (suspects.length > 0) console.log('[DATE-FILTER] HIGH-SCORE FILTERED OUT:', suspects.length, suspects.slice(0,5).map(v => v.year+' '+v.make+' '+v.model+' days:'+getDaysSinceSet(v)+' daysSinceSet:'+v.daysSinceSet+' score:'+v.score));
         const pillLabel = pillDays === 0 ? 'NEWEST ARRIVALS' : 'LAST ' + pillDays + ' DAYS';
         sections = highlighted.length > 0
           ? [{ label: pillLabel, vehicles: highlighted, isFresh: true }]
@@ -570,6 +577,7 @@
       const yardCap = VEHICLE_CAPS[dateFilter] || 500;
       let yardRendered = 0;
 
+      console.log('[DATE-FILTER]', yd.yard.name, 'sections:', sections.length, 'totalToRender:', sections.reduce((s,x) => s + x.vehicles.length, 0));
       for (const sec of sections) {
         // Fresh sections always render fully; others respect the cap
         const remaining = yardCap - yardRendered;
