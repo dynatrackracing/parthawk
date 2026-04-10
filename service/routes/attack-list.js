@@ -70,6 +70,7 @@ router.get('/', async (req, res) => {
           vehicle.part_chips = (vehicle.parts || []).filter(p => !p.belowFloor).slice(0, 6).map(p => ({
             partType: p.partType, price: p.price, verdict: p.verdict, priceSource: p.priceSource,
             isMarked: p.isMarked || false, noveltyTier: p.noveltyTier || 'STOCKED',
+            isSynthetic: p.isSynthetic || false, scoutAlertMatch: p.scoutAlertMatch || false,
           }));
           delete vehicle.parts;
           delete vehicle.rebuild_parts;
@@ -123,6 +124,7 @@ router.get('/vehicle/:id/parts', async (req, res) => {
     const salesIndex = await service.buildSalesIndex(cutoff);
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await service.buildStockIndex();
     const platformIndex = await service.buildPlatformIndex();
+    const scoutAlertIdx = await service.buildScoutAlertIndex();
 
     // Enrich with reference transmission if NHTSA didn't provide one
     if (!vehicle.decoded_transmission && vehicle.year && vehicle.make && vehicle.model) {
@@ -141,7 +143,11 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       } catch (e) { /* reference lookup optional */ }
     }
 
-    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers);
+    // Attach yard name for scout alert composite key lookup
+    const yard = await database('yard').where('id', vehicle.yard_id).first();
+    if (yard) vehicle._yardName = yard.name;
+
+    const scored = service.scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, undefined, undefined, undefined, undefined, scoutAlertIdx);
 
     // Enrich parts with value source fields.
     // Trust priceSource='sold' from legacy resolver (it already proved YourSale data exists).
@@ -159,7 +165,11 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       const pnNorm = toYSKey(p.partNumber);
       const ysHit = pnNorm ? ysMap.get(pnNorm) : null;
 
-      if (p.priceSource === 'sold') {
+      if (p.priceSource === 'scout_alert') {
+        // Synthetic chip from scout alert injection — price already set by scoreVehicle
+        p.valueSource = 'scout_alert';
+        p.displayPrice = p.price;
+      } else if (p.priceSource === 'sold') {
         // Legacy resolver already proved YourSale data exists. Trust it.
         p.valueSource = 'yoursale';
         p.displayPrice = p.price;
@@ -231,41 +241,7 @@ router.get('/vehicle/:id/parts', async (req, res) => {
       vehicle.make, vehicle.expected_parts, vehicle.audio_brand, validations
     );
 
-    // Tag parts with scout alert match + signal flags, then sort scout-alert-first
-    try {
-      const yard = await database('yard').where('id', vehicle.yard_id).first();
-      if (yard) {
-        const alerts = await database('scout_alerts')
-          .where('vehicle_year', vehicle.year)
-          .whereRaw('LOWER(vehicle_make) = ?', [(vehicle.make || '').toLowerCase()])
-          .whereRaw('LOWER(vehicle_model) = ?', [(vehicle.model || '').toLowerCase()])
-          .whereRaw('LOWER(yard_name) LIKE ?', ['%' + (yard.name || '').toLowerCase() + '%'])
-          .select('source', 'source_title', 'part_value', 'confidence', 'match_score');
-
-        if (alerts.length > 0) {
-          for (const part of (scored.parts || [])) {
-            let bestAlertScore = 0;
-            for (const alert of alerts) {
-              const alertTitle = (alert.source_title || '').toLowerCase();
-              const partType = (part.partType || '').toLowerCase();
-              const partNumber = (part.partNumber || '').toUpperCase();
-              const typeMatch = partType.length >= 3 && alertTitle.includes(partType);
-              const pnMatch = partNumber.length >= 5 && alertTitle.toUpperCase().includes(partNumber);
-              if (typeMatch || pnMatch) {
-                const s = parseInt(alert.match_score) || 0;
-                if (s > bestAlertScore) bestAlertScore = s;
-                if (!part.alertMatch) {
-                  part.alertMatch = { source: alert.source, title: alert.source_title, value: alert.part_value, confidence: alert.confidence };
-                }
-              }
-            }
-            part.scoutAlertMatch = bestAlertScore >= 50;
-            part.scoutAlertScore = bestAlertScore > 0 ? bestAlertScore : null;
-          }
-        }
-      }
-    } catch (e) { /* alert matching is non-fatal */ }
-
+    // Scout alert merge is now handled inside scoreVehicle() via scoutAlertIndex.
     // Set signal flags on each part
     for (const part of (scored.parts || [])) {
       if (!part.scoutAlertMatch) part.scoutAlertMatch = false;

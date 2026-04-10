@@ -493,9 +493,15 @@ class AttackListService {
     const { byMakeModel: stockIdx, byPartNumber: stockPNs } = await this.buildStockIndex();
     const _blockedSvc = require('./BlockedCompsService');
     const { soldKeys: _soldKeys } = await _blockedSvc.getBlockedSet();
+    const scoutAlertIdx = await this.buildScoutAlertIndex();
+
+    // Attach yard name for scout alert composite key lookup
+    const _yard = await database('yard').where('id', yardId).first();
+    const _yardName = _yard ? _yard.name : '';
+    for (const v of vehicles) v._yardName = _yardName;
 
     const scored = vehicles.map(v =>
-      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs, undefined, undefined, undefined, _soldKeys)
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIdx, {}, stockPNs, undefined, undefined, undefined, _soldKeys, scoutAlertIdx)
     );
     // Sort: highest total extractable value first, max single part tiebreaker
     scored.sort((a, b) => {
@@ -927,7 +933,7 @@ class AttackListService {
   /**
    * Score a single yard vehicle. Returns enriched vehicle object with per-part verdicts.
    */
-  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, frequencyMap = {}, soldKeys = new Set()) {
+  scoreVehicle(vehicle, inventoryIndex, salesIndex, stockIndex, platformIndex = {}, stockPartNumbers = {}, markIndex = { byPN: new Map(), byTitle: new Set() }, intelIndex = { wantPNs: new Set(), flagPNs: new Set() }, frequencyMap = {}, soldKeys = new Set(), scoutAlertIndex = {}) {
     const make = normalizeMake(vehicle.make);
     const model = (vehicle.model || '').trim();
     const year = parseInt(vehicle.year) || 0;
@@ -1453,6 +1459,73 @@ class AttackListService {
       }
     }
 
+    // === SCOUT ALERT INJECTION — merge onto matching parts + inject synthetic chips ===
+    const _yardName = (vehicle._yardName || '').toLowerCase();
+    const saKey = [year, make.toLowerCase(), modelLower, _yardName].join('|');
+    const vehicleAlerts = scoutAlertIndex[saKey] || [];
+    if (vehicleAlerts.length > 0) {
+      const attachedAlertIds = new Set();
+      // Phase 1: MERGE — attach alerts to existing parts (best match_score wins)
+      for (const part of filteredParts) {
+        let bestAlert = null, bestScore = 0;
+        const ptUpper = (part.partType || '').toUpperCase();
+        const pnUpper = (part.partNumber || '').toUpperCase();
+        for (const alert of vehicleAlerts) {
+          const alertTitleUpper = (alert.title || '').toUpperCase();
+          const typeMatch = ptUpper.length >= 3 && alertTitleUpper.includes(ptUpper);
+          const pnMatch = pnUpper.length >= 5 && alertTitleUpper.includes(pnUpper);
+          if (typeMatch || pnMatch) {
+            if (alert.matchScore > bestScore) {
+              bestAlert = alert;
+              bestScore = alert.matchScore;
+            }
+          }
+        }
+        if (bestAlert) {
+          part.scoutAlertMatch = true;
+          part.scoutAlertScore = bestScore;
+          part.alertMatch = { source: bestAlert.source, title: bestAlert.title, value: bestAlert.value, confidence: bestAlert.confidence };
+          attachedAlertIds.add(bestAlert.id);
+          // If scout alert value > part price, use it (MAX price wins)
+          if (bestAlert.value > (part.price || 0) && part.priceSource !== 'sold') {
+            part.price = Math.round(bestAlert.value);
+            part.priceSource = 'scout_alert';
+            part.valueSource = 'scout_alert';
+          }
+        }
+      }
+      // Phase 2: INJECT — create synthetic chips for unattached alerts
+      for (const alert of vehicleAlerts) {
+        if (attachedAlertIds.has(alert.id)) continue;
+        // Check if partType already covered by an existing part
+        const ptUpper = (alert.partType || '').toUpperCase();
+        const alreadyCovered = filteredParts.some(p => (p.partType || '').toUpperCase() === ptUpper);
+        if (alreadyCovered) continue;
+        if (alert.value <= 0) continue;
+        // Synthetic chip — shape matches findMatchedParts output
+        filteredParts.push({
+          itemId: null,
+          title: alert.title || `${make} ${model} ${alert.partType}`,
+          category: null,
+          partNumber: alert.partNumber || null,
+          partType: alert.partType || 'OTHER',
+          price: Math.round(alert.value),
+          priceSource: 'scout_alert',
+          valueSource: 'scout_alert',
+          in_stock: 0,
+          stockMatchType: 'none',
+          sold_90d: 0,
+          verdict: 'SKIP',
+          reason: `Scout alert (score ${alert.matchScore}) — ${alert.source}`,
+          deadWarning: null,
+          scoutAlertMatch: true,
+          scoutAlertScore: alert.matchScore,
+          alertMatch: { source: alert.source, title: alert.title, value: alert.value, confidence: alert.confidence },
+          isSynthetic: true,
+        });
+      }
+    }
+
     // === PART NOVELTY — boost scoring value for parts we've never had or need to restock ===
     for (const p of filteredParts) {
       const stock = p.in_stock || 0;
@@ -1767,6 +1840,48 @@ class AttackListService {
   }
 
   /**
+   * Build scout alert index keyed by composite vehicle key (year|make|model|yard).
+   * Returns Map: compositeKey → [{ source, title, value, partType, partNumber, matchScore }]
+   * Mirrors buildIntelIndex() pattern — batch load, sync lookup in scoreVehicle.
+   */
+  async buildScoutAlertIndex(yardNames = []) {
+    const index = {};
+    try {
+      let query = database('scout_alerts')
+        .where(function() { this.where('claimed', false).orWhereNull('claimed'); })
+        .where('match_score', '>=', 50)
+        .select('id', 'source', 'source_title', 'part_value', 'confidence',
+                'match_score', 'yard_name', 'vehicle_year', 'vehicle_make', 'vehicle_model');
+
+      const alerts = await query;
+      const { detectPartType, extractPartNumbers: eiPNs } = require('../utils/partIntelligence');
+      for (const a of alerts) {
+        const key = [a.vehicle_year, (a.vehicle_make || '').toLowerCase(),
+                     (a.vehicle_model || '').toLowerCase(),
+                     (a.yard_name || '').toLowerCase()].join('|');
+        if (!index[key]) index[key] = [];
+        const pt = detectPartType(a.source_title) || 'OTHER';
+        const pns = eiPNs(a.source_title || '');
+        const pn = pns.length > 0 ? (pns[0].base || pns[0].normalized || '').toUpperCase() : null;
+        index[key].push({
+          id: a.id,
+          source: a.source,
+          title: a.source_title,
+          value: parseFloat(a.part_value) || 0,
+          partType: pt,
+          partNumber: pn,
+          matchScore: parseInt(a.match_score) || 0,
+          confidence: a.confidence,
+        });
+      }
+      this.log.info({ alerts: alerts.length, keys: Object.keys(index).length }, 'Scout alert index built');
+    } catch (e) {
+      this.log.warn({ err: e.message }, 'buildScoutAlertIndex failed (table may not exist)');
+    }
+    return index;
+  }
+
+  /**
    * Score an array of manually-parsed vehicles (not from DB).
    * Uses the same indexes and scoreVehicle() as the regular attack list.
    */
@@ -1779,9 +1894,9 @@ class AttackListService {
     const platformIndex = await this.buildPlatformIndex();
     const _blockedSvc2 = require('./BlockedCompsService');
     const { soldKeys: _soldKeys2 } = await _blockedSvc2.getBlockedSet();
-
+    // Manual vehicles have no yard — no scout alert injection
     const scored = vehicles.map(v =>
-      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, undefined, undefined, undefined, _soldKeys2)
+      this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, undefined, undefined, undefined, _soldKeys2, {})
     );
 
     scored.sort((a, b) => {
@@ -1809,6 +1924,7 @@ class AttackListService {
     const salesIndex = await this.buildSalesIndex(cutoff);
     const { byMakeModel: stockIndex, byPartNumber: stockPartNumbers } = await this.buildStockIndex();
     const platformIndex = await this.buildPlatformIndex();
+    const scoutAlertIdx = await this.buildScoutAlertIndex();
 
     // Load persistent vehicle frequency data for rarity scoring (generation-aware)
     const frequencyMap = {};
@@ -1942,11 +2058,11 @@ class AttackListService {
       else if (costIndex <= 1.3) yardCostFactor = -0.03;  // somewhat expensive -3%
       else yardCostFactor = -0.05;                         // expensive -5%
 
-      // Attach yard cost factor to vehicles before scoring
-      for (const v of vehicles) v._yardCostFactor = yardCostFactor;
+      // Attach yard cost factor and yard name to vehicles before scoring
+      for (const v of vehicles) { v._yardCostFactor = yardCostFactor; v._yardName = yard.name; }
 
       const scored = vehicles.map(v =>
-        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3)
+        this.scoreVehicle(v, inventoryIndex, salesIndex, stockIndex, platformIndex, stockPartNumbers, markIndex, intelIndex, frequencyMap, _soldKeys3, scoutAlertIdx)
       );
 
       // Collect all partNumberBases across scored vehicles for YourSale batch lookup

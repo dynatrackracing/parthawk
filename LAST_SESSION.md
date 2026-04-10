@@ -1,3 +1,17 @@
+# LAST SESSION -- 2026-04-10
+
+## Scout Alert Injection — first-class value source on Attack List — 2026-04-10
+- Added `buildScoutAlertIndex()` to AttackListService — batch loads unclaimed alerts with match_score >= 50, keyed by year|make|model|yard composite
+- Extended `scoreVehicle()` with 11th param `scoutAlertIndex` — Phase 1: merges alerts onto matching existing parts (MAX price wins), Phase 2: injects synthetic chips for unattached alerts
+- Wired into `getAttackList()`, `getAllYardsAttackList()`, `scoreManualVehicles()` — vehicles get `_yardName` attached before scoring
+- Deleted redundant route-level scout alert merge loop in `/vehicle/:id/parts` handler (was lines 234-267)
+- Route handler now sets `valueSource='scout_alert'` for synthetic chips
+- Frontend: ALERT badge (pulsing amber 📢) for synthetic chips, SA badge for merged alerts
+- Frontend: `(alert)` price suffix for scout_alert value source
+- Vehicle card chips include `isSynthetic` and `scoutAlertMatch` for collapsed view rendering
+- Proof case: 2007 Honda Pilot at LKQ Durham should now show ABS chip from HIGH scout alert instead of silently dropping it
+- Files: AttackListService.js, routes/attack-list.js, attack-list.html
+
 # LAST SESSION -- 2026-04-09
 
 ## Vehicle-centric Scout Alerts refactor -- backend reshape -- 2026-04-09

@@ -4,6 +4,15 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout Alert Injection — Attack List value source — 2026-04-10
+- buildScoutAlertIndex() batch loads active alerts keyed by vehicle composite key
+- scoreVehicle() merges alerts onto matching parts (MAX price wins) + injects synthetic chips for unattached alerts
+- Deleted redundant route-level scout alert merge loop
+- Frontend: ALERT badge for synthetic chips, (alert) price suffix
+- Files: AttackListService.js, routes/attack-list.js, attack-list.html
+
+---
+
 ## End-of-Day Hygiene: Snapshot Regen + Rules 45-49 — 2026-04-09
 - Regenerated 4 snapshots to 2026-04-09. Added CLAUDE_RULES 45-49 (YourSale value, excluded parts, platform gate, ARCHIVES, isSkipWord).
 
