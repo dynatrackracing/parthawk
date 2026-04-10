@@ -1462,7 +1462,34 @@ class AttackListService {
     // === SCOUT ALERT INJECTION — merge onto matching parts + inject synthetic chips ===
     const _yardName = (vehicle._yardName || '').toLowerCase();
     const saKey = [year, (make || '').toLowerCase(), (modelLower || ''), (_yardName || '')].join('|');
-    const vehicleAlerts = scoutAlertIndex[saKey] || [];
+    const _rawAlerts = scoutAlertIndex[saKey] || [];
+    // Per-vehicle validation gates: filter out alerts that belong to a different vehicle with the same YMM
+    const vehicleAlerts = _rawAlerts.filter(alert => {
+      const atl = (alert.title || '').toLowerCase();
+      // Hybrid gate: title says hybrid, vehicle must be hybrid
+      if (/\bhybrid\b/.test(atl)) {
+        const vTrimStr = (vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || '').toLowerCase();
+        const vIsHybrid = /\bhybrid\b/.test(vTrimStr) || (vehicle.engine_type || '').toLowerCase() === 'hybrid';
+        if (!vIsHybrid) return false;
+      }
+      // Electric gate: title says electric/EV/BEV, vehicle must be electric
+      if (/\belectric\b|\bbev\b/.test(atl) || (/\bev\b/.test(atl) && !/\bvalve\b|\bcover\b/.test(atl))) {
+        const vTrimStr = (vehicle.decoded_trim || vehicle.trim_level || vehicle.trim || '').toLowerCase();
+        const vIsEV = /\belectric\b|\bev\b|\bbev\b/.test(vTrimStr) || (vehicle.engine_type || '').toLowerCase() === 'electric';
+        if (!vIsEV) return false;
+      }
+      // Displacement gate: title has N.NL, vehicle engine must match within ±0.15L
+      const tdm = atl.match(/(\d+\.\d+)\s*l\b/);
+      if (tdm) {
+        const vEngStr = (vehicle.decoded_engine || vehicle.engine || '');
+        const vdm = vEngStr.match(/(\d+\.?\d*)/);
+        if (vdm) {
+          const td = parseFloat(tdm[1]), vd = parseFloat(vdm[1]);
+          if (Math.abs(td - vd) > 0.15) return false;
+        }
+      }
+      return true;
+    });
     if (vehicleAlerts.length > 0) {
       const attachedAlertIds = new Set();
       // Phase 1: MERGE — attach alerts to existing parts (best match_score wins)

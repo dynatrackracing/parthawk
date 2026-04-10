@@ -4,6 +4,12 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Scout alert per-vehicle validation gates — 2026-04-10
+- Hybrid/electric/displacement gates filter same-YMM alert bleed in scoreVehicle()
+- Files: AttackListService.js
+
+---
+
 ## Hawk Eye frontend parity — badges, block, archives — 2026-04-10
 - Intel source badges (MARK/QUARRY/STREAM/OVER/FLAG) now render per-part on expanded rows
 - Novelty badges (NEW/RESTOCK) show alongside intel badges, not exclusively

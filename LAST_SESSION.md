@@ -1,5 +1,15 @@
 # LAST SESSION -- 2026-04-10
 
+## Scout alert injection: per-vehicle validation gates — 2026-04-10
+- buildScoutAlertIndex() keys by year|make|model|yard, collapsing same-YMM vehicles into one bucket. Hybrid Sonata's score-80 alert bled onto 1.6L non-hybrid Sonata at Durham.
+- Added 3 validation gates in scoreVehicle() BEFORE merge/inject loops:
+  1. Hybrid gate: title contains "hybrid" → vehicle decoded_trim/engine_type must indicate hybrid, else skip
+  2. Electric gate: title contains "electric"/"BEV" → vehicle must be electric, else skip
+  3. Displacement gate: title has N.NL → vehicle decoded_engine must match within ±0.15L, else skip
+- Alerts failing gates are filtered out before merge/inject — never attach to wrong vehicle, never contribute value
+- Proof: 2014 Sonata 1.6L at Durham no longer shows hybrid ABS. 2014 Sonata 2.4L Hybrid still shows it.
+- Files: AttackListService.js
+
 ## Scout alerts date pill showing wrong set date — 2026-04-10
 - Root cause: vehicle attribute lookup at line 126-132 used `.first()` without ORDER BY. When multiple instances of the same YMM exist at one yard (e.g. 5x 2013 Sonata at Raleigh with date_added 1d/3d/18d/22d/30d ago), `.first()` returned an arbitrary one. The 22d-old instance was selected, so the card showed "set 22d ago" even though the alert's vehicle_set_date (which passed the date filter) was from the 1d-old instance.
 - Fix: Added `.orderBy('date_added', 'desc')` before `.first()` — always picks the newest instance. Card now shows "set 1d ago" matching the date filter.
