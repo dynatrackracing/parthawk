@@ -130,6 +130,11 @@
 - SNAPSHOT_SCRAPERS unchanged (no scraper work today)
 - LAST_SESSION and CHANGELOG were already current per hygiene audit
 
+## Scout Alerts visual polish -- 2026-04-10
+- Part type group headers (AMP/ABS/TCM/OTHER) color changed #6B7280 → #F0F0F0 (primary white). Already bold (700). Easier scanning of dedup groups.
+- HIGH confidence score badge recolored gold (#FFD700) → blue (#3B82F6) to stop colliding with NEW/MARK pills. MEDIUM and LOW unchanged.
+- scout-alerts.html only. No backend touched.
+
 # LAST SESSION -- 2026-04-08
 
 ## Newest pill renders zero cards diagnosis — 2026-04-08
