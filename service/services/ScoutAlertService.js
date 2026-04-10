@@ -140,6 +140,7 @@ async function _generateAlertsInner() {
       'yard_vehicle.engine', 'yard_vehicle.drivetrain', 'yard_vehicle.trim_level',
       'yard_vehicle.decoded_trim', 'yard_vehicle.decoded_engine',
       'yard_vehicle.decoded_drivetrain', 'yard_vehicle.decoded_transmission',
+      'yard_vehicle.decoded_cylinders', 'yard_vehicle.engine_type',
       'yard_vehicle.diesel', 'yard_vehicle.trim_tier', 'yard_vehicle.body_style',
       'yard.name as yard_name'
     );
@@ -647,6 +648,59 @@ function computeMatchScore(wantTitle, vehicleData, partType) {
       } else {
         if (isReliable(vMake, 'drivetrain')) { score -= 15; reasons.push('Drivetrain unknown: -15'); }
         else { reasons.push('Drivetrain not encoded for ' + vMake + ': 0'); }
+      }
+    }
+  }
+
+  // --- PHASE 6b: HYBRID/EV POWERTRAIN ---
+  // Fires for ALL part types — hybrid components span ABS, ECM, battery, inverters, etc.
+  {
+    let titlePwt = null;
+    if (/\belectric\b|\bev\b|\bbev\b/i.test(wantTitle)) titlePwt = 'ELECTRIC';
+    else if (/\bphev\b|\bplug.?in\s*hybrid\b/i.test(wantTitle)) titlePwt = 'PHEV';
+    else if (/\bhybrid\b/i.test(wantTitle)) titlePwt = 'HYBRID';
+
+    if (titlePwt) {
+      // Determine vehicle powertrain from yard_vehicle fields
+      let vehiclePwt = 'GAS';
+      const vEngType = (vehicleData.engine_type || '').toUpperCase();
+      if (vEngType === 'ELECTRIC' || vEngType === 'BEV') vehiclePwt = 'ELECTRIC';
+      else if (vEngType === 'PLUG-IN HYBRID' || vEngType === 'PHEV') vehiclePwt = 'PHEV';
+      else if (vEngType === 'HYBRID') vehiclePwt = 'HYBRID';
+      else {
+        // Fallback: classifyPowertrain from model/trim
+        const { classifyPowertrain } = require('../lib/LocalVinDecoder');
+        const _pwt = classifyPowertrain(vehicleData.engine_type, vehicleData.make, vehicleData.model, vehicleData.decoded_trim || vehicleData.trim_level);
+        if (_pwt.isElectric) vehiclePwt = 'ELECTRIC';
+        else if (_pwt.isPHEV) vehiclePwt = 'PHEV';
+        else if (_pwt.isHybrid) vehiclePwt = 'HYBRID';
+      }
+
+      if (titlePwt === vehiclePwt || (titlePwt === 'HYBRID' && (vehiclePwt === 'PHEV' || vehiclePwt === 'HYBRID'))) {
+        score += 25; reasons.push('Hybrid/EV powertrain match (' + titlePwt + '): +25');
+      } else if (titlePwt === 'HYBRID' && vehiclePwt === 'GAS') {
+        score -= 60; reasons.push('Hybrid part on non-hybrid vehicle: -60');
+      } else if (titlePwt === 'ELECTRIC' && vehiclePwt !== 'ELECTRIC') {
+        score -= 60; reasons.push('EV part on non-EV vehicle: -60');
+      } else if (titlePwt === 'PHEV' && vehiclePwt === 'GAS') {
+        score -= 60; reasons.push('PHEV part on non-PHEV vehicle: -60');
+      }
+    }
+  }
+
+  // --- PHASE 6c: DISPLACEMENT (ALL PART TYPES) ---
+  // Fires for any part where the title mentions a displacement, regardless of part type sensitivity.
+  // Catches intake manifolds, valve covers, turbo assemblies, etc.
+  if (!sensitivity.includes('engine')) {
+    // Engine-sensitive types already ran displacement in Phase 4 — skip to avoid double-counting
+    const titleDisp = extractDisplacement(wantTitle);
+    if (titleDisp) {
+      const vEngStr = (vehicleData.decoded_engine || vehicleData.engine || '');
+      const vDisp = extractDisplacement(vEngStr);
+      if (vDisp) {
+        const td = parseFloat(titleDisp), vd = parseFloat(vDisp);
+        if (Math.abs(td - vd) <= 0.15) { score += 15; reasons.push('Displacement match (' + titleDisp + 'L): +15'); }
+        else { score -= 50; reasons.push('Displacement mismatch (title ' + titleDisp + 'L vs vehicle ' + vDisp + 'L): -50'); }
       }
     }
   }

@@ -4,6 +4,14 @@ Reverse chronological. Every deploy gets one entry. Claude Code appends to this 
 
 ---
 
+## Hybrid + displacement matching in scout alerts — 2026-04-10
+- computeMatchScore() hybrid/EV powertrain signal + displacement comparison
+- Hybrid ABS mismatch now -60, displacement mismatch -50
+- Added decoded_cylinders/engine_type to vehicle query (were missing)
+- Files: ScoutAlertService.js
+
+---
+
 ## Scout Alert Injection — Attack List value source — 2026-04-10
 - buildScoutAlertIndex() batch loads active alerts keyed by vehicle composite key
 - scoreVehicle() merges alerts onto matching parts (MAX price wins) + injects synthetic chips for unattached alerts

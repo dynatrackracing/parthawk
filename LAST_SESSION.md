@@ -1,5 +1,14 @@
 # LAST SESSION -- 2026-04-10
 
+## Hybrid + displacement matching in ScoutAlertService — 2026-04-10
+- computeMatchScore() gains two new signal phases:
+  1. Hybrid/EV powertrain (Phase 6b): extracts hybrid/phev/electric from source_title, compares against yard_vehicle engine_type + classifyPowertrain() fallback. Match +25, mismatch -60. Fires for ALL part types.
+  2. Displacement (Phase 6c): extracts N.NL from source_title, compares against decoded_engine. Match +15, mismatch -50, ±0.15L tolerance. Fires for ALL part types where title mentions displacement (skips engine-sensitive types to avoid double-counting with Phase 4).
+- Added decoded_cylinders and engine_type to ScoutAlertService vehicle query (decoded_cylinders was referenced but never selected — cylinder check was always null)
+- is_hybrid/is_phev/is_electric only exist on vin_cache, NOT yard_vehicle — hybrid detection uses engine_type + classifyPowertrain() fallback
+- Pre-change histogram: 2800@50, 844@55, 704@60, 324@65, 93@70, 111@75, 89@80, 375@85, 6@90, 62@null
+- Files: ScoutAlertService.js
+
 ## Scout Alert Injection — first-class value source on Attack List — 2026-04-10
 - Added `buildScoutAlertIndex()` to AttackListService — batch loads unclaimed alerts with match_score >= 50, keyed by year|make|model|yard composite
 - Extended `scoreVehicle()` with 11th param `scoutAlertIndex` — Phase 1: merges alerts onto matching existing parts (MAX price wins), Phase 2: injects synthetic chips for unattached alerts
