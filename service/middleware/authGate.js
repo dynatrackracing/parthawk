@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   '/private/ebay-challenger-api',
   '/test',
   '/api/health-check',
+  // Consumed by RYANANDA scrape-local.js Flyway hook — see CLAUDE_RULES Rule 42
+  '/flyway/active-yards',
 ];
 
 function getSecret() {
